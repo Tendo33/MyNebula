@@ -16,34 +16,31 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, onNodeClick }) => {
   const { width, height } = useResizeObserver(containerRef);
   const [hoverNode, setHoverNode] = useState<GraphNode | null>(null);
 
-  // Fallback mock data if data is null
-  const graphData = useMemo(() => {
-    if (data) return data;
-    // Generate star field mock data
-    const nodes = Array.from({ length: 150 }).map((_, i) => ({
-      id: i,
-      name: `Repo-${i}`,
-      val: Math.random() * 5,
-      color: i % 3 === 0 ? '#00FFFF' : i % 3 === 1 ? '#7B61FF' : '#F43F5E',
-      x: Math.random() * 200 - 100,
-      y: Math.random() * 200 - 100,
-      z: Math.random() * 200 - 100,
-    }));
-    const links = Array.from({ length: 100 }).map(() => ({
-      source: Math.floor(Math.random() * 150),
-      target: Math.floor(Math.random() * 150),
-    }));
-    return { nodes, links }; // force-graph expects 'links', we map 'edges' to it
+  // Transform data for the graph library
+  const processedData = useMemo(() => {
+    if (!data || !data.nodes || data.nodes.length === 0) {
+      return { nodes: [], links: [] };
+    }
+    return {
+      nodes: data.nodes,
+      links: data.edges.map(e => ({ source: e.source, target: e.target }))
+    };
   }, [data]);
 
-  // Transform 'edges' to 'links' for the library if needed
-  const processedData = useMemo(() => {
-     if (!data) return graphData;
-     return {
-         nodes: data.nodes,
-         links: data.edges.map(e => ({ source: e.source, target: e.target }))
-     }
-  }, [data, graphData]);
+  // Show empty state if no data
+  if (!data || !data.nodes || data.nodes.length === 0) {
+    return (
+      <div ref={containerRef} className="w-full h-full relative overflow-hidden rounded-2xl border border-nebula-border bg-nebula-bg shadow-inner flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="text-6xl mb-4">🌌</div>
+          <h3 className="text-nebula-text-main font-bold text-xl mb-2">星空尚未点亮</h3>
+          <p className="text-nebula-text-muted text-sm max-w-md">
+            点击右上角的"开始同步"按钮，同步你的 GitHub Star 项目，开始探索你的代码宇宙！
+          </p>
+        </div>
+      </div>
+    );
+  }
 
 
   return (

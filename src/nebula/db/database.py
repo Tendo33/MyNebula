@@ -7,7 +7,7 @@ with pgvector extension support.
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import text
+from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -33,9 +33,9 @@ async def init_db() -> None:
     global _engine, AsyncSessionLocal
 
     settings = get_database_settings()
-    logger.info(
-        f"Connecting to database at {settings.host}:{settings.port}/{settings.name}"
-    )
+    # Log actual connection URL (masked password)
+    safe_url = make_url(settings.async_url).render_as_string(hide_password=True)
+    logger.info(f"Connecting to database at {safe_url}")
 
     _engine = create_async_engine(
         settings.async_url,

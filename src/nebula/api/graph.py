@@ -64,7 +64,7 @@ async def get_user_by_token(token: str, db: AsyncSession) -> User:
 
 @router.get("", response_model=GraphData)
 async def get_graph_data(
-    token: str = Query(..., description="JWT token"),
+    token: str | None = Query(default=None, description="JWT token"),
     include_edges: bool = Query(default=False, description="Include similarity edges"),
     min_similarity: float = Query(
         default=0.7, ge=0.5, le=0.95, description="Minimum similarity for edges"
@@ -74,7 +74,7 @@ async def get_graph_data(
     """Get graph data for visualization.
 
     Args:
-        token: JWT access token
+        token: JWT access token (optional, returns empty data if not provided)
         include_edges: Whether to compute similarity edges
         min_similarity: Minimum similarity threshold for edges
         db: Database session
@@ -82,7 +82,29 @@ async def get_graph_data(
     Returns:
         Complete graph data with nodes, edges, and clusters
     """
-    user = await get_user_by_token(token, db)
+    # 如果没有 token，返回空数据
+    if not token:
+        return GraphData(
+            nodes=[],
+            edges=[],
+            clusters=[],
+            total_nodes=0,
+            total_edges=0,
+            total_clusters=0,
+        )
+
+    try:
+        user = await get_user_by_token(token, db)
+    except HTTPException:
+        # token 无效时也返回空数据
+        return GraphData(
+            nodes=[],
+            edges=[],
+            clusters=[],
+            total_nodes=0,
+            total_edges=0,
+            total_clusters=0,
+        )
 
     # Get all embedded repos with coordinates
     repos_result = await db.execute(
@@ -190,19 +212,35 @@ async def get_graph_data(
 
 @router.get("/timeline", response_model=TimelineData)
 async def get_timeline_data(
-    token: str = Query(..., description="JWT token"),
+    token: str | None = Query(default=None, description="JWT token"),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get timeline data for visualization.
 
     Args:
-        token: JWT access token
+        token: JWT access token (optional, returns empty data if not provided)
         db: Database session
 
     Returns:
         Timeline data grouped by month
     """
-    user = await get_user_by_token(token, db)
+    # 如果没有 token，返回空数据
+    if not token:
+        return TimelineData(
+            points=[],
+            total_stars=0,
+            date_range=("", ""),
+        )
+
+    try:
+        user = await get_user_by_token(token, db)
+    except HTTPException:
+        # token 无效时也返回空数据
+        return TimelineData(
+            points=[],
+            total_stars=0,
+            date_range=("", ""),
+        )
 
     # Get all repos with starred_at
     repos_result = await db.execute(
