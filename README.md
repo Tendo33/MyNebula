@@ -1,408 +1,230 @@
-# Python Template
+# 🌌 MyNebula (我的星云)
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-blue.svg)](https://www.postgresql.org/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-一个现代化的 Python 工具库模板，集成了常用的工具函数和最佳实践。
+**Transform your GitHub Stars into a semantic knowledge nebula.**
 
-## 🚀 开发者快速上手
+将你的 GitHub Star 列表转化为三维知识星云。通过语义分析，让相似的项目自动聚集，通过时间轴展示你的技术兴趣演变。
 
-如果你是刚克隆此项目的开发人员，请按照以下顺序初始化项目：
+![MyNebula Preview](https://via.placeholder.com/800x400?text=MyNebula+Preview)
 
-### 1. 环境准备
+## ✨ Features
 
-本项目使用 [uv](https://github.com/astral-sh/uv) 进行包管理。
+- 🌐 **星云图谱 (Nebula Graph)**: 3D 可视化你的 Star 列表，相似项目自动聚类
+- 🔍 **语义搜索 (Semantic Search)**: 自然语言查询，如"找一个轻量级的 Python 依赖管理工具"
+- 🤖 **AI 摘要 (AI Summary)**: 自动生成仓库的一句话总结
+- ⏰ **时间旅行 (Time Travel)**: 时间轴展示你的技术兴趣演变
+- 🔌 **多 Embedding 提供商**: 支持 OpenAI、SiliconFlow、Jina、Ollama 等
+- 🐳 **自托管 (Self-hosted)**: Docker 一键部署，数据完全自主
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.10+
+- Docker & Docker Compose
+- GitHub OAuth App (用于认证)
+
+### 1. Clone and Setup
 
 ```bash
-# 安装 uv (如果尚未安装)
+git clone https://github.com/yourusername/mynebula.git
+cd mynebula
+
+# Install uv if not already installed
 pip install uv
-```
 
-### 2. 安装依赖
-
-```bash
-# 同步项目依赖（包含开发工具）
-uv sync --all-extras
-```
-
-### 3. 项目重命名 (可选)
-
-如果你将此模板用于新项目，请先重命名包名：
-
-```bash
-# 将 'nebula' 重命名为你的项目名
-python scripts/rename_package.py my_awesome_project
-```
-
-### 4. 配置代码检查
-
-安装 git hooks 以确保代码质量：
-
-```bash
-# 配置 pre-commit hooks
-python scripts/setup_pre_commit.py
-```
-
-### 5. 验证环境
-
-运行测试确保一切正常：
-
-```bash
-uv run pytest
-```
-
----
-
-## ✨ 特性
-
-- 🛠 **丰富的工具集**：包含日期、文件、JSON、装饰器、通用工具等常用模块
-- 📝 **强大的日志系统**：基于 [loguru](https://github.com/Delgan/loguru) 的预配置日志管理
-- ⚙️ **配置管理**：基于 [pydantic-settings](https://github.com/pydantic/pydantic-settings) 的类型安全配置
-- 🔄 **上下文管理**：线程安全的运行时上下文存储
-- 🚀 **现代化工具链**：使用 `uv` 进行包管理，`ruff` 进行代码检查和格式化
-
-## 📦 安装
-
-使用 [uv](https://github.com/astral-sh/uv) 安装：
-
-```bash
-# 安装依赖
+# Install dependencies
 uv sync
-
-# 以开发模式安装
-uv pip install -e .
 ```
 
-## 🚀 快速开始
-
-### 1. 日志工具 (Logger)
-
-```python
-from nebula.utils import get_logger, setup_logging
-
-# 配置日志
-setup_logging(level="DEBUG", log_file="logs/app.log")
-
-logger = get_logger(__name__)
-
-logger.info("这是一条信息日志")
-logger.error("这是一条错误日志")
-logger.debug("这是一条调试日志")
-```
-
-### 2. 配置管理 (Settings)
-
-基于 Pydantic 的类型安全配置管理，支持环境变量和 .env 文件。
-
-```python
-from nebula.utils.setting import get_settings
-
-# 获取配置（单例）
-settings = get_settings()
-
-# 访问配置项
-print(f"App Name: {settings.app_name}")
-print(f"Debug Mode: {settings.debug}")
-print(f"Environment: {settings.environment}")
-print(f"Log Level: {settings.log_level}")
-
-# 获取项目路径
-project_root = settings.get_project_root()
-log_path = settings.get_log_file_path()
-```
-
-**配置文件设置：**
+### 2. Configure Environment
 
 ```bash
-# 复制示例文件
+# Copy example config
 cp .env.example .env
 
-# 编辑 .env 文件设置你的配置
-APP_NAME=my-app
-DEBUG=true
-ENVIRONMENT=development
-LOG_LEVEL=DEBUG
+# Edit .env with your settings:
+# - GitHub OAuth credentials
+# - Embedding provider (SiliconFlow recommended for CN users)
+# - Database credentials (or use defaults)
 ```
 
-**添加自定义配置：**
+### 3. Start PostgreSQL
 
-在 `src/nebula/utils/setting.py` 中添加字段：
+```bash
+# Start PostgreSQL with pgvector
+docker-compose up -d db
 
-```python
-class Settings(BaseSettings):
-    # ... 现有字段 ...
-
-    # 添加你的配置
-    database_url: str = Field(
-        default="sqlite:///./app.db",
-        description="Database URL"
-    )
+# Wait for database to be ready
+docker-compose logs -f db
 ```
 
-详细说明请查看 [配置指南](doc/SETTINGS_GUIDE.md)
+### 4. Initialize Database
 
-### 3. 装饰器工具 (Decorators)
-
-```python
-from nebula.utils import timing_decorator, retry_decorator, log_calls
-
-# 计时装饰器
-@timing_decorator
-def heavy_process():
-    # ... 耗时操作
-    pass
-
-# 重试装饰器
-@retry_decorator(max_retries=3, delay=1.0)
-def unstable_network_call():
-    # ... 可能失败的网络请求
-    pass
-
-# 自动日志记录
-@log_calls(log_args=True, log_result=True)
-def calculate(a, b):
-    return a + b
+```bash
+# Run database migrations
+uv run alembic upgrade head
 ```
 
-#### 异步装饰器 (Async Decorators)
+### 5. Start the Server
 
-```python
-from nebula.utils import (
-    async_timing_decorator,
-    async_retry_decorator,
-    async_catch_exceptions,
-    AsyncContextTimer,
-)
+```bash
+# Development mode
+uv run uvicorn nebula.main:app --reload
 
-# 异步计时装饰器
-@async_timing_decorator
-async def fetch_data():
-    await asyncio.sleep(1)
-    return "data"
-
-# 异步重试装饰器
-@async_retry_decorator(max_retries=3, delay=1.0)
-async def unstable_api_call():
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            return await response.json()
-
-# 异步异常捕获装饰器
-@async_catch_exceptions(default_return=None)
-async def safe_fetch():
-    # ... 可能失败的异步操作
-    pass
-
-# 异步上下文计时器
-async def process():
-    async with AsyncContextTimer("异步数据处理"):
-        await heavy_async_operation()
+# Or use the CLI
+uv run mynebula
 ```
 
-### 4. 通用工具 (Common Utils)
+Visit http://localhost:8000/docs for the API documentation.
 
-```python
-from nebula.utils import chunk_list, flatten_dict, merge_dicts
+## 📦 Configuration
 
-# 列表分块
-items = [1, 2, 3, 4, 5]
-chunks = chunk_list(items, 2)  # [[1, 2], [3, 4], [5]]
+### GitHub OAuth Setup
 
-# 字典展平
-nested = {"a": {"b": 1}}
-flat = flatten_dict(nested)  # {"a.b": 1}
+1. Go to https://github.com/settings/developers
+2. Create a new OAuth App
+3. Set the callback URL to `http://localhost:8000/api/auth/callback`
+4. Copy Client ID and Client Secret to `.env`
 
-# 字典合并
-d1 = {"a": 1}
-d2 = {"b": 2}
-merged = merge_dicts(d1, d2)  # {"a": 1, "b": 2}
+### Embedding Providers
+
+MyNebula supports multiple embedding providers through OpenAI-compatible APIs:
+
+| Provider | Base URL | Recommended Model |
+|----------|----------|-------------------|
+| **SiliconFlow** (推荐国内) | `https://api.siliconflow.cn/v1` | `BAAI/bge-large-zh-v1.5` |
+| **Jina AI** | `https://api.jina.ai/v1` | `jina-embeddings-v3` |
+| **OpenAI** | `https://api.openai.com/v1` | `text-embedding-3-small` |
+| **Ollama** (本地) | `http://localhost:11434/v1` | `nomic-embed-text` |
+
+Example `.env` configuration for SiliconFlow:
+
+```bash
+EMBEDDING_PROVIDER=siliconflow
+EMBEDDING_API_KEY=your_api_key
+EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
+EMBEDDING_MODEL=BAAI/bge-large-zh-v1.5
+EMBEDDING_DIMENSIONS=1024
 ```
 
-### 5. 文件操作 (File Utils)
-
-```python
-from nebula.utils import read_text_file, write_text_file, ensure_directory
-
-# 确保目录存在
-ensure_directory("data/output")
-
-# 写入文件 (自动创建父目录)
-write_text_file("Hello World", "data/output/test.txt")
-
-# 读取文件
-content = read_text_file("data/output/test.txt", default="Default Content")
-```
-
-### 6. JSON 处理 (JSON Utils)
-
-```python
-from nebula.utils import read_json, write_json
-
-data = {"name": "test", "value": 123}
-
-# 写入 JSON
-write_json(data, "config.json", indent=2)
-
-# 读取 JSON
-config = read_json("config.json", default={})
-```
-
-### 7. 日期时间 (Date Utils)
-
-```python
-from datetime import datetime
-from nebula.utils import get_timestamp, format_datetime, get_current_time
-
-# 获取当前 ISO 时间戳
-ts = get_timestamp()
-
-# 获取当前时间字符串
-now = get_current_time()
-
-# 格式化日期
-formatted = format_datetime(datetime.now(), format_str="%Y-%m-%d")
-```
-
-### 8. 数据模型 (Pydantic Models)
-
-所有数据模型使用 Pydantic BaseModel 进行定义,提供类型验证和序列化功能。
-
-```python
-from nebula.models import BaseModel, User, ApiResponse
-from pydantic import Field
-
-# 使用预定义模型
-user = User(
-    id=1,
-    username="john_doe",
-    email="john@example.com",
-    full_name="John Doe"
-)
-
-# 序列化
-user_dict = user.model_dump()
-user_json = user.model_dump_json()
-
-# 创建自定义模型
-class Product(BaseModel):
-    """产品模型"""
-    id: int = Field(..., description="产品ID", ge=1)
-    name: str = Field(..., description="产品名称", min_length=1)
-    price: float = Field(..., description="价格", gt=0)
-
-# 使用泛型响应模型
-response = ApiResponse[Product](
-    success=True,
-    data=Product(id=1, name="Phone", price=999.99),
-    message="Product fetched successfully"
-)
-```
-
-详细使用说明请查看 [模型使用指南](doc/MODELS_GUIDE.md)
-
-## 📁 项目结构
+## 🏗 Architecture
 
 ```
-nebula/
+┌─────────────────────────────────────────────────────────────────┐
+│                     MyNebula Architecture                        │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌──────────────────┐         ┌──────────────────┐              │
+│  │  React Frontend  │  HTTP   │  FastAPI Backend │              │
+│  │  (3D Force Graph)│◄───────►│                  │              │
+│  └──────────────────┘         └────────┬─────────┘              │
+│                                        │                         │
+│         ┌──────────────────────────────┼──────────────┐         │
+│         ▼                              ▼              ▼         │
+│  ┌─────────────────┐          ┌──────────────┐  ┌──────────┐   │
+│  │  PostgreSQL     │          │ GitHub API   │  │ Embedding│   │
+│  │  + pgvector     │          │              │  │ Provider │   │
+│  └─────────────────┘          └──────────────┘  └──────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## 📁 Project Structure
+
+```
+mynebula/
 ├── src/nebula/
-│   ├── utils/              # 核心工具包
-│   │   ├── common_utils.py    # 通用工具 (列表/字典操作, 验证等)
-│   │   ├── date_utils.py      # 日期时间处理
-│   │   ├── file_utils.py      # 文件系统操作
-│   │   ├── json_utils.py      # JSON 读写与序列化
-│   │   ├── decorator_utils.py # 常用装饰器
-│   │   ├── logger_util.py     # 日志配置
-│   │   ├── setting.py         # 应用配置管理
-│   │   └── context.py         # 上下文管理
-│   └── models/             # 数据模型
-├── tests/                  # 测试用例
-├── scripts/                # 维护脚本
-│   ├── rename_package.py      # 重命名包脚本
-│   ├── setup_pre_commit.py    # git hooks 配置脚本
-│   └── update_version.py      # 版本更新脚本
-├── pyproject.toml          # 项目配置
-└── README.md               # 说明文档
+│   ├── api/                # FastAPI routes
+│   │   ├── auth.py         # GitHub OAuth
+│   │   ├── repos.py        # Repository CRUD & search
+│   │   ├── graph.py        # Graph visualization data
+│   │   └── sync.py         # Star synchronization
+│   ├── core/               # Business logic
+│   │   ├── config.py       # Configuration management
+│   │   ├── embedding.py    # Embedding service
+│   │   ├── github_client.py# GitHub API wrapper
+│   │   └── clustering.py   # UMAP + HDBSCAN
+│   ├── db/                 # Database layer
+│   │   ├── database.py     # Connection management
+│   │   └── models.py       # SQLAlchemy models
+│   ├── schemas/            # Pydantic schemas
+│   ├── utils/              # Utility functions
+│   └── main.py             # Application entry
+├── frontend/               # React frontend (coming soon)
+├── alembic/                # Database migrations
+├── docker-compose.yml      # Docker configuration
+└── pyproject.toml          # Project dependencies
 ```
 
-## 🛠 开发指南
+## 🔧 Development
 
-### 环境设置
-
-```bash
-# 克隆项目
-git clone https://github.com/yourusername/nebula.git
-cd nebula
-
-# 安装开发依赖
-uv sync --all-extras
-```
-
-### 代码质量
-
-本项目使用 `ruff` 进行代码格式化和检查。
+### Running Tests
 
 ```bash
-# 格式化代码
-uv run ruff format
-
-# 代码检查
-uv run ruff check
-```
-
-### 运行测试
-
-```bash
-# 运行所有测试
 uv run pytest
 ```
 
-## 🛠️ 维护脚本
-
-项目在 `scripts/` 目录下提供了一些实用的维护脚本：
-
-### 1. Git Hooks 配置 (`setup_pre_commit.py`)
-
-用于自动配置 git hooks，确保每次提交时自动运行代码检查和格式化。
+### Code Quality
 
 ```bash
-# 安装并配置 hooks
-python scripts/setup_pre_commit.py
+# Format code
+uv run ruff format
 
-# 选项：
-# --update  更新 hooks 到最新版本
-# --test    手动运行 hooks 检查所有文件
-# --all     执行安装、更新和测试
+# Lint code
+uv run ruff check
+
+# Fix linting issues
+uv run ruff check --fix
 ```
 
-### 2. 项目重命名 (`rename_package.py`)
-
-如果你想将模板用于新项目，可以使用此脚本一键重命名包名和相关配置。
+### Database Migrations
 
 ```bash
-# 预览修改 (不实际执行)
-python scripts/rename_package.py my_new_project --dry-run
+# Create a new migration
+uv run alembic revision --autogenerate -m "description"
 
-# 执行重命名
-python scripts/rename_package.py my_new_project
+# Apply migrations
+uv run alembic upgrade head
+
+# Rollback
+uv run alembic downgrade -1
 ```
 
-### 3. 版本更新 (`update_version.py`)
+## 🛣 Roadmap
 
-统一更新项目中的版本号（包括 pyproject.toml, \_\_init\_\_.py 等）。
+- [x] Phase 1: Core Backend
+  - [x] PostgreSQL + pgvector setup
+  - [x] GitHub OAuth & Star sync
+  - [x] Embedding service (multi-provider)
+  - [x] Semantic search API
+- [ ] Phase 2: Advanced Features
+  - [ ] UMAP clustering & visualization data
+  - [ ] AI summary generation
+  - [ ] README fetching & processing
+- [ ] Phase 3: Frontend
+  - [ ] React + Three.js 3D visualization
+  - [ ] Semantic search UI
+  - [ ] Timeline component
+- [ ] Phase 4: Enhancements
+  - [ ] Multi-user support
+  - [ ] Trend discovery
+  - [ ] Tech stack DNA generation
 
-```bash
-# 更新版本到 0.2.0
-python scripts/update_version.py 0.2.0
-```
+## 🤝 Contributing
 
-## 📚 文档
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-- [配置指南](doc/SETTINGS_GUIDE.md) - Pydantic Settings 详细说明
-- [模型使用指南](doc/MODELS_GUIDE.md) - Pydantic BaseModel 数据模型使用说明
-- [SDK 使用指南](doc/SDK_USAGE.md) - 工具函数使用示例  
-- [Pre-commit 指南](doc/PRE_COMMIT_GUIDE.md) - Git hooks 配置
+## 📄 License
 
-## 📄 许可证
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+## 🙏 Acknowledgements
+
+- [pgvector](https://github.com/pgvector/pgvector) - Vector similarity for PostgreSQL
+- [UMAP](https://github.com/lmcinnes/umap) - Dimensionality reduction
+- [HDBSCAN](https://github.com/scikit-learn-contrib/hdbscan) - Clustering algorithm
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [react-force-graph](https://github.com/vasturiano/react-force-graph) - 3D force graph

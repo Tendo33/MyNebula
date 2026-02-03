@@ -1,0 +1,277 @@
+"""Graph visualization API routes.
+
+Provides data for 3D force graph visualization.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from nebula.db import Cluster, StarredRepo, User, get_db
+from nebula.schemas.graph import (
+    ClusterInfo,
+    GraphData,
+    GraphEdge,
+    GraphNode,
+    TimelineData,
+    TimelinePoint,
+)
+from nebula.utils import get_logger
+
+logger = get_logger(__name__)
+router = APIRouter()
+
+# Color palette for clusters
+CLUSTER_COLORS = [
+    "#FF6B6B",  # Red
+    "#4ECDC4",  # Teal
+    "#45B7D1",  # Blue
+    "#96CEB4",  # Green
+    "#FFEAA7",  # Yellow
+    "#DDA0DD",  # Plum
+    "#98D8C8",  # Mint
+    "#F7DC6F",  # Gold
+    "#BB8FCE",  # Purple
+    "#85C1E9",  # Light Blue
+    "#F8B500",  # Orange
+    "#00CED1",  # Dark Cyan
+]
+
+
+async def get_user_by_token(token: str, db: AsyncSession) -> User:
+    """Validate token and get user."""
+    from nebula.api.auth import verify_jwt_token
+
+    payload = verify_jwt_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    user_id = int(payload["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    return user
+
+
+@router.get("", response_model=GraphData)
+async def get_graph_data(
+    token: str = Query(..., description="JWT token"),
+    include_edges: bool = Query(default=False, description="Include similarity edges"),
+    min_similarity: float = Query(
+        default=0.7, ge=0.5, le=0.95, description="Minimum similarity for edges"
+    ),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Get graph data for visualization.
+
+    Args:
+        token: JWT access token
+        include_edges: Whether to compute similarity edges
+        min_similarity: Minimum similarity threshold for edges
+        db: Database session
+
+    Returns:
+        Complete graph data with nodes, edges, and clusters
+    """
+    user = await get_user_by_token(token, db)
+
+    # Get all embedded repos with coordinates
+    repos_result = await db.execute(
+        select(StarredRepo).where(
+            StarredRepo.user_id == user.id,
+            StarredRepo.is_embedded == True,  # noqa: E712
+            StarredRepo.coord_x.isnot(None),
+        )
+    )
+    repos = repos_result.scalars().all()
+
+    # Get clusters
+    clusters_result = await db.execute(
+        select(Cluster).where(Cluster.user_id == user.id)
+    )
+    clusters = clusters_result.scalars().all()
+
+    # Build cluster color map
+    cluster_colors = {
+        c.id: c.color or CLUSTER_COLORS[i % len(CLUSTER_COLORS)]
+        for i, c in enumerate(clusters)
+    }
+
+    # Build nodes
+    nodes = []
+    for repo in repos:
+        # Calculate node size based on stars (log scale)
+        import math
+
+        size = 1.0 + math.log10(max(repo.stargazers_count, 1)) * 0.5
+
+        node = GraphNode(
+            id=repo.id,
+            github_id=repo.github_repo_id,
+            full_name=repo.full_name,
+            name=repo.name,
+            description=repo.description,
+            language=repo.language,
+            html_url=repo.html_url,
+            x=repo.coord_x or 0.0,
+            y=repo.coord_y or 0.0,
+            z=repo.coord_z or 0.0,
+            cluster_id=repo.cluster_id,
+            color=cluster_colors.get(repo.cluster_id) if repo.cluster_id else "#808080",
+            size=size,
+            stargazers_count=repo.stargazers_count,
+            ai_summary=repo.ai_summary,
+            starred_at=repo.starred_at.isoformat() if repo.starred_at else None,
+        )
+        nodes.append(node)
+
+    # Build edges (optional, expensive for large datasets)
+    edges = []
+    if include_edges and len(repos) < 500:  # Limit for performance
+        # Compute pairwise similarities for nearby nodes
+        # This is a simplified version - in production, use spatial indexing
+        from nebula.core.embedding import get_embedding_service
+
+        embedding_service = get_embedding_service()
+
+        for i, repo1 in enumerate(repos):
+            if repo1.embedding is None:
+                continue
+            for repo2 in repos[i + 1 :]:
+                if repo2.embedding is None:
+                    continue
+
+                similarity = await embedding_service.compute_similarity(
+                    repo1.embedding, repo2.embedding
+                )
+                if similarity >= min_similarity:
+                    edges.append(
+                        GraphEdge(
+                            source=repo1.id,
+                            target=repo2.id,
+                            weight=similarity,
+                        )
+                    )
+
+    # Build cluster info
+    cluster_infos = [
+        ClusterInfo(
+            id=c.id,
+            name=c.name,
+            description=c.description,
+            keywords=c.keywords or [],
+            color=cluster_colors.get(c.id, "#808080"),
+            repo_count=c.repo_count,
+            center_x=c.center_x,
+            center_y=c.center_y,
+            center_z=c.center_z,
+        )
+        for c in clusters
+    ]
+
+    return GraphData(
+        nodes=nodes,
+        edges=edges,
+        clusters=cluster_infos,
+        total_nodes=len(nodes),
+        total_edges=len(edges),
+        total_clusters=len(clusters),
+    )
+
+
+@router.get("/timeline", response_model=TimelineData)
+async def get_timeline_data(
+    token: str = Query(..., description="JWT token"),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Get timeline data for visualization.
+
+    Args:
+        token: JWT access token
+        db: Database session
+
+    Returns:
+        Timeline data grouped by month
+    """
+    user = await get_user_by_token(token, db)
+
+    # Get all repos with starred_at
+    repos_result = await db.execute(
+        select(StarredRepo)
+        .where(
+            StarredRepo.user_id == user.id,
+            StarredRepo.starred_at.isnot(None),
+        )
+        .order_by(StarredRepo.starred_at)
+    )
+    repos = repos_result.scalars().all()
+
+    if not repos:
+        return TimelineData(
+            points=[],
+            total_stars=0,
+            date_range=("", ""),
+        )
+
+    # Group by month
+    from collections import defaultdict
+
+    monthly_data: dict[str, dict] = defaultdict(
+        lambda: {
+            "count": 0,
+            "repos": [],
+            "languages": defaultdict(int),
+            "topics": defaultdict(int),
+        }
+    )
+
+    for repo in repos:
+        month_key = repo.starred_at.strftime("%Y-%m")
+        monthly_data[month_key]["count"] += 1
+        monthly_data[month_key]["repos"].append(repo.full_name)
+
+        if repo.language:
+            monthly_data[month_key]["languages"][repo.language] += 1
+
+        for topic in repo.topics or []:
+            monthly_data[month_key]["topics"][topic] += 1
+
+    # Build timeline points
+    points = []
+    for date_key in sorted(monthly_data.keys()):
+        data = monthly_data[date_key]
+        top_languages = sorted(
+            data["languages"].items(), key=lambda x: x[1], reverse=True
+        )[:5]
+        top_topics = sorted(data["topics"].items(), key=lambda x: x[1], reverse=True)[
+            :5
+        ]
+
+        points.append(
+            TimelinePoint(
+                date=date_key,
+                count=data["count"],
+                repos=data["repos"][:10],  # Limit for response size
+                top_languages=[lang for lang, _ in top_languages],
+                top_topics=[topic for topic, _ in top_topics],
+            )
+        )
+
+    # Get date range
+    first_date = repos[0].starred_at.strftime("%Y-%m")
+    last_date = repos[-1].starred_at.strftime("%Y-%m")
+
+    return TimelineData(
+        points=points,
+        total_stars=len(repos),
+        date_range=(first_date, last_date),
+    )

@@ -212,3 +212,10 @@ project_document/
 temp/
 temporary/
 scratch/
+
+# MyNebula specific
+data/
+*.db
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
