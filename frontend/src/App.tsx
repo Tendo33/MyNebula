@@ -2,9 +2,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 
-
-
-
 function App() {
   return (
     <Router>

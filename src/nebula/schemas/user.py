@@ -51,11 +51,3 @@ class UserStats(BaseModel):
     first_star_date: str | None = Field(None, description="First star date")
     last_star_date: str | None = Field(None, description="Most recent star date")
     most_active_month: str | None = Field(None, description="Month with most stars")
-
-
-class AuthResponse(BaseModel):
-    """Schema for authentication response."""
-
-    access_token: str = Field(..., description="JWT access token")
-    token_type: str = Field(default="bearer", description="Token type")
-    user: UserResponse = Field(..., description="User information")

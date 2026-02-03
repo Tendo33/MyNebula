@@ -132,28 +132,6 @@ class LLMSettings(BaseSettings):
     )
 
 
-class GitHubSettings(BaseSettings):
-    """GitHub OAuth and API configuration."""
-
-    client_id: str = Field(default="", description="GitHub OAuth client ID")
-    client_secret: str = Field(default="", description="GitHub OAuth client secret")
-    redirect_uri: str = Field(
-        default="http://localhost:8000/api/auth/callback",
-        description="OAuth redirect URI",
-    )
-    token: str | None = Field(
-        default=None,
-        description="Personal access token for development",
-    )
-
-    model_config = SettingsConfigDict(
-        env_prefix="GITHUB_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-
 class SyncSettings(BaseSettings):
     """Synchronization configuration."""
 
@@ -191,14 +169,23 @@ class AppSettings(BaseSettings):
     debug: bool = Field(
         default=False, description="Debug mode (also controls environment)"
     )
-    secret_key: str = Field(
-        default="change-this-in-production",
-        description="Secret key for JWT and sessions",
+    frontend_url: str = Field(
+        default="http://localhost:5173",
+        description="Frontend URL for redirects",
+    )
+
+    # GitHub Personal Access Token
+    github_token: str = Field(
+        default="",
+        description="GitHub Personal Access Token for API access",
     )
 
     # Logging
     log_level: str = Field(default="INFO", description="Log level")
     log_file: str = Field(default="logs/app.log", description="Log file path")
+
+    # Server
+    api_port: int = Field(default=8000, description="API server port")
 
     # Sub-configurations (loaded separately for clean env prefix handling)
     # These are accessed via get_*_settings() functions
@@ -245,12 +232,6 @@ def get_llm_settings() -> LLMSettings:
 
 
 @lru_cache
-def get_github_settings() -> GitHubSettings:
-    """Get cached GitHub settings instance."""
-    return GitHubSettings()
-
-
-@lru_cache
 def get_sync_settings() -> SyncSettings:
     """Get cached sync settings instance."""
     return SyncSettings()
@@ -262,5 +243,4 @@ def reload_all_settings() -> None:
     get_database_settings.cache_clear()
     get_embedding_settings.cache_clear()
     get_llm_settings.cache_clear()
-    get_github_settings.cache_clear()
     get_sync_settings.cache_clear()

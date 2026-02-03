@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Network, Settings, Github, Database } from 'lucide-react';
+import { LayoutDashboard, Network, Settings,Github, Database } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 
 export const Sidebar = () => {
   const { t } = useTranslation();
+
   const navItems = [
     { icon: LayoutDashboard, label: t('sidebar.dashboard'), path: '/' },
     { icon: Network, label: t('sidebar.graph'), path: '/graph' },
@@ -42,16 +43,6 @@ export const Sidebar = () => {
           </NavLink>
         ))}
       </nav>
-
-      <div className="px-3 py-4 border-t border-nebula-border mt-auto">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-nebula-surfaceHighlight ring-2 ring-nebula-border" />
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-nebula-text-main truncate">{t('app.user')}</p>
-            <p className="text-xs text-nebula-text-dim truncate">user@github.com</p>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 };

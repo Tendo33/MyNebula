@@ -53,25 +53,18 @@ class SyncStartResponse(BaseModel):
     status: str
 
 
-async def get_user_by_token(token: str, db: AsyncSession) -> User:
-    """Validate token and get user."""
-    from nebula.api.auth import verify_jwt_token
+async def get_default_user(db: AsyncSession) -> User:
+    """Get the first user from database.
 
-    payload = verify_jwt_token(token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-
-    user_id = int(payload["sub"])
-    result = await db.execute(select(User).where(User.id == user_id))
+    Since authentication is disabled, we use the first available user.
+    """
+    result = await db.execute(select(User).limit(1))
     user = result.scalar_one_or_none()
 
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail="No user found. Please sync your GitHub stars first.",
         )
 
     return user
@@ -131,8 +124,23 @@ async def sync_stars_task(
             task.error_details = {"sync_mode": effective_mode}
             await db.commit()
 
+            # Get GitHub token from settings
+            from nebula.core.config import get_app_settings
+
+            settings = get_app_settings()
+
+            if not settings.github_token:
+                error_msg = (
+                    "GitHub token not configured. Please set GITHUB_TOKEN in .env file"
+                )
+                logger.error(error_msg)
+                task.status = "failed"
+                task.error_message = error_msg
+                await db.commit()
+                return
+
             # Get starred repos from GitHub
-            async with GitHubClient(access_token=user.access_token) as client:
+            async with GitHubClient(access_token=settings.github_token) as client:
                 repos, was_truncated = await client.get_starred_repos(
                     stop_before=stop_before
                 )
@@ -351,7 +359,6 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 
 @router.post("/stars", response_model=SyncStartResponse)
 async def start_star_sync(
-    token: str = Query(..., description="JWT token"),
     mode: Literal["incremental", "full"] = Query(
         default="incremental",
         description="Sync mode: 'incremental' (fast, only new stars) or 'full' (all stars)",
@@ -368,7 +375,6 @@ async def start_star_sync(
       to ensure complete data consistency.
 
     Args:
-        token: JWT access token
         mode: Sync mode - "incremental" or "full"
         background_tasks: FastAPI background tasks
         db: Database session
@@ -376,7 +382,7 @@ async def start_star_sync(
     Returns:
         Sync task information
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     # Check for existing running task
     result = await db.execute(
@@ -418,21 +424,19 @@ async def start_star_sync(
 
 @router.post("/embeddings", response_model=SyncStartResponse)
 async def start_embedding_computation(
-    token: str = Query(..., description="JWT token"),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Start embedding computation for repos.
 
     Args:
-        token: JWT access token
         background_tasks: FastAPI background tasks
         db: Database session
 
     Returns:
         Task information
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     # Check for existing running task
     result = await db.execute(
@@ -474,20 +478,18 @@ async def start_embedding_computation(
 @router.get("/status/{task_id}", response_model=SyncStatusResponse)
 async def get_sync_status(
     task_id: int,
-    token: str = Query(..., description="JWT token"),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get sync task status.
 
     Args:
         task_id: Task database ID
-        token: JWT access token
         db: Database session
 
     Returns:
         Task status information
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     result = await db.execute(
         select(SyncTask).where(
@@ -523,19 +525,17 @@ async def get_sync_status(
 
 @router.get("/status", response_model=list[SyncStatusResponse])
 async def get_all_sync_status(
-    token: str = Query(..., description="JWT token"),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get all sync tasks for current user.
 
     Args:
-        token: JWT access token
         db: Database session
 
     Returns:
         List of task statuses
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     result = await db.execute(
         select(SyncTask)
@@ -662,21 +662,19 @@ async def generate_summaries_task(user_id: int, task_id: int):
 
 @router.post("/summaries", response_model=SyncStartResponse)
 async def start_summary_generation(
-    token: str = Query(..., description="JWT token"),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Start AI summary generation for repos.
 
     Args:
-        token: JWT access token
         background_tasks: FastAPI background tasks
         db: Database session
 
     Returns:
         Task information
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     # Check for existing running task
     result = await db.execute(
@@ -885,7 +883,6 @@ async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
 
 @router.post("/clustering", response_model=SyncStartResponse)
 async def start_clustering(
-    token: str = Query(..., description="JWT token"),
     use_llm: bool = Query(default=True, description="Use LLM for cluster naming"),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),  # noqa: B008
@@ -899,15 +896,14 @@ async def start_clustering(
     4. Update repo coordinates and cluster assignments
 
     Args:
-        token: JWT access token
-        use_llm: Whether to use LLM for generating cluster names
+        use_llm: Use LLM for cluster naming
         background_tasks: FastAPI background tasks
         db: Database session
 
     Returns:
         Task information
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     # Check for existing running task
     result = await db.execute(

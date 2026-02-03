@@ -23,12 +23,11 @@ export interface SyncStatusResponse {
  * 开始同步星标仓库
  * @param mode 同步模式: 'incremental' (增量) 或 'full' (全量)
  */
-export const startStarSync = async (mode: 'incremental' | 'full' = 'incremental') => {
-  const token = localStorage.getItem("token");
-  const response = await client.post<SyncStartResponse>("/sync/stars", null, {
-    params: { token, mode },
-  });
-  return response.data;
+export const startStarSync = async (mode: "incremental" | "full" = "incremental") => {
+	const response = await client.post<SyncStartResponse>("/sync/stars", null, {
+		params: { mode },
+	});
+	return response.data;
 };
 
 /**
@@ -36,20 +35,14 @@ export const startStarSync = async (mode: 'incremental' | 'full' = 'incremental'
  * @param taskId 任务 ID
  */
 export const getSyncStatus = async (taskId: number) => {
-  const token = localStorage.getItem("token");
-  const response = await client.get<SyncStatusResponse>(`/sync/status/${taskId}`, {
-    params: { token },
-  });
-  return response.data;
+	const response = await client.get<SyncStatusResponse>(`/sync/status/${taskId}`);
+	return response.data;
 };
 
 /**
  * 获取所有同步任务状态
  */
 export const getAllSyncStatus = async () => {
-  const token = localStorage.getItem("token");
-  const response = await client.get<SyncStatusResponse[]>("/sync/status", {
-    params: { token },
-  });
-  return response.data;
+	const response = await client.get<SyncStatusResponse[]>("/sync/status");
+	return response.data;
 };

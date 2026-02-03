@@ -47,12 +47,6 @@ const Dashboard = () => {
   };
 
   const handleSyncStars = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      alert(t('dashboard.sync_error_no_token') || '请先登录');
-      return;
-    }
-
     try {
       setSyncing(true);
       const result = await startStarSync('incremental');
@@ -89,9 +83,10 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Failed to start sync:', error);
       setSyncing(false);
-      alert('同步失败，请重试');
+      alert('同步失败,请检查是否已配置 GITHUB_TOKEN');
     }
   };
+
 
 
   return (

@@ -126,7 +126,7 @@ def run():
     uvicorn.run(
         "nebula.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=settings.api_port,
         reload=settings.debug,
         log_level=settings.log_level.lower(),
     )

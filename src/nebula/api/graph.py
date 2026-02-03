@@ -3,7 +3,7 @@
 Provides data for 3D force graph visualization.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,33 +38,18 @@ CLUSTER_COLORS = [
 ]
 
 
-async def get_user_by_token(token: str, db: AsyncSession) -> User:
-    """Validate token and get user."""
-    from nebula.api.auth import verify_jwt_token
+async def get_default_user(db: AsyncSession) -> User | None:
+    """Get the first user from database.
 
-    payload = verify_jwt_token(token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-
-    user_id = int(payload["sub"])
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    return user
+    Since authentication is disabled, we use the first available user.
+    Returns None if no user exists.
+    """
+    result = await db.execute(select(User).limit(1))
+    return result.scalar_one_or_none()
 
 
 @router.get("", response_model=GraphData)
 async def get_graph_data(
-    token: str | None = Query(default=None, description="JWT token"),
     include_edges: bool = Query(default=False, description="Include similarity edges"),
     min_similarity: float = Query(
         default=0.7, ge=0.5, le=0.95, description="Minimum similarity for edges"
@@ -74,7 +59,6 @@ async def get_graph_data(
     """Get graph data for visualization.
 
     Args:
-        token: JWT access token (optional, returns empty data if not provided)
         include_edges: Whether to compute similarity edges
         min_similarity: Minimum similarity threshold for edges
         db: Database session
@@ -82,21 +66,9 @@ async def get_graph_data(
     Returns:
         Complete graph data with nodes, edges, and clusters
     """
-    # 如果没有 token，返回空数据
-    if not token:
-        return GraphData(
-            nodes=[],
-            edges=[],
-            clusters=[],
-            total_nodes=0,
-            total_edges=0,
-            total_clusters=0,
-        )
-
-    try:
-        user = await get_user_by_token(token, db)
-    except HTTPException:
-        # token 无效时也返回空数据
+    # Get default user
+    user = await get_default_user(db)
+    if not user:
         return GraphData(
             nodes=[],
             edges=[],
@@ -212,30 +184,19 @@ async def get_graph_data(
 
 @router.get("/timeline", response_model=TimelineData)
 async def get_timeline_data(
-    token: str | None = Query(default=None, description="JWT token"),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get timeline data for visualization.
 
     Args:
-        token: JWT access token (optional, returns empty data if not provided)
         db: Database session
 
     Returns:
         Timeline data grouped by month
     """
-    # 如果没有 token，返回空数据
-    if not token:
-        return TimelineData(
-            points=[],
-            total_stars=0,
-            date_range=("", ""),
-        )
-
-    try:
-        user = await get_user_by_token(token, db)
-    except HTTPException:
-        # token 无效时也返回空数据
+    # Get default user
+    user = await get_default_user(db)
+    if not user:
         return TimelineData(
             points=[],
             total_stars=0,

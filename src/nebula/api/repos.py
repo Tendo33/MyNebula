@@ -21,39 +21,18 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-async def get_user_by_token(
-    token: str,
-    db: AsyncSession,
-) -> User:
-    """Validate token and get user.
+async def get_default_user(db: AsyncSession) -> User:
+    """Get the first user from database.
 
-    Args:
-        token: JWT token
-        db: Database session
-
-    Returns:
-        User object
-
-    Raises:
-        HTTPException: If token is invalid or user not found
+    Since authentication is disabled, we use the first available user.
     """
-    from nebula.api.auth import verify_jwt_token
-
-    payload = verify_jwt_token(token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-
-    user_id = int(payload["sub"])
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).limit(1))
     user = result.scalar_one_or_none()
 
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail="No user found. Please sync your GitHub stars first.",
         )
 
     return user
@@ -61,7 +40,6 @@ async def get_user_by_token(
 
 @router.get("", response_model=RepoListResponse)
 async def list_repos(
-    token: str = Query(..., description="JWT token"),
     page: int = Query(default=1, ge=1, description="Page number"),
     per_page: int = Query(default=50, ge=1, le=100, description="Items per page"),
     language: str | None = Query(default=None, description="Filter by language"),
@@ -73,7 +51,6 @@ async def list_repos(
     """List user's starred repositories.
 
     Args:
-        token: JWT access token
         page: Page number (1-indexed)
         per_page: Items per page
         language: Filter by programming language
@@ -85,7 +62,7 @@ async def list_repos(
     Returns:
         Paginated list of repositories
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     # Build query
     query = select(StarredRepo).where(StarredRepo.user_id == user.id)
@@ -135,20 +112,18 @@ async def list_repos(
 @router.get("/{repo_id}", response_model=RepoResponse)
 async def get_repo(
     repo_id: int,
-    token: str = Query(..., description="JWT token"),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get a specific repository by ID.
 
     Args:
         repo_id: Repository database ID
-        token: JWT access token
         db: Database session
 
     Returns:
         Repository details
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     result = await db.execute(
         select(StarredRepo).where(
@@ -170,20 +145,18 @@ async def get_repo(
 @router.post("/search", response_model=list[RepoSearchResponse])
 async def search_repos(
     request: RepoSearchRequest,
-    token: str = Query(..., description="JWT token"),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Semantic search for repositories.
 
     Args:
         request: Search request with query and filters
-        token: JWT access token
         db: Database session
 
     Returns:
         List of matching repositories with similarity scores
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     # Get embedding for query
     embedding_service = get_embedding_service()
@@ -228,19 +201,17 @@ async def search_repos(
 
 @router.get("/languages/stats")
 async def get_language_stats(
-    token: str = Query(..., description="JWT token"),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get language statistics for user's starred repos.
 
     Args:
-        token: JWT access token
         db: Database session
 
     Returns:
         Language breakdown with counts
     """
-    user = await get_user_by_token(token, db)
+    user = await get_default_user(db)
 
     query = (
         select(

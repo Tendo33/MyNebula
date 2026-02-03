@@ -51,8 +51,7 @@ dependencies = [
     "hdbscan>=0.8.0",
     # GitHub integration
     "PyGithub>=2.5.0",
-    # Authentication
-    "PyJWT>=2.8.0",
+    # Database sync driver
     "psycopg2>=2.9.11",
 ]
 

@@ -1,7 +1,6 @@
 """GitHub API client wrapper.
 
 This module provides async GitHub API operations including:
-- OAuth authentication flow
 - Starred repositories retrieval
 - README content fetching
 - Repository metadata
@@ -13,7 +12,6 @@ from datetime import datetime
 import httpx
 from pydantic import BaseModel
 
-from nebula.core.config import GitHubSettings, get_github_settings
 from nebula.utils import get_logger
 from nebula.utils.decorator_utils import async_retry_decorator
 
@@ -21,8 +19,6 @@ logger = get_logger(__name__)
 
 # GitHub API endpoints
 GITHUB_API_BASE = "https://api.github.com"
-GITHUB_OAUTH_AUTHORIZE = "https://github.com/login/oauth/authorize"
-GITHUB_OAUTH_TOKEN = "https://github.com/login/oauth/access_token"
 
 
 class GitHubUser(BaseModel):
@@ -60,31 +56,22 @@ class GitHubRepo(BaseModel):
 class GitHubClient:
     """Async GitHub API client.
 
-    Supports both OAuth token and Personal Access Token authentication.
+    Supports Personal Access Token authentication.
 
     Usage:
-        # With OAuth token
-        client = GitHubClient(access_token="gho_xxx")
+        # With PAT
+        client = GitHubClient(access_token="ghp_xxx")
         user = await client.get_current_user()
         stars = await client.get_starred_repos()
-
-        # With PAT for development
-        client = GitHubClient(access_token="ghp_xxx")
     """
 
-    def __init__(
-        self,
-        access_token: str | None = None,
-        settings: GitHubSettings | None = None,
-    ):
+    def __init__(self, access_token: str):
         """Initialize GitHub client.
 
         Args:
-            access_token: OAuth or Personal Access Token
-            settings: Optional settings override
+            access_token: Personal Access Token for GitHub API
         """
-        self.settings = settings or get_github_settings()
-        self._access_token = access_token or self.settings.token
+        self._access_token = access_token
         self._client: httpx.AsyncClient | None = None
 
     @property
@@ -105,59 +92,6 @@ class GitHubClient:
             )
         return self._client
 
-    def get_oauth_url(self, state: str) -> str:
-        """Generate GitHub OAuth authorization URL.
-
-        Args:
-            state: Random state string for CSRF protection
-
-        Returns:
-            OAuth authorization URL
-        """
-        params = {
-            "client_id": self.settings.client_id,
-            "redirect_uri": self.settings.redirect_uri,
-            "scope": "read:user user:email",
-            "state": state,
-        }
-        query = "&".join(f"{k}={v}" for k, v in params.items())
-        return f"{GITHUB_OAUTH_AUTHORIZE}?{query}"
-
-    async def exchange_code_for_token(self, code: str) -> str:
-        """Exchange OAuth code for access token.
-
-        Args:
-            code: OAuth authorization code
-
-        Returns:
-            Access token
-
-        Raises:
-            ValueError: If token exchange fails
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                GITHUB_OAUTH_TOKEN,
-                data={
-                    "client_id": self.settings.client_id,
-                    "client_secret": self.settings.client_secret,
-                    "code": code,
-                },
-                headers={"Accept": "application/json"},
-            )
-
-        if response.status_code != 200:
-            raise ValueError(f"Token exchange failed: {response.text}")
-
-        data = response.json()
-        if "error" in data:
-            raise ValueError(
-                f"Token exchange error: {data.get('error_description', data['error'])}"
-            )
-
-        return data["access_token"]
-
-    @async_retry_decorator(max_retries=3, delay=1.0)
     async def get_current_user(self) -> GitHubUser:
         """Get current authenticated user.
 
