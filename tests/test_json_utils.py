@@ -6,7 +6,7 @@
 import json
 from pathlib import Path
 
-from python_template.utils import (
+from nebula.utils import (
     merge_json_files,
     read_json,
     safe_json_dumps,

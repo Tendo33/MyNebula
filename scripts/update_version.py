@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Version update script for python-template project.
+"""Version update script for nebula project.
 
 This script updates the version number across all relevant files in the project:
 - pyproject.toml
-- src/python_template/__init__.py
+- src/nebula/__init__.py
 - config.example.toml
 
 该脚本用于更新项目中所有相关文件的版本号。
@@ -44,7 +44,7 @@ class VersionUpdater:
                 'version = "{version}"',
             ),
             (
-                project_root / "src" / "python_template" / "__init__.py",
+                project_root / "src" / "nebula" / "__init__.py",
                 r'^__version__ = "([^"]+)"',
                 '__version__ = "{version}"',
             ),

@@ -7,8 +7,8 @@
 ### 1. Fork 并克隆项目
 
 ```bash
-git clone https://github.com/yourusername/python-template.git
-cd python-template
+git clone https://github.com/yourusername/nebula.git
+cd nebula
 ```
 
 ### 2. 设置开发环境
@@ -89,7 +89,7 @@ uv run pytest
 uv run pytest tests/test_your_module.py
 
 # 生成覆盖率报告
-uv run pytest --cov=python_template --cov-report=html
+uv run pytest --cov=nebula --cov-report=html
 ```
 
 ## 🔄 提交流程
@@ -146,7 +146,7 @@ uv run pytest
 
 ### 报告 Bug
 
-如果你发现了 bug，请创建一个 [Issue](https://github.com/yourusername/python-template/issues)，包含：
+如果你发现了 bug，请创建一个 [Issue](https://github.com/yourusername/nebula/issues)，包含：
 
 - 问题描述
 - 复现步骤
@@ -178,7 +178,7 @@ uv run pytest
 
 如有任何问题，请通过以下方式联系：
 
-- 创建 [Issue](https://github.com/yourusername/python-template/issues)
+- 创建 [Issue](https://github.com/yourusername/nebula/issues)
 - 发送邮件至 your.email@example.com
 
 ---

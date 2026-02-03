@@ -41,5 +41,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/yourusername/python-template/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/yourusername/python-template/releases/tag/v0.1.0
+[Unreleased]: https://github.com/yourusername/nebula/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/yourusername/nebula/releases/tag/v0.1.0

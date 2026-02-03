@@ -1,4 +1,4 @@
-"""Test package for python-template.
+"""Test package for nebula.
 
-This package contains all test modules for the python-template project.
+This package contains all test modules for the nebula project.
 """

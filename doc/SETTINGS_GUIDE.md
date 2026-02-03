@@ -16,7 +16,7 @@ cp .env.example .env
 
 ### 2. 使用配置
 ```python
-from python_template.utils.setting import get_settings
+from nebula.utils.setting import get_settings
 
 settings = get_settings()
 print(f"App: {settings.app_name} v{settings.app_version}")

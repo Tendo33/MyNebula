@@ -31,7 +31,7 @@ uv sync --all-extras
 如果你将此模板用于新项目，请先重命名包名：
 
 ```bash
-# 将 'python_template' 重命名为你的项目名
+# 将 'nebula' 重命名为你的项目名
 python scripts/rename_package.py my_awesome_project
 ```
 
@@ -79,7 +79,7 @@ uv pip install -e .
 ### 1. 日志工具 (Logger)
 
 ```python
-from python_template.utils import get_logger, setup_logging
+from nebula.utils import get_logger, setup_logging
 
 # 配置日志
 setup_logging(level="DEBUG", log_file="logs/app.log")
@@ -96,7 +96,7 @@ logger.debug("这是一条调试日志")
 基于 Pydantic 的类型安全配置管理，支持环境变量和 .env 文件。
 
 ```python
-from python_template.utils.setting import get_settings
+from nebula.utils.setting import get_settings
 
 # 获取配置（单例）
 settings = get_settings()
@@ -127,7 +127,7 @@ LOG_LEVEL=DEBUG
 
 **添加自定义配置：**
 
-在 `src/python_template/utils/setting.py` 中添加字段：
+在 `src/nebula/utils/setting.py` 中添加字段：
 
 ```python
 class Settings(BaseSettings):
@@ -145,7 +145,7 @@ class Settings(BaseSettings):
 ### 3. 装饰器工具 (Decorators)
 
 ```python
-from python_template.utils import timing_decorator, retry_decorator, log_calls
+from nebula.utils import timing_decorator, retry_decorator, log_calls
 
 # 计时装饰器
 @timing_decorator
@@ -168,7 +168,7 @@ def calculate(a, b):
 #### 异步装饰器 (Async Decorators)
 
 ```python
-from python_template.utils import (
+from nebula.utils import (
     async_timing_decorator,
     async_retry_decorator,
     async_catch_exceptions,
@@ -203,7 +203,7 @@ async def process():
 ### 4. 通用工具 (Common Utils)
 
 ```python
-from python_template.utils import chunk_list, flatten_dict, merge_dicts
+from nebula.utils import chunk_list, flatten_dict, merge_dicts
 
 # 列表分块
 items = [1, 2, 3, 4, 5]
@@ -222,7 +222,7 @@ merged = merge_dicts(d1, d2)  # {"a": 1, "b": 2}
 ### 5. 文件操作 (File Utils)
 
 ```python
-from python_template.utils import read_text_file, write_text_file, ensure_directory
+from nebula.utils import read_text_file, write_text_file, ensure_directory
 
 # 确保目录存在
 ensure_directory("data/output")
@@ -237,7 +237,7 @@ content = read_text_file("data/output/test.txt", default="Default Content")
 ### 6. JSON 处理 (JSON Utils)
 
 ```python
-from python_template.utils import read_json, write_json
+from nebula.utils import read_json, write_json
 
 data = {"name": "test", "value": 123}
 
@@ -252,7 +252,7 @@ config = read_json("config.json", default={})
 
 ```python
 from datetime import datetime
-from python_template.utils import get_timestamp, format_datetime, get_current_time
+from nebula.utils import get_timestamp, format_datetime, get_current_time
 
 # 获取当前 ISO 时间戳
 ts = get_timestamp()
@@ -269,7 +269,7 @@ formatted = format_datetime(datetime.now(), format_str="%Y-%m-%d")
 所有数据模型使用 Pydantic BaseModel 进行定义,提供类型验证和序列化功能。
 
 ```python
-from python_template.models import BaseModel, User, ApiResponse
+from nebula.models import BaseModel, User, ApiResponse
 from pydantic import Field
 
 # 使用预定义模型
@@ -304,8 +304,8 @@ response = ApiResponse[Product](
 ## 📁 项目结构
 
 ```
-python-template/
-├── src/python_template/
+nebula/
+├── src/nebula/
 │   ├── utils/              # 核心工具包
 │   │   ├── common_utils.py    # 通用工具 (列表/字典操作, 验证等)
 │   │   ├── date_utils.py      # 日期时间处理
@@ -331,8 +331,8 @@ python-template/
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourusername/python-template.git
-cd python-template
+git clone https://github.com/yourusername/nebula.git
+cd nebula
 
 # 安装开发依赖
 uv sync --all-extras

@@ -10,7 +10,7 @@ Features / 特性:
 - Easy to extend / 易于扩展
 
 Usage / 使用方法:
-    from python_template.utils.setting import get_settings
+    from nebula.utils.setting import get_settings
 
     settings = get_settings()
     print(settings.app_name)
@@ -48,9 +48,7 @@ class Settings(BaseSettings):
     """
 
     # Basic application settings / 基础应用配置
-    app_name: str = Field(
-        default="python-template", description="Application name / 应用名称"
-    )
+    app_name: str = Field(default="nebula", description="Application name / 应用名称")
     app_version: str = Field(
         default="0.1.0", description="Application version / 应用版本"
     )
@@ -141,10 +139,10 @@ def get_settings() -> Settings:
         Settings instance / 配置实例
 
     Example:
-        >>> from python_template.utils.setting import get_settings
+        >>> from nebula.utils.setting import get_settings
         >>> settings = get_settings()
         >>> print(settings.app_name)
-        python-template
+        nebula
     """
     return Settings()
 
