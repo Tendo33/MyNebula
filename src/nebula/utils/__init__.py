@@ -119,12 +119,6 @@ from .logger_util import (
     warning,
 )
 
-# Settings and configuration
-from .setting import (
-    get_settings,
-    reload_settings,
-)
-
 # 常用函数快捷导出
 __all__ = [
     # Logger
@@ -207,8 +201,6 @@ __all__ = [
     "remove_empty_values",
     "batch_process",
     "retry_on_exception",
-    "get_settings",
-    "reload_settings",
     "Context",
     "ContextManager",
     "clear_global",

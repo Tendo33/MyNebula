@@ -41,6 +41,21 @@ class DatabaseSettings(BaseSettings):
                 url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
             elif not url.startswith("postgresql+asyncpg://"):
                 url = f"postgresql+asyncpg://{url}"
+
+            # Fix URL parameters for asyncpg
+            if "?" in url:
+                base, query = url.split("?", 1)
+                params = query.split("&")
+                new_params = []
+                for p in params:
+                    if p.startswith("sslmode="):
+                        new_params.append("ssl=require")
+                    elif p.startswith("channel_binding="):
+                        continue
+                    else:
+                        new_params.append(p)
+                url = base + "?" + "&".join(new_params) if new_params else base
+
             return url
         return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
 
