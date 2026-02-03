@@ -21,42 +21,42 @@ const Timeline: React.FC<TimelineProps> = ({ className, data, onRangeChange }) =
   const maxCount = Math.max(...points.map(p => p.count));
 
   return (
-    <div className={clsx("bg-nebula-surface/90 backdrop-blur-md border border-nebula-border rounded-xl p-4 flex flex-col gap-2 shadow-xl", className)}>
-        <div className="flex justify-between items-end h-16 gap-1 px-2">
+    <div className={clsx("bg-white border border-border-light rounded-md p-3 flex flex-col gap-2 shadow-sm", className)}>
+        <div className="flex justify-between items-end h-12 gap-1 px-1">
             {points.map((point, idx) => {
                 const heightPercent = (point.count / maxCount) * 100;
                 return (
                     <div key={idx} className="flex-1 flex flex-col justify-end items-center group cursor-pointer">
                         <div
-                            className="w-full bg-nebula-primary/20 hover:bg-nebula-primary/50 transition-all rounded-t-sm relative"
+                            className="w-full bg-bg-hover hover:bg-action-primary/60 transition-all rounded-t-[2px] relative"
                             style={{ height: `${heightPercent}%` }}
                         >
                             {/* Tooltip */}
-                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-nebula-surface px-2 py-1 rounded text-xs border border-nebula-border opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none transition-opacity">
-                                <span className="text-nebula-primary font-bold">{point.count} stars</span>
-                                <span className="text-nebula-text-muted ml-2">{point.date}</span>
+                            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-text-main text-white px-2 py-0.5 rounded-sm text-[10px] opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none transition-opacity">
+                                <span className="font-semibold">{point.count} stars</span>
+                                <span className="opacity-80 ml-1">{point.date}</span>
                             </div>
                         </div>
                     </div>
                 );
             })}
         </div>
-        <div className="flex justify-between text-[10px] text-nebula-text-dim px-1 font-mono uppercase tracking-wider">
+        <div className="flex justify-between text-[10px] text-text-muted px-1 font-mono uppercase tracking-wider">
             <span>{points[0]?.date}</span>
             <span>{points[points.length - 1]?.date}</span>
         </div>
 
         {/* Range Slider Overlay (Conceptual) */}
-        <div className="absolute inset-x-4 bottom-2 h-1 bg-gray-700/50 rounded-full overflow-hidden">
+        <div className="absolute inset-x-3 bottom-2 h-0.5 bg-border-light rounded-full overflow-hidden">
              {/* This would be a real dual-thumb slider in production */}
-             <div className="h-full bg-nebula-primary/50 w-full" />
+             <div className="h-full bg-action-primary/30 w-full" />
         </div>
         <input
             type="range"
             min="0"
             max="11"
             defaultValue="0"
-            className="absolute inset-x-4 bottom-1 w-[calc(100%-2rem)] h-2 opacity-0 cursor-pointer"
+            className="absolute inset-x-3 bottom-1 w-[calc(100%-1.5rem)] h-2 opacity-0 cursor-pointer"
             onChange={(e) => {
                  const start = parseInt(e.target.value);
                  if (onRangeChange) onRangeChange([start, 11]);

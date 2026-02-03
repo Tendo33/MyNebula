@@ -5,14 +5,13 @@ import Settings from './pages/Settings';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-nebula-bg text-nebula-text-main font-sans selection:bg-nebula-primary selection:text-nebula-bg">
+      <div className="min-h-screen bg-bg-main text-text-main font-sans selection:bg-action-primary/20">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/graph" element={<Dashboard />} />
           <Route path="/data" element={<Dashboard />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
-
       </div>
     </Router>
   );

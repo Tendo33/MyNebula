@@ -1,4 +1,7 @@
-# 🌌 MyNebula (我的星云)
+<div align="center">
+  <img src="doc/images/logo2.png" width="120" alt="MyNebula Logo" />
+  <h1>MyNebula (我的星云)</h1>
+</div>
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com/)
@@ -9,7 +12,7 @@
 
 将你的 GitHub Star 列表转化为三维知识星云。通过语义分析，让相似的项目自动聚集，通过时间轴展示你的技术兴趣演变。
 
-![MyNebula Preview](https://via.placeholder.com/800x400?text=MyNebula+Preview)
+![MyNebula Banner](doc/images/banner.png)
 
 ## ✨ Features
 

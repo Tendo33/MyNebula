@@ -30,12 +30,12 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, onNodeClick }) => {
   // Show empty state if no data
   if (!data || !data.nodes || data.nodes.length === 0) {
     return (
-      <div ref={containerRef} className="w-full h-full relative overflow-hidden rounded-2xl border border-nebula-border bg-nebula-bg shadow-inner flex items-center justify-center">
+      <div ref={containerRef} className="w-full h-full relative overflow-hidden rounded-sm border border-border-light bg-bg-sidebar/30 flex items-center justify-center">
         <div className="text-center p-8">
-          <div className="text-6xl mb-4">🌌</div>
-          <h3 className="text-nebula-text-main font-bold text-xl mb-2">星空尚未点亮</h3>
-          <p className="text-nebula-text-muted text-sm max-w-md">
-            点击右上角的"开始同步"按钮，同步你的 GitHub Star 项目，开始探索你的代码宇宙！
+          <div className="text-6xl mb-4 grayscale opacity-20">🌌</div>
+          <h3 className="text-text-main font-semibold text-lg mb-2">星空尚未点亮</h3>
+          <p className="text-text-muted text-sm max-w-md">
+            点击右上角的"同步"按钮，同步你的 GitHub Star 项目，开始探索你的代码宇宙！
           </p>
         </div>
       </div>
@@ -44,64 +44,47 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, onNodeClick }) => {
 
 
   return (
-    <div ref={containerRef} className="w-full h-full relative overflow-hidden rounded-2xl border border-nebula-border bg-nebula-bg shadow-inner">
-      {/* Overlay UI */}
-      <div className="absolute top-4 right-4 z-10 bg-nebula-surface/90 backdrop-blur-md p-4 rounded-xl border border-nebula-border/50 max-w-xs transition-opacity duration-300">
-        <h3 className="text-nebula-text-main font-bold mb-1">
-          {hoverNode ? hoverNode.name : 'Galactic View'}
-        </h3>
-        <p className="text-nebula-text-muted text-sm">
-          {hoverNode ? hoverNode.description || 'No description' : 'Hover over a star to reveal details'}
-        </p>
-      </div>
+    <div ref={containerRef} className="w-full h-full relative overflow-hidden bg-white">
+      {/* Overlay UI - Minimal Hover Card */}
+      {hoverNode && (
+        <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-sm border border-border-light shadow-sm max-w-xs transition-opacity duration-200">
+            <h3 className="text-text-main font-semibold text-sm mb-0.5">
+            {hoverNode.name}
+            </h3>
+            <p className="text-text-muted text-xs truncate">
+            {hoverNode.description || 'No description'}
+            </p>
+        </div>
+      )}
 
       <ForceGraph3D
         ref={graphRef}
         width={width}
         height={height}
         graphData={processedData as any}
-        backgroundColor="#0B0B10"
+        backgroundColor="#FFFFFF"
         nodeLabel="name"
 
-        nodeColor={(node: any) => node.color || '#E0E0FF'}
+        nodeColor={(node: any) => node.color || '#37352F'} // Dark gray default
         nodeVal={(node: any) => node.size || node.val || 1}
         nodeResolution={16}
-        linkOpacity={0.2}
-        linkWidth={0.5}
-        linkColor={() => '#2D2D3A'}
+        linkOpacity={0.3}
+        linkWidth={1}
+        linkColor={() => '#E9E9E7'} // Light gray links
 
         // Custom Node Layout
         nodeThreeObject={(node: any) => {
           const size = node.size || node.val || 1;
-          const color = node.color || '#E0E0FF';
+          const color = node.color ? node.color : '#37352F'; // Use node color if present, else dark gray
 
-          const group = new THREE.Group();
-
-          // Core Sphere
+          // Use solid materials instead of emissive for flat look
           const geometry = new THREE.SphereGeometry(Math.max(1, Math.log(size) * 2));
-          const material = new THREE.MeshStandardMaterial({
+           const material = new THREE.MeshLambertMaterial({
             color: color,
-            emissive: color,
-            emissiveIntensity: 0.8,
-            roughness: 0.1,
-            metalness: 0.5
+            transparent: false
           });
-          const mesh = new THREE.Mesh(geometry, material);
-          group.add(mesh);
 
-          // Glow Halo (transparent slightly larger sphere)
-          if (hoverNode && hoverNode.id === node.id) {
-             const glowGeo = new THREE.SphereGeometry(Math.max(1, Math.log(size) * 3));
-             const glowMat = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.3,
-             });
-             const glowMesh = new THREE.Mesh(glowGeo, glowMat);
-             group.add(glowMesh);
-          }
-
-          return group;
+          return new THREE.Mesh(geometry, material);
         }}
 
         onNodeHover={(node: any) => {
