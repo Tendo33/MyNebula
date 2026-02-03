@@ -1,12 +1,14 @@
 import React from 'react';
 import { Search } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useTranslation } from 'react-i18next';
 
 interface SearchInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   onSearch?: (value: string) => void;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({ className, onSearch, onChange, ...props }) => {
+  const { t } = useTranslation();
   return (
     <div className={clsx('relative group', className)}>
       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -15,7 +17,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({ className, onSearch, o
       <input
         type="text"
         className="block w-full pl-10 pr-3 py-2 border border-nebula-border rounded-xl leading-5 bg-nebula-surface/50 text-nebula-text-main placeholder-nebula-text-dim focus:outline-none focus:ring-1 focus:ring-nebula-primary focus:border-nebula-primary sm:text-sm shadow-sm transition-all duration-200"
-        placeholder="Search repositories via semantics..."
+        placeholder={t('dashboard.search_placeholder')}
         onChange={(e) => {
             if (onChange) onChange(e);
             if (onSearch) onSearch(e.target.value);

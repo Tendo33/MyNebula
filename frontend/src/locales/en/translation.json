@@ -1,0 +1,30 @@
+{
+  "app": {
+    "title": "MyNebula",
+    "user": "User"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "graph": "Graph",
+    "data": "Data",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Universe Explorer",
+    "subtitle": "Visualizing {{count}} Stars",
+    "subtitle_infinite": "Visualizing Infinite Stars",
+    "sync_button": "Sync Stars",
+    "search_placeholder": "Search stars, clusters, or topics..."
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "appearance": "Appearance",
+    "hq_rendering": "High Quality Rendering",
+    "show_trajectories": "Show Trajectories",
+    "connection": "Connection",
+    "api_endpoint": "API Endpoint",
+    "github_token_status": "GitHub Token Status",
+    "connected": "Connected"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "app": {
+    "title": "我的星云",
+    "user": "用户"
+  },
+  "sidebar": {
+    "dashboard": "仪表盘",
+    "graph": "图谱",
+    "data": "数据",
+    "settings": "设置"
+  },
+  "dashboard": {
+    "title": "宇宙探索器",
+    "subtitle": "正如繁星 {{count}} 颗",
+    "subtitle_infinite": "正如繁星无尽",
+    "sync_button": "同步星标",
+    "search_placeholder": "搜索星星、星团或主题..."
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "appearance": "外观",
+    "hq_rendering": "高质量渲染",
+    "show_trajectories": "显示轨迹",
+    "connection": "连接",
+    "api_endpoint": "API 端点",
+    "github_token_status": "GitHub 令牌状态",
+    "connected": "已连接"
+  }
+}

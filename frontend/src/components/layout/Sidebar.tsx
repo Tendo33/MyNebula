@@ -1,13 +1,15 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Network, Settings, Github, Database } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 
 export const Sidebar = () => {
+  const { t } = useTranslation();
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: Network, label: 'Graph', path: '/graph' },
-    { icon: Database, label: 'Data', path: '/data' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: LayoutDashboard, label: t('sidebar.dashboard'), path: '/' },
+    { icon: Network, label: t('sidebar.graph'), path: '/graph' },
+    { icon: Database, label: t('sidebar.data'), path: '/data' },
+    { icon: Settings, label: t('sidebar.settings'), path: '/settings' },
   ];
 
   return (
@@ -17,7 +19,7 @@ export const Sidebar = () => {
           <Github className="w-5 h-5 text-white" />
         </div>
         <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-nebula-primary to-nebula-secondary">
-          MyNebula
+          {t('app.title')}
         </h1>
       </div>
 
@@ -45,7 +47,7 @@ export const Sidebar = () => {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-nebula-surfaceHighlight ring-2 ring-nebula-border" />
           <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-nebula-text-main truncate">User</p>
+            <p className="text-sm font-medium text-nebula-text-main truncate">{t('app.user')}</p>
             <p className="text-xs text-nebula-text-dim truncate">user@github.com</p>
           </div>
         </div>

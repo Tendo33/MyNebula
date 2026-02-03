@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Sidebar } from '../components/layout/Sidebar';
 import Graph3D from '../components/graph/Graph3D';
 import Timeline from '../components/graph/Timeline';
@@ -8,6 +9,7 @@ import { getGraphData } from '../api/graph';
 import { GraphData } from '../types';
 
 const Dashboard = () => {
+  const { t } = useTranslation();
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -46,9 +48,13 @@ const Dashboard = () => {
         <header className="flex items-center justify-between p-4 bg-nebula-surface/50 backdrop-blur-md border border-nebula-border rounded-2xl shadow-lg">
            <div className="flex flex-col">
               <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                  Universe Explorer
+                  {t('dashboard.title')}
               </h2>
-              <p className="text-xs text-nebula-text-muted">Visualizing {data?.total_nodes || 'Infinite'} Stars</p>
+              <p className="text-xs text-nebula-text-muted">
+                {data?.total_nodes
+                  ? t('dashboard.subtitle', { count: data.total_nodes })
+                  : t('dashboard.subtitle_infinite')}
+              </p>
            </div>
 
            <div className="w-96">
@@ -57,7 +63,7 @@ const Dashboard = () => {
 
            <div className="flex gap-2">
                <button className="px-4 py-2 rounded-xl bg-nebula-primary/10 text-nebula-primary text-sm font-medium hover:bg-nebula-primary/20 transition-colors">
-                   Sync Stars
+                   {t('dashboard.sync_button')}
                </button>
            </div>
         </header>
