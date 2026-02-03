@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     # Setup logging
     setup_logging(level=settings.log_level, log_file=settings.log_file)
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Debug mode: {settings.debug}")
 
     # Initialize database
     try:

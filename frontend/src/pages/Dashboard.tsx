@@ -6,12 +6,16 @@ import Timeline from '../components/graph/Timeline';
 import { SearchInput } from '../components/ui/SearchInput';
 
 import { getGraphData } from '../api/graph';
-import { GraphData } from '../types';
+import { GraphData, GraphNode } from '../types';
+import { RepoDetailsPanel } from '../components/graph/RepoDetailsPanel';
+
 
 const Dashboard = () => {
   const { t } = useTranslation();
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+
 
   useEffect(() => {
     // Determine if we should fetch real data (if API is available)
@@ -31,6 +35,15 @@ const Dashboard = () => {
     };
     loadData();
   }, []);
+
+  const handleNodeClick = (node: GraphNode) => {
+    setSelectedNode(node);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedNode(null);
+  };
+
 
   return (
     <div className="flex min-h-screen bg-nebula-bg text-nebula-text-main overflow-hidden">
@@ -70,7 +83,13 @@ const Dashboard = () => {
 
         {/* Visualization Area */}
         <section className="flex-1 min-h-0 relative rounded-2xl shadow-2xl shadow-black/50 border border-nebula-border overflow-hidden group">
-            <Graph3D data={data} />
+            <Graph3D data={data} onNodeClick={handleNodeClick} />
+
+            {/* Repo Details Panel */}
+            {selectedNode && (
+              <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />
+            )}
+
 
             {/* Timeline Overlay */}
             <div className="absolute bottom-6 left-6 right-6 z-20 transition-transform duration-300 translate-y-4 group-hover:translate-y-0 opacity-80 group-hover:opacity-100">

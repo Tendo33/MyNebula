@@ -151,7 +151,6 @@ GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/callback
 SiliconFlow 配置示例：
 
 ```bash
-EMBEDDING_PROVIDER=siliconflow
 EMBEDDING_API_KEY=your_api_key
 EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
 EMBEDDING_MODEL=BAAI/bge-large-zh-v1.5

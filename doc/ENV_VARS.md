@@ -21,8 +21,7 @@
 |--------|------|--------|------|
 | `APP_NAME` | string | `mynebula` | 应用名称 |
 | `APP_VERSION` | string | `0.1.0` | 应用版本 |
-| `DEBUG` | boolean | `false` | 调试模式（启用 Swagger UI） |
-| `ENVIRONMENT` | string | `development` | 环境：`development` / `staging` / `production` |
+| `DEBUG` | boolean | `false` | 调试模式（启用 Swagger UI，同时控制开发/生产环境） |
 | `SECRET_KEY` | string | - | JWT 签名密钥（生产环境必须修改） |
 
 ### 示例
@@ -31,7 +30,6 @@
 APP_NAME=mynebula
 APP_VERSION=0.1.0
 DEBUG=true
-ENVIRONMENT=development
 SECRET_KEY=your-32-character-secret-key-here
 ```
 
@@ -119,13 +117,12 @@ GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/callback
 
 ## Embedding 配置 ⚠️ 必填
 
-用于生成仓库描述的向量嵌入。
+用于生成仓库描述的向量嵌入。所有配置使用 OpenAI 兼容接口。
 
 | 变量名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `EMBEDDING_PROVIDER` | string | `siliconflow` | 提供商名称 |
 | `EMBEDDING_API_KEY` | string | - | API 密钥 ⚠️ **必填** |
-| `EMBEDDING_BASE_URL` | string | `https://api.siliconflow.cn/v1` | API 基础 URL |
+| `EMBEDDING_BASE_URL` | string | `https://api.siliconflow.cn/v1` | API 基础 URL (OpenAI 兼容) |
 | `EMBEDDING_MODEL` | string | `BAAI/bge-large-zh-v1.5` | 模型名称 |
 | `EMBEDDING_DIMENSIONS` | integer | `1024` | 向量维度 |
 
@@ -134,7 +131,6 @@ GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/callback
 #### SiliconFlow（推荐国内用户）
 
 ```bash
-EMBEDDING_PROVIDER=siliconflow
 EMBEDDING_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxx
 EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
 EMBEDDING_MODEL=BAAI/bge-large-zh-v1.5
@@ -147,7 +143,6 @@ EMBEDDING_DIMENSIONS=1024
 #### Jina AI
 
 ```bash
-EMBEDDING_PROVIDER=jina
 EMBEDDING_API_KEY=jina_xxxxxxxxxxxxxxxxxxxxx
 EMBEDDING_BASE_URL=https://api.jina.ai/v1
 EMBEDDING_MODEL=jina-embeddings-v3
@@ -159,7 +154,6 @@ EMBEDDING_DIMENSIONS=1024
 #### OpenAI
 
 ```bash
-EMBEDDING_PROVIDER=openai
 EMBEDDING_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxx
 EMBEDDING_BASE_URL=https://api.openai.com/v1
 EMBEDDING_MODEL=text-embedding-3-small
@@ -172,7 +166,6 @@ EMBEDDING_DIMENSIONS=1536
 #### 智谱 AI
 
 ```bash
-EMBEDDING_PROVIDER=zhipu
 EMBEDDING_API_KEY=xxxxxxxxxxxxxxxxxxxxx
 EMBEDDING_BASE_URL=https://open.bigmodel.cn/api/paas/v4
 EMBEDDING_MODEL=embedding-3
@@ -184,7 +177,6 @@ EMBEDDING_DIMENSIONS=2048
 #### Ollama（本地部署）
 
 ```bash
-EMBEDDING_PROVIDER=ollama
 EMBEDDING_API_KEY=ollama  # Ollama 不需要真实 key，但字段不能为空
 EMBEDDING_BASE_URL=http://localhost:11434/v1
 EMBEDDING_MODEL=nomic-embed-text
@@ -198,19 +190,17 @@ EMBEDDING_DIMENSIONS=768
 
 ## LLM 配置（可选）
 
-用于生成 AI 摘要和聚类名称。
+用于生成 AI 摘要和聚类名称。使用 OpenAI 兼容接口。
 
 | 变量名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `LLM_PROVIDER` | string | `siliconflow` | 提供商名称 |
 | `LLM_API_KEY` | string | - | API 密钥 |
-| `LLM_BASE_URL` | string | `https://api.siliconflow.cn/v1` | API 基础 URL |
+| `LLM_BASE_URL` | string | `https://api.siliconflow.cn/v1` | API 基础 URL (OpenAI 兼容) |
 | `LLM_MODEL` | string | `Qwen/Qwen2.5-7B-Instruct` | 模型名称 |
 
 ### 示例配置
 
 ```bash
-LLM_PROVIDER=siliconflow
 LLM_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxx
 LLM_BASE_URL=https://api.siliconflow.cn/v1
 LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
@@ -250,7 +240,6 @@ LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 APP_NAME=mynebula
 APP_VERSION=0.1.0
 DEBUG=true
-ENVIRONMENT=development
 SECRET_KEY=dev-secret-key-not-for-production
 
 # ==================== 日志配置 ====================
@@ -269,15 +258,13 @@ GITHUB_CLIENT_ID=your_client_id
 GITHUB_CLIENT_SECRET=your_client_secret
 GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/callback
 
-# ==================== Embedding ====================
-EMBEDDING_PROVIDER=siliconflow
+# ==================== Embedding (OpenAI 兼容接口) ====================
 EMBEDDING_API_KEY=your_embedding_api_key
 EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
 EMBEDDING_MODEL=BAAI/bge-large-zh-v1.5
 EMBEDDING_DIMENSIONS=1024
 
-# ==================== LLM (可选) ====================
-LLM_PROVIDER=siliconflow
+# ==================== LLM (OpenAI 兼容接口，可选) ====================
 LLM_API_KEY=your_llm_api_key
 LLM_BASE_URL=https://api.siliconflow.cn/v1
 LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
@@ -290,7 +277,6 @@ LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 APP_NAME=mynebula
 APP_VERSION=0.1.0
 DEBUG=false
-ENVIRONMENT=production
 SECRET_KEY=your-very-long-and-secure-secret-key-32chars
 
 # ==================== 日志配置 ====================
@@ -309,8 +295,7 @@ GITHUB_CLIENT_ID=your_production_client_id
 GITHUB_CLIENT_SECRET=your_production_client_secret
 GITHUB_REDIRECT_URI=https://your-domain.com/api/auth/callback
 
-# ==================== Embedding ====================
-EMBEDDING_PROVIDER=siliconflow
+# ==================== Embedding (OpenAI 兼容接口) ====================
 EMBEDDING_API_KEY=your_embedding_api_key
 EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
 EMBEDDING_MODEL=BAAI/bge-large-zh-v1.5

@@ -57,18 +57,12 @@ class DatabaseSettings(BaseSettings):
 
 
 class EmbeddingSettings(BaseSettings):
-    """Embedding service configuration."""
+    """Embedding service configuration (OpenAI compatible API)."""
 
-    provider: Literal["openai", "siliconflow", "jina", "ollama", "zhipu", "custom"] = (
-        Field(
-            default="siliconflow",
-            description="Embedding provider name",
-        )
-    )
     api_key: str = Field(default="", description="API key for embedding service")
     base_url: str = Field(
         default="https://api.siliconflow.cn/v1",
-        description="Base URL for embedding API",
+        description="Base URL for embedding API (OpenAI compatible)",
     )
     model: str = Field(
         default="BAAI/bge-large-zh-v1.5",
@@ -103,13 +97,12 @@ class EmbeddingSettings(BaseSettings):
 
 
 class LLMSettings(BaseSettings):
-    """LLM service configuration for summarization."""
+    """LLM service configuration for summarization (OpenAI compatible API)."""
 
-    provider: str = Field(default="siliconflow", description="LLM provider name")
     api_key: str = Field(default="", description="API key for LLM service")
     base_url: str = Field(
         default="https://api.siliconflow.cn/v1",
-        description="Base URL for LLM API",
+        description="Base URL for LLM API (OpenAI compatible)",
     )
     model: str = Field(
         default="Qwen/Qwen2.5-7B-Instruct",
@@ -180,10 +173,8 @@ class AppSettings(BaseSettings):
     # Basic settings
     app_name: str = Field(default="mynebula", description="Application name")
     app_version: str = Field(default="0.1.0", description="Application version")
-    debug: bool = Field(default=False, description="Debug mode")
-    environment: Literal["development", "staging", "production"] = Field(
-        default="development",
-        description="Environment name",
+    debug: bool = Field(
+        default=False, description="Debug mode (also controls environment)"
     )
     secret_key: str = Field(
         default="change-this-in-production",

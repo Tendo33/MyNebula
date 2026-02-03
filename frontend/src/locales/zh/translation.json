@@ -26,5 +26,15 @@
     "api_endpoint": "API 端点",
     "github_token_status": "GitHub 令牌状态",
     "connected": "已连接"
+  },
+  "repoDetails": {
+    "close": "关闭",
+    "no_description": "暂无描述",
+    "stars": "星标",
+    "language": "语言",
+    "unknown": "未知",
+    "starred_at": "收藏于",
+    "ai_summary": "AI 摘要",
+    "view_on_github": "在 GitHub 上查看"
   }
 }

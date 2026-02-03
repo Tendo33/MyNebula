@@ -26,5 +26,15 @@
     "api_endpoint": "API Endpoint",
     "github_token_status": "GitHub Token Status",
     "connected": "Connected"
+},
+"repoDetails": {
+    "close": "Close",
+    "no_description": "No description available",
+    "stars": "Stars",
+    "language": "Language",
+    "unknown": "Unknown",
+    "starred_at": "Starred",
+    "ai_summary": "AI Summary",
+    "view_on_github": "View on GitHub"
   }
 }

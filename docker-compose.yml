@@ -34,12 +34,12 @@ services:
       - DATABASE_USER=${DATABASE_USER:-mynebula}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD:-mynebula_secret}
       - DATABASE_NAME=${DATABASE_NAME:-mynebula}
-      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-siliconflow}
+
       - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-large-zh-v1.5}
       - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-1024}
-      - LLM_PROVIDER=${LLM_PROVIDER:-siliconflow}
+
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
@@ -47,7 +47,7 @@ services:
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI:-http://localhost:8000/api/auth/callback}
       - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+
     env_file:
       - .env
     ports:
