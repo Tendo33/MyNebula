@@ -266,6 +266,38 @@ def generate_cluster_name(
     return name, description, keywords
 
 
+async def generate_cluster_name_llm(
+    repo_names: list[str],
+    descriptions: list[str],
+    topics: list[list[str]],
+    languages: list[str] | None = None,
+) -> tuple[str, str, list[str]]:
+    """Generate cluster name, description, and keywords using LLM.
+
+    This provides better results than the heuristic approach by using
+    LLM to understand the semantic relationship between repos.
+
+    Args:
+        repo_names: Names of repos in cluster
+        descriptions: Descriptions of repos
+        topics: Topics/tags of repos
+        languages: Primary languages of repos (optional)
+
+    Returns:
+        Tuple of (name, description, keywords)
+    """
+    from nebula.core.llm import get_llm_service
+
+    llm_service = get_llm_service()
+
+    return await llm_service.generate_cluster_info(
+        repo_names=repo_names,
+        descriptions=descriptions,
+        topics=topics,
+        languages=languages or [],
+    )
+
+
 # Global service instance
 _clustering_service: ClusteringService | None = None
 

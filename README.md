@@ -20,89 +20,135 @@
 - 🔌 **多 Embedding 提供商**: 支持 OpenAI、SiliconFlow、Jina、Ollama 等
 - 🐳 **自托管 (Self-hosted)**: Docker 一键部署，数据完全自主
 
+---
+
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option A: Docker Compose (推荐)
 
-- Python 3.10+
-- Docker & Docker Compose
-- GitHub OAuth App (用于认证)
-
-### 1. Clone and Setup
+一键部署完整应用栈：
 
 ```bash
+# 1. 克隆仓库
 git clone https://github.com/yourusername/mynebula.git
 cd mynebula
 
-# Install uv if not already installed
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，填写必要配置（详见下方说明）
+
+# 3. 启动所有服务
+docker-compose up -d
+
+# 4. 查看日志
+docker-compose logs -f
+```
+
+服务启动后：
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs (开发模式)
+
+### Option B: 本地开发模式
+
+#### Prerequisites
+
+- Python 3.10+
+- Node.js 20+
+- Docker (仅用于 PostgreSQL)
+- GitHub OAuth App
+
+#### 1. 安装依赖
+
+```bash
+# 安装 uv (Python 包管理器)
 pip install uv
 
-# Install dependencies
+# 安装 Python 依赖
 uv sync
+
+# 安装前端依赖
+cd frontend && npm install && cd ..
 ```
 
-### 2. Configure Environment
+#### 2. 配置环境变量
 
 ```bash
-# Copy example config
 cp .env.example .env
-
-# Edit .env with your settings:
-# - GitHub OAuth credentials
-# - Embedding provider (SiliconFlow recommended for CN users)
-# - Database credentials (or use defaults)
+# 编辑 .env 文件（详见 doc/ENV_VARS.md）
 ```
 
-### 3. Start PostgreSQL
+#### 3. 启动数据库
 
 ```bash
-# Start PostgreSQL with pgvector
 docker-compose up -d db
-
-# Wait for database to be ready
-docker-compose logs -f db
 ```
 
-### 4. Initialize Database
+#### 4. 初始化数据库
 
 ```bash
-# Run database migrations
 uv run alembic upgrade head
 ```
 
-### 5. Start the Server
+#### 5. 启动服务
 
+**后端** (终端 1):
 ```bash
-# Development mode
 uv run uvicorn nebula.main:app --reload
-
-# Or use the CLI
-uv run mynebula
 ```
 
-Visit http://localhost:8000/docs for the API documentation.
+**前端** (终端 2):
+```bash
+cd frontend && npm run dev
+```
+
+访问：
+- Frontend: http://localhost:5173
+- API Docs: http://localhost:8000/docs
+
+---
 
 ## 📦 Configuration
 
-### GitHub OAuth Setup
+### 环境变量概览
 
-1. Go to https://github.com/settings/developers
-2. Create a new OAuth App
-3. Set the callback URL to `http://localhost:8000/api/auth/callback`
-4. Copy Client ID and Client Secret to `.env`
+详细配置说明请参考 [doc/ENV_VARS.md](doc/ENV_VARS.md)。
 
-### Embedding Providers
+| 变量组 | 必填 | 说明 |
+|--------|------|------|
+| `GITHUB_*` | ✅ | GitHub OAuth 认证 |
+| `EMBEDDING_*` | ✅ | Embedding 服务配置 |
+| `DATABASE_*` | ❌ | 数据库配置（有默认值） |
+| `LLM_*` | ❌ | LLM 服务（用于 AI 摘要） |
 
-MyNebula supports multiple embedding providers through OpenAI-compatible APIs:
+### GitHub OAuth 配置
 
-| Provider | Base URL | Recommended Model |
-|----------|----------|-------------------|
-| **SiliconFlow** (推荐国内) | `https://api.siliconflow.cn/v1` | `BAAI/bge-large-zh-v1.5` |
-| **Jina AI** | `https://api.jina.ai/v1` | `jina-embeddings-v3` |
-| **OpenAI** | `https://api.openai.com/v1` | `text-embedding-3-small` |
-| **Ollama** (本地) | `http://localhost:11434/v1` | `nomic-embed-text` |
+1. 访问 https://github.com/settings/developers
+2. 创建新的 OAuth App
+3. 设置 Callback URL:
+   - 开发环境: `http://localhost:8000/api/auth/callback`
+   - 生产环境: `https://your-domain.com/api/auth/callback`
+4. 将 Client ID 和 Client Secret 填入 `.env`
 
-Example `.env` configuration for SiliconFlow:
+```bash
+GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_client_secret
+GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/callback
+```
+
+### Embedding 提供商
+
+支持多种 OpenAI 兼容的 Embedding API：
+
+| 提供商 | Base URL | 推荐模型 | 维度 |
+|--------|----------|----------|------|
+| **SiliconFlow** (推荐国内) | `https://api.siliconflow.cn/v1` | `BAAI/bge-large-zh-v1.5` | 1024 |
+| **Jina AI** | `https://api.jina.ai/v1` | `jina-embeddings-v3` | 1024 |
+| **OpenAI** | `https://api.openai.com/v1` | `text-embedding-3-small` | 1536 |
+| **智谱 AI** | `https://open.bigmodel.cn/api/paas/v4` | `embedding-3` | 2048 |
+| **Ollama** (本地) | `http://localhost:11434/v1` | `nomic-embed-text` | 768 |
+
+SiliconFlow 配置示例：
 
 ```bash
 EMBEDDING_PROVIDER=siliconflow
@@ -195,23 +241,41 @@ uv run alembic downgrade -1
 
 ## 🛣 Roadmap
 
-- [x] Phase 1: Core Backend
-  - [x] PostgreSQL + pgvector setup
-  - [x] GitHub OAuth & Star sync
-  - [x] Embedding service (multi-provider)
-  - [x] Semantic search API
-- [ ] Phase 2: Advanced Features
-  - [ ] UMAP clustering & visualization data
-  - [ ] AI summary generation
-  - [ ] README fetching & processing
-- [ ] Phase 3: Frontend
-  - [ ] React + Three.js 3D visualization
-  - [ ] Semantic search UI
-  - [ ] Timeline component
-- [ ] Phase 4: Enhancements
-  - [ ] Multi-user support
-  - [ ] Trend discovery
-  - [ ] Tech stack DNA generation
+### Phase 1: 基础架构 ✅
+- [x] PostgreSQL + pgvector 向量数据库
+- [x] GitHub OAuth 认证流程
+- [x] 多提供商 Embedding 服务
+- [x] Star 列表同步 API
+
+### Phase 2: 核心数据管道 ✅
+- [x] README 内容获取与处理
+- [x] 批量 Embedding 计算
+- [x] 向量入库流程
+- [x] 语义相似度搜索
+
+### Phase 3: 语义能力 ✅
+- [x] 自然语言查询 API
+- [x] UMAP 降维算法
+- [x] 聚类名称生成 (LLM)
+- [x] AI 摘要生成
+
+### Phase 4: 前端可视化 ✅
+- [x] React + Three.js 3D 力导图
+- [x] 节点交互 (悬停/点击)
+- [x] 语义搜索 UI
+- [x] 时间轴滑块
+- [x] 配置面板
+
+### Phase 5: 部署与运维 ✅
+- [x] Docker Compose 配置
+- [x] 部署文档
+- [x] 环境变量说明
+
+### Future Enhancements
+- [ ] 多用户支持
+- [ ] 趋势发现
+- [ ] 技术栈 DNA 生成
+- [ ] 导出/分享功能
 
 ## 🤝 Contributing
 

@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from nebula.core.config import get_sync_settings
 from nebula.core.embedding import get_embedding_service
 from nebula.core.github_client import GitHubClient
-from nebula.db import StarredRepo, SyncTask, User, get_db
+from nebula.core.llm import get_llm_service
+from nebula.db import Cluster, StarredRepo, SyncTask, User, get_db
 from nebula.utils import get_logger
 
 logger = get_logger(__name__)
@@ -481,3 +482,385 @@ async def get_all_sync_status(
         )
         for task in tasks
     ]
+
+
+# ==================== AI Summary Generation ====================
+
+
+async def generate_summaries_task(user_id: int, task_id: int):
+    """Background task to generate AI summaries for repos.
+
+    Args:
+        user_id: User database ID
+        task_id: Sync task ID
+    """
+    from nebula.db.database import get_db_context
+
+    async with get_db_context() as db:
+        try:
+            task = await db.get(SyncTask, task_id)
+            if not task:
+                return
+
+            task.status = "running"
+            task.started_at = datetime.utcnow()
+            await db.commit()
+
+            # Get repos without summaries
+            result = await db.execute(
+                select(StarredRepo).where(
+                    StarredRepo.user_id == user_id,
+                    StarredRepo.is_summarized == False,  # noqa: E712
+                )
+            )
+            repos = result.scalars().all()
+
+            task.total_items = len(repos)
+            await db.commit()
+
+            if not repos:
+                task.status = "completed"
+                task.completed_at = datetime.utcnow()
+                await db.commit()
+                return
+
+            # Generate summaries using LLM
+            llm_service = get_llm_service()
+            processed = 0
+            failed = 0
+
+            # Process in small batches to avoid rate limits
+            batch_size = 5
+            for i in range(0, len(repos), batch_size):
+                batch = repos[i : i + batch_size]
+
+                for repo in batch:
+                    try:
+                        summary = await llm_service.generate_repo_summary(
+                            full_name=repo.full_name,
+                            description=repo.description,
+                            topics=repo.topics,
+                            language=repo.language,
+                            readme_content=repo.readme_content,
+                        )
+
+                        repo.ai_summary = summary
+                        repo.is_summarized = True
+                        processed += 1
+
+                    except Exception as e:
+                        logger.warning(
+                            f"Summary generation failed for {repo.full_name}: {e}"
+                        )
+                        failed += 1
+
+                task.processed_items = processed
+                task.failed_items = failed
+                await db.commit()
+
+                logger.info(f"Generated summaries: {processed}/{len(repos)}")
+
+            task.status = "completed"
+            task.completed_at = datetime.utcnow()
+            await db.commit()
+
+            logger.info(
+                f"Completed summary generation for user {user_id}: {processed} generated, {failed} failed"
+            )
+
+        except Exception as e:
+            logger.exception(f"Summary generation task failed: {e}")
+
+            async with get_db_context() as db:
+                task = await db.get(SyncTask, task_id)
+                if task:
+                    task.status = "failed"
+                    task.error_message = str(e)
+                    task.completed_at = datetime.utcnow()
+                    await db.commit()
+
+
+@router.post("/summaries", response_model=SyncStartResponse)
+async def start_summary_generation(
+    token: str = Query(..., description="JWT token"),
+    background_tasks: BackgroundTasks = None,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Start AI summary generation for repos.
+
+    Args:
+        token: JWT access token
+        background_tasks: FastAPI background tasks
+        db: Database session
+
+    Returns:
+        Task information
+    """
+    user = await get_user_by_token(token, db)
+
+    # Check for existing running task
+    result = await db.execute(
+        select(SyncTask).where(
+            SyncTask.user_id == user.id,
+            SyncTask.task_type == "summary",
+            SyncTask.status.in_(["pending", "running"]),
+        )
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        return SyncStartResponse(
+            task_id=existing.id,
+            message="Summary generation already in progress",
+            status=existing.status,
+        )
+
+    # Create new task
+    task = SyncTask(
+        user_id=user.id,
+        task_type="summary",
+        status="pending",
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    # Start background task
+    background_tasks.add_task(generate_summaries_task, user.id, task.id)
+
+    return SyncStartResponse(
+        task_id=task.id,
+        message="Summary generation started",
+        status="pending",
+    )
+
+
+# ==================== Clustering ====================
+
+
+async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
+    """Background task to run clustering on user's repos.
+
+    Args:
+        user_id: User database ID
+        task_id: Sync task ID
+        use_llm: Whether to use LLM for cluster naming
+    """
+    from nebula.core.clustering import (
+        generate_cluster_name,
+        generate_cluster_name_llm,
+        get_clustering_service,
+    )
+    from nebula.db.database import get_db_context
+
+    async with get_db_context() as db:
+        try:
+            task = await db.get(SyncTask, task_id)
+            if not task:
+                return
+
+            task.status = "running"
+            task.started_at = datetime.utcnow()
+            await db.commit()
+
+            # Get all embedded repos
+            result = await db.execute(
+                select(StarredRepo).where(
+                    StarredRepo.user_id == user_id,
+                    StarredRepo.is_embedded == True,  # noqa: E712
+                )
+            )
+            repos = result.scalars().all()
+
+            if not repos:
+                task.status = "completed"
+                task.completed_at = datetime.utcnow()
+                task.error_message = "No embedded repos found"
+                await db.commit()
+                return
+
+            task.total_items = len(repos)
+            await db.commit()
+
+            logger.info(f"Running clustering on {len(repos)} repos for user {user_id}")
+
+            # Extract embeddings
+            embeddings = [repo.embedding for repo in repos if repo.embedding]
+
+            if len(embeddings) < 5:
+                task.status = "completed"
+                task.completed_at = datetime.utcnow()
+                task.error_message = "Not enough embedded repos for clustering (min 5)"
+                await db.commit()
+                return
+
+            # Run clustering
+            clustering_service = get_clustering_service()
+            cluster_result = clustering_service.fit_transform(embeddings)
+
+            # Delete existing clusters for this user
+            await db.execute(select(Cluster).where(Cluster.user_id == user_id))
+            existing_clusters = (
+                (await db.execute(select(Cluster).where(Cluster.user_id == user_id)))
+                .scalars()
+                .all()
+            )
+
+            for cluster in existing_clusters:
+                await db.delete(cluster)
+            await db.commit()
+
+            # Create new clusters
+            cluster_map: dict[int, Cluster] = {}
+
+            for cluster_id in set(cluster_result.labels):
+                if cluster_id == -1:
+                    continue  # Skip noise
+
+                # Get repos in this cluster
+                cluster_repo_indices = [
+                    i
+                    for i, label in enumerate(cluster_result.labels)
+                    if label == cluster_id
+                ]
+                cluster_repos = [repos[i] for i in cluster_repo_indices]
+
+                # Extract info for naming
+                repo_names = [r.full_name for r in cluster_repos]
+                descriptions = [r.description or "" for r in cluster_repos]
+                topics = [r.topics or [] for r in cluster_repos]
+                languages = [r.language or "" for r in cluster_repos]
+
+                # Generate cluster name
+                try:
+                    if use_llm:
+                        name, description, keywords = await generate_cluster_name_llm(
+                            repo_names, descriptions, topics, languages
+                        )
+                    else:
+                        name, description, keywords = generate_cluster_name(
+                            repo_names, descriptions, topics
+                        )
+                except Exception as e:
+                    logger.warning(f"Cluster naming failed: {e}, using heuristic")
+                    name, description, keywords = generate_cluster_name(
+                        repo_names, descriptions, topics
+                    )
+
+                # Get cluster center
+                center = cluster_result.cluster_centers.get(cluster_id, [0, 0, 0])
+
+                # Create cluster record
+                cluster = Cluster(
+                    user_id=user_id,
+                    name=name,
+                    description=description,
+                    keywords=keywords,
+                    repo_count=len(cluster_repos),
+                    center_x=center[0] if len(center) > 0 else None,
+                    center_y=center[1] if len(center) > 1 else None,
+                    center_z=center[2] if len(center) > 2 else None,
+                )
+                db.add(cluster)
+                await db.flush()  # Get the ID
+
+                cluster_map[cluster_id] = cluster
+
+            await db.commit()
+
+            # Update repos with cluster assignments and coordinates
+            for i, repo in enumerate(repos):
+                if i < len(cluster_result.labels):
+                    label = cluster_result.labels[i]
+                    if label != -1 and label in cluster_map:
+                        repo.cluster_id = cluster_map[label].id
+
+                    if i < len(cluster_result.coords_3d):
+                        coords = cluster_result.coords_3d[i]
+                        repo.coord_x = coords[0] if len(coords) > 0 else None
+                        repo.coord_y = coords[1] if len(coords) > 1 else None
+                        repo.coord_z = coords[2] if len(coords) > 2 else None
+
+            task.processed_items = len(repos)
+            task.status = "completed"
+            task.completed_at = datetime.utcnow()
+            await db.commit()
+
+            logger.info(
+                f"Clustering completed for user {user_id}: "
+                f"{cluster_result.n_clusters} clusters, {len(repos)} repos assigned"
+            )
+
+        except Exception as e:
+            logger.exception(f"Clustering task failed: {e}")
+
+            async with get_db_context() as db:
+                task = await db.get(SyncTask, task_id)
+                if task:
+                    task.status = "failed"
+                    task.error_message = str(e)
+                    task.completed_at = datetime.utcnow()
+                    await db.commit()
+
+
+@router.post("/clustering", response_model=SyncStartResponse)
+async def start_clustering(
+    token: str = Query(..., description="JWT token"),
+    use_llm: bool = Query(default=True, description="Use LLM for cluster naming"),
+    background_tasks: BackgroundTasks = None,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Start clustering on user's repos.
+
+    This will:
+    1. Run UMAP dimensionality reduction
+    2. Apply HDBSCAN clustering
+    3. Generate cluster names (using LLM if enabled)
+    4. Update repo coordinates and cluster assignments
+
+    Args:
+        token: JWT access token
+        use_llm: Whether to use LLM for generating cluster names
+        background_tasks: FastAPI background tasks
+        db: Database session
+
+    Returns:
+        Task information
+    """
+    user = await get_user_by_token(token, db)
+
+    # Check for existing running task
+    result = await db.execute(
+        select(SyncTask).where(
+            SyncTask.user_id == user.id,
+            SyncTask.task_type == "cluster",
+            SyncTask.status.in_(["pending", "running"]),
+        )
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        return SyncStartResponse(
+            task_id=existing.id,
+            message="Clustering already in progress",
+            status=existing.status,
+        )
+
+    # Create new task
+    task = SyncTask(
+        user_id=user.id,
+        task_type="cluster",
+        status="pending",
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    # Start background task
+    background_tasks.add_task(run_clustering_task, user.id, task.id, use_llm)
+
+    return SyncStartResponse(
+        task_id=task.id,
+        message="Clustering started",
+        status="pending",
+    )

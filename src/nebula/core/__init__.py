@@ -25,6 +25,7 @@ from .config import (
 )
 from .embedding import EmbeddingService, close_embedding_service, get_embedding_service
 from .github_client import GitHubClient, GitHubRepo, GitHubUser
+from .llm import LLMService, close_llm_service, get_llm_service
 
 __all__ = [
     # Config
@@ -45,6 +46,10 @@ __all__ = [
     "EmbeddingService",
     "get_embedding_service",
     "close_embedding_service",
+    # LLM
+    "LLMService",
+    "get_llm_service",
+    "close_llm_service",
     # GitHub
     "GitHubClient",
     "GitHubUser",

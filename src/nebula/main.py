@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from nebula.api import api_router
 from nebula.core.config import get_app_settings
 from nebula.core.embedding import close_embedding_service
+from nebula.core.llm import close_llm_service
 from nebula.db import close_db, init_db
 from nebula.utils import get_logger, setup_logging
 
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
     # Cleanup
     logger.info("Shutting down...")
     await close_embedding_service()
+    await close_llm_service()
     await close_db()
     logger.info("Shutdown complete")
 

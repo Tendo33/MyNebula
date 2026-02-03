@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  # PostgreSQL with pgvector extension
+  # ==================== Database ====================
   db:
     image: pgvector/pgvector:pg16
     container_name: mynebula-db
@@ -19,27 +19,89 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - mynebula-net
 
-  # Backend API (optional - for production deployment)
-  # api:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/Dockerfile
-  #   container_name: mynebula-api
-  #   environment:
-  #     - DATABASE_HOST=db
-  #     - DATABASE_PORT=5432
-  #     - DATABASE_USER=${DATABASE_USER:-mynebula}
-  #     - DATABASE_PASSWORD=${DATABASE_PASSWORD:-mynebula_secret}
-  #     - DATABASE_NAME=${DATABASE_NAME:-mynebula}
-  #   env_file:
-  #     - .env
+  # ==================== Backend API ====================
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: mynebula-api
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - DATABASE_USER=${DATABASE_USER:-mynebula}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-mynebula_secret}
+      - DATABASE_NAME=${DATABASE_NAME:-mynebula}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-siliconflow}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-large-zh-v1.5}
+      - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-1024}
+      - LLM_PROVIDER=${LLM_PROVIDER:-siliconflow}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI:-http://localhost:8000/api/auth/callback}
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - mynebula-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==================== Frontend ====================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+    container_name: mynebula-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - mynebula-net
+
+  # ==================== Nginx Reverse Proxy (Optional) ====================
+  # Uncomment to use Nginx as a reverse proxy in production
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: mynebula-nginx
   #   ports:
-  #     - "8000:8000"
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./docker/ssl:/etc/nginx/ssl:ro
   #   depends_on:
-  #     db:
-  #       condition: service_healthy
+  #     - api
+  #     - frontend
   #   restart: unless-stopped
+  #   networks:
+  #     - mynebula-net
+
+networks:
+  mynebula-net:
+    driver: bridge
 
 volumes:
   postgres_data:
