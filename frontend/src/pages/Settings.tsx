@@ -1,5 +1,6 @@
 import { Sidebar } from '../components/layout/Sidebar';
 import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from '../api/client';
 
 const Settings = () => {
   const { t, i18n } = useTranslation();
@@ -55,7 +56,7 @@ const Settings = () => {
                         <label className="block text-sm text-nebula-text-muted mb-1">{t('settings.api_endpoint')}</label>
                         <input
                             type="text"
-                            value="http://localhost:8000/api"
+                            value={API_BASE_URL}
                             readOnly
                             className="w-full bg-nebula-bg border border-nebula-border rounded-lg px-3 py-2 text-nebula-text-dim"
                         />
