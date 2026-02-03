@@ -4,6 +4,8 @@ Handles GitHub star synchronization and processing tasks.
 """
 
 from datetime import datetime
+from enum import Enum
+from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -19,6 +21,13 @@ from nebula.utils import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+class SyncMode(str, Enum):
+    """Sync mode for star synchronization."""
+
+    FULL = "full"  # Full sync: fetch all starred repos
+    INCREMENTAL = "incremental"  # Incremental: only fetch new stars since last sync
 
 
 class SyncStatusResponse(BaseModel):
@@ -68,12 +77,21 @@ async def get_user_by_token(token: str, db: AsyncSession) -> User:
     return user
 
 
-async def sync_stars_task(user_id: int, task_id: int):
+async def sync_stars_task(
+    user_id: int,
+    task_id: int,
+    sync_mode: str = "incremental",
+):
     """Background task to sync GitHub stars.
+
+    Supports two modes:
+    - incremental: Only fetch stars newer than last_sync_at (fast, default)
+    - full: Fetch all starred repos (complete sync)
 
     Args:
         user_id: User database ID
         task_id: Sync task ID
+        sync_mode: Sync mode - "incremental" or "full"
     """
     from nebula.db.database import get_db_context
 
@@ -92,9 +110,38 @@ async def sync_stars_task(user_id: int, task_id: int):
             task.started_at = datetime.utcnow()
             await db.commit()
 
+            # Determine effective sync mode
+            # If no previous sync, force full mode
+            effective_mode = sync_mode
+            stop_before = None
+
+            if sync_mode == "incremental" and user.last_sync_at:
+                stop_before = user.last_sync_at
+                logger.info(
+                    f"Incremental sync for {user.username}: "
+                    f"fetching stars newer than {stop_before}"
+                )
+            elif sync_mode == "incremental" and not user.last_sync_at:
+                effective_mode = "full"
+                logger.info(f"First sync for {user.username}: switching to full mode")
+            else:
+                logger.info(f"Full sync for {user.username}")
+
+            # Store sync mode in task metadata
+            task.error_details = {"sync_mode": effective_mode}
+            await db.commit()
+
             # Get starred repos from GitHub
             async with GitHubClient(access_token=user.access_token) as client:
-                repos = await client.get_starred_repos()
+                repos, was_truncated = await client.get_starred_repos(
+                    stop_before=stop_before
+                )
+
+            if was_truncated:
+                logger.info(
+                    f"Incremental sync: fetched {len(repos)} new repos "
+                    f"(stopped at last_sync_at)"
+                )
 
             task.total_items = len(repos)
             await db.commit()
@@ -103,6 +150,8 @@ async def sync_stars_task(user_id: int, task_id: int):
             settings = get_sync_settings()
             processed = 0
             failed = 0
+            new_count = 0
+            updated_count = 0
 
             for repo in repos:
                 try:
@@ -124,6 +173,7 @@ async def sync_stars_task(user_id: int, task_id: int):
                         existing.forks_count = repo.forks_count
                         existing.repo_updated_at = repo.updated_at
                         existing.repo_pushed_at = repo.pushed_at
+                        updated_count += 1
                     else:
                         # Create new
                         new_repo = StarredRepo(
@@ -147,6 +197,7 @@ async def sync_stars_task(user_id: int, task_id: int):
                             repo_pushed_at=repo.pushed_at,
                         )
                         db.add(new_repo)
+                        new_count += 1
 
                     processed += 1
                     task.processed_items = processed
@@ -167,17 +218,34 @@ async def sync_stars_task(user_id: int, task_id: int):
             await db.commit()
 
             # Update user stats
-            user.total_stars = len(repos)
-            user.synced_stars = processed
+            # For incremental sync, we need to count total stars from database
+            if effective_mode == "incremental":
+                result = await db.execute(
+                    select(StarredRepo).where(StarredRepo.user_id == user_id)
+                )
+                total_db_repos = len(result.scalars().all())
+                user.total_stars = total_db_repos
+                user.synced_stars = total_db_repos
+            else:
+                user.total_stars = len(repos)
+                user.synced_stars = processed
+
             user.last_sync_at = datetime.utcnow()
 
-            # Update task
+            # Update task with summary
             task.status = "completed"
             task.completed_at = datetime.utcnow()
+            task.error_details = {
+                "sync_mode": effective_mode,
+                "new_repos": new_count,
+                "updated_repos": updated_count,
+                "was_truncated": was_truncated,
+            }
             await db.commit()
 
             logger.info(
-                f"Completed star sync for {user.username}: {processed} synced, {failed} failed"
+                f"Completed star sync for {user.username} ({effective_mode}): "
+                f"{new_count} new, {updated_count} updated, {failed} failed"
             )
 
         except Exception as e:
@@ -284,13 +352,24 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 @router.post("/stars", response_model=SyncStartResponse)
 async def start_star_sync(
     token: str = Query(..., description="JWT token"),
+    mode: Literal["incremental", "full"] = Query(
+        default="incremental",
+        description="Sync mode: 'incremental' (fast, only new stars) or 'full' (all stars)",
+    ),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Start GitHub star synchronization.
 
+    Supports two sync modes:
+    - **incremental** (default): Only fetch stars newer than last sync.
+      Fast and efficient for regular updates (e.g., after starring a new repo).
+    - **full**: Fetch all starred repos. Use for first sync or when you need
+      to ensure complete data consistency.
+
     Args:
         token: JWT access token
+        mode: Sync mode - "incremental" or "full"
         background_tasks: FastAPI background tasks
         db: Database session
 
@@ -326,12 +405,13 @@ async def start_star_sync(
     await db.commit()
     await db.refresh(task)
 
-    # Start background task
-    background_tasks.add_task(sync_stars_task, user.id, task.id)
+    # Start background task with sync mode
+    background_tasks.add_task(sync_stars_task, user.id, task.id, mode)
 
+    mode_desc = "incremental (new stars only)" if mode == "incremental" else "full"
     return SyncStartResponse(
         task_id=task.id,
-        message="Star sync started",
+        message=f"Star sync started ({mode_desc})",
         status="pending",
     )
 

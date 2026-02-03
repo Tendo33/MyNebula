@@ -161,6 +161,10 @@ class SyncSettings(BaseSettings):
         ge=1000,
         le=100000,
     )
+    default_sync_mode: Literal["incremental", "full"] = Field(
+        default="incremental",
+        description="Default sync mode: incremental (fast) or full (complete)",
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="SYNC_",

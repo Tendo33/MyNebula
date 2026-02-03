@@ -183,20 +183,29 @@ class GitHubClient:
         self,
         per_page: int = 100,
         max_pages: int | None = None,
-    ) -> list[GitHubRepo]:
-        """Get all starred repositories for current user.
+        stop_before: datetime | None = None,
+    ) -> tuple[list[GitHubRepo], bool]:
+        """Get starred repositories for current user.
+
+        GitHub API returns repos sorted by starred_at DESC (newest first).
+        This allows efficient incremental sync by stopping when we reach
+        repos starred before a given timestamp.
 
         Args:
             per_page: Items per page (max 100)
             max_pages: Maximum pages to fetch (None for all)
+            stop_before: Stop fetching when starred_at <= this timestamp.
+                         Used for incremental sync to skip already-synced repos.
 
         Returns:
-            List of starred repositories
+            Tuple of (repos list, was_truncated).
+            was_truncated is True if we stopped early due to stop_before.
 
         Yields progress through logger.
         """
         repos: list[GitHubRepo] = []
         page = 1
+        was_truncated = False
 
         while True:
             if max_pages and page > max_pages:
@@ -215,9 +224,27 @@ class GitHubClient:
             if not data:
                 break
 
+            should_stop = False
             for item in data:
                 repo_data = item.get("repo", item)  # Handle both formats
                 starred_at = item.get("starred_at")
+
+                # Parse starred_at for comparison
+                starred_at_dt = (
+                    datetime.fromisoformat(starred_at.replace("Z", "+00:00"))
+                    if starred_at
+                    else None
+                )
+
+                # Check if we should stop (incremental sync optimization)
+                if stop_before and starred_at_dt and starred_at_dt <= stop_before:
+                    logger.info(
+                        f"Incremental sync: stopping at {starred_at_dt} "
+                        f"(<= last_sync {stop_before})"
+                    )
+                    should_stop = True
+                    was_truncated = True
+                    break
 
                 repo = GitHubRepo(
                     id=repo_data["id"],
@@ -248,16 +275,17 @@ class GitHubClient:
                     )
                     if repo_data.get("pushed_at")
                     else None,
-                    starred_at=datetime.fromisoformat(starred_at.replace("Z", "+00:00"))
-                    if starred_at
-                    else None,
+                    starred_at=starred_at_dt,
                 )
                 repos.append(repo)
+
+            if should_stop:
+                break
 
             logger.info(f"Fetched page {page}, total repos: {len(repos)}")
             page += 1
 
-        return repos
+        return repos, was_truncated
 
     @async_retry_decorator(max_retries=2, delay=0.5)
     async def get_readme(
