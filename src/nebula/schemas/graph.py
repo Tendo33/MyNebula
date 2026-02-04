@@ -14,6 +14,10 @@ class GraphNode(BaseModel):
     language: str | None = Field(None, description="Primary language")
     html_url: str = Field(..., description="GitHub URL")
 
+    # Owner info
+    owner: str = Field(..., description="Repository owner")
+    owner_avatar_url: str | None = Field(None, description="Owner avatar URL")
+
     # 3D position
     x: float = Field(..., description="X coordinate")
     y: float = Field(..., description="Y coordinate")
@@ -24,10 +28,25 @@ class GraphNode(BaseModel):
     color: str | None = Field(None, description="Node color (hex)")
     size: float = Field(default=1.0, description="Node size based on stars")
 
+    # User's star list (GitHub user-defined category)
+    star_list_id: int | None = Field(None, description="User's star list ID")
+    star_list_name: str | None = Field(None, description="User's star list name")
+
     # Stats for tooltip
     stargazers_count: int = 0
     ai_summary: str | None = None
+    ai_tags: list[str] | None = Field(None, description="AI-generated tags")
+    topics: list[str] | None = Field(None, description="GitHub topics")
     starred_at: str | None = None
+
+
+class StarListInfo(BaseModel):
+    """Schema for user's star list."""
+
+    id: int = Field(..., description="Star list ID")
+    name: str = Field(..., description="List name")
+    description: str | None = Field(None, description="List description")
+    repo_count: int = Field(default=0, description="Number of repos in list")
 
 
 class GraphEdge(BaseModel):
@@ -62,11 +81,15 @@ class GraphData(BaseModel):
     clusters: list[ClusterInfo] = Field(
         default_factory=list, description="Cluster information"
     )
+    star_lists: list[StarListInfo] = Field(
+        default_factory=list, description="User's star lists"
+    )
 
     # Metadata
     total_nodes: int = Field(..., description="Total number of nodes")
     total_edges: int = Field(..., description="Total number of edges")
     total_clusters: int = Field(..., description="Total number of clusters")
+    total_star_lists: int = Field(default=0, description="Total number of star lists")
 
 
 class TimelinePoint(BaseModel):

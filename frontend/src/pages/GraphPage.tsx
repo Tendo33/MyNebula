@@ -5,6 +5,7 @@ import Graph2D from '../components/graph/Graph2D';
 import Graph3D from '../components/graph/Graph3D';
 import Timeline from '../components/graph/Timeline';
 import ClusterPanel from '../components/graph/ClusterPanel';
+import StarListPanel from '../components/graph/StarListPanel';
 import { SearchInput } from '../components/ui/SearchInput';
 import { RepoDetailsPanel } from '../components/graph/RepoDetailsPanel';
 import { startStarSync, getSyncStatus, startEmbedding, startClustering } from '../api/sync';
@@ -44,6 +45,7 @@ const GraphPage = () => {
   // Local UI state
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);
+  const [starListPanelCollapsed, setStarListPanelCollapsed] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
 
   // Close details panel
@@ -129,6 +131,7 @@ const GraphPage = () => {
 
   // Check if any filters are active
   const hasActiveFilters = filters.selectedClusters.size > 0 ||
+                          filters.selectedStarLists.size > 0 ||
                           filters.searchQuery.trim() !== '' ||
                           filters.timeRange !== null ||
                           filters.minStars > 0 ||
@@ -239,6 +242,12 @@ const GraphPage = () => {
                   {t('common.clear_all_filters')}
                 </button>
               )}
+
+              {/* User's Star Lists panel */}
+              <StarListPanel
+                collapsed={starListPanelCollapsed}
+                onToggleCollapsed={() => setStarListPanelCollapsed(!starListPanelCollapsed)}
+              />
 
               {/* Cluster panel */}
               <ClusterPanel

@@ -7,12 +7,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nebula.db import Cluster, StarredRepo, User, get_db
+from nebula.db import Cluster, StarList, StarredRepo, User, get_db
 from nebula.schemas.graph import (
     ClusterInfo,
     GraphData,
     GraphEdge,
     GraphNode,
+    StarListInfo,
     TimelineData,
     TimelinePoint,
 )
@@ -94,11 +95,20 @@ async def get_graph_data(
     )
     clusters = clusters_result.scalars().all()
 
+    # Get user's star lists
+    star_lists_result = await db.execute(
+        select(StarList).where(StarList.user_id == user.id)
+    )
+    star_lists = star_lists_result.scalars().all()
+
     # Build cluster color map
     cluster_colors = {
         c.id: c.color or CLUSTER_COLORS[i % len(CLUSTER_COLORS)]
         for i, c in enumerate(clusters)
     }
+
+    # Build star list name map
+    star_list_names = {sl.id: sl.name for sl in star_lists}
 
     # Build nodes
     nodes = []
@@ -116,14 +126,22 @@ async def get_graph_data(
             description=repo.description,
             language=repo.language,
             html_url=repo.html_url,
+            owner=repo.owner,
+            owner_avatar_url=repo.owner_avatar_url,
             x=repo.coord_x or 0.0,
             y=repo.coord_y or 0.0,
             z=repo.coord_z or 0.0,
             cluster_id=repo.cluster_id,
             color=cluster_colors.get(repo.cluster_id) if repo.cluster_id else "#808080",
             size=size,
+            star_list_id=repo.star_list_id,
+            star_list_name=star_list_names.get(repo.star_list_id)
+            if repo.star_list_id
+            else None,
             stargazers_count=repo.stargazers_count,
             ai_summary=repo.ai_summary,
+            ai_tags=repo.ai_tags,
+            topics=repo.topics,
             starred_at=repo.starred_at.isoformat() if repo.starred_at else None,
         )
         nodes.append(node)
@@ -172,13 +190,26 @@ async def get_graph_data(
         for c in clusters
     ]
 
+    # Build star list info
+    star_list_infos = [
+        StarListInfo(
+            id=sl.id,
+            name=sl.name,
+            description=sl.description,
+            repo_count=sl.repo_count,
+        )
+        for sl in star_lists
+    ]
+
     return GraphData(
         nodes=nodes,
         edges=edges,
         clusters=cluster_infos,
+        star_lists=star_list_infos,
         total_nodes=len(nodes),
         total_edges=len(edges),
         total_clusters=len(clusters),
+        total_star_lists=len(star_lists),
     )
 
 

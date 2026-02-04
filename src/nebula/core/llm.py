@@ -307,6 +307,159 @@ class LLMService:
                 return description[:100]
             return f"{full_name.split('/')[-1]} - 开源项目"
 
+    async def generate_repo_tags(
+        self,
+        full_name: str,
+        description: str | None,
+        topics: list[str] | None,
+        language: str | None,
+        readme_content: str | None,
+    ) -> list[str]:
+        """Generate AI tags for a repository based on README and metadata.
+
+        Args:
+            full_name: Repository full name (owner/repo)
+            description: Repository description
+            topics: Repository topics/tags from GitHub
+            language: Primary programming language
+            readme_content: README content (truncated)
+
+        Returns:
+            List of 3-7 AI-generated tags in Chinese
+        """
+        # Build context
+        context_parts = [f"仓库: {full_name}"]
+
+        if language:
+            context_parts.append(f"语言: {language}")
+
+        if description:
+            context_parts.append(f"描述: {description}")
+
+        if topics:
+            context_parts.append(f"GitHub 标签: {', '.join(topics[:10])}")
+
+        if readme_content:
+            # Truncate README to avoid token limits
+            readme_truncated = readme_content[:3000]
+            context_parts.append(f"README 内容:\n{readme_truncated}")
+
+        context = "\n".join(context_parts)
+
+        prompt = f"""请为以下 GitHub 项目生成 3-7 个精准的中文标签。
+
+{context}
+
+要求:
+1. 标签应该描述项目的核心功能、技术栈、应用场景
+2. 使用中文
+3. 每个标签 2-4 个字
+4. 标签之间用逗号分隔
+5. 不要重复 GitHub 已有的标签
+6. 关注项目的实际用途和技术特点
+
+直接输出标签列表，格式：标签1,标签2,标签3"""
+
+        try:
+            response = await self.complete(
+                prompt=prompt,
+                system_prompt="你是一个技术标签专家，擅长为开源项目生成精准的分类标签。",
+                max_tokens=100,
+                temperature=0.3,
+            )
+
+            # Parse response
+            tags = [tag.strip() for tag in response.strip().split(",")]
+            # Clean up tags
+            tags = [tag for tag in tags if tag and len(tag) <= 20]
+
+            return tags[:7]  # Limit to 7 tags
+
+        except Exception as e:
+            logger.warning(f"AI tag generation failed for {full_name}: {e}")
+            # Fallback to empty list
+            return []
+
+    async def generate_repo_summary_and_tags(
+        self,
+        full_name: str,
+        description: str | None,
+        topics: list[str] | None,
+        language: str | None,
+        readme_content: str | None,
+    ) -> tuple[str, list[str]]:
+        """Generate both summary and tags for a repository in one call.
+
+        More efficient than calling generate_repo_summary and generate_repo_tags separately.
+
+        Args:
+            full_name: Repository full name (owner/repo)
+            description: Repository description
+            topics: Repository topics/tags from GitHub
+            language: Primary programming language
+            readme_content: README content (truncated)
+
+        Returns:
+            Tuple of (summary, tags)
+        """
+        # Build context
+        context_parts = [f"仓库: {full_name}"]
+
+        if language:
+            context_parts.append(f"语言: {language}")
+
+        if description:
+            context_parts.append(f"描述: {description}")
+
+        if topics:
+            context_parts.append(f"GitHub 标签: {', '.join(topics[:10])}")
+
+        if readme_content:
+            # Truncate README to avoid token limits
+            readme_truncated = readme_content[:2500]
+            context_parts.append(f"README 内容:\n{readme_truncated}")
+
+        context = "\n".join(context_parts)
+
+        prompt = f"""请为以下 GitHub 项目生成中文摘要和标签。
+
+{context}
+
+请按以下格式输出（使用 | 分隔）:
+摘要|标签1,标签2,标签3,标签4,标签5
+
+要求:
+1. 摘要: 一句话概括项目核心功能，不超过 50 字，不要用"这是一个"开头
+2. 标签: 3-7 个精准的中文标签，每个 2-4 字，用逗号分隔
+
+直接输出，不要有其他文字。"""
+
+        try:
+            response = await self.complete(
+                prompt=prompt,
+                system_prompt="你是一个技术文档专家，擅长用简洁的语言描述和分类开源项目。",
+                max_tokens=150,
+                temperature=0.3,
+            )
+
+            # Parse response
+            parts = response.strip().split("|")
+            if len(parts) >= 2:
+                summary = parts[0].strip()
+                tags = [tag.strip() for tag in parts[1].split(",")]
+                tags = [tag for tag in tags if tag and len(tag) <= 20][:7]
+                return summary[:100], tags
+            else:
+                # Fallback: treat entire response as summary
+                return response.strip()[:100], []
+
+        except Exception as e:
+            logger.warning(f"Summary/tag generation failed for {full_name}: {e}")
+            # Fallback
+            if description:
+                return description[:100], []
+            return f"{full_name.split('/')[-1]} - 开源项目", []
+
     async def generate_batch_summaries(
         self,
         repos: list[dict],

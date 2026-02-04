@@ -16,7 +16,7 @@ from nebula.core.config import get_sync_settings
 from nebula.core.embedding import get_embedding_service
 from nebula.core.github_client import GitHubClient
 from nebula.core.llm import get_llm_service
-from nebula.db import Cluster, StarredRepo, SyncTask, User, get_db
+from nebula.db import Cluster, StarList, StarredRepo, SyncTask, User, get_db
 from nebula.utils import get_logger
 
 logger = get_logger(__name__)
@@ -98,6 +98,94 @@ async def get_default_user(db: AsyncSession) -> User:
             ) from e
 
     return user
+
+
+async def sync_star_lists(
+    user_id: int,
+    github_token: str,
+    db: AsyncSession,
+) -> None:
+    """Sync user's GitHub star lists.
+
+    This fetches the user's custom star lists from GitHub and updates
+    the database, linking repos to their respective lists.
+
+    Args:
+        user_id: User database ID
+        github_token: GitHub access token
+        db: Database session
+    """
+    try:
+        async with GitHubClient(access_token=github_token) as client:
+            star_lists = await client.get_star_lists()
+
+        if not star_lists:
+            logger.info(f"No star lists found for user {user_id}")
+            return
+
+        # Build map of github_repo_id -> list_id for quick lookup
+        repo_to_list_map: dict[int, int] = {}
+
+        for gh_list in star_lists:
+            # Check if list exists
+            result = await db.execute(
+                select(StarList).where(
+                    StarList.user_id == user_id,
+                    StarList.github_list_id == gh_list.id,
+                )
+            )
+            existing_list = result.scalar_one_or_none()
+
+            if existing_list:
+                # Update existing
+                existing_list.name = gh_list.name
+                existing_list.description = gh_list.description
+                existing_list.is_public = gh_list.is_public
+                existing_list.repo_count = gh_list.repos_count
+                db_list = existing_list
+            else:
+                # Create new
+                db_list = StarList(
+                    user_id=user_id,
+                    github_list_id=gh_list.id,
+                    name=gh_list.name,
+                    description=gh_list.description,
+                    is_public=gh_list.is_public,
+                    repo_count=gh_list.repos_count,
+                )
+                db.add(db_list)
+                await db.flush()  # Get the ID
+
+            # Map repo IDs to this list
+            for repo_id in gh_list.repo_ids:
+                repo_to_list_map[repo_id] = db_list.id
+
+        await db.commit()
+
+        # Update repos with their list assignments
+        if repo_to_list_map:
+            result = await db.execute(
+                select(StarredRepo).where(
+                    StarredRepo.user_id == user_id,
+                    StarredRepo.github_repo_id.in_(list(repo_to_list_map.keys())),
+                )
+            )
+            repos = result.scalars().all()
+
+            for repo in repos:
+                if repo.github_repo_id in repo_to_list_map:
+                    repo.star_list_id = repo_to_list_map[repo.github_repo_id]
+
+            await db.commit()
+
+        logger.info(
+            f"Synced {len(star_lists)} star lists for user {user_id}, "
+            f"{len(repo_to_list_map)} repos assigned to lists"
+        )
+
+    except Exception as e:
+        logger.warning(f"Failed to sync star lists: {e}")
+        raise
 
 
 async def sync_stars_task(
@@ -211,6 +299,7 @@ async def sync_stars_task(
                         existing.forks_count = repo.forks_count
                         existing.repo_updated_at = repo.updated_at
                         existing.repo_pushed_at = repo.pushed_at
+                        existing.owner_avatar_url = repo.owner_avatar_url
                         updated_count += 1
                     else:
                         # Create new
@@ -233,6 +322,7 @@ async def sync_stars_task(
                             repo_created_at=repo.created_at,
                             repo_updated_at=repo.updated_at,
                             repo_pushed_at=repo.pushed_at,
+                            owner_avatar_url=repo.owner_avatar_url,
                         )
                         db.add(new_repo)
                         new_count += 1
@@ -285,6 +375,12 @@ async def sync_stars_task(
                 f"Completed star sync for {user.username} ({effective_mode}): "
                 f"{new_count} new, {updated_count} updated, {failed} failed"
             )
+
+            # Sync star lists (user's custom categories)
+            try:
+                await sync_star_lists(user_id, settings.github_token, db)
+            except Exception as e:
+                logger.warning(f"Star lists sync failed (non-critical): {e}")
 
         except Exception as e:
             logger.exception(f"Star sync failed for user {user_id}: {e}")
@@ -646,7 +742,11 @@ async def generate_summaries_task(user_id: int, task_id: int):
 
                 for repo in batch:
                     try:
-                        summary = await llm_service.generate_repo_summary(
+                        # Generate both summary and tags in one call
+                        (
+                            summary,
+                            tags,
+                        ) = await llm_service.generate_repo_summary_and_tags(
                             full_name=repo.full_name,
                             description=repo.description,
                             topics=repo.topics,
@@ -655,12 +755,13 @@ async def generate_summaries_task(user_id: int, task_id: int):
                         )
 
                         repo.ai_summary = summary
+                        repo.ai_tags = tags if tags else None
                         repo.is_summarized = True
                         processed += 1
 
                     except Exception as e:
                         logger.warning(
-                            f"Summary generation failed for {repo.full_name}: {e}"
+                            f"Summary/tag generation failed for {repo.full_name}: {e}"
                         )
                         failed += 1
 

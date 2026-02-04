@@ -51,6 +51,20 @@ class GitHubRepo(BaseModel):
     updated_at: datetime | None = None
     pushed_at: datetime | None = None
     starred_at: datetime | None = None
+    # Owner avatar for display
+    owner_avatar_url: str | None = None
+
+
+class GitHubStarList(BaseModel):
+    """GitHub Star List (user-defined category)."""
+
+    id: str  # GitHub's list node ID
+    name: str
+    description: str | None = None
+    is_public: bool = True
+    repos_count: int = 0
+    # List of repo IDs (GitHub repo IDs) in this list
+    repo_ids: list[int] = []
 
 
 class GitHubClient:
@@ -210,6 +224,8 @@ class GitHubClient:
                     if repo_data.get("pushed_at")
                     else None,
                     starred_at=starred_at_dt,
+                    # Owner avatar URL for display
+                    owner_avatar_url=repo_data["owner"].get("avatar_url"),
                 )
                 repos.append(repo)
 
@@ -264,6 +280,89 @@ class GitHubClient:
         except Exception as e:
             logger.warning(f"Error getting README for {owner}/{repo}: {e}")
             return None
+
+    async def get_star_lists(self) -> list[GitHubStarList]:
+        """Get user's star lists using GraphQL API.
+
+        Returns:
+            List of GitHubStarList objects containing list info and repo IDs.
+        """
+        # GraphQL endpoint
+        graphql_url = "https://api.github.com/graphql"
+
+        query = """
+        query {
+          viewer {
+            lists(first: 100) {
+              nodes {
+                id
+                name
+                description
+                isPrivate
+                items(first: 100) {
+                  totalCount
+                  nodes {
+                    ... on Repository {
+                      databaseId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    graphql_url,
+                    json={"query": query},
+                    headers={
+                        "Authorization": f"Bearer {self._access_token}",
+                        "Content-Type": "application/json",
+                    },
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+            if "errors" in data:
+                logger.warning(f"GraphQL errors: {data['errors']}")
+                return []
+
+            lists_data = (
+                data.get("data", {}).get("viewer", {}).get("lists", {}).get("nodes", [])
+            )
+
+            star_lists = []
+            for list_data in lists_data:
+                if not list_data:
+                    continue
+
+                # Extract repo IDs from items
+                repo_ids = []
+                items = list_data.get("items", {}).get("nodes", [])
+                for item in items:
+                    if item and "databaseId" in item and item["databaseId"]:
+                        repo_ids.append(item["databaseId"])
+
+                star_list = GitHubStarList(
+                    id=list_data["id"],
+                    name=list_data["name"],
+                    description=list_data.get("description"),
+                    is_public=not list_data.get("isPrivate", False),
+                    repos_count=list_data.get("items", {}).get("totalCount", 0),
+                    repo_ids=repo_ids,
+                )
+                star_lists.append(star_list)
+
+            logger.info(f"Fetched {len(star_lists)} star lists")
+            return star_lists
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch star lists (may not be available): {e}")
+            return []
 
     async def get_rate_limit(self) -> dict:
         """Get current rate limit status.

@@ -48,6 +48,7 @@
   },
   "graph": {
     "clusters": "Clusters",
+    "my_lists": "My Lists",
     "timeline": "Timeline",
     "showing_repos": "Showing {{count}} repos",
     "empty_title": "No Data",

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { GraphNode } from '../../types';
-import { X, Star, Code, ExternalLink, Sparkles } from 'lucide-react';
+import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart } from 'lucide-react';
 
 interface RepoDetailsPanelProps {
   node: GraphNode;
@@ -13,19 +13,37 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
 
   return (
     <div className="absolute top-6 right-6 z-30 w-96 bg-white rounded-lg border border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
-      {/* Header */}
-      <div className="relative p-5 border-b border-border-light bg-bg-sidebar flex items-start justify-between">
-        <div className="pr-8">
-            <div className="flex items-center gap-2 mb-1.5">
-                <a href={node.html_url} target="_blank" rel="noopener noreferrer" className="hover:underline decoration-text-muted underline-offset-4">
-                    <h2 className="text-base font-semibold text-text-main line-clamp-1 leading-snug" title={node.name}>
-                    {node.name}
-                    </h2>
-                </a>
+      {/* Header with Avatar */}
+      <div className="relative p-5 border-b border-border-light bg-bg-sidebar">
+        <div className="flex items-start gap-3 pr-8">
+            {/* Owner Avatar */}
+            {node.owner_avatar_url ? (
+              <img
+                src={node.owner_avatar_url}
+                alt={node.owner}
+                className="w-10 h-10 rounded-lg border border-border-light flex-shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                <span className="text-gray-500 text-sm font-medium">
+                  {node.owner?.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                    <a href={node.html_url} target="_blank" rel="noopener noreferrer" className="hover:underline decoration-text-muted underline-offset-4">
+                        <h2 className="text-base font-semibold text-text-main line-clamp-1 leading-snug" title={node.full_name}>
+                        {node.name}
+                        </h2>
+                    </a>
+                </div>
+                <p className="text-xs text-text-dim">{node.owner}</p>
+                <p className="text-sm text-text-muted line-clamp-2 leading-relaxed mt-1">
+                {node.description || 'No description available'}
+                </p>
             </div>
-            <p className="text-sm text-text-muted line-clamp-2 leading-relaxed">
-            {node.description || 'No description available'}
-            </p>
         </div>
         <button
           onClick={onClose}
@@ -36,7 +54,17 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       </div>
 
       {/* Content */}
-      <div className="p-5 space-y-6">
+      <div className="p-5 space-y-5">
+
+        {/* User's Star List Badge */}
+        {node.star_list_name && (
+          <div className="flex items-center gap-2">
+            <FolderHeart className="w-4 h-4 text-pink-500" />
+            <span className="text-xs font-medium text-pink-600 bg-pink-50 px-2 py-1 rounded-full">
+              {node.star_list_name}
+            </span>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
@@ -59,6 +87,48 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                 </div>
             </div>
         </div>
+
+        {/* AI Tags */}
+        {node.ai_tags && node.ai_tags.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-purple-600 uppercase tracking-wider">
+                <Tag className="w-3.5 h-3.5" />
+                <span>AI Tags</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {node.ai_tags.map((tag, idx) => (
+                <span
+                  key={idx}
+                  className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded-full"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* GitHub Topics */}
+        {node.topics && node.topics.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                Topics
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {node.topics.slice(0, 8).map((topic, idx) => (
+                <span
+                  key={idx}
+                  className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full"
+                >
+                  {topic}
+                </span>
+              ))}
+              {node.topics.length > 8 && (
+                <span className="text-xs text-text-dim">+{node.topics.length - 8}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* AI Summary */}
         <div className="space-y-2">

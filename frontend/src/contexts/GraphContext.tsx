@@ -9,6 +9,8 @@ import { getGraphData, getTimelineData } from '../api/graph';
 interface GraphFilters {
   /** Selected cluster IDs to show (empty = show all) */
   selectedClusters: Set<number>;
+  /** Selected star list IDs to show (empty = show all) */
+  selectedStarLists: Set<number>;
   /** Search query for filtering nodes */
   searchQuery: string;
   /** Time range filter [startIndex, endIndex] into timeline points */
@@ -53,6 +55,9 @@ interface GraphContextValue extends GraphState {
   toggleCluster: (clusterId: number) => void;
   setSelectedClusters: (clusterIds: number[]) => void;
   clearClusterFilter: () => void;
+  toggleStarList: (listId: number) => void;
+  setSelectedStarLists: (listIds: number[]) => void;
+  clearStarListFilter: () => void;
   setTimeRange: (range: [number, number] | null) => void;
   setMinStars: (min: number) => void;
   toggleLanguage: (language: string) => void;
@@ -69,6 +74,7 @@ interface GraphContextValue extends GraphState {
 
 const defaultFilters: GraphFilters = {
   selectedClusters: new Set(),
+  selectedStarLists: new Set(),
   searchQuery: '',
   timeRange: null,
   minStars: 0,
@@ -151,6 +157,13 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       );
     }
 
+    // Filter by star lists
+    if (filters.selectedStarLists.size > 0) {
+      filteredNodes = filteredNodes.filter(
+        node => node.star_list_id !== undefined && filters.selectedStarLists.has(node.star_list_id)
+      );
+    }
+
     // Filter by search query
     if (filters.searchQuery.trim()) {
       const query = filters.searchQuery.toLowerCase().trim();
@@ -212,9 +225,11 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       nodes: filteredNodes,
       edges: filteredEdges,
       clusters: filteredClusters,
+      star_lists: rawData.star_lists || [],
       total_nodes: filteredNodes.length,
       total_edges: filteredEdges.length,
       total_clusters: filteredClusters.length,
+      total_star_lists: rawData.star_lists?.length || 0,
     };
   }, [rawData, timelineData, filters]);
 
@@ -241,6 +256,26 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const clearClusterFilter = useCallback(() => {
     setFilters(prev => ({ ...prev, selectedClusters: new Set() }));
+  }, []);
+
+  const toggleStarList = useCallback((listId: number) => {
+    setFilters(prev => {
+      const newLists = new Set(prev.selectedStarLists);
+      if (newLists.has(listId)) {
+        newLists.delete(listId);
+      } else {
+        newLists.add(listId);
+      }
+      return { ...prev, selectedStarLists: newLists };
+    });
+  }, []);
+
+  const setSelectedStarLists = useCallback((listIds: number[]) => {
+    setFilters(prev => ({ ...prev, selectedStarLists: new Set(listIds) }));
+  }, []);
+
+  const clearStarListFilter = useCallback(() => {
+    setFilters(prev => ({ ...prev, selectedStarLists: new Set() }));
   }, []);
 
   const setTimeRange = useCallback((range: [number, number] | null) => {
@@ -299,6 +334,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     toggleCluster,
     setSelectedClusters,
     clearClusterFilter,
+    toggleStarList,
+    setSelectedStarLists,
+    clearStarListFilter,
     setTimeRange,
     setMinStars,
     toggleLanguage,

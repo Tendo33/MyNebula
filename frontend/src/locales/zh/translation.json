@@ -52,6 +52,7 @@
   },
   "graph": {
     "clusters": "聚类",
+    "my_lists": "我的收藏夹",
     "timeline": "时间线",
     "showing_repos": "显示 {{count}} 个仓库",
     "empty_title": "暂无数据",

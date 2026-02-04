@@ -99,6 +99,9 @@ class StarredRepo(Base):
     homepage_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     html_url: Mapped[str] = mapped_column(String(500), nullable=False)
 
+    # Owner avatar (for display)
+    owner_avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     # Statistics
     stargazers_count: Mapped[int] = mapped_column(Integer, default=0)
     forks_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -119,6 +122,14 @@ class StarredRepo(Base):
 
     # AI-generated content
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_tags: Mapped[list[str] | None] = mapped_column(
+        ARRAY(String), nullable=True
+    )  # AI-generated tags based on README
+
+    # User's GitHub Star List (user-defined category)
+    star_list_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("star_lists.id"), nullable=True, index=True
+    )
 
     # Clustering
     cluster_id: Mapped[int | None] = mapped_column(
@@ -160,6 +171,9 @@ class StarredRepo(Base):
     cluster: Mapped[Optional["Cluster"]] = relationship(
         "Cluster", back_populates="repos"
     )
+    star_list: Mapped[Optional["StarList"]] = relationship(
+        "StarList", back_populates="repos"
+    )
 
     # Indexes
     __table_args__ = (
@@ -170,6 +184,52 @@ class StarredRepo(Base):
 
     def __repr__(self) -> str:
         return f"<StarredRepo(id={self.id}, full_name={self.full_name})>"
+
+
+class StarList(Base):
+    """User's GitHub Star List (user-defined category).
+
+    Represents a user's custom list for organizing starred repos on GitHub.
+    """
+
+    __tablename__ = "star_lists"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    github_list_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )  # GitHub's list ID (from GraphQL)
+
+    # List info
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Statistics
+    repo_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    repos: Mapped[list["StarredRepo"]] = relationship(
+        "StarredRepo", back_populates="star_list"
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_star_lists_user_github", "user_id", "github_list_id", unique=True),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StarList(id={self.id}, name={self.name}, count={self.repo_count})>"
 
 
 class Cluster(Base):
