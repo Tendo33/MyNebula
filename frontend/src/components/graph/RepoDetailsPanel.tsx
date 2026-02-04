@@ -45,7 +45,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                     <Star className="w-4 h-4" fill="currentColor" />
                 </div>
                 <div>
-                    <span className="block text-lg font-semibold text-text-main leading-none">{node.val.toLocaleString()}</span>
+                    <span className="block text-lg font-semibold text-text-main leading-none">{node.stargazers_count?.toLocaleString() ?? 0}</span>
                     <span className="text-xs text-text-muted capitalize">{t('repoDetails.stars')}</span>
                 </div>
             </div>

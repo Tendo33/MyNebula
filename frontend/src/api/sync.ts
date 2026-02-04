@@ -46,3 +46,21 @@ export const getAllSyncStatus = async () => {
 	const response = await client.get<SyncStatusResponse[]>("/sync/status");
 	return response.data;
 };
+
+/**
+ * 开始计算向量嵌入（增量：只处理未嵌入的仓库）
+ */
+export const startEmbedding = async () => {
+	const response = await client.post<SyncStartResponse>("/sync/embeddings");
+	return response.data;
+};
+
+/**
+ * 开始运行聚类（生成3D坐标和分类）
+ */
+export const startClustering = async (useLlm: boolean = true) => {
+	const response = await client.post<SyncStartResponse>("/sync/clustering", null, {
+		params: { use_llm: useLlm },
+	});
+	return response.data;
+};

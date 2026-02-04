@@ -57,6 +57,13 @@ async def init_db() -> None:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         logger.info("pgvector extension ensured")
 
+    # Auto-create tables if they don't exist
+    from nebula.db.models import Base
+
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables ensured")
+
 
 async def close_db() -> None:
     """Close database connection.

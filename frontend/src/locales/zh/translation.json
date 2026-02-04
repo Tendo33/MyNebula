@@ -18,6 +18,9 @@
     "subtitle_infinite": "正如繁星无尽",
     "sync_button": "同步星标",
     "syncing": "同步中...",
+    "sync_step_stars": "同步星标...",
+    "sync_step_embedding": "计算嵌入...",
+    "sync_step_clustering": "生成聚类...",
     "sync_error_no_token": "请先登录 GitHub",
     "search_placeholder": "搜索星星、星团或主题..."
   },

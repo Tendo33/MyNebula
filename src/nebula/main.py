@@ -66,18 +66,23 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Configure CORS
+    # Configure CORS - 确保所有请求都能正确返回 CORS 头
+    # 注意：allow_origins=["*"] 与 allow_credentials=True 不能同时使用
+    # 在开发模式下我们使用具体的来源地址
+    cors_origins = [
+        "http://localhost:5173",  # Vite 开发服务器
+        "http://localhost:3000",  # 生产前端
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",  # React dev server
-            "http://localhost:5173",  # Vite dev server
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:5173",
-        ],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["*"],
     )
 
     # Include API routes

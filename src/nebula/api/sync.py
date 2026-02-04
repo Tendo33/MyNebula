@@ -54,18 +54,48 @@ class SyncStartResponse(BaseModel):
 
 
 async def get_default_user(db: AsyncSession) -> User:
-    """Get the first user from database.
+    """Get the first user from database, or create one from GitHub token.
 
     Since authentication is disabled, we use the first available user.
+    If no user exists, we create one using the GitHub token.
     """
     result = await db.execute(select(User).limit(1))
     user = result.scalar_one_or_none()
 
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No user found. Please sync your GitHub stars first.",
-        )
+        # Try to create a user from GitHub token
+        from nebula.core.config import get_app_settings
+
+        settings = get_app_settings()
+
+        if not settings.github_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No user found and GITHUB_TOKEN not configured. Please set GITHUB_TOKEN in .env file.",
+            )
+
+        # Get user info from GitHub
+        try:
+            async with GitHubClient(access_token=settings.github_token) as client:
+                github_user = await client.get_current_user()
+
+            # Create new user
+            user = User(
+                github_id=github_user.id,
+                username=github_user.login,
+                email=github_user.email,
+                avatar_url=github_user.avatar_url,
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            logger.info(f"Created default user: {user.username}")
+        except Exception as e:
+            logger.error(f"Failed to create user from GitHub token: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create user from GitHub token: {e}",
+            ) from e
 
     return user
 
@@ -763,7 +793,9 @@ async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
             logger.info(f"Running clustering on {len(repos)} repos for user {user_id}")
 
             # Extract embeddings
-            embeddings = [repo.embedding for repo in repos if repo.embedding]
+            embeddings = [
+                repo.embedding for repo in repos if repo.embedding is not None
+            ]
 
             if len(embeddings) < 5:
                 task.status = "completed"

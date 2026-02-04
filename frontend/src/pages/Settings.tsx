@@ -1,7 +1,7 @@
 import { Sidebar } from '../components/layout/Sidebar';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../api/client';
-import { Check, Globe, Zap, Eye, Server, Shield } from 'lucide-react';
+import { Globe, Zap, Eye, Server, Shield } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useState } from 'react';
 

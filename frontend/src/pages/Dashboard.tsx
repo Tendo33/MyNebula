@@ -5,7 +5,7 @@ import Graph3D from '../components/graph/Graph3D';
 import Timeline from '../components/graph/Timeline';
 import { SearchInput } from '../components/ui/SearchInput';
 import { getGraphData } from '../api/graph';
-import { startStarSync, getSyncStatus } from '../api/sync';
+import { startStarSync, getSyncStatus, startEmbedding, startClustering } from '../api/sync';
 import { GraphData, GraphNode } from '../types';
 import { RepoDetailsPanel } from '../components/graph/RepoDetailsPanel';
 import { Loader2 } from 'lucide-react';
@@ -40,35 +40,75 @@ const Dashboard = () => {
     setSelectedNode(null);
   };
 
-  const handleSyncStars = async () => {
-    try {
-      setSyncing(true);
-      const result = await startStarSync('incremental');
-      console.log('Sync started:', result);
+  const [syncStep, setSyncStep] = useState<string>('');
 
-      const pollStatus = async () => {
+  const waitForTaskComplete = async (taskId: number): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const poll = async () => {
         try {
-          const status = await getSyncStatus(result.task_id);
+          const status = await getSyncStatus(taskId);
           if (status.status === 'completed') {
-            setSyncing(false);
-            const graphData = await getGraphData();
-            setData(graphData);
+            resolve(true);
           } else if (status.status === 'failed') {
-            setSyncing(false);
-            alert(status.error_message || '同步失败');
+            console.error('Task failed:', status.error_message);
+            resolve(false);
           } else {
-            setTimeout(pollStatus, 2000);
+            setTimeout(poll, 2000);
           }
         } catch (err) {
           console.error('Poll status error:', err);
-          setSyncing(false);
+          resolve(false);
         }
       };
-      setTimeout(pollStatus, 1000);
+      setTimeout(poll, 1000);
+    });
+  };
+
+  const handleSyncStars = async () => {
+    try {
+      setSyncing(true);
+
+      // 步骤1: 同步星标
+      setSyncStep(t('dashboard.sync_step_stars'));
+      const starsResult = await startStarSync('incremental');
+      console.log('Stars sync started:', starsResult);
+
+      const starsSuccess = await waitForTaskComplete(starsResult.task_id);
+      if (!starsSuccess) {
+        throw new Error('星标同步失败');
+      }
+
+      // 步骤2: 计算嵌入（增量，只处理新仓库）
+      setSyncStep(t('dashboard.sync_step_embedding'));
+      const embeddingResult = await startEmbedding();
+      console.log('Embedding started:', embeddingResult);
+
+      const embeddingSuccess = await waitForTaskComplete(embeddingResult.task_id);
+      if (!embeddingSuccess) {
+        throw new Error('嵌入计算失败');
+      }
+
+      // 步骤3: 运行聚类（生成3D坐标）
+      setSyncStep(t('dashboard.sync_step_clustering'));
+      const clusterResult = await startClustering();
+      console.log('Clustering started:', clusterResult);
+
+      const clusterSuccess = await waitForTaskComplete(clusterResult.task_id);
+      if (!clusterSuccess) {
+        throw new Error('聚类失败');
+      }
+
+      // 完成，刷新数据
+      setSyncStep('');
+      const graphData = await getGraphData();
+      setData(graphData);
+
     } catch (error) {
-      console.error('Failed to start sync:', error);
+      console.error('Sync failed:', error);
+      alert(error instanceof Error ? error.message : '同步失败,请检查是否已配置 GITHUB_TOKEN');
+    } finally {
       setSyncing(false);
-      alert('同步失败,请检查是否已配置 GITHUB_TOKEN');
+      setSyncStep('');
     }
   };
 
@@ -106,7 +146,7 @@ const Dashboard = () => {
                   }`}
                 >
                     {syncing && <Loader2 className="animate-spin h-4 w-4" />}
-                    {syncing ? t('dashboard.syncing') : t('dashboard.sync_button')}
+                    {syncing ? (syncStep || t('dashboard.syncing')) : t('dashboard.sync_button')}
                 </button>
            </div>
         </header>
