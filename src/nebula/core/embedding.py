@@ -136,10 +136,14 @@ class EmbeddingService:
         topics: list[str] | None = None,
         readme_summary: str | None = None,
         language: str | None = None,
+        ai_summary: str | None = None,
+        ai_tags: list[str] | None = None,
     ) -> str:
         """Build text for repository embedding.
 
         Combines repository metadata into a single text optimized for embedding.
+        Prioritizes LLM-generated content (ai_summary, ai_tags) over raw metadata
+        for better semantic clustering accuracy.
 
         Args:
             full_name: Repository full name (owner/repo)
@@ -147,6 +151,8 @@ class EmbeddingService:
             topics: Repository topics/tags
             readme_summary: Summarized README content
             language: Primary programming language
+            ai_summary: LLM-generated summary (preferred over description)
+            ai_tags: LLM-generated semantic tags (preferred over topics)
 
         Returns:
             Combined text for embedding
@@ -156,12 +162,21 @@ class EmbeddingService:
         if language:
             parts.append(f"Language: {language}")
 
-        if description:
+        # Prefer LLM-generated summary over raw description
+        # LLM summary is more concise and semantically rich
+        if ai_summary:
+            parts.append(ai_summary)
+        elif description:
             parts.append(description)
 
-        if topics:
+        # Prefer LLM-generated tags over raw topics
+        # LLM tags are semantically normalized and more meaningful for clustering
+        if ai_tags:
+            parts.append(f"Tags: {', '.join(ai_tags)}")
+        elif topics:
             parts.append(f"Topics: {', '.join(topics)}")
 
+        # Include readme summary if available (additional context)
         if readme_summary:
             parts.append(readme_summary)
 

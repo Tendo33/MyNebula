@@ -1,6 +1,7 @@
 """Clustering service using UMAP + HDBSCAN.
 
 This module provides semantic clustering of repositories based on their embeddings.
+Includes collision resolution to prevent node overlap in 3D visualization.
 """
 
 import numpy as np
@@ -9,6 +10,83 @@ from pydantic import BaseModel
 from nebula.utils import get_logger
 
 logger = get_logger(__name__)
+
+
+def resolve_collisions(
+    coords: np.ndarray,
+    node_sizes: list[float] | None = None,
+    min_distance: float = 0.15,
+    iterations: int = 50,
+    repulsion_strength: float = 0.1,
+) -> np.ndarray:
+    """Resolve node collisions in 3D space using force-directed repulsion.
+
+    This algorithm iteratively pushes overlapping nodes apart while trying
+    to preserve the overall cluster structure from UMAP.
+
+    Args:
+        coords: Nx3 array of 3D coordinates
+        node_sizes: Optional list of node sizes (used for distance calculation)
+        min_distance: Minimum distance between node centers
+        iterations: Number of iterations for collision resolution
+        repulsion_strength: How strongly nodes repel each other
+
+    Returns:
+        Adjusted Nx3 coordinates with resolved collisions
+    """
+    if len(coords) < 2:
+        return coords
+
+    result = coords.copy()
+    n = len(result)
+
+    # Default sizes if not provided
+    if node_sizes is None:
+        node_sizes = [1.0] * n
+
+    for iteration in range(iterations):
+        moved = False
+        displacements = np.zeros_like(result)
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                # Calculate distance between nodes
+                diff = result[i] - result[j]
+                dist = np.linalg.norm(diff)
+
+                # Calculate minimum allowed distance based on node sizes
+                size_i = node_sizes[i] if i < len(node_sizes) else 1.0
+                size_j = node_sizes[j] if j < len(node_sizes) else 1.0
+                required_dist = min_distance * (size_i + size_j) / 2
+
+                # If nodes are too close, push them apart
+                if dist < required_dist and dist > 0.001:
+                    # Calculate repulsion direction
+                    direction = diff / dist
+                    overlap = required_dist - dist
+
+                    # Apply displacement (split evenly between both nodes)
+                    displacement = direction * overlap * repulsion_strength
+                    displacements[i] += displacement
+                    displacements[j] -= displacement
+                    moved = True
+                elif dist <= 0.001:
+                    # Nodes are at same position, add random displacement
+                    random_dir = np.random.randn(3)
+                    random_dir /= np.linalg.norm(random_dir) + 0.001
+                    displacements[i] += random_dir * min_distance * repulsion_strength
+                    displacements[j] -= random_dir * min_distance * repulsion_strength
+                    moved = True
+
+        # Apply displacements
+        result += displacements
+
+        # Early exit if no collisions were found
+        if not moved:
+            logger.debug(f"Collision resolution converged at iteration {iteration}")
+            break
+
+    return result
 
 
 class ClusterResult(BaseModel):
@@ -83,12 +161,16 @@ class ClusteringService:
         self,
         embeddings: list[list[float]],
         existing_coords: list[list[float]] | None = None,
+        node_sizes: list[float] | None = None,
+        resolve_overlap: bool = True,
     ) -> ClusterResult:
         """Reduce dimensions and cluster embeddings.
 
         Args:
             embeddings: List of embedding vectors
             existing_coords: Optional existing 3D coordinates to preserve positions
+            node_sizes: Optional node sizes for collision resolution (e.g., based on star count)
+            resolve_overlap: Whether to run collision resolution algorithm
 
         Returns:
             ClusterResult with labels, coordinates, and cluster info
@@ -141,7 +223,19 @@ class ClusteringService:
 
         logger.info(f"Found {n_clusters} clusters")
 
-        # Compute cluster centers
+        # Resolve node collisions to prevent overlap
+        if resolve_overlap and n_samples > 1:
+            logger.info("Resolving node collisions...")
+            coords_3d = resolve_collisions(
+                coords=coords_3d,
+                node_sizes=node_sizes,
+                min_distance=0.15,
+                iterations=50,
+                repulsion_strength=0.1,
+            )
+            logger.info("Collision resolution complete")
+
+        # Compute cluster centers (after collision resolution)
         cluster_centers = {}
         for cluster_id in set(labels):
             if cluster_id == -1:

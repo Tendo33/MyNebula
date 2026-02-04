@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { useGraph } from '../contexts/GraphContext';
+import { DashboardSkeleton } from '../components/ui/Skeleton';
 import { Loader2, Book, Star, Code, Layers, TrendingUp, ArrowRight, Calendar } from 'lucide-react';
 
 // ============================================================================
@@ -249,9 +250,7 @@ const Dashboard = () => {
 
         <section className="flex-1 p-8 overflow-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-full min-h-[400px]">
-              <Loader2 className="animate-spin h-8 w-8 text-action-primary" />
-            </div>
+            <DashboardSkeleton />
           ) : (
             <div className="max-w-6xl mx-auto space-y-8">
               {/* Stats Grid */}

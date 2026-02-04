@@ -4,6 +4,7 @@ import { useResizeObserver } from '../../hooks/useResizeObserver';
 import { useTranslation } from 'react-i18next';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
 import { ClusterInfo } from '../../types';
+import { GraphSkeleton } from '../ui/Skeleton';
 
 // ============================================================================
 // Types
@@ -19,6 +20,12 @@ interface ProcessedNode extends NodeObject {
   color: string;
   size: number;
   stargazers_count: number;
+  // Owner info for avatar display
+  owner?: string;
+  owner_avatar_url?: string;
+  // AI-generated content
+  ai_summary?: string;
+  ai_tags?: string[];
   // Force-graph will add x, y, vx, vy
   x?: number;
   y?: number;
@@ -168,6 +175,12 @@ const Graph2D: React.FC = () => {
         color: n.color || COLORS.NODE_DEFAULT,
         size: n.size,
         stargazers_count: n.stargazers_count,
+        // Owner info for avatar display
+        owner: n.owner,
+        owner_avatar_url: n.owner_avatar_url,
+        // AI-generated content
+        ai_summary: n.ai_summary,
+        ai_tags: n.ai_tags,
         // Use pre-computed positions if available (from clustering)
         x: n.x * 50, // Scale up for better spread
         y: n.y * 50,
@@ -498,6 +511,15 @@ const Graph2D: React.FC = () => {
     setSelectedNode(null);
   }, [setSelectedNode]);
 
+  // Loading state with skeleton
+  if (loading) {
+    return (
+      <div ref={containerRef} className="w-full h-full relative">
+        <GraphSkeleton />
+      </div>
+    );
+  }
+
   // Empty state
   if (!filteredData || filteredData.nodes.length === 0) {
     return (
@@ -505,13 +527,11 @@ const Graph2D: React.FC = () => {
         <div className="text-center p-8 opacity-50">
           <div className="text-6xl mb-4 grayscale">🕸️</div>
           <h3 className="font-semibold text-lg text-text-main">
-            {loading ? t('common.loading') : t('dashboard.subtitle_infinite')}
+            {t('dashboard.subtitle_infinite')}
           </h3>
-          {!loading && (
-            <p className="text-sm text-text-muted mt-2">
-              {t('graph.empty_hint')}
-            </p>
-          )}
+          <p className="text-sm text-text-muted mt-2">
+            {t('graph.empty_hint')}
+          </p>
         </div>
       </div>
     );
@@ -563,25 +583,71 @@ const Graph2D: React.FC = () => {
         }}
       />
 
-      {/* Hover info overlay */}
+      {/* Hover info overlay - Enhanced with full info */}
       {activeHoverNode && (
-        <div className="absolute top-4 right-4 pointer-events-none bg-white/95 backdrop-blur-sm px-4 py-3 rounded-lg border border-border-light shadow-md z-10 max-w-xs">
-          <div className="font-semibold text-sm text-text-main truncate">
-            {activeHoverNode.name}
-          </div>
-          <div className="text-xs text-text-muted mt-1 flex items-center gap-2">
-            {activeHoverNode.language && (
-              <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-700">
-                {activeHoverNode.language}
-              </span>
+        <div className="absolute top-4 right-4 z-10 bg-white/98 backdrop-blur-sm px-4 py-3 rounded-lg border border-border-light shadow-lg max-w-sm pointer-events-none">
+          {/* Header with Avatar */}
+          <div className="flex items-start gap-3">
+            {/* Owner Avatar */}
+            {activeHoverNode.owner_avatar_url ? (
+              <img
+                src={activeHoverNode.owner_avatar_url}
+                alt={activeHoverNode.owner || activeHoverNode.name}
+                className="w-10 h-10 rounded-md border border-border-light flex-shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0">
+                <span className="text-gray-500 text-sm font-medium">
+                  {(activeHoverNode.owner || activeHoverNode.name)?.charAt(0).toUpperCase()}
+                </span>
+              </div>
             )}
-            <span>⭐ {activeHoverNode.stargazers_count.toLocaleString()}</span>
+
+            <div className="flex-1 min-w-0">
+              <h3 className="text-text-main font-semibold text-sm truncate">
+                {activeHoverNode.name}
+              </h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                {activeHoverNode.language && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 rounded text-blue-700">
+                    {activeHoverNode.language}
+                  </span>
+                )}
+                <span className="text-xs text-orange-500 font-medium">
+                  ⭐ {activeHoverNode.stargazers_count.toLocaleString()}
+                </span>
+              </div>
+            </div>
           </div>
-          {activeHoverNode.description && (
-            <p className="text-xs text-text-muted mt-2 line-clamp-2">
-              {activeHoverNode.description}
+
+          {/* Full Description - Not truncated */}
+          {(activeHoverNode.description || activeHoverNode.ai_summary) && (
+            <p className="text-xs text-text-muted mt-2 leading-relaxed">
+              {activeHoverNode.description || activeHoverNode.ai_summary}
             </p>
           )}
+
+          {/* AI Tags Preview */}
+          {activeHoverNode.ai_tags && activeHoverNode.ai_tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {activeHoverNode.ai_tags.slice(0, 4).map((tag: string, idx: number) => (
+                <span
+                  key={idx}
+                  className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded"
+                >
+                  {tag}
+                </span>
+              ))}
+              {activeHoverNode.ai_tags.length > 4 && (
+                <span className="text-[10px] text-text-dim">+{activeHoverNode.ai_tags.length - 4}</span>
+              )}
+            </div>
+          )}
+
+          {/* Hint to click */}
+          <div className="text-[10px] text-text-dim mt-2 pt-2 border-t border-border-light/50">
+            Click for details & related repos
+          </div>
         </div>
       )}
     </div>

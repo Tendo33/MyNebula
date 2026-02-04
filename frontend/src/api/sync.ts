@@ -56,6 +56,14 @@ export const startEmbedding = async () => {
 };
 
 /**
+ * 开始生成 AI 摘要和标签
+ */
+export const startSummaries = async () => {
+	const response = await client.post<SyncStartResponse>("/sync/summaries");
+	return response.data;
+};
+
+/**
  * 开始运行聚类（生成3D坐标和分类）
  */
 export const startClustering = async (useLlm: boolean = true) => {

@@ -5,6 +5,7 @@ import { useResizeObserver } from '../../hooks/useResizeObserver';
 import { useTranslation } from 'react-i18next';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
 import { ClusterInfo } from '../../types';
+import { GraphSkeleton } from '../ui/Skeleton';
 
 // ============================================================================
 // Types
@@ -53,9 +54,9 @@ const COLORS = {
   BACKGROUND: '#FAFAFA',
 };
 
-const NODE_BASE_SIZE = 3;
-const NODE_MAX_SIZE = 15;
-const POSITION_SCALE = 30; // Scale factor for pre-computed positions
+const NODE_BASE_SIZE = 2;
+const NODE_MAX_SIZE = 12;
+const POSITION_SCALE = 80; // Scale factor for pre-computed positions
 
 // ============================================================================
 // Utility Functions
@@ -403,6 +404,15 @@ const Graph3D: React.FC = () => {
     return 0.3;
   }, [activeHoverNode]);
 
+  // Loading state with skeleton
+  if (loading) {
+    return (
+      <div ref={containerRef} className="w-full h-full relative overflow-hidden">
+        <GraphSkeleton />
+      </div>
+    );
+  }
+
   // Empty state
   if (!filteredData || filteredData.nodes.length === 0) {
     return (
@@ -410,7 +420,7 @@ const Graph3D: React.FC = () => {
         <div className="text-center p-8">
           <div className="text-6xl mb-4 grayscale opacity-20">🌌</div>
           <h3 className="text-text-main font-semibold text-lg mb-2">
-            {loading ? t('common.loading') : t('graph.empty_title')}
+            {t('graph.empty_title')}
           </h3>
           <p className="text-text-muted text-sm max-w-md">
             {t('graph.empty_hint')}
@@ -461,27 +471,71 @@ const Graph3D: React.FC = () => {
         warmupTicks={0}
       />
 
-      {/* Hover info overlay */}
+      {/* Hover info overlay - Enhanced with full info */}
       {activeHoverNode && (
-        <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm px-4 py-3 rounded-lg border border-border-light shadow-md max-w-xs pointer-events-none">
-          <h3 className="text-text-main font-semibold text-sm truncate">
-            {activeHoverNode.name}
-          </h3>
-          <div className="flex items-center gap-2 mt-1">
-            {activeHoverNode.language && (
-              <span className="text-xs px-1.5 py-0.5 bg-gray-100 rounded text-gray-700">
-                {activeHoverNode.language}
-              </span>
+        <div className="absolute top-4 right-4 z-10 bg-white/98 backdrop-blur-sm px-4 py-3 rounded-lg border border-border-light shadow-lg max-w-sm pointer-events-none">
+          {/* Header with Avatar */}
+          <div className="flex items-start gap-3">
+            {/* Owner Avatar */}
+            {(activeHoverNode as any).owner_avatar_url ? (
+              <img
+                src={(activeHoverNode as any).owner_avatar_url}
+                alt={(activeHoverNode as any).owner || activeHoverNode.name}
+                className="w-10 h-10 rounded-md border border-border-light flex-shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0">
+                <span className="text-gray-500 text-sm font-medium">
+                  {((activeHoverNode as any).owner || activeHoverNode.name)?.charAt(0).toUpperCase()}
+                </span>
+              </div>
             )}
-            <span className="text-xs text-text-muted">
-              ⭐ {activeHoverNode.stargazers_count.toLocaleString()}
-            </span>
+
+            <div className="flex-1 min-w-0">
+              <h3 className="text-text-main font-semibold text-sm truncate">
+                {activeHoverNode.name}
+              </h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                {activeHoverNode.language && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 rounded text-blue-700">
+                    {activeHoverNode.language}
+                  </span>
+                )}
+                <span className="text-xs text-orange-500 font-medium">
+                  ⭐ {activeHoverNode.stargazers_count.toLocaleString()}
+                </span>
+              </div>
+            </div>
           </div>
-          {activeHoverNode.description && (
-            <p className="text-xs text-text-muted mt-2 line-clamp-2">
-              {activeHoverNode.description}
+
+          {/* Full Description - Not truncated */}
+          {(activeHoverNode.description || (activeHoverNode as any).ai_summary) && (
+            <p className="text-xs text-text-muted mt-2 leading-relaxed">
+              {activeHoverNode.description || (activeHoverNode as any).ai_summary}
             </p>
           )}
+
+          {/* AI Tags Preview */}
+          {(activeHoverNode as any).ai_tags && (activeHoverNode as any).ai_tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {(activeHoverNode as any).ai_tags.slice(0, 4).map((tag: string, idx: number) => (
+                <span
+                  key={idx}
+                  className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded"
+                >
+                  {tag}
+                </span>
+              ))}
+              {(activeHoverNode as any).ai_tags.length > 4 && (
+                <span className="text-[10px] text-text-dim">+{(activeHoverNode as any).ai_tags.length - 4}</span>
+              )}
+            </div>
+          )}
+
+          {/* Hint to click */}
+          <div className="text-[10px] text-text-dim mt-2 pt-2 border-t border-border-light/50">
+            Click for details & related repos
+          </div>
         </div>
       )}
     </div>

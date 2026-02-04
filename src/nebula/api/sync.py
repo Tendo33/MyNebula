@@ -398,6 +398,11 @@ async def sync_stars_task(
 async def compute_embeddings_task(user_id: int, task_id: int):
     """Background task to compute embeddings for repos.
 
+    IMPORTANT: This task now prioritizes LLM-generated content (ai_summary, ai_tags)
+    over raw metadata for better semantic clustering accuracy.
+
+    If a repo doesn't have ai_summary/ai_tags, it will be auto-generated first.
+
     Args:
         user_id: User database ID
         task_id: Sync task ID
@@ -432,11 +437,50 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 await db.commit()
                 return
 
-            # Compute embeddings
+            # First pass: Generate summaries and tags for repos that don't have them
+            # This ensures embedding is based on LLM-enhanced content
+            llm_service = get_llm_service()
+            repos_needing_llm = [r for r in repos if not r.ai_summary or not r.ai_tags]
+
+            if repos_needing_llm:
+                logger.info(
+                    f"Generating summaries/tags for {len(repos_needing_llm)} repos before embedding"
+                )
+                for repo in repos_needing_llm:
+                    try:
+                        (
+                            summary,
+                            tags,
+                        ) = await llm_service.generate_repo_summary_and_tags(
+                            full_name=repo.full_name,
+                            description=repo.description,
+                            topics=repo.topics,
+                            language=repo.language,
+                            readme_content=repo.readme_content,
+                        )
+                        repo.ai_summary = summary
+                        repo.ai_tags = tags
+                        repo.is_summarized = True
+                    except Exception as e:
+                        logger.warning(
+                            f"LLM generation failed for {repo.full_name}: {e}"
+                        )
+                        # Ensure tags are not empty even on failure
+                        if not repo.ai_tags:
+                            repo.ai_tags = (
+                                repo.topics[:5] if repo.topics else ["开源项目"]
+                            )
+
+                await db.commit()
+                logger.info(
+                    f"LLM enhancement complete for {len(repos_needing_llm)} repos"
+                )
+
+            # Compute embeddings using LLM-enhanced content
             embedding_service = get_embedding_service()
             processed = 0
 
-            # Build texts for batch processing
+            # Build texts for batch processing with LLM content priority
             texts = []
             for repo in repos:
                 text = embedding_service.build_repo_text(
@@ -444,6 +488,8 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                     description=repo.description,
                     topics=repo.topics,
                     language=repo.language,
+                    ai_summary=repo.ai_summary,
+                    ai_tags=repo.ai_tags,
                 )
                 texts.append(text)
                 repo.embedding_text = text
@@ -893,10 +939,18 @@ async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
 
             logger.info(f"Running clustering on {len(repos)} repos for user {user_id}")
 
-            # Extract embeddings
-            embeddings = [
-                repo.embedding for repo in repos if repo.embedding is not None
-            ]
+            # Extract embeddings and node sizes (based on star count for collision resolution)
+            embeddings = []
+            node_sizes = []
+            for repo in repos:
+                if repo.embedding is not None:
+                    embeddings.append(repo.embedding)
+                    # Calculate node size based on star count (log scale)
+                    # This ensures larger (more popular) repos have more space
+                    import math
+
+                    size = math.log10(max(repo.stargazers_count, 1) + 1) * 0.5 + 0.5
+                    node_sizes.append(min(size, 3.0))  # Cap at 3.0
 
             if len(embeddings) < 5:
                 task.status = "completed"
@@ -905,9 +959,13 @@ async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
                 await db.commit()
                 return
 
-            # Run clustering
+            # Run clustering with collision resolution
             clustering_service = get_clustering_service()
-            cluster_result = clustering_service.fit_transform(embeddings)
+            cluster_result = clustering_service.fit_transform(
+                embeddings=embeddings,
+                node_sizes=node_sizes,
+                resolve_overlap=True,
+            )
 
             # Delete existing clusters for this user
             await db.execute(select(Cluster).where(Cluster.user_id == user_id))

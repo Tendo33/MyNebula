@@ -1,6 +1,56 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { GraphData, GraphNode, ClusterInfo, TimelineData } from '../types';
 import { getGraphData, getTimelineData } from '../api/graph';
+
+// ============================================================================
+// Cache Utilities
+// ============================================================================
+
+const CACHE_KEY_GRAPH = 'nebula_graph_data';
+const CACHE_KEY_TIMELINE = 'nebula_timeline_data';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+const getCachedData = <T,>(key: string): T | null => {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const entry: CacheEntry<T> = JSON.parse(stored);
+      if (Date.now() < entry.expiresAt) {
+        return entry.data;
+      }
+      localStorage.removeItem(key);
+    }
+  } catch (e) {
+    console.warn('Cache read error:', e);
+  }
+  return null;
+};
+
+const setCachedData = <T,>(key: string, data: T, ttl = CACHE_TTL) => {
+  try {
+    const entry: CacheEntry<T> = {
+      data,
+      expiresAt: Date.now() + ttl,
+    };
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch (e) {
+    console.warn('Cache write error:', e);
+  }
+};
+
+const clearCache = () => {
+  try {
+    localStorage.removeItem(CACHE_KEY_GRAPH);
+    localStorage.removeItem(CACHE_KEY_TIMELINE);
+  } catch (e) {
+    console.warn('Cache clear error:', e);
+  }
+};
 
 // ============================================================================
 // Types
@@ -99,7 +149,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [syncStep, setSyncStep] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Load data from API
+  // Load data from API with caching
   const loadData = useCallback(async () => {
     if (loading) return;
 
@@ -107,7 +157,33 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setLoading(true);
       setError(null);
 
-      // Fetch graph data with edges enabled for visualization
+      // Try to load from cache first for instant display
+      const cachedGraph = getCachedData<GraphData>(CACHE_KEY_GRAPH);
+      const cachedTimeline = getCachedData<TimelineData>(CACHE_KEY_TIMELINE);
+
+      if (cachedGraph && cachedTimeline) {
+        // Use cached data immediately
+        setRawData(cachedGraph);
+        setTimelineData(cachedTimeline);
+        setLoading(false);
+
+        // Fetch fresh data in background
+        Promise.all([
+          getGraphData({ include_edges: true, min_similarity: 0.7 }),
+          getTimelineData(),
+        ]).then(([graphData, timeline]) => {
+          setRawData(graphData);
+          setTimelineData(timeline);
+          setCachedData(CACHE_KEY_GRAPH, graphData);
+          setCachedData(CACHE_KEY_TIMELINE, timeline);
+        }).catch(err => {
+          console.warn('Background refresh failed:', err);
+        });
+
+        return;
+      }
+
+      // Fetch fresh data
       const [graphData, timeline] = await Promise.all([
         getGraphData({ include_edges: true, min_similarity: 0.7 }),
         getTimelineData(),
@@ -115,6 +191,10 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setRawData(graphData);
       setTimelineData(timeline);
+
+      // Cache the data
+      setCachedData(CACHE_KEY_GRAPH, graphData);
+      setCachedData(CACHE_KEY_TIMELINE, timeline);
     } catch (err) {
       console.error('Failed to load graph data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -123,11 +203,14 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [loading]);
 
-  // Refresh data (force reload)
+  // Refresh data (force reload, clear cache)
   const refreshData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Clear cache to force fresh fetch
+      clearCache();
 
       const [graphData, timeline] = await Promise.all([
         getGraphData({ include_edges: true, min_similarity: 0.7 }),
@@ -136,6 +219,10 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setRawData(graphData);
       setTimelineData(timeline);
+
+      // Update cache with fresh data
+      setCachedData(CACHE_KEY_GRAPH, graphData);
+      setCachedData(CACHE_KEY_TIMELINE, timeline);
     } catch (err) {
       console.error('Failed to refresh graph data:', err);
       setError(err instanceof Error ? err.message : 'Failed to refresh data');

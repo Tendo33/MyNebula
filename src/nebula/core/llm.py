@@ -391,6 +391,7 @@ class LLMService:
         """Generate both summary and tags for a repository in one call.
 
         More efficient than calling generate_repo_summary and generate_repo_tags separately.
+        IMPORTANT: This method guarantees non-empty tags through fallback mechanisms.
 
         Args:
             full_name: Repository full name (owner/repo)
@@ -400,7 +401,7 @@ class LLMService:
             readme_content: README content (truncated)
 
         Returns:
-            Tuple of (summary, tags)
+            Tuple of (summary, tags) - tags is guaranteed to be non-empty
         """
         # Build context
         context_parts = [f"仓库: {full_name}"]
@@ -431,8 +432,12 @@ class LLMService:
 要求:
 1. 摘要: 一句话概括项目核心功能，不超过 50 字，不要用"这是一个"开头
 2. 标签: 3-7 个精准的中文标签，每个 2-4 字，用逗号分隔
+3. 标签必须包含：功能类型、技术领域、应用场景中的至少两类
 
 直接输出，不要有其他文字。"""
+
+        tags: list[str] = []
+        summary: str = ""
 
         try:
             response = await self.complete(
@@ -445,20 +450,86 @@ class LLMService:
             # Parse response
             parts = response.strip().split("|")
             if len(parts) >= 2:
-                summary = parts[0].strip()
+                summary = parts[0].strip()[:100]
                 tags = [tag.strip() for tag in parts[1].split(",")]
                 tags = [tag for tag in tags if tag and len(tag) <= 20][:7]
-                return summary[:100], tags
             else:
                 # Fallback: treat entire response as summary
-                return response.strip()[:100], []
+                summary = response.strip()[:100]
 
         except Exception as e:
             logger.warning(f"Summary/tag generation failed for {full_name}: {e}")
-            # Fallback
+            # Fallback summary
             if description:
-                return description[:100], []
-            return f"{full_name.split('/')[-1]} - 开源项目", []
+                summary = description[:100]
+            else:
+                summary = f"{full_name.split('/')[-1]} - 开源项目"
+
+        # CRITICAL: Ensure tags are never empty
+        # This is essential for accurate clustering
+        tags = self._ensure_tags_not_empty(
+            tags=tags,
+            topics=topics,
+            language=language,
+            full_name=full_name,
+        )
+
+        return summary, tags
+
+    def _ensure_tags_not_empty(
+        self,
+        tags: list[str],
+        topics: list[str] | None,
+        language: str | None,
+        full_name: str,
+    ) -> list[str]:
+        """Ensure tags list is never empty through fallback mechanisms.
+
+        Fallback priority:
+        1. Use existing tags if available
+        2. Use GitHub topics as fallback
+        3. Use language as fallback
+        4. Generate default tag from repo name
+
+        Args:
+            tags: LLM-generated tags (may be empty)
+            topics: GitHub topics/tags
+            language: Programming language
+            full_name: Repository full name
+
+        Returns:
+            Non-empty list of tags
+        """
+        if tags and len(tags) >= 1:
+            return tags
+
+        result_tags: list[str] = []
+
+        # Fallback 1: Use GitHub topics
+        if topics and len(topics) > 0:
+            # Convert English topics to simple Chinese tags or keep as-is
+            for topic in topics[:5]:
+                # Keep short topics as-is, they work as tags
+                if len(topic) <= 15:
+                    result_tags.append(topic)
+            if result_tags:
+                return result_tags
+
+        # Fallback 2: Use language
+        if language:
+            result_tags.append(language)
+            result_tags.append("开源项目")
+            return result_tags
+
+        # Fallback 3: Generate from repo name
+        repo_name = full_name.split("/")[-1] if "/" in full_name else full_name
+        # Extract meaningful parts from repo name
+        parts = repo_name.replace("-", " ").replace("_", " ").split()
+        if parts:
+            result_tags.append(parts[0])
+        result_tags.append("开源项目")
+
+        return result_tags
 
     async def generate_batch_summaries(
         self,
