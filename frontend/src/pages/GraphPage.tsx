@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sidebar } from '../components/layout/Sidebar';
-import Graph3D from '../components/graph/Graph3D';
+import Graph2D from '../components/graph/Graph2D';
 import Timeline from '../components/graph/Timeline';
 import { SearchInput } from '../components/ui/SearchInput';
 import { getGraphData } from '../api/graph';
@@ -155,7 +155,7 @@ const GraphPage = () => {
         <section className="flex-1 relative flex flex-col">
             {/* Graph Container */}
             <div className="flex-1 relative bg-white">
-                <Graph3D data={data} onNodeClick={handleNodeClick} />
+                <Graph2D data={data} onNodeClick={handleNodeClick} />
 
                 {selectedNode && (
                     <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />
