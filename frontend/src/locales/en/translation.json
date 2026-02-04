@@ -9,6 +9,18 @@
     "data": "Data",
     "settings": "Settings"
   },
+  "common": {
+    "loading": "Loading...",
+    "total": "total",
+    "repositories": "repositories",
+    "languages": "languages",
+    "clear": "Clear",
+    "clear_filter": "Clear filter",
+    "clear_filters": "Clear filters",
+    "clear_all_filters": "Clear all filters",
+    "show_all": "Show all",
+    "view_all": "View all"
+  },
   "dashboard": {
     "title": "Universe Explorer",
     "subtitle": "Visualizing {{count}} Stars",
@@ -18,7 +30,42 @@
     "sync_step_stars": "Syncing Stars...",
     "sync_step_embedding": "Computing Embeddings...",
     "sync_step_clustering": "Generating Clusters...",
-    "search_placeholder": "Search stars, clusters, or topics..."
+    "search_placeholder": "Search stars, clusters, or topics...",
+    "explore_graph": "Explore Graph",
+    "total_repos": "Total Repos",
+    "total_stars": "Total Stars",
+    "top_language": "Top Language",
+    "clusters": "Clusters",
+    "starred_repos": "Starred repositories",
+    "combined_stars": "Combined stars",
+    "knowledge_groups": "Knowledge groups",
+    "language_distribution": "Language Distribution",
+    "star_activity": "Star Activity",
+    "last_3_months": "last 3 months",
+    "top_clusters": "Top Clusters",
+    "no_data": "No data available",
+    "no_activity": "No activity data"
+  },
+  "graph": {
+    "clusters": "Clusters",
+    "timeline": "Timeline",
+    "showing_repos": "Showing {{count}} repos",
+    "empty_title": "No Data",
+    "empty_hint": "Sync your GitHub stars to start exploring"
+  },
+  "data": {
+    "repository": "Repository",
+    "language": "Language",
+    "stars": "Stars",
+    "cluster": "Cluster",
+    "starred_date": "Starred",
+    "description": "Description",
+    "filter_by_cluster": "Filter by cluster",
+    "search_placeholder": "Search repositories...",
+    "rows_per_page": "Rows per page",
+    "showing": "{{start}}-{{end}} of {{total}}",
+    "no_results": "No results found",
+    "no_data": "No data available"
   },
   "settings": {
     "title": "Settings",
@@ -30,8 +77,8 @@
     "api_endpoint": "API Endpoint",
     "github_token_status": "GitHub Token Status",
     "connected": "Connected"
-},
-"repoDetails": {
+  },
+  "repoDetails": {
     "close": "Close",
     "no_description": "No description available",
     "stars": "Stars",
@@ -40,5 +87,11 @@
     "starred_at": "Starred",
     "ai_summary": "AI Summary",
     "view_on_github": "View on GitHub"
+  },
+  "errors": {
+    "sync_failed": "Sync failed. Please check if GITHUB_TOKEN is configured.",
+    "sync_stars_failed": "Failed to sync stars",
+    "embedding_failed": "Failed to compute embeddings",
+    "clustering_failed": "Failed to generate clusters"
   }
 }

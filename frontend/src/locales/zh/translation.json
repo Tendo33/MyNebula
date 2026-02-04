@@ -12,6 +12,18 @@
     "data": "数据",
     "settings": "设置"
   },
+  "common": {
+    "loading": "加载中...",
+    "total": "共",
+    "repositories": "仓库",
+    "languages": "语言",
+    "clear": "清除",
+    "clear_filter": "清除筛选",
+    "clear_filters": "清除筛选",
+    "clear_all_filters": "清除所有筛选",
+    "show_all": "显示全部",
+    "view_all": "查看全部"
+  },
   "dashboard": {
     "title": "宇宙探索器",
     "subtitle": "正如繁星 {{count}} 颗",
@@ -22,7 +34,42 @@
     "sync_step_embedding": "计算嵌入...",
     "sync_step_clustering": "生成聚类...",
     "sync_error_no_token": "请先登录 GitHub",
-    "search_placeholder": "搜索星星、星团或主题..."
+    "search_placeholder": "搜索星星、星团或主题...",
+    "explore_graph": "探索图谱",
+    "total_repos": "仓库总数",
+    "total_stars": "星标总数",
+    "top_language": "主要语言",
+    "clusters": "聚类",
+    "starred_repos": "已收藏仓库",
+    "combined_stars": "累计星标数",
+    "knowledge_groups": "知识分组",
+    "language_distribution": "语言分布",
+    "star_activity": "收藏活动",
+    "last_3_months": "近3个月",
+    "top_clusters": "热门聚类",
+    "no_data": "暂无数据",
+    "no_activity": "暂无活动数据"
+  },
+  "graph": {
+    "clusters": "聚类",
+    "timeline": "时间线",
+    "showing_repos": "显示 {{count}} 个仓库",
+    "empty_title": "暂无数据",
+    "empty_hint": "同步你的 GitHub 星标开始探索"
+  },
+  "data": {
+    "repository": "仓库",
+    "language": "语言",
+    "stars": "星标",
+    "cluster": "聚类",
+    "starred_date": "收藏时间",
+    "description": "描述",
+    "filter_by_cluster": "按聚类筛选",
+    "search_placeholder": "搜索仓库...",
+    "rows_per_page": "每页行数",
+    "showing": "{{start}}-{{end}} / {{total}}",
+    "no_results": "未找到结果",
+    "no_data": "暂无数据"
   },
   "settings": {
     "title": "设置",
@@ -44,5 +91,11 @@
     "starred_at": "收藏于",
     "ai_summary": "AI 摘要",
     "view_on_github": "在 GitHub 上查看"
+  },
+  "errors": {
+    "sync_failed": "同步失败，请检查是否已配置 GITHUB_TOKEN",
+    "sync_stars_failed": "星标同步失败",
+    "embedding_failed": "嵌入计算失败",
+    "clustering_failed": "聚类失败"
   }
 }
