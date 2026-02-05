@@ -56,7 +56,7 @@ const COLORS = {
 
 const NODE_BASE_SIZE = 2;
 const NODE_MAX_SIZE = 12;
-const POSITION_SCALE = 80; // Scale factor for pre-computed positions
+const POSITION_SCALE = 150; // Scale factor for pre-computed positions
 
 // ============================================================================
 // Utility Functions

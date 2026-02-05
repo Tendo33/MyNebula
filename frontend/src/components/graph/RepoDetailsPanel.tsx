@@ -177,7 +177,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                     </a>
                 </div>
                 <p className="text-xs text-text-dim">{node.owner}</p>
-                <p className="text-sm text-text-muted line-clamp-2 leading-relaxed mt-1">
+                <p className="text-sm text-text-muted leading-relaxed mt-1">
                 {node.description || 'No description available'}
                 </p>
             </div>

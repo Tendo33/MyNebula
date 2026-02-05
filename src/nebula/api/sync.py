@@ -273,7 +273,7 @@ async def sync_stars_task(
             await db.commit()
 
             # Process repos
-            settings = get_sync_settings()
+            sync_settings = get_sync_settings()
             processed = 0
             failed = 0
             new_count = 0
@@ -331,7 +331,7 @@ async def sync_stars_task(
                     task.processed_items = processed
 
                     # Commit in batches
-                    if processed % settings.batch_size == 0:
+                    if processed % sync_settings.batch_size == 0:
                         await db.commit()
                         logger.info(
                             f"Synced {processed}/{len(repos)} repos for user {user.username}"
