@@ -14,7 +14,7 @@ import {
 // Types
 // ============================================================================
 
-type SortField = 'name' | 'language' | 'stargazers_count' | 'starred_at' | 'cluster';
+type SortField = 'name' | 'language' | 'stargazers_count' | 'starred_at' | 'cluster' | 'summary';
 type SortDirection = 'asc' | 'desc';
 
 interface SortConfig {
@@ -183,6 +183,9 @@ const DataPage = () => {
           const clusterB = b.cluster_id !== undefined ? clusterMap.get(b.cluster_id)?.name || '' : '';
           comparison = clusterA.localeCompare(clusterB);
           break;
+        case 'summary':
+          comparison = (a.ai_summary || '').localeCompare(b.ai_summary || '');
+          break;
       }
 
       return sortConfig.direction === 'asc' ? comparison : -comparison;
@@ -327,9 +330,16 @@ const DataPage = () => {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-bg-hover text-text-muted font-medium border-b border-border-light">
                       <tr>
+                        <th className="px-4 py-3 w-12 text-center text-xs text-text-muted/50">#</th>
                         <SortableHeader
                           label={t('data.repository')}
                           field="name"
+                          currentSort={sortConfig}
+                          onSort={handleSort}
+                        />
+                         <SortableHeader
+                          label={t('data.summary')}
+                          field="summary"
                           currentSort={sortConfig}
                           onSort={handleSort}
                         />
@@ -358,7 +368,7 @@ const DataPage = () => {
                           currentSort={sortConfig}
                           onSort={handleSort}
                         />
-                        <th className="px-4 py-3 w-20">{t('data.description')}</th>
+                        <th className="px-4 py-3 w-20 hidden">{t('data.description')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-light">
@@ -368,6 +378,15 @@ const DataPage = () => {
                           className="hover:bg-bg-hover/50 transition-colors cursor-pointer"
                           onClick={() => handleRowClick(repo)}
                         >
+                          <td className="px-4 py-3 text-center">
+                            {repo.owner_avatar_url ? (
+                              <img src={repo.owner_avatar_url} alt={repo.owner} className="w-6 h-6 rounded-md mx-auto" />
+                            ) : (
+                               <div className="w-6 h-6 rounded-md bg-gray-200 mx-auto flex items-center justify-center text-[10px] text-gray-500">
+                                 {repo.owner.charAt(0).toUpperCase()}
+                               </div>
+                            )}
+                          </td>
                           <td className="px-4 py-3 max-w-xs">
                             <div className="flex items-center gap-2">
                               <a
@@ -388,6 +407,11 @@ const DataPage = () => {
                                 <ExternalLink className="w-3 h-3 text-text-muted flex-shrink-0 hover:text-action-primary" />
                               </a>
                             </div>
+                          </td>
+                          <td className="px-4 py-3 max-w-md">
+                            <p className="line-clamp-2 text-sm text-text-muted" title={repo.ai_summary || repo.description}>
+                                {repo.ai_summary || repo.description || <span className="italic text-text-dim">No summary</span>}
+                            </p>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {repo.language ? (
@@ -410,7 +434,7 @@ const DataPage = () => {
                           <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap">
                             {formatDate(repo.starred_at)}
                           </td>
-                          <td className="px-4 py-3 max-w-md">
+                          <td className="px-4 py-3 max-w-md hidden">
                             <p className="truncate text-text-muted text-xs">
                               {repo.description || <span className="italic text-text-dim">No description</span>}
                             </p>
@@ -420,7 +444,7 @@ const DataPage = () => {
 
                       {paginatedData.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center text-text-muted">
+                          <td colSpan={7} className="px-4 py-12 text-center text-text-muted">
                             {localSearch || filters.selectedClusters.size > 0
                               ? t('data.no_results')
                               : t('data.no_data')

@@ -240,7 +240,7 @@ class LLMService:
         language: str | None,
         readme_content: str | None,
     ) -> str:
-        """Generate a one-line summary for a repository.
+        """Generate a summary for a repository.
 
         Args:
             full_name: Repository full name (owner/repo)
@@ -250,7 +250,7 @@ class LLMService:
             readme_content: README content (truncated)
 
         Returns:
-            One-line summary in Chinese
+            Summary in Chinese
         """
         # Build context
         context_parts = [f"仓库: {full_name}"]
@@ -266,28 +266,28 @@ class LLMService:
 
         if readme_content:
             # Truncate README to avoid token limits
-            readme_truncated = readme_content[:2000]
+            readme_truncated = readme_content[:4000]
             context_parts.append(f"README 摘要:\n{readme_truncated}")
 
         context = "\n".join(context_parts)
 
-        prompt = f"""请为以下 GitHub 项目生成一句话中文摘要（不超过 50 字）。
+        prompt = f"""请为以下 GitHub 项目生成一段中文摘要（100-150 字）。
 
 {context}
 
 要求:
-1. 简洁明了，突出项目核心功能
-2. 使用中文
+1. 涵盖项目的核心功能、技术特点和适用场景
+2. 使用专业、流畅的中文
 3. 不要使用 "这是一个" 开头
-4. 不超过 50 个字
+4. 字数控制在 100-150 字之间
 
 直接输出摘要内容，不要有其他文字。"""
 
         try:
             response = await self.complete(
                 prompt=prompt,
-                system_prompt="你是一个技术文档专家，擅长用简洁的语言描述开源项目。",
-                max_tokens=100,
+                system_prompt="你是一个技术文档专家，擅长用清晰的语言描述开源项目。",
+                max_tokens=10000,
                 temperature=0.3,
             )
 
@@ -298,13 +298,13 @@ class LLMService:
                 if summary.startswith(prefix):
                     summary = summary[len(prefix) :].strip()
 
-            return summary[:100]  # Ensure max length
+            return summary
 
         except Exception as e:
             logger.warning(f"LLM summary generation failed for {full_name}: {e}")
             # Fallback to description or default
             if description:
-                return description[:100]
+                return description
             return f"{full_name.split('/')[-1]} - 开源项目"
 
     async def generate_repo_tags(
@@ -430,7 +430,7 @@ class LLMService:
 摘要|标签1,标签2,标签3,标签4,标签5
 
 要求:
-1. 摘要: 一句话概括项目核心功能，不超过 50 字，不要用"这是一个"开头
+1. 摘要: 概括项目核心功能、技术特点和应用场景，100-150 字，不要用"这是一个"开头
 2. 标签: 3-7 个精准的中文标签，每个 2-4 字，用逗号分隔
 3. 标签必须包含：功能类型、技术领域、应用场景中的至少两类
 
@@ -442,28 +442,28 @@ class LLMService:
         try:
             response = await self.complete(
                 prompt=prompt,
-                system_prompt="你是一个技术文档专家，擅长用简洁的语言描述和分类开源项目。",
-                max_tokens=150,
+                system_prompt="你是一个技术文档专家，擅长用清晰的语言描述和分类开源项目。",
+                max_tokens=350,
                 temperature=0.3,
             )
 
             # Parse response
             parts = response.strip().split("|")
             if len(parts) >= 2:
-                summary = parts[0].strip()[:100]
+                summary = parts[0].strip()
                 tags = [tag.strip() for tag in parts[1].split(",")]
                 tags = [tag for tag in tags if tag and len(tag) <= 20][:7]
             else:
                 # Fallback: treat entire response as summary
-                summary = response.strip()[:100]
+                summary = response.strip()
 
         except Exception as e:
             logger.warning(f"Summary/tag generation failed for {full_name}: {e}")
             # Fallback summary
-            if description:
-                summary = description[:100]
-            else:
-                summary = f"{full_name.split('/')[-1]} - 开源项目"
+
+            summary = (
+                description if description else f"{full_name.split('/')[-1]} - 开源项目"
+            )
 
         # CRITICAL: Ensure tags are never empty
         # This is essential for accurate clustering
