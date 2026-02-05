@@ -55,6 +55,7 @@
     "my_lists": "我的收藏夹",
     "timeline": "时间线",
     "showing_repos": "显示 {{count}} 个仓库",
+    "loading_data": "正在加载图谱数据...",
     "empty_title": "暂无数据",
     "empty_hint": "同步你的 GitHub 星标开始探索"
   },

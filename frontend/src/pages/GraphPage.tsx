@@ -35,7 +35,7 @@ const GraphPage = () => {
     filters,
     setSearchQuery,
     clearFilters,
-    loading,
+
     syncing,
     syncStep,
     setSyncing,
@@ -286,7 +286,7 @@ const GraphPage = () => {
         <section className="flex-1 relative flex">
           {/* Filters sidebar */}
           {showFilters && (
-            <aside className="w-72 border-r border-border-light bg-bg-sidebar/50 p-4 space-y-4 overflow-y-auto">
+            <aside className="w-72 flex-shrink-0 border-r border-border-light bg-bg-sidebar p-4 space-y-4 overflow-y-auto z-30 relative">
               {/* Clear all filters */}
               {hasActiveFilters && (
                 <button
@@ -316,7 +316,7 @@ const GraphPage = () => {
           )}
 
           {/* Graph Container */}
-          <div className="flex-1 relative bg-white">
+          <div className="flex-1 min-w-0 relative bg-white">
             {viewMode === '2d' ? <Graph2D /> : <Graph3D />}
 
             {/* Details panel */}
@@ -325,11 +325,7 @@ const GraphPage = () => {
             )}
 
             {/* Loading overlay */}
-            {loading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-50">
-                <Loader2 className="animate-spin h-8 w-8 text-action-primary" />
-              </div>
-            )}
+
           </div>
         </section>
       </main>

@@ -51,6 +51,7 @@
     "my_lists": "My Lists",
     "timeline": "Timeline",
     "showing_repos": "Showing {{count}} repos",
+    "loading_data": "Loading graph data...",
     "empty_title": "No Data",
     "empty_hint": "Sync your GitHub stars to start exploring"
   },
