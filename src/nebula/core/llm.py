@@ -14,6 +14,7 @@ Used for:
 - Natural language processing tasks
 """
 
+import json_repair
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
@@ -346,7 +347,7 @@ class LLMService:
 
         if readme_content:
             # Truncate README to avoid token limits
-            readme_truncated = readme_content[:2500]
+            readme_truncated = readme_content[:5000]
             context_parts.append(f"README 内容:\n{readme_truncated}")
 
         context = "\n".join(context_parts)
@@ -407,7 +408,7 @@ class LLMService:
             response_text = response_text.strip()
 
             try:
-                data = json.loads(response_text)
+                data = json_repair.loads(response_text)
                 summary = data.get("summary", "").strip()
                 raw_tags = data.get("tags", [])
                 if isinstance(raw_tags, list):

@@ -852,6 +852,15 @@ wheels = [
 ]
 
 [[package]]
+name = "json-repair"
+version = "0.56.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/90/13e25364ffad227896a1853fb05bf26af6186d97dc3c30ed7317c2edf33a/json_repair-0.56.0.tar.gz", hash = "sha256:d6159e9b32a8a310a7e016862a255c4ce19221417f80847a5be146f0cca753a7", size = 53486, upload-time = "2026-02-03T13:11:04.78Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/4f/aa233e9849c521e7480c02e253d1e1c9c58d9ad5e9350a702650b797d3a5/json_repair-0.56.0-py3-none-any.whl", hash = "sha256:41005b8c1d4ca74dcb902bab6049467d4feb5e18e1d1621b6ca73c48dae04798", size = 38749, upload-time = "2026-02-03T13:11:03.666Z" },
+]
+
+[[package]]
 name = "llvmlite"
 version = "0.46.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1000,6 +1009,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "hdbscan" },
     { name = "httpx" },
+    { name = "json-repair" },
     { name = "loguru" },
     { name = "numba" },
     { name = "numpy" },
@@ -1045,6 +1055,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "hdbscan", specifier = ">=0.8.0" },
     { name = "httpx", specifier = ">=0.28.0" },
+    { name = "json-repair", specifier = ">=0.56.0" },
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "numba", specifier = ">=0.61.0" },
     { name = "numpy", specifier = ">=1.26.0" },

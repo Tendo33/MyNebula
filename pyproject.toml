@@ -53,6 +53,7 @@ dependencies = [
     "PyGithub>=2.5.0",
     # Database sync driver
     "psycopg2>=2.9.11",
+    "json-repair>=0.56.0",
 ]
 
 [project.optional-dependencies]
