@@ -246,9 +246,9 @@ class ClusteringService:
         self,
         n_neighbors: int = 15,
         min_dist: float = 0.1,
-        min_cluster_size: int = 2,
+        min_cluster_size: int = 5,
         min_samples: int = 1,
-        cluster_selection_method: str = "leaf",
+        cluster_selection_method: str = "eom",
         min_clusters: int = 3,
         assign_all_points: bool = True,
     ):
