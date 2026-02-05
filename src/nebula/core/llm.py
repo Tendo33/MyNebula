@@ -68,7 +68,7 @@ class LLMService:
         self,
         prompt: str,
         system_prompt: str | None = None,
-        max_tokens: int = 500,
+        max_tokens: int = 2048,
         temperature: float = 0.7,
     ) -> str:
         """Generate completion for a prompt.
@@ -103,7 +103,7 @@ class LLMService:
         self,
         prompt: str,
         system_prompt: str | None = None,
-        max_tokens: int = 500,
+        max_tokens: int = 2048,
         temperature: float = 0.7,
     ) -> LLMResponse:
         """Generate completion with full response metadata.
@@ -204,7 +204,7 @@ class LLMService:
             response = await self.complete(
                 prompt=prompt,
                 system_prompt="你是一个技术分析专家，擅长分析和总结 GitHub 项目。请用中文回答。",
-                max_tokens=200,
+                max_tokens=4096,
                 temperature=0.5,
             )
 
@@ -307,79 +307,6 @@ class LLMService:
                 return description
             return f"{full_name.split('/')[-1]} - 开源项目"
 
-    async def generate_repo_tags(
-        self,
-        full_name: str,
-        description: str | None,
-        topics: list[str] | None,
-        language: str | None,
-        readme_content: str | None,
-    ) -> list[str]:
-        """Generate AI tags for a repository based on README and metadata.
-
-        Args:
-            full_name: Repository full name (owner/repo)
-            description: Repository description
-            topics: Repository topics/tags from GitHub
-            language: Primary programming language
-            readme_content: README content (truncated)
-
-        Returns:
-            List of 3-7 AI-generated tags in Chinese
-        """
-        # Build context
-        context_parts = [f"仓库: {full_name}"]
-
-        if language:
-            context_parts.append(f"语言: {language}")
-
-        if description:
-            context_parts.append(f"描述: {description}")
-
-        if topics:
-            context_parts.append(f"GitHub 标签: {', '.join(topics[:10])}")
-
-        if readme_content:
-            # Truncate README to avoid token limits
-            readme_truncated = readme_content[:3000]
-            context_parts.append(f"README 内容:\n{readme_truncated}")
-
-        context = "\n".join(context_parts)
-
-        prompt = f"""请为以下 GitHub 项目生成 3-7 个精准的中文标签。
-
-{context}
-
-要求:
-1. 标签应该描述项目的核心功能、技术栈、应用场景
-2. 使用中文
-3. 每个标签 2-4 个字
-4. 标签之间用逗号分隔
-5. 不要重复 GitHub 已有的标签
-6. 关注项目的实际用途和技术特点
-
-直接输出标签列表，格式：标签1,标签2,标签3"""
-
-        try:
-            response = await self.complete(
-                prompt=prompt,
-                system_prompt="你是一个技术标签专家，擅长为开源项目生成精准的分类标签。",
-                max_tokens=100,
-                temperature=0.3,
-            )
-
-            # Parse response
-            tags = [tag.strip() for tag in response.strip().split(",")]
-            # Clean up tags
-            tags = [tag for tag in tags if tag and len(tag) <= 20]
-
-            return tags[:7]  # Limit to 7 tags
-
-        except Exception as e:
-            logger.warning(f"AI tag generation failed for {full_name}: {e}")
-            # Fallback to empty list
-            return []
-
     async def generate_repo_summary_and_tags(
         self,
         full_name: str,
@@ -388,9 +315,9 @@ class LLMService:
         language: str | None,
         readme_content: str | None,
     ) -> tuple[str, list[str]]:
-        """Generate both summary and tags for a repository in one call.
+        """Generate both summary and tags for a repository in one LLM call.
 
-        More efficient than calling generate_repo_summary and generate_repo_tags separately.
+        Uses JSON output format for reliable parsing.
         IMPORTANT: This method guarantees non-empty tags through fallback mechanisms.
 
         Args:
@@ -403,14 +330,16 @@ class LLMService:
         Returns:
             Tuple of (summary, tags) - tags is guaranteed to be non-empty
         """
-        # Build context
-        context_parts = [f"仓库: {full_name}"]
+        import json
+
+        # Build structured context
+        context_parts = [f"仓库名称: {full_name}"]
 
         if language:
-            context_parts.append(f"语言: {language}")
+            context_parts.append(f"主要语言: {language}")
 
         if description:
-            context_parts.append(f"描述: {description}")
+            context_parts.append(f"官方描述: {description}")
 
         if topics:
             context_parts.append(f"GitHub 标签: {', '.join(topics[:10])}")
@@ -422,45 +351,90 @@ class LLMService:
 
         context = "\n".join(context_parts)
 
-        prompt = f"""请为以下 GitHub 项目生成中文摘要和标签。
+        system_prompt = """你是一名资深的开源项目分析师，专注于技术项目的分类和文档撰写。
 
+你的职责：
+1. 深入理解项目的技术架构和核心价值
+2. 用专业、简洁的中文描述项目
+3. 提取精准的分类标签
+
+输出要求：
+- 必须以纯 JSON 格式输出
+- 不要添加 markdown 代码块标记
+- 不要添加任何额外说明文字"""
+
+        user_prompt = f"""分析以下 GitHub 项目，生成结构化的摘要和标签。
+
+## 项目信息
 {context}
 
-请按以下格式输出（使用 | 分隔）:
-摘要|标签1,标签2,标签3,标签4,标签5
+## 输出要求
 
-要求:
-1. 摘要: 概括项目核心功能、技术特点和应用场景，100-150 字，不要用"这是一个"开头
-2. 标签: 3-7 个精准的中文标签，每个 2-4 字，用逗号分隔
-3. 标签必须包含：功能类型、技术领域、应用场景中的至少两类
+### summary (摘要)
+- 字数：100-150 字
+- 内容：核心功能、技术特点、适用场景
+- 风格：专业流畅，避免"这是一个"等冗余开头
+- 语言：中文
 
-直接输出，不要有其他文字。"""
+### tags (标签)
+- 数量：3-7 个
+- 长度：每个 2-6 字
+- 覆盖：功能类型、技术领域、应用场景
+- 语言：中文优先，技术专有名词可用英文
+
+## 输出格式 (严格按此 JSON 格式)
+{{"summary": "项目摘要内容", "tags": ["标签1", "标签2", "标签3"]}}"""
 
         tags: list[str] = []
         summary: str = ""
 
         try:
             response = await self.complete(
-                prompt=prompt,
-                system_prompt="你是一个技术文档专家，擅长用清晰的语言描述和分类开源项目。",
-                max_tokens=350,
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                max_tokens=2048,
                 temperature=0.3,
             )
 
-            # Parse response
-            parts = response.strip().split("|")
-            if len(parts) >= 2:
-                summary = parts[0].strip()
-                tags = [tag.strip() for tag in parts[1].split(",")]
-                tags = [tag for tag in tags if tag and len(tag) <= 20][:7]
-            else:
-                # Fallback: treat entire response as summary
-                summary = response.strip()
+            # Parse JSON response
+            response_text = response.strip()
+            # Remove potential markdown code block markers
+            if response_text.startswith("```"):
+                lines = response_text.split("\n")
+                response_text = "\n".join(
+                    lines[1:-1] if lines[-1] == "```" else lines[1:]
+                )
+            response_text = response_text.strip()
+
+            try:
+                data = json.loads(response_text)
+                summary = data.get("summary", "").strip()
+                raw_tags = data.get("tags", [])
+                if isinstance(raw_tags, list):
+                    tags = [str(tag).strip() for tag in raw_tags if tag]
+                    tags = [tag for tag in tags if tag and len(tag) <= 20][:7]
+            except json.JSONDecodeError:
+                # Fallback: try to extract from malformed response
+                logger.warning(f"JSON parse failed for {full_name}, trying fallback")
+                if "summary" in response_text and "tags" in response_text:
+                    # Attempt regex extraction
+                    import re
+
+                    summary_match = re.search(
+                        r'"summary"\s*:\s*"([^"]+)"', response_text
+                    )
+                    if summary_match:
+                        summary = summary_match.group(1)
+                    tags_match = re.search(r'"tags"\s*:\s*\[([^\]]+)\]', response_text)
+                    if tags_match:
+                        tags_str = tags_match.group(1)
+                        tags = [t.strip().strip("\"'") for t in tags_str.split(",")]
+                        tags = [tag for tag in tags if tag and len(tag) <= 20][:7]
+                else:
+                    summary = response_text[:200]
 
         except Exception as e:
             logger.warning(f"Summary/tag generation failed for {full_name}: {e}")
-            # Fallback summary
-
             summary = (
                 description if description else f"{full_name.split('/')[-1]} - 开源项目"
             )
