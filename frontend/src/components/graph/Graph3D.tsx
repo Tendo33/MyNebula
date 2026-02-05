@@ -246,6 +246,18 @@ const Graph3D: React.FC = () => {
     };
   }, [clusterBounds]);
 
+  // Fit camera to data bounds on load/resize
+  useEffect(() => {
+    if (!graphRef.current || processedData.nodes.length === 0) return;
+    if (width <= 1 || height <= 1) return;
+
+    const timeout = window.setTimeout(() => {
+      graphRef.current?.zoomToFit?.(800, 60);
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [processedData.nodes.length, width, height]);
+
   // Get node color based on state
   const getNodeColor = useCallback((node: ProcessedNode): string => {
     if (selectedNode && selectedNode.id === node.id) {
