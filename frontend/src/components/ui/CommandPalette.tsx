@@ -10,8 +10,6 @@ import {
   Tag,
   Clock,
   ArrowRight,
-  ExternalLink,
-  Layers,
   TrendingUp,
   Command,
 } from 'lucide-react';

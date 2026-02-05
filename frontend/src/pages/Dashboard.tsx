@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { useGraph } from '../contexts/GraphContext';
 import { DashboardSkeleton } from '../components/ui/Skeleton';
-import { Loader2, Book, Star, Code, Layers, TrendingUp, ArrowRight, Calendar } from 'lucide-react';
+import { Book, Star, Code, Layers, TrendingUp, ArrowRight, Calendar } from 'lucide-react';
 
 // ============================================================================
 // Types

@@ -8,10 +8,12 @@ import { clsx } from 'clsx';
 interface SkeletonProps {
   className?: string;
   animate?: boolean;
+  style?: React.CSSProperties;
 }
 
-export const Skeleton: React.FC<SkeletonProps> = ({ className, animate = true }) => (
+export const Skeleton: React.FC<SkeletonProps> = ({ className, animate = true, style }) => (
   <div
+    style={style}
     className={clsx(
       'bg-gray-200 rounded',
       animate && 'animate-pulse',

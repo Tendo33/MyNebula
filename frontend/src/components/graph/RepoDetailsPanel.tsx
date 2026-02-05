@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GraphNode } from '../../types';
-import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart, Link2, ChevronRight, User, Package, GitFork, Copy, Check } from 'lucide-react';
+import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart, Link2, ChevronRight, User, GitFork, Copy, Check } from 'lucide-react';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
 import { clsx } from 'clsx';
 
