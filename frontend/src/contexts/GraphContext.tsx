@@ -9,6 +9,7 @@ import { getGraphData, getTimelineData } from '../api/graph';
 const CACHE_KEY_GRAPH = 'nebula_graph_data';
 const CACHE_KEY_TIMELINE = 'nebula_timeline_data';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const STORAGE_KEY_SETTINGS = 'nebula_graph_settings';
 
 interface CacheEntry<T> {
   data: T;
@@ -71,6 +72,11 @@ interface GraphFilters {
   languages: Set<string>;
 }
 
+export interface GraphSettings {
+  showTrajectories: boolean;
+  hqRendering: boolean;
+}
+
 interface GraphState {
   /** Raw data from API */
   rawData: GraphData | null;
@@ -82,6 +88,8 @@ interface GraphState {
   hoveredNode: GraphNode | null;
   /** Current filters */
   filters: GraphFilters;
+  /** Visual settings */
+  settings: GraphSettings;
   /** Loading states */
   loading: boolean;
   syncing: boolean;
@@ -113,6 +121,9 @@ interface GraphContextValue extends GraphState {
   toggleLanguage: (language: string) => void;
   clearFilters: () => void;
 
+  // Settings actions
+  updateSettings: (settings: Partial<GraphSettings>) => void;
+
   // Sync actions
   setSyncing: (syncing: boolean) => void;
   setSyncStep: (step: string) => void;
@@ -131,6 +142,11 @@ const defaultFilters: GraphFilters = {
   languages: new Set(),
 };
 
+const defaultSettings: GraphSettings = {
+  showTrajectories: true,
+  hqRendering: true,
+};
+
 const GraphContext = createContext<GraphContextValue | null>(null);
 
 // ============================================================================
@@ -144,6 +160,17 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [filters, setFilters] = useState<GraphFilters>(defaultFilters);
+  const [settings, setSettings] = useState<GraphSettings>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
+      if (stored) {
+        return { ...defaultSettings, ...JSON.parse(stored) };
+      }
+    } catch (e) {
+      console.warn('Failed to load settings:', e);
+    }
+    return defaultSettings;
+  });
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncStep, setSyncStep] = useState('');
@@ -389,6 +416,14 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setFilters(defaultFilters);
   }, []);
 
+  const updateSettings = useCallback((newSettings: Partial<GraphSettings>) => {
+    setSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   // Auto-load data on mount
   useEffect(() => {
     loadData();
@@ -402,6 +437,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     selectedNode,
     hoveredNode,
     filters,
+    settings,
     loading,
     syncing,
     syncStep,
@@ -428,6 +464,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMinStars,
     toggleLanguage,
     clearFilters,
+
+    // Settings actions
+    updateSettings,
 
     // Sync actions
     setSyncing,

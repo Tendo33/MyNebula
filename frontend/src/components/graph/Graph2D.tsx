@@ -149,6 +149,7 @@ const Graph2D: React.FC = () => {
     hoveredNode,
     setSelectedNode,
     setHoveredNode,
+    settings,
     loading,
   } = useGraph();
 
@@ -323,6 +324,8 @@ const Graph2D: React.FC = () => {
 
   // Get link color based on state
   const getLinkColor = useCallback((link: ProcessedLink): string => {
+    if (!settings.showTrajectories) return 'rgba(0,0,0,0)';
+
     if (!activeHoverNode) return COLORS.LINK_DEFAULT;
 
     const sourceId = getNodeId(link.source);
@@ -338,6 +341,8 @@ const Graph2D: React.FC = () => {
 
   // Get link width based on state
   const getLinkWidth = useCallback((link: ProcessedLink): number => {
+    if (!settings.showTrajectories) return 0;
+
     if (!activeHoverNode) return 1;
 
     const sourceId = getNodeId(link.source);
@@ -372,14 +377,16 @@ const Graph2D: React.FC = () => {
       ctx.lineWidth = 2 / globalScale;
       ctx.stroke();
 
-      // Draw outer glow
-      ctx.beginPath();
-      ctx.arc(x, y, radius + 4 / globalScale, 0, 2 * Math.PI);
-      ctx.strokeStyle = isSelected
-        ? 'rgba(59, 130, 246, 0.3)'
-        : 'rgba(139, 92, 246, 0.3)';
-      ctx.lineWidth = 3 / globalScale;
-      ctx.stroke();
+      // Draw outer glow if HQ rendering is enabled
+      if (settings.hqRendering) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius + 4 / globalScale, 0, 2 * Math.PI);
+        ctx.strokeStyle = isSelected
+          ? 'rgba(59, 130, 246, 0.3)'
+          : 'rgba(139, 92, 246, 0.3)';
+        ctx.lineWidth = 3 / globalScale;
+        ctx.stroke();
+      }
     }
 
     // Draw label

@@ -1,5 +1,6 @@
 import { Sidebar } from '../components/layout/Sidebar';
 import { useTranslation } from 'react-i18next';
+import { useGraph } from '../contexts/GraphContext';
 import { API_BASE_URL } from '../api/client';
 import { Globe, Zap, Eye, Server, Shield, Clock, RefreshCw, Database, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -19,8 +20,9 @@ import {
 
 const Settings = () => {
   const { t, i18n } = useTranslation();
-  const [hqRendering, setHqRendering] = useState(true);
-  const [showTrajectories, setShowTrajectories] = useState(false);
+  const { settings, updateSettings } = useGraph();
+
+  // Schedule state
 
   // Schedule state
   const [schedule, setSchedule] = useState<ScheduleResponse | null>(null);
@@ -149,7 +151,10 @@ const Settings = () => {
                     </div>
 
                     {/* Rendering Toggle */}
-                    <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group cursor-pointer" onClick={() => setHqRendering(!hqRendering)}>
+                    <div
+                        className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group cursor-pointer"
+                        onClick={() => updateSettings({ hqRendering: !settings.hqRendering })}
+                    >
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-white transition-colors">
                                 <Zap className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -162,18 +167,21 @@ const Settings = () => {
                         <button
                             className={clsx(
                                 "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                                hqRendering ? "bg-black" : "bg-gray-300"
+                                settings.hqRendering ? "bg-black" : "bg-gray-300"
                             )}
                         >
                             <span className={clsx(
                                 "inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out shadow-sm",
-                                hqRendering ? "translate-x-5" : "translate-x-0.5"
+                                settings.hqRendering ? "translate-x-5" : "translate-x-0.5"
                             )} />
                         </button>
                     </div>
 
                     {/* Trajectories Toggle */}
-                    <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group cursor-pointer" onClick={() => setShowTrajectories(!showTrajectories)}>
+                    <div
+                        className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group cursor-pointer"
+                        onClick={() => updateSettings({ showTrajectories: !settings.showTrajectories })}
+                    >
                         <div className="flex items-center gap-3">
                              <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-white transition-colors">
                                 <Eye className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -186,12 +194,12 @@ const Settings = () => {
                          <button
                             className={clsx(
                                 "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                                showTrajectories ? "bg-black" : "bg-gray-300"
+                                settings.showTrajectories ? "bg-black" : "bg-gray-300"
                             )}
                         >
                             <span className={clsx(
                                 "inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out shadow-sm",
-                                showTrajectories ? "translate-x-5" : "translate-x-0.5"
+                                settings.showTrajectories ? "translate-x-5" : "translate-x-0.5"
                             )} />
                         </button>
                     </div>

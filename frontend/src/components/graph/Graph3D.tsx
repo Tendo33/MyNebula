@@ -99,6 +99,7 @@ const Graph3D: React.FC = () => {
     hoveredNode,
     setSelectedNode,
     setHoveredNode,
+    settings,
     loading,
   } = useGraph();
 
@@ -296,11 +297,18 @@ const Graph3D: React.FC = () => {
 
     // Create material with proper color handling
     const isTransparent = color.includes('rgba');
-    const material = new THREE.MeshLambertMaterial({
-      color: isTransparent ? '#6B7280' : color,
-      transparent: isTransparent,
-      opacity: isTransparent ? 0.3 : 1,
-    });
+    // Use simpler material if HQ rendering is disabled
+    const material = settings.hqRendering
+      ? new THREE.MeshLambertMaterial({
+          color: isTransparent ? '#6B7280' : color,
+          transparent: isTransparent,
+          opacity: isTransparent ? 0.3 : 1,
+        })
+      : new THREE.MeshBasicMaterial({
+          color: isTransparent ? '#6B7280' : color,
+          transparent: isTransparent,
+          opacity: isTransparent ? 0.3 : 1,
+        });
 
     const mesh = new THREE.Mesh(geometry, material);
 
@@ -415,6 +423,9 @@ const Graph3D: React.FC = () => {
       return COLORS.LINK_ACTIVE;
     }
 
+    // Hide non-active links if trajectories are hidden
+    if (!settings.showTrajectories) return 'rgba(0,0,0,0)';
+
     return 'rgba(156, 163, 175, 0.1)';
   }, [activeHoverNode]);
 
@@ -428,6 +439,9 @@ const Graph3D: React.FC = () => {
     if (sourceId === activeHoverNode.id || targetId === activeHoverNode.id) {
       return 1.5;
     }
+
+    // Hide non-active links if trajectories are hidden
+    if (!settings.showTrajectories) return 0;
 
     return 0.3;
   }, [activeHoverNode]);
