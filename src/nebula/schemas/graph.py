@@ -38,6 +38,7 @@ class GraphNode(BaseModel):
     ai_tags: list[str] | None = Field(None, description="AI-generated tags")
     topics: list[str] | None = Field(None, description="GitHub topics")
     starred_at: str | None = None
+    last_commit_time: str | None = Field(None, description="Last commit time")
 
 
 class StarListInfo(BaseModel):
