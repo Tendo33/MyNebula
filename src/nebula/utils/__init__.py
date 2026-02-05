@@ -94,6 +94,14 @@ from .file_utils import (
     write_text_file,
 )
 
+# Hash utilities
+from .hash_utils import (
+    compute_content_hash,
+    compute_topics_hash,
+    content_has_changed,
+    topics_have_changed,
+)
+
 # JSON utilities
 from .json_utils import (
     async_read_json,
@@ -214,4 +222,9 @@ __all__ = [
     "async_log_calls",
     "async_retry_decorator",
     "async_timing_decorator",
+    # Hash utilities
+    "compute_content_hash",
+    "compute_topics_hash",
+    "content_has_changed",
+    "topics_have_changed",
 ]

@@ -6,18 +6,33 @@ Handles GitHub star synchronization and processing tasks.
 from datetime import datetime
 from enum import Enum
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.core.config import get_sync_settings
 from nebula.core.embedding import get_embedding_service
 from nebula.core.github_client import GitHubClient
 from nebula.core.llm import get_llm_service
-from nebula.db import Cluster, StarList, StarredRepo, SyncTask, User, get_db
-from nebula.utils import get_logger
+from nebula.db import (
+    Cluster,
+    StarList,
+    StarredRepo,
+    SyncSchedule,
+    SyncTask,
+    User,
+    get_db,
+)
+from nebula.schemas import (
+    FullRefreshResponse,
+    ScheduleConfig,
+    ScheduleResponse,
+    SyncInfoResponse,
+)
+from nebula.utils import compute_content_hash, compute_topics_hash, get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -291,7 +306,28 @@ async def sync_stars_task(
                     existing = result.scalar_one_or_none()
 
                     if existing:
-                        # Update existing
+                        # Smart change detection: check if description or topics changed
+                        new_desc_hash = compute_content_hash(repo.description)
+                        new_topics_hash = compute_topics_hash(repo.topics)
+
+                        needs_reprocess = False
+                        if existing.description_hash != new_desc_hash:
+                            needs_reprocess = True
+                        if existing.topics_hash != new_topics_hash:
+                            needs_reprocess = True
+
+                        # If content changed, reset processing flags
+                        if needs_reprocess:
+                            existing.is_embedded = False
+                            existing.is_summarized = False
+                            existing.ai_summary = None
+                            existing.ai_tags = None
+                            existing.embedding = None
+                            logger.info(
+                                f"Repo {repo.full_name} content changed, marked for reprocessing"
+                            )
+
+                        # Update metadata
                         existing.description = repo.description
                         existing.language = repo.language
                         existing.topics = repo.topics
@@ -300,9 +336,14 @@ async def sync_stars_task(
                         existing.repo_updated_at = repo.updated_at
                         existing.repo_pushed_at = repo.pushed_at
                         existing.owner_avatar_url = repo.owner_avatar_url
+
+                        # Update hashes for future detection
+                        existing.description_hash = new_desc_hash
+                        existing.topics_hash = new_topics_hash
+
                         updated_count += 1
                     else:
-                        # Create new
+                        # Create new with content hashes for future detection
                         new_repo = StarredRepo(
                             user_id=user_id,
                             github_repo_id=repo.id,
@@ -323,6 +364,9 @@ async def sync_stars_task(
                             repo_updated_at=repo.updated_at,
                             repo_pushed_at=repo.pushed_at,
                             owner_avatar_url=repo.owner_avatar_url,
+                            # Content hashes for smart change detection
+                            description_hash=compute_content_hash(repo.description),
+                            topics_hash=compute_topics_hash(repo.topics),
                         )
                         db.add(new_repo)
                         new_count += 1
@@ -1149,4 +1193,419 @@ async def start_clustering(
         task_id=task.id,
         message="Clustering started",
         status="pending",
+    )
+
+
+# ==================== Full Refresh ====================
+
+
+async def full_refresh_task(user_id: int, task_id: int):
+    """Background task to perform full refresh of all repositories.
+
+    This will:
+    1. Reset all processing flags for user's repos
+    2. Run full star sync from GitHub
+    3. Regenerate all AI summaries
+    4. Recompute all embeddings
+    5. Re-run clustering
+
+    Args:
+        user_id: User database ID
+        task_id: Sync task ID for tracking
+    """
+    from sqlalchemy import update
+
+    from nebula.db.database import get_db_context
+
+    async with get_db_context() as db:
+        try:
+            task = await db.get(SyncTask, task_id)
+            if not task:
+                return
+
+            task.status = "running"
+            task.started_at = datetime.utcnow()
+            await db.commit()
+
+            # Step 1: Reset all processing flags
+            logger.info(f"Full refresh: Resetting all repos for user {user_id}")
+            result = await db.execute(
+                update(StarredRepo)
+                .where(StarredRepo.user_id == user_id)
+                .values(
+                    is_embedded=False,
+                    is_summarized=False,
+                    ai_summary=None,
+                    ai_tags=None,
+                    embedding=None,
+                    description_hash=None,
+                    topics_hash=None,
+                )
+            )
+            reset_count = result.rowcount
+            await db.commit()
+            logger.info(f"Full refresh: Reset {reset_count} repos")
+
+            task.total_items = reset_count
+            task.error_details = {"phase": "reset", "reset_count": reset_count}
+            await db.commit()
+
+            # Step 2: Create and run star sync task (full mode)
+            logger.info(f"Full refresh: Starting full star sync for user {user_id}")
+            stars_task = SyncTask(
+                user_id=user_id,
+                task_type="stars",
+                status="pending",
+            )
+            db.add(stars_task)
+            await db.commit()
+            await db.refresh(stars_task)
+
+            await sync_stars_task(user_id, stars_task.id, "full")
+
+            task.error_details = {"phase": "stars", "reset_count": reset_count}
+            task.processed_items = 1
+            await db.commit()
+
+            # Step 3: Create and run embedding task (includes LLM summaries)
+            logger.info(f"Full refresh: Computing embeddings for user {user_id}")
+            embed_task = SyncTask(
+                user_id=user_id,
+                task_type="embedding",
+                status="pending",
+            )
+            db.add(embed_task)
+            await db.commit()
+            await db.refresh(embed_task)
+
+            await compute_embeddings_task(user_id, embed_task.id)
+
+            task.error_details = {"phase": "embeddings", "reset_count": reset_count}
+            task.processed_items = 2
+            await db.commit()
+
+            # Step 4: Create and run clustering task
+            logger.info(f"Full refresh: Running clustering for user {user_id}")
+            cluster_task = SyncTask(
+                user_id=user_id,
+                task_type="cluster",
+                status="pending",
+            )
+            db.add(cluster_task)
+            await db.commit()
+            await db.refresh(cluster_task)
+
+            await run_clustering_task(user_id, cluster_task.id, use_llm=True)
+
+            # Mark complete
+            task.status = "completed"
+            task.completed_at = datetime.utcnow()
+            task.processed_items = 3
+            task.error_details = {
+                "phase": "complete",
+                "reset_count": reset_count,
+                "steps_completed": ["reset", "stars", "embeddings", "clustering"],
+            }
+            await db.commit()
+
+            logger.info(f"Full refresh completed for user {user_id}")
+
+        except Exception as e:
+            logger.exception(f"Full refresh failed for user {user_id}: {e}")
+
+            async with get_db_context() as db:
+                task = await db.get(SyncTask, task_id)
+                if task:
+                    task.status = "failed"
+                    task.error_message = str(e)
+                    task.completed_at = datetime.utcnow()
+                    await db.commit()
+
+
+# ==================== Schedule Management ====================
+
+
+def calculate_next_run_time(schedule: SyncSchedule) -> datetime | None:
+    """Calculate the next scheduled run time for a sync schedule.
+
+    Args:
+        schedule: The sync schedule configuration.
+
+    Returns:
+        The next run datetime in UTC, or None if schedule is disabled.
+    """
+    if not schedule.is_enabled:
+        return None
+
+    try:
+        tz = ZoneInfo(schedule.timezone)
+        now_utc = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC"))
+        now_local = now_utc.astimezone(tz)
+
+        # Create today's scheduled time in user's timezone
+        scheduled_today = now_local.replace(
+            hour=schedule.schedule_hour,
+            minute=schedule.schedule_minute,
+            second=0,
+            microsecond=0,
+        )
+
+        # If we've passed today's time, schedule for tomorrow
+        if now_local >= scheduled_today:
+            from datetime import timedelta
+
+            scheduled_today += timedelta(days=1)
+
+        # Convert back to UTC
+        return scheduled_today.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
+    except Exception as e:
+        logger.warning(f"Error calculating next run time: {e}")
+        return None
+
+
+@router.get("/schedule", response_model=ScheduleResponse)
+async def get_schedule(
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Get current sync schedule configuration.
+
+    Returns the user's scheduled sync settings including:
+    - Whether scheduled sync is enabled
+    - Scheduled time (hour, minute)
+    - Timezone
+    - Last run status
+    - Next scheduled run time
+
+    Args:
+        db: Database session
+
+    Returns:
+        Schedule configuration
+    """
+    user = await get_default_user(db)
+
+    result = await db.execute(
+        select(SyncSchedule).where(SyncSchedule.user_id == user.id)
+    )
+    schedule = result.scalar_one_or_none()
+
+    if not schedule:
+        # Return default configuration
+        return ScheduleResponse(
+            is_enabled=False,
+            schedule_hour=9,
+            schedule_minute=0,
+            timezone="Asia/Shanghai",
+            last_run_at=None,
+            last_run_status=None,
+            last_run_error=None,
+            next_run_at=None,
+        )
+
+    # Calculate next run time
+    next_run = calculate_next_run_time(schedule)
+
+    return ScheduleResponse(
+        is_enabled=schedule.is_enabled,
+        schedule_hour=schedule.schedule_hour,
+        schedule_minute=schedule.schedule_minute,
+        timezone=schedule.timezone,
+        last_run_at=schedule.last_run_at,
+        last_run_status=schedule.last_run_status,
+        last_run_error=schedule.last_run_error,
+        next_run_at=next_run,
+    )
+
+
+@router.post("/schedule", response_model=ScheduleResponse)
+async def update_schedule(
+    config: ScheduleConfig,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Update sync schedule configuration.
+
+    Creates or updates the user's scheduled sync settings.
+
+    Args:
+        config: New schedule configuration
+        db: Database session
+
+    Returns:
+        Updated schedule configuration
+    """
+    user = await get_default_user(db)
+
+    result = await db.execute(
+        select(SyncSchedule).where(SyncSchedule.user_id == user.id)
+    )
+    schedule = result.scalar_one_or_none()
+
+    if not schedule:
+        # Create new schedule
+        schedule = SyncSchedule(user_id=user.id)
+        db.add(schedule)
+
+    # Update fields
+    schedule.is_enabled = config.is_enabled
+    schedule.schedule_hour = config.schedule_hour
+    schedule.schedule_minute = config.schedule_minute
+    schedule.timezone = config.timezone
+
+    await db.commit()
+    await db.refresh(schedule)
+
+    # Calculate next run time
+    next_run = calculate_next_run_time(schedule)
+
+    logger.info(
+        f"Schedule updated for user {user.id}: "
+        f"enabled={config.is_enabled}, time={config.schedule_hour}:{config.schedule_minute:02d} {config.timezone}"
+    )
+
+    return ScheduleResponse(
+        is_enabled=schedule.is_enabled,
+        schedule_hour=schedule.schedule_hour,
+        schedule_minute=schedule.schedule_minute,
+        timezone=schedule.timezone,
+        last_run_at=schedule.last_run_at,
+        last_run_status=schedule.last_run_status,
+        last_run_error=schedule.last_run_error,
+        next_run_at=next_run,
+    )
+
+
+@router.post("/full-refresh", response_model=FullRefreshResponse)
+async def trigger_full_refresh(
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Trigger a full refresh of all repositories.
+
+    This will:
+    1. Reset all processing flags for user's repos
+    2. Re-fetch all starred repos from GitHub
+    3. Regenerate all AI summaries and tags
+    4. Recompute all embeddings
+    5. Re-run clustering
+
+    WARNING: This is a resource-intensive operation that may take
+    a long time and consume API quota.
+
+    Args:
+        background_tasks: FastAPI background tasks
+        db: Database session
+
+    Returns:
+        Task information for tracking progress
+    """
+    user = await get_default_user(db)
+
+    # Check for existing running full refresh task
+    result = await db.execute(
+        select(SyncTask).where(
+            SyncTask.user_id == user.id,
+            SyncTask.task_type == "full_refresh",
+            SyncTask.status.in_(["pending", "running"]),
+        )
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        return FullRefreshResponse(
+            task_id=existing.id,
+            message="Full refresh already in progress",
+            reset_count=0,
+        )
+
+    # Count repos that will be reset
+    count_result = await db.execute(
+        select(func.count(StarredRepo.id)).where(StarredRepo.user_id == user.id)
+    )
+    repo_count = count_result.scalar() or 0
+
+    # Create new task
+    task = SyncTask(
+        user_id=user.id,
+        task_type="full_refresh",
+        status="pending",
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    # Start background task
+    background_tasks.add_task(full_refresh_task, user.id, task.id)
+
+    logger.info(
+        f"Full refresh started for user {user.id}, {repo_count} repos will be reset"
+    )
+
+    return FullRefreshResponse(
+        task_id=task.id,
+        message=f"Full refresh started. {repo_count} repositories will be reprocessed.",
+        reset_count=repo_count,
+    )
+
+
+@router.get("/info", response_model=SyncInfoResponse)
+async def get_sync_info(
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Get comprehensive sync status information.
+
+    Returns statistics about the user's repositories and sync status:
+    - Last sync time
+    - Repository counts (total, embedded, summarized)
+    - Current schedule configuration
+
+    Args:
+        db: Database session
+
+    Returns:
+        Sync status information
+    """
+    user = await get_default_user(db)
+
+    # Get repository statistics
+    stats_result = await db.execute(
+        select(
+            func.count(StarredRepo.id).label("total"),
+            func.count(StarredRepo.id)
+            .filter(StarredRepo.is_embedded == True)  # noqa: E712
+            .label("embedded"),
+            func.count(StarredRepo.id)
+            .filter(StarredRepo.is_summarized == True)  # noqa: E712
+            .label("summarized"),
+        ).where(StarredRepo.user_id == user.id)
+    )
+    stats = stats_result.one()
+
+    # Get schedule
+    schedule_result = await db.execute(
+        select(SyncSchedule).where(SyncSchedule.user_id == user.id)
+    )
+    schedule = schedule_result.scalar_one_or_none()
+
+    schedule_response = None
+    if schedule:
+        next_run = calculate_next_run_time(schedule)
+        schedule_response = ScheduleResponse(
+            is_enabled=schedule.is_enabled,
+            schedule_hour=schedule.schedule_hour,
+            schedule_minute=schedule.schedule_minute,
+            timezone=schedule.timezone,
+            last_run_at=schedule.last_run_at,
+            last_run_status=schedule.last_run_status,
+            last_run_error=schedule.last_run_error,
+            next_run_at=next_run,
+        )
+
+    return SyncInfoResponse(
+        last_sync_at=user.last_sync_at,
+        total_repos=stats.total or 0,
+        synced_repos=user.synced_stars or 0,
+        embedded_repos=stats.embedded or 0,
+        summarized_repos=stats.summarized or 0,
+        schedule=schedule_response,
     )

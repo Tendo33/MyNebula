@@ -12,6 +12,7 @@ from nebula.api import api_router
 from nebula.core.config import get_app_settings
 from nebula.core.embedding import close_embedding_service
 from nebula.core.llm import close_llm_service
+from nebula.core.scheduler import close_scheduler_service, get_scheduler_service
 from nebula.db import close_db, init_db
 from nebula.utils import get_logger, setup_logging
 
@@ -39,10 +40,20 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to initialize database: {e}")
         raise
 
+    # Start scheduler service
+    try:
+        scheduler = get_scheduler_service()
+        await scheduler.start()
+        logger.info("Scheduler service started")
+    except Exception as e:
+        logger.warning(f"Failed to start scheduler service: {e}")
+        # Non-critical, continue without scheduler
+
     yield
 
     # Cleanup
     logger.info("Shutting down...")
+    await close_scheduler_service()
     await close_embedding_service()
     await close_llm_service()
     await close_db()

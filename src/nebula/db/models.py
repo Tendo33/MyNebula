@@ -83,6 +83,12 @@ class User(Base):
     sync_tasks: Mapped[list["SyncTask"]] = relationship(
         "SyncTask", back_populates="user", cascade="all, delete-orphan"
     )
+    sync_schedule: Mapped[Optional["SyncSchedule"]] = relationship(
+        "SyncSchedule",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username={self.username})>"
@@ -175,6 +181,14 @@ class StarredRepo(Base):
     is_readme_fetched: Mapped[bool] = mapped_column(Boolean, default=False)
     is_embedded: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_summarized: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Content hashes for smart change detection
+    description_hash: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )  # MD5 hash of description
+    topics_hash: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )  # MD5 hash of sorted topics
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="starred_repos")
@@ -290,6 +304,49 @@ class Cluster(Base):
 
     def __repr__(self) -> str:
         return f"<Cluster(id={self.id}, name={self.name}, count={self.repo_count})>"
+
+
+class SyncSchedule(Base):
+    """Scheduled sync configuration model.
+
+    Stores user's automatic sync schedule settings for periodic synchronization.
+    """
+
+    __tablename__ = "sync_schedules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True
+    )
+
+    # Schedule configuration
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    schedule_hour: Mapped[int] = mapped_column(Integer, default=9)  # 0-23, default 9 AM
+    schedule_minute: Mapped[int] = mapped_column(Integer, default=0)  # 0-59
+    timezone: Mapped[str] = mapped_column(String(50), default="Asia/Shanghai")
+
+    # Execution status
+    last_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_run_status: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )  # 'success', 'failed', 'running'
+    last_run_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="sync_schedule")
+
+    def __repr__(self) -> str:
+        return f"<SyncSchedule(id={self.id}, user_id={self.user_id}, enabled={self.is_enabled}, time={self.schedule_hour}:{self.schedule_minute:02d})>"
 
 
 class SyncTask(Base):

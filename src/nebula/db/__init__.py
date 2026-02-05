@@ -16,6 +16,7 @@ from .models import (
     Cluster,
     StarList,
     StarredRepo,
+    SyncSchedule,
     SyncTask,
     User,
 )
@@ -32,5 +33,6 @@ __all__ = [
     "StarredRepo",
     "StarList",
     "Cluster",
+    "SyncSchedule",
     "SyncTask",
 ]
