@@ -337,6 +337,22 @@ const Graph3D: React.FC = () => {
     return sprite;
   };
 
+  // Configure controls
+  useEffect(() => {
+    if (graphRef.current) {
+      const controls = graphRef.current.controls() as any;
+      if (controls) {
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.2;
+        controls.rotateSpeed = 0.5;
+        controls.zoomSpeed = 0.5;
+        controls.panSpeed = 0.5;
+        controls.minDistance = 50;
+        controls.maxDistance = 5000;
+      }
+    }
+  }, []);
+
   // Handle node click
   const handleNodeClick = useCallback((node: any) => {
     const processedNode = node as ProcessedNode;
