@@ -7,14 +7,15 @@ import { useGraph } from '../contexts/GraphContext';
 import { ClusterInfo } from '../types';
 import {
   Loader2, ChevronUp, ChevronDown,
-  ChevronLeft, ChevronRight, X, Layers
+  ChevronLeft, ChevronRight, X, Layers, Calendar
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type SortField = 'name' | 'language' | 'stargazers_count' | 'starred_at' | 'cluster' | 'summary';
+type SortField = 'name' | 'language' | 'stargazers_count' | 'starred_at' | 'cluster' | 'summary' | 'last_commit_time';
 type SortDirection = 'asc' | 'desc';
 
 interface SortConfig {
@@ -120,6 +121,8 @@ const DataPage = () => {
   const { t } = useTranslation();
 
   const { rawData, filters, toggleCluster, clearClusterFilter, loading } = useGraph();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const monthFilter = searchParams.get('month');
 
   // Local state
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -164,6 +167,13 @@ const DataPage = () => {
       );
     }
 
+    // Apply month filter
+    if (monthFilter) {
+      filtered = filtered.filter(node =>
+        node.starred_at && node.starred_at.startsWith(monthFilter)
+      );
+    }
+
     // Sort
     filtered.sort((a, b) => {
       let comparison = 0;
@@ -188,6 +198,9 @@ const DataPage = () => {
           break;
         case 'summary':
           comparison = (a.ai_summary || '').localeCompare(b.ai_summary || '');
+          break;
+        case 'last_commit_time':
+          comparison = (a.last_commit_time || '').localeCompare(b.last_commit_time || '');
           break;
       }
 
@@ -262,11 +275,12 @@ const DataPage = () => {
             </div>
 
             {/* Clear filters */}
-            {(filters.selectedClusters.size > 0 || localSearch.trim()) && (
+            {(filters.selectedClusters.size > 0 || localSearch.trim() || monthFilter) && (
               <button
                 onClick={() => {
                   clearClusterFilter();
                   setLocalSearch('');
+                  setSearchParams({});
                   setCurrentPage(1);
                 }}
                 className="flex items-center gap-1 px-3 py-1.5 text-sm text-text-muted hover:text-text-main hover:bg-bg-hover rounded-md transition-colors"
@@ -286,13 +300,37 @@ const DataPage = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Cluster filter chips */}
-              {rawData && rawData.clusters.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1 text-xs text-text-muted">
-                    <Layers className="w-4 h-4" />
-                    <span>{t('data.filter_by_cluster')}:</span>
-                  </div>
+              {/* Filter chips */}
+              {(rawData && rawData.clusters.length > 0) || monthFilter ? (
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* Month Filter Chip */}
+                  {monthFilter && (
+                    <div className="flex items-center gap-2">
+                       <div className="flex items-center gap-1 text-xs text-text-muted">
+                        <Calendar className="w-4 h-4" />
+                        <span>Filter:</span>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-action-primary/10 text-action-primary ring-1 ring-inset ring-action-primary/20">
+                        {monthFilter}
+                        <button
+                          onClick={() => {
+                            searchParams.delete('month');
+                            setSearchParams(searchParams);
+                          }}
+                          className="hover:bg-action-primary/20 rounded-full p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    </div>
+                  )}
+
+                  {rawData && rawData.clusters.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1 text-xs text-text-muted">
+                        <Layers className="w-4 h-4" />
+                        <span>{t('data.filter_by_cluster')}:</span>
+                      </div>
                   {rawData.clusters.slice(0, 8).map(cluster => (
                     <button
                       key={cluster.id}
@@ -323,6 +361,8 @@ const DataPage = () => {
                   )}
                 </div>
               )}
+            </div>
+          ) : null}
 
               {/* Table */}
               <div className="w-full overflow-hidden rounded-lg border border-border-light bg-white shadow-sm">
@@ -367,6 +407,13 @@ const DataPage = () => {
                         <SortableHeader
                           label={t('data.starred_date')}
                           field="starred_at"
+                          currentSort={sortConfig}
+                          onSort={handleSort}
+                          align="center"
+                        />
+                        <SortableHeader
+                          label={t('data.last_commit')}
+                          field="last_commit_time"
                           currentSort={sortConfig}
                           onSort={handleSort}
                           align="center"
@@ -427,6 +474,9 @@ const DataPage = () => {
                           </td>
                           <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap text-center">
                             {formatDate(repo.starred_at)}
+                          </td>
+                          <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap text-center">
+                            {formatDate(repo.last_commit_time)}
                           </td>
                           <td className="px-4 py-3 max-w-md hidden">
                             <p className="truncate text-text-muted text-xs">

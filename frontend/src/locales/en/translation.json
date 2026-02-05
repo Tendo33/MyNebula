@@ -33,11 +33,11 @@
     "search_placeholder": "Search stars, clusters, or topics...",
     "explore_graph": "Explore Graph",
     "total_repos": "Total Repos",
-    "total_stars": "Total Stars",
+    "total_topics": "Total Topics",
     "top_language": "Top Language",
     "clusters": "Clusters",
     "starred_repos": "Starred repositories",
-    "combined_stars": "Combined stars",
+    "unique_topics": "Unique topics",
     "knowledge_groups": "Knowledge groups",
     "language_distribution": "Language Distribution",
     "star_activity": "Star Activity",
@@ -67,7 +67,9 @@
     "rows_per_page": "Rows per page",
     "showing": "{{start}}-{{end}} of {{total}}",
     "no_results": "No results found",
-    "no_data": "No data available"
+    "no_data": "No data available",
+    "summary": "Summary",
+    "last_commit": "Last Commit"
   },
   "settings": {
     "title": "Settings",

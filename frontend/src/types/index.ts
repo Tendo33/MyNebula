@@ -1,31 +1,32 @@
 export interface GraphNode {
-  id: number;
-  github_id: number;
-  full_name: string;
-  name: string;
-  description?: string;
-  language?: string;
-  html_url: string;
-  // Owner info
-  owner: string;
-  owner_avatar_url?: string;
-  // Position
-  x: number;
-  y: number;
-  z: number;
-  // Clustering
-  cluster_id?: number;
-  color: string;
-  size: number;
-  // User's star list (GitHub user-defined category)
-  star_list_id?: number;
-  star_list_name?: string;
-  // Stats
-  stargazers_count: number;
-  ai_summary?: string;
-  ai_tags?: string[];
-  topics?: string[];
-  starred_at?: string;
+	id: number;
+	github_id: number;
+	full_name: string;
+	name: string;
+	description?: string;
+	language?: string;
+	html_url: string;
+	// Owner info
+	owner: string;
+	owner_avatar_url?: string;
+	// Position
+	x: number;
+	y: number;
+	z: number;
+	// Clustering
+	cluster_id?: number;
+	color: string;
+	size: number;
+	// User's star list (GitHub user-defined category)
+	star_list_id?: number;
+	star_list_name?: string;
+	// Stats
+	stargazers_count: number;
+	ai_summary?: string;
+	ai_tags?: string[];
+	topics?: string[];
+	starred_at?: string;
+	last_commit_time?: string;
 }
 
 export interface GraphEdge {

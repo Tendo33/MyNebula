@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { useGraph } from '../contexts/GraphContext';
 import { DashboardSkeleton } from '../components/ui/Skeleton';
-import { Book, Star, Code, Layers, TrendingUp, ArrowRight, Calendar } from 'lucide-react';
+import { Book, Code, Layers, TrendingUp, ArrowRight, Calendar, Hash } from 'lucide-react';
 
 // ============================================================================
 // Types
@@ -161,7 +161,16 @@ const Dashboard = () => {
     if (!rawData) return null;
 
     const totalRepos = rawData.total_nodes;
-    const totalStars = rawData.nodes.reduce((acc, node) => acc + node.stargazers_count, 0);
+
+    // Calculate unique topics instead of stars
+    const allTopics = new Set<string>();
+    rawData.nodes.forEach(node => {
+      if (node.topics && Array.isArray(node.topics)) {
+        node.topics.forEach(topic => allTopics.add(topic.toLowerCase()));
+      }
+    });
+    const totalTopics = allTopics.size;
+
     const totalClusters = rawData.total_clusters;
     const totalEdges = rawData.total_edges;
 
@@ -196,7 +205,7 @@ const Dashboard = () => {
 
     return {
       totalRepos,
-      totalStars,
+      totalTopics,
       totalClusters,
       totalEdges,
       topLanguages,
@@ -263,10 +272,10 @@ const Dashboard = () => {
                   onClick={() => navigate('/data')}
                 />
                 <StatCard
-                  title={t('dashboard.total_stars')}
-                  value={stats?.totalStars.toLocaleString() || '0'}
-                  icon={Star}
-                  subValue={t('dashboard.combined_stars')}
+                  title={t('dashboard.total_topics')}
+                  value={stats?.totalTopics.toLocaleString() || '0'}
+                  icon={Hash}
+                  subValue={t('dashboard.unique_topics')}
                 />
                 <StatCard
                   title={t('dashboard.top_language')}
@@ -287,7 +296,7 @@ const Dashboard = () => {
                 {/* Language Distribution */}
                 <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-sm font-semibold text-text-main">
+                  <h3 className="text-sm font-semibold text-text-main">
                       {t('dashboard.language_distribution')}
                     </h3>
                     <span className="text-xs text-text-muted">
@@ -335,11 +344,12 @@ const Dashboard = () => {
                     {activityData.map((data, idx) => {
                       const height = (data.count / maxActivity) * 100;
                       return (
-                        <div key={idx} className="flex-1 flex flex-col justify-end group">
+                        <div key={idx} className="flex-1 flex flex-col justify-end group h-full">
                           <div
                             className="w-full bg-action-primary/80 hover:bg-action-primary rounded-t transition-all cursor-pointer"
                             style={{ height: `${Math.max(height, 4)}%` }}
                             title={`${data.date}: ${data.count} repos`}
+                            onClick={() => navigate(`/data?month=${data.date}`)}
                           />
                         </div>
                       );

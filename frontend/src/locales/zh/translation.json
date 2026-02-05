@@ -37,11 +37,11 @@
     "search_placeholder": "搜索星星、星团或主题...",
     "explore_graph": "探索图谱",
     "total_repos": "仓库总数",
-    "total_stars": "星标总数",
+    "total_topics": "主题总数",
     "top_language": "主要语言",
     "clusters": "聚类",
     "starred_repos": "已收藏仓库",
-    "combined_stars": "累计星标数",
+    "unique_topics": "涵盖主题",
     "knowledge_groups": "知识分组",
     "language_distribution": "语言分布",
     "star_activity": "收藏活动",
@@ -71,7 +71,9 @@
     "rows_per_page": "每页行数",
     "showing": "{{start}}-{{end}} / {{total}}",
     "no_results": "未找到结果",
-    "no_data": "暂无数据"
+    "no_data": "暂无数据",
+    "summary": "AI 摘要",
+    "last_commit": "最后提交"
   },
   "settings": {
     "title": "设置",

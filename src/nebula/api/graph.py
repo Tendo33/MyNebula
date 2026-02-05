@@ -143,6 +143,9 @@ async def get_graph_data(
             ai_tags=repo.ai_tags,
             topics=repo.topics,
             starred_at=repo.starred_at.isoformat() if repo.starred_at else None,
+            last_commit_time=repo.repo_pushed_at.isoformat()
+            if repo.repo_pushed_at
+            else None,
         )
         nodes.append(node)
 
