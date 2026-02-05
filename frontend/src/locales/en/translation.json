@@ -94,5 +94,14 @@
     "sync_stars_failed": "Failed to sync stars",
     "embedding_failed": "Failed to compute embeddings",
     "clustering_failed": "Failed to generate clusters"
+  },
+  "sync": {
+    "title": "Syncing Data",
+    "completed": "Sync Completed",
+    "failed": "Sync Failed",
+    "allDone": "All tasks completed successfully",
+    "steps": "steps",
+    "overallProgress": "Overall Progress",
+    "viewResults": "View Results"
   }
 }

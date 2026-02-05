@@ -98,5 +98,14 @@
     "sync_stars_failed": "星标同步失败",
     "embedding_failed": "嵌入计算失败",
     "clustering_failed": "聚类失败"
+  },
+  "sync": {
+    "title": "同步数据",
+    "completed": "同步完成",
+    "failed": "同步失败",
+    "allDone": "所有任务已成功完成",
+    "steps": "步骤",
+    "overallProgress": "总进度",
+    "viewResults": "查看结果"
   }
 }
