@@ -3,7 +3,7 @@
 Handles GitHub star synchronization and processing tasks.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -36,6 +36,15 @@ from nebula.utils import compute_content_hash, compute_topics_hash, get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+def _to_utc(dt: datetime | None) -> datetime | None:
+    """Normalize datetime to UTC for safe comparison."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 class SyncMode(str, Enum):
@@ -219,6 +228,9 @@ async def sync_stars_task(
         task_id: Sync task ID
         sync_mode: Sync mode - "incremental" or "full"
     """
+    logger.info(
+        f"[TASK START] sync_stars_task called: user={user_id}, task={task_id}, mode={sync_mode}"
+    )
     from nebula.db.database import get_db_context
 
     async with get_db_context() as db:
@@ -266,17 +278,27 @@ async def sync_stars_task(
                 error_msg = (
                     "GitHub token not configured. Please set GITHUB_TOKEN in .env file"
                 )
-                logger.error(error_msg)
+                logger.error(f"[TASK ERROR] {error_msg}")
                 task.status = "failed"
                 task.error_message = error_msg
                 await db.commit()
                 return
 
+            logger.info("[TASK PROGRESS] GitHub token found, fetching starred repos...")
             # Get starred repos from GitHub
-            async with GitHubClient(access_token=settings.github_token) as client:
-                repos, was_truncated = await client.get_starred_repos(
-                    stop_before=stop_before
-                )
+            try:
+                async with GitHubClient(access_token=settings.github_token) as client:
+                    repos, was_truncated = await client.get_starred_repos(
+                        stop_before=stop_before
+                    )
+            except Exception as api_error:
+                logger.exception(f"[TASK ERROR] GitHub API call failed: {api_error}")
+                task.status = "failed"
+                task.error_message = f"GitHub API error: {api_error}"
+                await db.commit()
+                return
+
+            logger.info(f"[TASK PROGRESS] Fetched {len(repos)} repos from GitHub")
 
             if was_truncated:
                 logger.info(
@@ -611,11 +633,38 @@ async def start_star_sync(
     existing = result.scalar_one_or_none()
 
     if existing:
-        return SyncStartResponse(
-            task_id=existing.id,
-            message="Sync already in progress",
-            status=existing.status,
+        now_utc = datetime.now(timezone.utc)
+        created_at_utc = _to_utc(existing.created_at)
+        started_at_utc = _to_utc(existing.started_at)
+
+        is_stale_pending = (
+            existing.status == "pending"
+            and created_at_utc is not None
+            and now_utc - created_at_utc > timedelta(minutes=2)
         )
+        is_stale_running = (
+            existing.status == "running"
+            and started_at_utc is not None
+            and now_utc - started_at_utc > timedelta(hours=2)
+        )
+
+        if is_stale_pending or is_stale_running:
+            logger.warning(
+                f"Stale sync task detected (id={existing.id}, status={existing.status}); "
+                "marking failed and starting a new task"
+            )
+            existing.status = "failed"
+            existing.error_message = (
+                "Previous sync task appears stuck. Please retry the sync."
+            )
+            existing.completed_at = datetime.utcnow()
+            await db.commit()
+        else:
+            return SyncStartResponse(
+                task_id=existing.id,
+                message="Sync already in progress",
+                status=existing.status,
+            )
 
     # Create new task
     task = SyncTask(
@@ -628,6 +677,7 @@ async def start_star_sync(
     await db.refresh(task)
 
     # Start background task with sync mode
+    logger.info(f"Starting sync task {task.id} for user {user.id} in mode {mode}")
     background_tasks.add_task(sync_stars_task, user.id, task.id, mode)
 
     mode_desc = "incremental (new stars only)" if mode == "incremental" else "full"

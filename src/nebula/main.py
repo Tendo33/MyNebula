@@ -144,6 +144,8 @@ def run():
         host="0.0.0.0",
         port=settings.api_port,
         reload=settings.debug,
+        reload_dirs=["src"],  # Explicitly watch src directory
+        reload_excludes=[".history"],  # Ignore .history directory
         log_level=settings.log_level.lower(),
     )
 
