@@ -149,7 +149,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   };
 
   return (
-    <div className="absolute top-6 right-6 z-50 w-96 bg-white rounded-lg border border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
+    <div className="w-96 h-full bg-white border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20">
       {/* Header with Avatar */}
       <div className="relative p-5 border-b border-border-light bg-bg-sidebar">
         <div className="flex items-start gap-3 pr-8">
@@ -191,7 +191,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       </div>
 
       {/* Content */}
-      <div className="p-5 space-y-5">
+      <div className="p-5 space-y-5 flex-1 overflow-y-auto">
 
         {/* User's Star List Badge */}
         {node.star_list_name && (

@@ -316,10 +316,12 @@ const GraphPage = () => {
           )}
 
           {/* Graph Container */}
-          <div className="flex-1 min-w-0 relative bg-white">
-            {viewMode === '2d' ? <Graph2D /> : <Graph3D />}
+          <div className="flex-1 min-w-0 relative bg-white flex flex-row overflow-hidden">
+            <div className="flex-1 relative min-w-0 h-full">
+              {viewMode === '2d' ? <Graph2D /> : <Graph3D />}
+            </div>
 
-            {/* Details panel */}
+            {/* Details panel - Sidebar style */}
             {selectedNode && (
               <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />
             )}

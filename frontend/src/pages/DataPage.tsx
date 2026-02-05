@@ -1,12 +1,12 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+
 import { Sidebar } from '../components/layout/Sidebar';
 import { SearchInput } from '../components/ui/SearchInput';
 import { useGraph } from '../contexts/GraphContext';
 import { ClusterInfo } from '../types';
 import {
-  Loader2, ExternalLink, ChevronUp, ChevronDown,
+  Loader2, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, X, Layers
 } from 'lucide-react';
 
@@ -391,20 +391,15 @@ const DataPage = () => {
                           </td>
                           <td className="px-4 py-3 max-w-xs">
                             <div className="flex items-center gap-2">
-                              <Link
-                                to={`/graph?node=${repo.id}`}
-                                className="font-medium text-text-main hover:text-action-primary truncate block hover:underline"
-                              >
-                                {repo.full_name}
-                              </Link>
                               <a
                                 href={repo.html_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
+                                className="font-medium text-text-main hover:text-action-primary truncate block hover:underline"
                               >
-                                <ExternalLink className="w-3 h-3 text-text-muted flex-shrink-0 hover:text-action-primary" />
+                                {repo.full_name}
                               </a>
+
                             </div>
                           </td>
                           <td className="px-4 py-3 max-w-md">
