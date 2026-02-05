@@ -2,10 +2,19 @@
 
 This module provides semantic clustering of repositories based on their embeddings.
 Includes collision resolution to prevent node overlap in 3D visualization.
+
+Key features:
+- Adaptive clustering with automatic parameter tuning
+- Noise point assignment to ensure all nodes have a cluster
+- Fallback to hierarchical clustering when HDBSCAN produces too few clusters
 """
+
+import math
 
 import numpy as np
 from pydantic import BaseModel
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.neighbors import NearestNeighbors
 
 from nebula.utils import get_logger
 
@@ -89,6 +98,125 @@ def resolve_collisions(
     return result
 
 
+def assign_noise_to_nearest_cluster(
+    coords: np.ndarray,
+    labels: np.ndarray,
+    embeddings: np.ndarray | None = None,
+) -> np.ndarray:
+    """Assign noise points (-1 labels) to the nearest cluster.
+
+    Uses K-Nearest Neighbors to find the closest clustered point for each
+    noise point and assigns it to that cluster.
+
+    Args:
+        coords: Nx3 array of 3D coordinates
+        labels: Array of cluster labels (-1 indicates noise)
+        embeddings: Optional original embeddings for distance calculation.
+                   If provided, uses embedding space; otherwise uses 3D coords.
+
+    Returns:
+        Updated labels with no noise points (-1)
+    """
+    labels = labels.copy()
+    noise_mask = labels == -1
+
+    if not noise_mask.any():
+        logger.debug("No noise points to assign")
+        return labels
+
+    noise_count = noise_mask.sum()
+    clustered_mask = ~noise_mask
+
+    if not clustered_mask.any():
+        # All points are noise - assign all to cluster 0
+        logger.warning("All points are noise, assigning all to cluster 0")
+        return np.zeros_like(labels)
+
+    # Use embeddings if available, otherwise use 3D coordinates
+    if embeddings is not None:
+        reference_data = embeddings[clustered_mask]
+        query_data = embeddings[noise_mask]
+        metric = "cosine"
+    else:
+        reference_data = coords[clustered_mask]
+        query_data = coords[noise_mask]
+        metric = "euclidean"
+
+    # Find nearest clustered neighbor for each noise point
+    nn = NearestNeighbors(n_neighbors=1, metric=metric)
+    nn.fit(reference_data)
+    _, indices = nn.kneighbors(query_data)
+
+    # Get the labels of the nearest clustered points
+    clustered_labels = labels[clustered_mask]
+    labels[noise_mask] = clustered_labels[indices.flatten()]
+
+    logger.info(f"Assigned {noise_count} noise points to nearest clusters")
+    return labels
+
+
+def estimate_cluster_count(n_samples: int, min_clusters: int = 3) -> int:
+    """Estimate a reasonable number of clusters based on sample count.
+
+    Uses a heuristic based on sqrt(n) which works well for most datasets.
+
+    Args:
+        n_samples: Number of data points
+        min_clusters: Minimum number of clusters to return
+
+    Returns:
+        Estimated number of clusters (guaranteed <= n_samples)
+    """
+    # sqrt(n) rule of thumb, with minimum and maximum bounds
+    estimated = int(math.sqrt(n_samples))
+    # Ensure we don't request more clusters than samples
+    max_clusters = min(n_samples, 20)
+    result = max(min_clusters, min(estimated, max_clusters))
+    # Final safety check: never more clusters than samples
+    return min(result, n_samples)
+
+
+def fallback_hierarchical_clustering(
+    coords: np.ndarray,
+    n_clusters: int,
+) -> np.ndarray:
+    """Perform hierarchical clustering as fallback when HDBSCAN fails.
+
+    Args:
+        coords: Nx3 array of 3D coordinates
+        n_clusters: Target number of clusters
+
+    Returns:
+        Array of cluster labels (0 to n_clusters-1)
+    """
+    n_samples = len(coords)
+
+    # Safety check: n_clusters cannot exceed n_samples
+    effective_n_clusters = min(n_clusters, n_samples)
+    if effective_n_clusters < n_clusters:
+        logger.warning(
+            f"Requested {n_clusters} clusters but only {n_samples} samples, "
+            f"using {effective_n_clusters} clusters"
+        )
+
+    # Edge case: only 1 sample
+    if n_samples == 1:
+        return np.array([0])
+
+    logger.info(
+        f"Using fallback hierarchical clustering with {effective_n_clusters} clusters"
+    )
+
+    clustering = AgglomerativeClustering(
+        n_clusters=effective_n_clusters,
+        metric="euclidean",
+        linkage="ward",
+    )
+    labels = clustering.fit_predict(coords)
+
+    return labels
+
+
 class ClusterResult(BaseModel):
     """Result of clustering operation."""
 
@@ -104,6 +232,11 @@ class ClusteringService:
     This service reduces high-dimensional embeddings to 3D for visualization
     and groups similar items into clusters.
 
+    Key improvements over basic HDBSCAN:
+    - Uses 'leaf' cluster selection for more fine-grained clusters
+    - Assigns noise points to nearest clusters (no orphaned nodes)
+    - Falls back to hierarchical clustering if too few clusters are found
+
     Usage:
         service = ClusteringService()
         result = service.fit_transform(embeddings)
@@ -113,21 +246,30 @@ class ClusteringService:
         self,
         n_neighbors: int = 15,
         min_dist: float = 0.1,
-        min_cluster_size: int = 5,
-        min_samples: int | None = None,
+        min_cluster_size: int = 2,
+        min_samples: int = 1,
+        cluster_selection_method: str = "leaf",
+        min_clusters: int = 3,
+        assign_all_points: bool = True,
     ):
         """Initialize clustering service.
 
         Args:
             n_neighbors: UMAP parameter for local neighborhood size
             min_dist: UMAP parameter for minimum distance between points
-            min_cluster_size: HDBSCAN minimum cluster size
-            min_samples: HDBSCAN min samples (defaults to min_cluster_size)
+            min_cluster_size: HDBSCAN minimum cluster size (lowered for more clusters)
+            min_samples: HDBSCAN min samples (lowered for more sensitivity)
+            cluster_selection_method: HDBSCAN method - 'leaf' for fine-grained, 'eom' for larger
+            min_clusters: Minimum expected number of clusters (triggers fallback if not met)
+            assign_all_points: Whether to assign noise points to nearest clusters
         """
         self.n_neighbors = n_neighbors
         self.min_dist = min_dist
         self.min_cluster_size = min_cluster_size
-        self.min_samples = min_samples or min_cluster_size
+        self.min_samples = min_samples
+        self.cluster_selection_method = cluster_selection_method
+        self.min_clusters = min_clusters
+        self.assign_all_points = assign_all_points
 
         self._umap_reducer = None
         self._clusterer = None
@@ -154,7 +296,7 @@ class ClusteringService:
                 min_cluster_size=self.min_cluster_size,
                 min_samples=self.min_samples,
                 metric="euclidean",
-                cluster_selection_method="eom",
+                cluster_selection_method=self.cluster_selection_method,
             )
 
     def fit_transform(
@@ -165,6 +307,11 @@ class ClusteringService:
         resolve_overlap: bool = True,
     ) -> ClusterResult:
         """Reduce dimensions and cluster embeddings.
+
+        This method uses an adaptive clustering strategy:
+        1. First tries HDBSCAN with 'leaf' mode for fine-grained clusters
+        2. Assigns noise points to nearest clusters if assign_all_points=True
+        3. Falls back to hierarchical clustering if too few clusters are found
 
         Args:
             embeddings: List of embedding vectors
@@ -190,7 +337,8 @@ class ClusteringService:
 
         # Adjust parameters for small datasets
         effective_n_neighbors = min(self.n_neighbors, n_samples - 1)
-        effective_min_cluster_size = min(self.min_cluster_size, max(2, n_samples // 5))
+        effective_min_cluster_size = min(self.min_cluster_size, max(2, n_samples // 10))
+        effective_min_samples = min(self.min_samples, effective_min_cluster_size)
 
         # UMAP dimensionality reduction
         self._init_umap()
@@ -204,24 +352,51 @@ class ClusteringService:
             coords_3d = self._umap_reducer.fit_transform(embeddings_array)
             logger.info("Generated new 3D coordinates via UMAP")
 
-        # HDBSCAN clustering on 3D coordinates
-        if n_samples < 5:
+        # Clustering strategy
+        if n_samples < 3:
             # Too few samples for meaningful clustering
-            labels = [0] * n_samples
+            labels = np.array([0] * n_samples)
             n_clusters = 1
+            logger.info("Too few samples, assigning all to cluster 0")
         else:
+            # Try HDBSCAN first with optimized parameters
             import hdbscan
 
             clusterer = hdbscan.HDBSCAN(
                 min_cluster_size=effective_min_cluster_size,
-                min_samples=min(self.min_samples, effective_min_cluster_size),
+                min_samples=effective_min_samples,
                 metric="euclidean",
-                cluster_selection_method="eom",
+                cluster_selection_method=self.cluster_selection_method,
             )
-            labels = clusterer.fit_predict(coords_3d).tolist()
+            labels = clusterer.fit_predict(coords_3d)
             n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
-        logger.info(f"Found {n_clusters} clusters")
+            logger.info(
+                f"HDBSCAN found {n_clusters} clusters "
+                f"(noise points: {(labels == -1).sum()})"
+            )
+
+            # Check if we need fallback clustering
+            expected_clusters = estimate_cluster_count(n_samples, self.min_clusters)
+
+            if n_clusters < self.min_clusters and n_samples >= 5:
+                logger.warning(
+                    f"HDBSCAN produced only {n_clusters} clusters, "
+                    f"falling back to hierarchical clustering with {expected_clusters} clusters"
+                )
+                labels = fallback_hierarchical_clustering(coords_3d, expected_clusters)
+                n_clusters = len(set(labels))
+            elif self.assign_all_points and (labels == -1).any():
+                # Assign noise points to nearest clusters
+                labels = assign_noise_to_nearest_cluster(
+                    coords_3d, labels, embeddings_array
+                )
+
+        # Ensure labels is a numpy array for further processing
+        labels = np.array(labels)
+        n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+
+        logger.info(f"Final clustering: {n_clusters} clusters, all points assigned")
 
         # Resolve node collisions to prevent overlap
         if resolve_overlap and n_samples > 1:
@@ -237,15 +412,16 @@ class ClusteringService:
 
         # Compute cluster centers (after collision resolution)
         cluster_centers = {}
-        for cluster_id in set(labels):
+        unique_labels = set(labels.tolist())
+        for cluster_id in unique_labels:
             if cluster_id == -1:
                 continue
-            mask = np.array(labels) == cluster_id
+            mask = labels == cluster_id
             center = coords_3d[mask].mean(axis=0)
-            cluster_centers[cluster_id] = center.tolist()
+            cluster_centers[int(cluster_id)] = center.tolist()
 
         return ClusterResult(
-            labels=labels,
+            labels=labels.tolist(),
             n_clusters=n_clusters,
             coords_3d=coords_3d.tolist(),
             cluster_centers=cluster_centers,

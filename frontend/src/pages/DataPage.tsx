@@ -1,10 +1,10 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { SearchInput } from '../components/ui/SearchInput';
 import { useGraph } from '../contexts/GraphContext';
-import { GraphNode, ClusterInfo } from '../types';
+import { ClusterInfo } from '../types';
 import {
   Loader2, ExternalLink, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, X, Layers
@@ -39,6 +39,7 @@ interface SortableHeaderProps {
   currentSort: SortConfig;
   onSort: (field: SortField) => void;
   className?: string;
+  align?: 'left' | 'center' | 'right';
 }
 
 const SortableHeader: React.FC<SortableHeaderProps> = ({
@@ -47,15 +48,17 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({
   currentSort,
   onSort,
   className = '',
+  align = 'left',
 }) => {
   const isActive = currentSort.field === field;
+  const justifyClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
 
   return (
     <th
       className={`px-4 py-3 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors select-none ${className}`}
       onClick={() => onSort(field)}
     >
-      <div className="flex items-center gap-1">
+      <div className={`flex items-center gap-1 ${justifyClass}`}>
         <span>{label}</span>
         <span className="flex flex-col">
           <ChevronUp
@@ -115,7 +118,7 @@ const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) => {
 
 const DataPage = () => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
+
   const { rawData, filters, toggleCluster, clearClusterFilter, loading } = useGraph();
 
   // Local state
@@ -222,10 +225,7 @@ const DataPage = () => {
     setCurrentPage(1);
   }, [toggleCluster]);
 
-  // Handle row click - navigate to graph with node focused
-  const handleRowClick = useCallback((node: GraphNode) => {
-    navigate(`/graph?node=${node.id}`);
-  }, [navigate]);
+
 
   // Format date
   const formatDate = (dateStr: string | undefined): string => {
@@ -330,7 +330,7 @@ const DataPage = () => {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-bg-hover text-text-muted font-medium border-b border-border-light">
                       <tr>
-                        <th className="px-4 py-3 w-12 text-center text-xs text-text-muted/50">#</th>
+                        <th className="px-2 py-3 w-14 text-center text-xs text-text-muted/50">#</th>
                         <SortableHeader
                           label={t('data.repository')}
                           field="name"
@@ -348,25 +348,28 @@ const DataPage = () => {
                           field="language"
                           currentSort={sortConfig}
                           onSort={handleSort}
+                          align="center"
                         />
                         <SortableHeader
                           label={t('data.stars')}
                           field="stargazers_count"
                           currentSort={sortConfig}
                           onSort={handleSort}
-                          className="text-right"
+                          align="center"
                         />
                         <SortableHeader
                           label={t('data.cluster')}
                           field="cluster"
                           currentSort={sortConfig}
                           onSort={handleSort}
+                          align="center"
                         />
                         <SortableHeader
                           label={t('data.starred_date')}
                           field="starred_at"
                           currentSort={sortConfig}
                           onSort={handleSort}
+                          align="center"
                         />
                         <th className="px-4 py-3 w-20 hidden">{t('data.description')}</th>
                       </tr>
@@ -375,29 +378,25 @@ const DataPage = () => {
                       {paginatedData.map((repo) => (
                         <tr
                           key={repo.id}
-                          className="hover:bg-bg-hover/50 transition-colors cursor-pointer"
-                          onClick={() => handleRowClick(repo)}
+                          className="hover:bg-bg-hover/50 transition-colors"
                         >
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-2 py-3 text-center">
                             {repo.owner_avatar_url ? (
-                              <img src={repo.owner_avatar_url} alt={repo.owner} className="w-6 h-6 rounded-md mx-auto" />
+                              <img src={repo.owner_avatar_url} alt={repo.owner} className="w-6 h-6 min-w-6 min-h-6 mx-auto object-cover rounded-none" />
                             ) : (
-                               <div className="w-6 h-6 rounded-md bg-gray-200 mx-auto flex items-center justify-center text-[10px] text-gray-500">
+                               <div className="w-6 h-6 min-w-6 min-h-6 bg-gray-200 mx-auto flex items-center justify-center text-[10px] text-gray-500 rounded-none">
                                  {repo.owner.charAt(0).toUpperCase()}
                                </div>
                             )}
                           </td>
                           <td className="px-4 py-3 max-w-xs">
                             <div className="flex items-center gap-2">
-                              <a
-                                href={repo.html_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <Link
+                                to={`/graph?node=${repo.id}`}
                                 className="font-medium text-text-main hover:text-action-primary truncate block hover:underline"
-                                onClick={(e) => e.stopPropagation()}
                               >
                                 {repo.full_name}
-                              </a>
+                              </Link>
                               <a
                                 href={repo.html_url}
                                 target="_blank"
@@ -413,7 +412,7 @@ const DataPage = () => {
                                 {repo.ai_summary || repo.description || <span className="italic text-text-dim">No summary</span>}
                             </p>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-3 whitespace-nowrap text-center">
                             {repo.language ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                                 {repo.language}
@@ -422,16 +421,16 @@ const DataPage = () => {
                               <span className="text-text-muted italic">-</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono text-text-dim tabular-nums">
+                          <td className="px-4 py-3 text-center font-mono text-text-dim tabular-nums">
                             {repo.stargazers_count.toLocaleString()}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 text-center">
                             <ClusterBadge
                               cluster={repo.cluster_id !== undefined ? clusterMap.get(repo.cluster_id) : undefined}
                               onClick={() => repo.cluster_id !== undefined && handleClusterFilter(repo.cluster_id)}
                             />
                           </td>
-                          <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap">
+                          <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap text-center">
                             {formatDate(repo.starred_at)}
                           </td>
                           <td className="px-4 py-3 max-w-md hidden">

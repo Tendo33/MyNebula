@@ -1038,12 +1038,30 @@ async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
             await db.commit()
 
             # Update repos with cluster assignments and coordinates
+            assigned_count = 0
+            unassigned_count = 0
+
             for i, repo in enumerate(repos):
                 if i < len(cluster_result.labels):
                     label = cluster_result.labels[i]
+
+                    # Assign cluster (skip noise points, though they should be rare now)
                     if label != -1 and label in cluster_map:
                         repo.cluster_id = cluster_map[label].id
+                        assigned_count += 1
+                    else:
+                        # Fallback: assign to first available cluster if label not in map
+                        if cluster_map and label == -1:
+                            first_cluster = next(iter(cluster_map.values()))
+                            repo.cluster_id = first_cluster.id
+                            assigned_count += 1
+                            logger.debug(
+                                f"Assigned noise point {repo.full_name} to fallback cluster"
+                            )
+                        else:
+                            unassigned_count += 1
 
+                    # Update 3D coordinates
                     if i < len(cluster_result.coords_3d):
                         coords = cluster_result.coords_3d[i]
                         repo.coord_x = coords[0] if len(coords) > 0 else None
@@ -1057,7 +1075,8 @@ async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
 
             logger.info(
                 f"Clustering completed for user {user_id}: "
-                f"{cluster_result.n_clusters} clusters, {len(repos)} repos assigned"
+                f"{cluster_result.n_clusters} clusters, "
+                f"{assigned_count} repos assigned, {unassigned_count} unassigned"
             )
 
         except Exception as e:
