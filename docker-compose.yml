@@ -22,18 +22,32 @@ services:
     networks:
       - mynebula-net
 
-  # ==================== Backend API ====================
+  # ==================== Backend API + Frontend ====================
   api:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
     container_name: mynebula-api
     environment:
+      # 强制内部端口为 8000，防止 .env 中的 API_PORT (宿主机端口) 影响容器内监听端口
+      - API_PORT=8000
+      - APP_NAME=${APP_NAME:-mynebula}
+      - APP_VERSION=${APP_VERSION:-0.1.0}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FILE=${LOG_FILE:-logs/app.log}
+
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
       - DATABASE_USER=${DATABASE_USER:-mynebula}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD:-mynebula_secret}
       - DATABASE_NAME=${DATABASE_NAME:-mynebula}
+      # 确保清空 DATABASE_URL，防止 .env 中的本地连接字符串 (localhost) 覆盖上述配置
+      - DATABASE_URL=
+
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
 
       - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
@@ -43,10 +57,10 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI:-http://localhost:8000/api/auth/callback}
-      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+
+      - SYNC_BATCH_SIZE=${SYNC_BATCH_SIZE:-100}
+      - README_MAX_LENGTH=${README_MAX_LENGTH:-10000}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
 
     env_file:
       - .env
@@ -64,40 +78,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # ==================== Frontend ====================
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
-    container_name: mynebula-frontend
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
-    depends_on:
-      - api
-    restart: unless-stopped
-    networks:
-      - mynebula-net
-
-  # ==================== Nginx Reverse Proxy (Optional) ====================
-  # Uncomment to use Nginx as a reverse proxy in production
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: mynebula-nginx
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
-  #     - ./docker/ssl:/etc/nginx/ssl:ro
-  #   depends_on:
-  #     - api
-  #     - frontend
-  #   restart: unless-stopped
-  #   networks:
-  #     - mynebula-net
 
 networks:
   mynebula-net:
