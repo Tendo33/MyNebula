@@ -126,7 +126,7 @@ const DataPage = () => {
 
   // Local state
   const [sortConfig, setSortConfig] = useState<SortConfig>({
-    field: 'stargazers_count',
+    field: 'starred_at',
     direction: 'desc'
   });
   const [currentPage, setCurrentPage] = useState(1);
