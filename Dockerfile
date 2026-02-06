@@ -41,7 +41,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE ./
 
 # Install dependencies (without project) to improve caching
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy source code
 COPY src/ ./src/
