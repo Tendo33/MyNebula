@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import Graph2D from '../components/graph/Graph2D';
 import Timeline from '../components/graph/Timeline';
@@ -18,6 +19,7 @@ import { Loader2, Filter, X } from 'lucide-react';
 
 const GraphPage = () => {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Global state
   const {
@@ -35,6 +37,20 @@ const GraphPage = () => {
     setSyncStep,
     refreshData,
   } = useGraph();
+
+  // Handle URL parameter for node selection
+  useEffect(() => {
+    const nodeId = searchParams.get('node');
+    if (nodeId && rawData?.nodes) {
+      const node = rawData.nodes.find(n => n.id === parseInt(nodeId, 10));
+      if (node) {
+        setSelectedNode(node);
+        // Clear the URL parameter after selecting
+        searchParams.delete('node');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, rawData, setSelectedNode, setSearchParams]);
 
   // Local UI state
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);

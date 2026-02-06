@@ -179,6 +179,43 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       {/* Content */}
       <div className="p-5 space-y-5 flex-1 overflow-y-auto">
 
+        {/* Quick Actions */}
+        <div className="flex items-center gap-2">
+          <a
+            href={node.html_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-text-main hover:bg-black text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span>GitHub</span>
+          </a>
+
+          {/* Deep Wiki */}
+          <a
+            href={`https://deepwiki.com/${node.full_name}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
+            title="View on DeepWiki"
+          >
+            <img src="https://deepwiki.com/favicon.ico" alt="DeepWiki" className="w-4 h-4 rounded-sm bg-white" />
+            <span>DeepWiki</span>
+          </a>
+
+          {/* zRead */}
+          <a
+            href={`https://zread.ai/${node.full_name}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
+            title="View on zRead"
+          >
+            <img src="https://zread.ai/favicon.ico" alt="zRead" className="w-4 h-4 rounded-sm bg-white" />
+            <span>zRead</span>
+          </a>
+        </div>
+
         {/* User's Star List Badge */}
         {node.star_list_name && (
           <div className="flex items-center gap-2">
@@ -345,51 +382,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="space-y-2">
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2">
-            <a
-              href={node.html_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-text-main hover:bg-black text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>GitHub</span>
-            </a>
 
-             {/* Deep Wiki */}
-             <a
-              href={`https://deepwiki.com/${node.full_name}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md ml-auto"
-              title="View on DeepWiki"
-            >
-              <img src="https://deepwiki.com/favicon.ico" alt="DeepWiki" className="w-4 h-4 rounded-sm bg-white" />
-              <span>DeepWiki</span>
-            </a>
-
-             {/* zRead */}
-             <a
-              href={`https://zread.ai/${node.full_name}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
-              title="View on zRead"
-            >
-               <img src="https://zread.ai/favicon.ico" alt="zRead" className="w-4 h-4 rounded-sm bg-white" />
-              <span>zRead</span>
-            </a>
-
-          </div>
-
-          {/* Clone command preview */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-bg-sidebar rounded-md text-xs text-text-muted font-mono overflow-hidden">
-            <span className="truncate">git clone https://github.com/{node.full_name}.git</span>
-          </div>
-        </div>
       </div>
     </div>
   );

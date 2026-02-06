@@ -9,7 +9,7 @@ import {
   Loader2, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, X, Layers, Calendar
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 
 // ============================================================================
 // Types
@@ -433,14 +433,12 @@ const DataPage = () => {
                           </td>
                           <td className="px-4 py-3 max-w-xs">
                             <div className="flex items-center gap-2">
-                              <a
-                                href={repo.html_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <Link
+                                to={`/graph?node=${repo.id}`}
                                 className="font-medium text-text-main hover:text-action-primary truncate block hover:underline"
                               >
                                 {repo.full_name}
-                              </a>
+                              </Link>
 
                             </div>
                           </td>
