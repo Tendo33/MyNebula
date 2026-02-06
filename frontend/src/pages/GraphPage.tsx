@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sidebar } from '../components/layout/Sidebar';
 import Graph2D from '../components/graph/Graph2D';
-import Graph3D from '../components/graph/Graph3D';
 import Timeline from '../components/graph/Timeline';
 import ClusterPanel from '../components/graph/ClusterPanel';
 import StarListPanel from '../components/graph/StarListPanel';
@@ -11,13 +10,7 @@ import { RepoDetailsPanel } from '../components/graph/RepoDetailsPanel';
 import { SyncProgress, SyncStep } from '../components/ui/SyncProgress';
 import { startStarSync, getSyncStatus, startEmbedding, startClustering, startSummaries } from '../api/sync';
 import { useGraph } from '../contexts/GraphContext';
-import { Loader2, Grid3X3, Box, Filter, X } from 'lucide-react';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-type ViewMode = '2d' | '3d';
+import { Loader2, Filter, X } from 'lucide-react';
 
 // ============================================================================
 // Component
@@ -44,7 +37,6 @@ const GraphPage = () => {
   } = useGraph();
 
   // Local UI state
-  const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);
   const [starListPanelCollapsed, setStarListPanelCollapsed] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
@@ -225,32 +217,6 @@ const GraphPage = () => {
               />
             </div>
 
-            {/* View mode toggle */}
-            <div className="flex items-center bg-bg-sidebar rounded-md p-0.5 border border-border-light">
-              <button
-                onClick={() => setViewMode('2d')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all ${
-                  viewMode === '2d'
-                    ? 'bg-white shadow-sm text-text-main font-medium'
-                    : 'text-text-muted hover:text-text-main'
-                }`}
-              >
-                <Grid3X3 className="w-4 h-4" />
-                <span>2D</span>
-              </button>
-              <button
-                onClick={() => setViewMode('3d')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all ${
-                  viewMode === '3d'
-                    ? 'bg-white shadow-sm text-text-main font-medium'
-                    : 'text-text-muted hover:text-text-main'
-                }`}
-              >
-                <Box className="w-4 h-4" />
-                <span>3D</span>
-              </button>
-            </div>
-
             {/* Filter toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -318,7 +284,7 @@ const GraphPage = () => {
           {/* Graph Container */}
           <div className="flex-1 min-w-0 relative bg-white flex flex-row overflow-hidden">
             <div className="flex-1 relative min-w-0 h-full">
-              {viewMode === '2d' ? <Graph2D /> : <Graph3D />}
+              <Graph2D />
             </div>
 
             {/* Details panel - Sidebar style */}
