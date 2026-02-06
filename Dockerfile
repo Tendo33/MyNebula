@@ -37,16 +37,19 @@ RUN pip install uv
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml uv.lock ./
+# Copy dependency files and project metadata
+COPY pyproject.toml uv.lock README.md LICENSE ./
 
-# Install dependencies
+# Install dependencies (without project) to improve caching
 RUN uv sync --frozen --no-dev
 
 # Copy source code
 COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
+
+# Install the project itself
+RUN uv sync --frozen --no-dev
 
 # Copy frontend build from frontend-builder stage
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
