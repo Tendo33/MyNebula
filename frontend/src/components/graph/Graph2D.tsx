@@ -68,8 +68,8 @@ const NODE_MAX_SIZE = 30;
 const ZOOM_TO_FIT_PADDING = 80;
 
 // Layout tuning: smaller = more compact initial view
-const POSITION_SCALE = 10;
-const MIN_CLUSTER_DISTANCE = 45;
+const POSITION_SCALE = 13;
+const MIN_CLUSTER_DISTANCE = 50;
 const CENTER_PULL_STRENGTH = 0.015;
 
 // ============================================================================
@@ -290,7 +290,7 @@ const Graph2D: React.FC = () => {
 
           // If clusters are too close, push them apart
           if (dist < minClusterDistance) {
-            const force = ((minClusterDistance - dist) / dist) * alpha * 0.18;
+            const force = ((minClusterDistance - dist) / dist) * alpha * 2;
             const fx = dx * force;
             const fy = dy * force;
 

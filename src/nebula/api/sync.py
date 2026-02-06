@@ -411,6 +411,60 @@ async def sync_stars_task(
             # Final commit
             await db.commit()
 
+            # Detect and remove unstarred repos
+            # For incremental mode: we need to fetch full starred list just for IDs (fast)
+            # For full mode: we already have the complete list
+            removed_count = 0
+
+            if effective_mode == "full" and not was_truncated:
+                # Full sync already has complete data
+                github_repo_ids_from_api = {repo.id for repo in repos}
+            else:
+                # Incremental sync: fetch complete starred ID list for deletion detection
+                # This is fast because we only need the IDs, not full repo metadata
+                logger.info(
+                    "Fetching complete starred repos list for deletion detection..."
+                )
+                try:
+                    async with GitHubClient(
+                        access_token=settings.github_token
+                    ) as client:
+                        all_repos, _ = await client.get_starred_repos()
+                    github_repo_ids_from_api = {repo.id for repo in all_repos}
+                    logger.info(
+                        f"Fetched {len(github_repo_ids_from_api)} starred repo IDs for deletion check"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to fetch complete starred list for deletion: {e}. "
+                        "Skipping deletion detection."
+                    )
+                    github_repo_ids_from_api = None
+
+            # Remove repos that are no longer starred
+            if github_repo_ids_from_api is not None:
+                result = await db.execute(
+                    select(StarredRepo).where(
+                        StarredRepo.user_id == user_id,
+                        StarredRepo.github_repo_id.notin_(github_repo_ids_from_api),
+                    )
+                )
+                unstarred_repos = result.scalars().all()
+
+                if unstarred_repos:
+                    for repo in unstarred_repos:
+                        logger.info(
+                            f"Removing unstarred repo: {repo.full_name} "
+                            f"(github_id={repo.github_repo_id})"
+                        )
+                        await db.delete(repo)
+                        removed_count += 1
+
+                    await db.commit()
+                    logger.info(
+                        f"Removed {removed_count} unstarred repos for user {user.username}"
+                    )
+
             # Update user stats
             # For incremental sync, we need to count total stars from database
             if effective_mode == "incremental":
@@ -433,13 +487,14 @@ async def sync_stars_task(
                 "sync_mode": effective_mode,
                 "new_repos": new_count,
                 "updated_repos": updated_count,
+                "removed_repos": removed_count,
                 "was_truncated": was_truncated,
             }
             await db.commit()
 
             logger.info(
                 f"Completed star sync for {user.username} ({effective_mode}): "
-                f"{new_count} new, {updated_count} updated, {failed} failed"
+                f"{new_count} new, {updated_count} updated, {removed_count} removed, {failed} failed"
             )
 
             # Sync star lists (user's custom categories)
