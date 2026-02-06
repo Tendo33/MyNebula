@@ -3,17 +3,21 @@
   <h1>MyNebula (我的星云)</h1>
 </div>
 
+<div align="center">
+
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-blue.svg)](https://www.postgresql.org/)
 [![Modern Tooling: uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+</div>
+
 **Transform your GitHub Stars into a semantic knowledge nebula.**
 
 MyNebula 是一个现代化的 GitHub 星标管理与探索工具。它通过语义分析技术，将你浩如烟海的 GitHub Star 转化为一个直观的 2D 知识图谱。相似的项目会自动聚集，配合时间轴展示，让你对自己的技术栈演变一目了然。
 
-![MyNebula Banner](doc/images/banner.png)
+<img src="doc/images/banner.png" width="80%" alt="MyNebula Banner" />
 
 ## ✨ 主要特性
 

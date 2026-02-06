@@ -987,18 +987,55 @@ async def start_summary_generation(
 # ==================== Clustering ====================
 
 
-async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
+def _derive_clustering_params_for_max_clusters(
+    *,
+    n_samples: int,
+    max_clusters: int,
+) -> dict:
+    """Derive clustering parameters from a user-friendly 'max clusters' knob.
+
+    This is intentionally heuristic. The goal is stable UX, not perfect clustering.
+    """
+    safe_max_clusters = max(2, min(int(max_clusters), 20))
+    target_min_clusters = max(2, safe_max_clusters // 2)
+
+    # Roughly aim for average cluster size around n/max_clusters.
+    # Use a slightly smaller min_cluster_size so HDBSCAN can still form clusters.
+    approx_cluster_size = max(2, int(n_samples / safe_max_clusters))
+    min_cluster_size = max(5, int(approx_cluster_size * 0.9))
+    min_samples = max(2, int(min_cluster_size * 0.4))
+
+    # Coarser (smaller max_clusters) => more global structure in UMAP.
+    # Finer (larger max_clusters) => more local structure.
+    n_neighbors = int(max(15, min(60, 10 + (50 - 2 * safe_max_clusters))))
+
+    return {
+        "n_neighbors": n_neighbors,
+        "min_cluster_size": min_cluster_size,
+        "min_samples": min_samples,
+        "target_min_clusters": target_min_clusters,
+        "target_max_clusters": safe_max_clusters,
+    }
+
+
+async def run_clustering_task(
+    user_id: int,
+    task_id: int,
+    use_llm: bool = True,
+    max_clusters: int = 8,
+):
     """Background task to run clustering on user's repos.
 
     Args:
         user_id: User database ID
         task_id: Sync task ID
         use_llm: Whether to use LLM for cluster naming
+        max_clusters: User-friendly knob for controlling clustering granularity
     """
     from nebula.core.clustering import (
+        ClusteringService,
         generate_cluster_name,
         generate_cluster_name_llm,
-        get_clustering_service,
     )
     from nebula.db.database import get_db_context
 
@@ -1053,8 +1090,24 @@ async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
                 await db.commit()
                 return
 
-            # Run clustering with collision resolution
-            clustering_service = get_clustering_service()
+            # Run clustering with collision resolution.
+            # Use a user-friendly max-clusters control to derive stable parameters.
+            derived = _derive_clustering_params_for_max_clusters(
+                n_samples=len(embeddings),
+                max_clusters=max_clusters,
+            )
+            clustering_service = ClusteringService(
+                n_neighbors=derived["n_neighbors"],
+                min_dist=0.1,
+                min_cluster_size=derived["min_cluster_size"],
+                min_samples=derived["min_samples"],
+                cluster_selection_method="eom",
+                min_clusters=derived["target_min_clusters"],
+                target_min_clusters=derived["target_min_clusters"],
+                target_max_clusters=derived["target_max_clusters"],
+                assign_all_points=True,
+            )
+
             cluster_result = clustering_service.fit_transform(
                 embeddings=embeddings,
                 node_sizes=node_sizes,
@@ -1188,6 +1241,12 @@ async def run_clustering_task(user_id: int, task_id: int, use_llm: bool = True):
 @router.post("/clustering", response_model=SyncStartResponse)
 async def start_clustering(
     use_llm: bool = Query(default=True, description="Use LLM for cluster naming"),
+    max_clusters: int = Query(
+        default=8,
+        ge=2,
+        le=20,
+        description="Maximum number of clusters (lower = coarser, higher = finer)",
+    ),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
@@ -1237,7 +1296,9 @@ async def start_clustering(
     await db.refresh(task)
 
     # Start background task
-    background_tasks.add_task(run_clustering_task, user.id, task.id, use_llm)
+    background_tasks.add_task(
+        run_clustering_task, user.id, task.id, use_llm, max_clusters
+    )
 
     return SyncStartResponse(
         task_id=task.id,

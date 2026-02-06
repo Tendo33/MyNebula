@@ -28,6 +28,7 @@ const GraphPage = () => {
     selectedNode,
     setSelectedNode,
     filters,
+    settings,
     setSearchQuery,
     clearFilters,
 
@@ -160,7 +161,7 @@ const GraphPage = () => {
 
       // Step 4: Run clustering
       updateStepStatus('clustering', 'running');
-      const clusterResult = await startClustering();
+      const clusterResult = await startClustering(true, settings.maxClusters);
 
       const clusterSuccess = await waitForTaskComplete(clusterResult.task_id);
       if (!clusterSuccess) {

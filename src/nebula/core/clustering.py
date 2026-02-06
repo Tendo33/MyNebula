@@ -250,6 +250,8 @@ class ClusteringService:
         min_samples: int = 1,
         cluster_selection_method: str = "eom",
         min_clusters: int = 3,
+        target_min_clusters: int | None = None,
+        target_max_clusters: int | None = None,
         assign_all_points: bool = True,
     ):
         """Initialize clustering service.
@@ -261,6 +263,8 @@ class ClusteringService:
             min_samples: HDBSCAN min samples (lowered for more sensitivity)
             cluster_selection_method: HDBSCAN method - 'leaf' for fine-grained, 'eom' for larger
             min_clusters: Minimum expected number of clusters (triggers fallback if not met)
+            target_min_clusters: If set, ensure final cluster count is at least this value
+            target_max_clusters: If set, ensure final cluster count is at most this value
             assign_all_points: Whether to assign noise points to nearest clusters
         """
         self.n_neighbors = n_neighbors
@@ -269,6 +273,8 @@ class ClusteringService:
         self.min_samples = min_samples
         self.cluster_selection_method = cluster_selection_method
         self.min_clusters = min_clusters
+        self.target_min_clusters = target_min_clusters
+        self.target_max_clusters = target_max_clusters
         self.assign_all_points = assign_all_points
 
         self._umap_reducer = None
@@ -325,8 +331,10 @@ class ClusteringService:
 
         # Adjust parameters for small datasets
         effective_n_neighbors = min(self.n_neighbors, n_samples - 1)
-        effective_min_cluster_size = min(self.min_cluster_size, max(2, n_samples // 10))
-        effective_min_samples = min(self.min_samples, effective_min_cluster_size)
+        effective_min_cluster_size = min(max(2, self.min_cluster_size), n_samples)
+        effective_min_samples = min(
+            max(1, self.min_samples), effective_min_cluster_size
+        )
 
         # UMAP dimensionality reduction
         self._init_umap()
@@ -365,6 +373,10 @@ class ClusteringService:
 
             # Check if we need fallback clustering
             expected_clusters = estimate_cluster_count(n_samples, self.min_clusters)
+            if self.target_min_clusters is not None:
+                expected_clusters = max(expected_clusters, self.target_min_clusters)
+            if self.target_max_clusters is not None:
+                expected_clusters = min(expected_clusters, self.target_max_clusters)
 
             if n_clusters < self.min_clusters and n_samples >= 5:
                 logger.warning(
@@ -382,6 +394,39 @@ class ClusteringService:
         # Ensure labels is a numpy array for further processing
         labels = np.array(labels)
         n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+
+        # Enforce a target cluster count range (optional).
+        # This provides stable UX: user can ask for "no more than N clusters"
+        # without manually tuning HDBSCAN/UMAP parameters.
+        if (
+            self.target_max_clusters is not None
+            and n_samples >= max(2, self.target_max_clusters)
+            and n_clusters > self.target_max_clusters
+        ):
+            logger.info(
+                f"Cluster count {n_clusters} exceeds target_max_clusters={self.target_max_clusters}; "
+                "merging via hierarchical clustering"
+            )
+            labels = fallback_hierarchical_clustering(
+                coords_3d, self.target_max_clusters
+            )
+            labels = np.array(labels)
+            n_clusters = len(set(labels))
+
+        if (
+            self.target_min_clusters is not None
+            and n_samples >= max(2, self.target_min_clusters)
+            and n_clusters < self.target_min_clusters
+        ):
+            logger.info(
+                f"Cluster count {n_clusters} is below target_min_clusters={self.target_min_clusters}; "
+                "splitting via hierarchical clustering"
+            )
+            labels = fallback_hierarchical_clustering(
+                coords_3d, self.target_min_clusters
+            )
+            labels = np.array(labels)
+            n_clusters = len(set(labels))
 
         logger.info(f"Final clustering: {n_clusters} clusters, all points assigned")
 
@@ -532,5 +577,17 @@ def get_clustering_service() -> ClusteringService:
     """Get global clustering service instance."""
     global _clustering_service
     if _clustering_service is None:
-        _clustering_service = ClusteringService()
+        # Fewer, more stable clusters by default (aim for 4-8 clusters).
+        # - Larger min_cluster_size/min_samples => less fragmentation
+        # - Larger n_neighbors => more global structure in UMAP
+        # - Target range provides consistent UX without manual tuning
+        _clustering_service = ClusteringService(
+            n_neighbors=40,
+            min_cluster_size=20,
+            min_samples=8,
+            cluster_selection_method="eom",
+            min_clusters=4,
+            target_min_clusters=4,
+            target_max_clusters=8,
+        )
     return _clustering_service

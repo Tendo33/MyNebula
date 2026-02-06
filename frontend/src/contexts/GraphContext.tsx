@@ -75,6 +75,8 @@ interface GraphFilters {
 export interface GraphSettings {
   showTrajectories: boolean;
   hqRendering: boolean;
+  /** User-friendly knob for clustering granularity (lower = coarser) */
+  maxClusters: number;
 }
 
 interface GraphState {
@@ -145,6 +147,7 @@ const defaultFilters: GraphFilters = {
 const defaultSettings: GraphSettings = {
   showTrajectories: true,
   hqRendering: true,
+  maxClusters: 8,
 };
 
 const GraphContext = createContext<GraphContextValue | null>(null);

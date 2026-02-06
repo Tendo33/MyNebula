@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import { Layers, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useGraph } from '../../contexts/GraphContext';
 import { ClusterInfo } from '../../types';
+import { startClustering, getSyncStatus } from '../../api/sync';
 
 // ============================================================================
 // Types
@@ -113,7 +114,37 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
     filters,
     toggleCluster,
     clearClusterFilter,
+    settings,
+    updateSettings,
+    refreshData,
   } = useGraph();
+
+  const [reclustering, setReclustering] = useState(false);
+
+  const handleRecluster = useCallback(async () => {
+    if (reclustering) return;
+
+    try {
+      setReclustering(true);
+      const started = await startClustering(true, settings.maxClusters);
+
+      // Poll until clustering completes, then refresh graph data
+      // (Keeps this lightweight vs. the full 4-step sync flow)
+      for (;;) {
+        const status = await getSyncStatus(started.task_id);
+        if (status.status === 'completed') break;
+        if (status.status === 'failed') throw new Error(status.error_message || 'Clustering failed');
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+
+      await refreshData();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Re-cluster failed:', e);
+    } finally {
+      setReclustering(false);
+    }
+  }, [reclustering, refreshData, settings.maxClusters]);
 
   // Get clusters with node counts
   const clustersWithCounts = useMemo(() => {
@@ -192,6 +223,47 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
           )}
         </div>
       </div>
+
+      {/* Controls */}
+      {!collapsed && (
+        <div className="px-4 py-3 border-b border-border-light bg-bg-sidebar/40">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-text-muted">
+                  最大簇数（越小越粗）
+                </span>
+                <span className="text-xs font-mono tabular-nums text-text-dim">
+                  {settings.maxClusters}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={2}
+                max={20}
+                step={1}
+                value={settings.maxClusters}
+                onChange={(e) => updateSettings({ maxClusters: Number(e.target.value) })}
+                className="w-full mt-2"
+              />
+            </div>
+
+            <button
+              onClick={handleRecluster}
+              disabled={reclustering}
+              className={clsx(
+                'h-8 px-3 rounded-md text-xs font-medium border transition-colors flex-shrink-0',
+                reclustering
+                  ? 'bg-gray-100 text-gray-400 border-border-light cursor-not-allowed'
+                  : 'bg-white text-text-main border-border-light hover:bg-bg-hover'
+              )}
+              title="用当前设置重新聚类"
+            >
+              {reclustering ? '聚类中…' : '重新聚类'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Cluster list */}
       {!collapsed && (

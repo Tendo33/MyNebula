@@ -66,9 +66,12 @@ export const startSummaries = async () => {
 /**
  * 开始运行聚类（生成3D坐标和分类）
  */
-export const startClustering = async (useLlm: boolean = true) => {
+export const startClustering = async (
+  useLlm: boolean = true,
+  maxClusters: number = 8
+) => {
 	const response = await client.post<SyncStartResponse>("/sync/clustering", null, {
-		params: { use_llm: useLlm },
+		params: { use_llm: useLlm, max_clusters: maxClusters },
 	});
 	return response.data;
 };

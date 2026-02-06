@@ -65,7 +65,12 @@ const COLORS = {
 
 const NODE_BASE_SIZE = 5;
 const NODE_MAX_SIZE = 30;
-const ZOOM_TO_FIT_PADDING = 50;
+const ZOOM_TO_FIT_PADDING = 80;
+
+// Layout tuning: smaller = more compact initial view
+const POSITION_SCALE = 10;
+const MIN_CLUSTER_DISTANCE = 45;
+const CENTER_PULL_STRENGTH = 0.015;
 
 // ============================================================================
 // Utility Functions
@@ -190,8 +195,8 @@ const Graph2D: React.FC = () => {
         ai_summary: n.ai_summary,
         ai_tags: n.ai_tags,
         // Use pre-computed positions if available (from clustering)
-        x: n.x * 50, // Scale up for better spread
-        y: n.y * 50,
+        x: n.x * POSITION_SCALE,
+        y: n.y * POSITION_SCALE,
       })),
       links: filteredData.edges.map(e => ({
         source: typeof e.source === 'object' ? e.source.id : e.source,
@@ -224,7 +229,7 @@ const Graph2D: React.FC = () => {
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : undefined;
         const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : undefined;
         // Same cluster: short distance, Different cluster: moderate separation
-        return sourceCluster === targetCluster ? 35 : 120;
+        return sourceCluster === targetCluster ? 22 : 55;
       })
       .strength((link: any) => {
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : undefined;
@@ -235,8 +240,12 @@ const Graph2D: React.FC = () => {
 
     // Configure charge force (repulsion) - balanced for separation
     fg.d3Force('charge')
-      ?.strength(-180)
-      .distanceMax(350);
+      ?.strength(-80)
+      .distanceMax(180);
+
+    // Gentle pull toward the origin to avoid disconnected groups drifting far apart
+    fg.d3Force('x', (d3 as any).forceX(0).strength(CENTER_PULL_STRENGTH));
+    fg.d3Force('y', (d3 as any).forceY(0).strength(CENTER_PULL_STRENGTH));
 
     // Add collision force to prevent overlap
     fg.d3Force('collide', (d3 as any).forceCollide()
@@ -267,7 +276,7 @@ const Graph2D: React.FC = () => {
 
       // Convert to array for center-to-center repulsion
       const centersArray = Array.from(clusterCenters.entries());
-      const minClusterDistance = 150; // Minimum distance between cluster centers
+      const minClusterDistance = MIN_CLUSTER_DISTANCE; // Minimum distance between cluster centers
 
       // Apply repulsion between cluster centers
       for (let i = 0; i < centersArray.length; i++) {
@@ -281,7 +290,7 @@ const Graph2D: React.FC = () => {
 
           // If clusters are too close, push them apart
           if (dist < minClusterDistance) {
-            const force = ((minClusterDistance - dist) / dist) * alpha * 0.5;
+            const force = ((minClusterDistance - dist) / dist) * alpha * 0.18;
             const fx = dx * force;
             const fy = dy * force;
 
