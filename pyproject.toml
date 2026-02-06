@@ -54,7 +54,7 @@ dependencies = [
     # Scheduler
     "apscheduler>=3.10.0",
     # Database sync driver
-    "psycopg2>=2.9.11",
+    "psycopg2-binary>=2.9.11",
     "json-repair>=0.56.0",
 ]
 
