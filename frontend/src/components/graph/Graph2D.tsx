@@ -218,35 +218,33 @@ const Graph2D: React.FC = () => {
 
     const fg = graphRef.current;
 
-    // Configure link force
+    // Configure link force - increased distance for cross-cluster links
     fg.d3Force('link')
       ?.distance((link: any) => {
-        // Shorter distance for same cluster, longer for different
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : undefined;
         const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : undefined;
-        return sourceCluster === targetCluster ? 50 : 100;
+        // Same cluster: short distance, Different cluster: moderate separation
+        return sourceCluster === targetCluster ? 35 : 120;
       })
       .strength((link: any) => {
-        // Stronger links within same cluster
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : undefined;
         const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : undefined;
-        return sourceCluster === targetCluster ? 0.5 : 0.1;
+        // Stronger links within same cluster, very weak for cross-cluster
+        return sourceCluster === targetCluster ? 0.7 : 0.05;
       });
 
-    // Configure charge force (repulsion)
+    // Configure charge force (repulsion) - balanced for separation
     fg.d3Force('charge')
-      ?.strength(-150)
-      .distanceMax(300);
+      ?.strength(-180)
+      .distanceMax(350);
 
     // Add collision force to prevent overlap
-    // Radius = node radius + padding
     fg.d3Force('collide', (d3 as any).forceCollide()
-      .radius((node: any) => calculateNodeRadius(node.stargazers_count) * 1.5 + 2)
-      .strength(0.8)
+      .radius((node: any) => calculateNodeRadius(node.stargazers_count) * 1.5 + 3)
+      .strength(0.9)
       .iterations(2));
 
-    // Add cluster force to group nodes by cluster
-    // Using a custom force that pulls nodes toward their cluster center
+    // Enhanced cluster force with cluster-center repulsion
     const clusterForce = (alpha: number) => {
       const clusterCenters = new Map<number, { x: number; y: number; count: number }>();
 
@@ -267,12 +265,46 @@ const Graph2D: React.FC = () => {
         center.y /= center.count;
       });
 
-      // Apply force toward cluster center
+      // Convert to array for center-to-center repulsion
+      const centersArray = Array.from(clusterCenters.entries());
+      const minClusterDistance = 150; // Minimum distance between cluster centers
+
+      // Apply repulsion between cluster centers
+      for (let i = 0; i < centersArray.length; i++) {
+        for (let j = i + 1; j < centersArray.length; j++) {
+          const [clusterId1, center1] = centersArray[i];
+          const [clusterId2, center2] = centersArray[j];
+
+          const dx = center2.x - center1.x;
+          const dy = center2.y - center1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+          // If clusters are too close, push them apart
+          if (dist < minClusterDistance) {
+            const force = ((minClusterDistance - dist) / dist) * alpha * 0.5;
+            const fx = dx * force;
+            const fy = dy * force;
+
+            // Apply force to all nodes in each cluster
+            processedData.nodes.forEach((node: any) => {
+              if (node.cluster_id === clusterId1) {
+                node.vx = (node.vx || 0) - fx;
+                node.vy = (node.vy || 0) - fy;
+              } else if (node.cluster_id === clusterId2) {
+                node.vx = (node.vx || 0) + fx;
+                node.vy = (node.vy || 0) + fy;
+              }
+            });
+          }
+        }
+      }
+
+      // Apply stronger force toward cluster center (increased from 0.1 to 0.3)
       processedData.nodes.forEach((node: any) => {
         if (node.cluster_id !== undefined) {
           const center = clusterCenters.get(node.cluster_id);
           if (center && node.x !== undefined && node.y !== undefined) {
-            const k = alpha * 0.1; // Strength of clustering
+            const k = alpha * 0.2; // Moderate clustering strength
             node.vx = (node.vx || 0) + (center.x - node.x) * k;
             node.vy = (node.vy || 0) + (center.y - node.y) * k;
           }
