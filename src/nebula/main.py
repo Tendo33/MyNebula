@@ -83,16 +83,11 @@ def create_app() -> FastAPI:
     # Configure CORS - 确保所有请求都能正确返回 CORS 头
     # 注意：allow_origins=["*"] 与 allow_credentials=True 不能同时使用
     # 在开发模式下我们使用具体的来源地址
-    cors_origins = [
-        "http://localhost:5173",  # Vite 开发服务器
-        "http://localhost:3000",  # 生产前端
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-    ]
-
+    # Configure CORS - 允许所有本地开发端口
+    # 使用 regex 匹配 localhost 和 127.0.0.1 的任意端口
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins,
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
