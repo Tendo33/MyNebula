@@ -43,8 +43,11 @@
     "star_activity": "Star Activity",
     "last_3_months": "last 3 months",
     "top_clusters": "Top Clusters",
+    "popular_topics": "Popular Topics",
+    "top_12": "Top 12",
     "no_data": "No data available",
-    "no_activity": "No activity data"
+    "no_activity": "No activity data",
+    "no_topics": "No topics available"
   },
   "graph": {
     "clusters": "Clusters",

@@ -47,8 +47,11 @@
     "star_activity": "收藏活动",
     "last_3_months": "近3个月",
     "top_clusters": "热门聚类",
+    "popular_topics": "热门标签",
+    "top_12": "Top 12",
     "no_data": "暂无数据",
-    "no_activity": "暂无活动数据"
+    "no_activity": "暂无活动数据",
+    "no_topics": "暂无标签数据"
   },
   "graph": {
     "clusters": "聚类",

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { useGraph } from '../contexts/GraphContext';
 import { DashboardSkeleton } from '../components/ui/Skeleton';
-import { Book, Code, Layers, TrendingUp, ArrowRight, Calendar, Hash } from 'lucide-react';
+import { Book, Code, Layers, TrendingUp, ArrowRight, Calendar, Hash, Tag } from 'lucide-react';
 
 // ============================================================================
 // Types
@@ -162,14 +162,23 @@ const Dashboard = () => {
 
     const totalRepos = rawData.total_nodes;
 
-    // Calculate unique topics instead of stars
-    const allTopics = new Set<string>();
+    // Calculate unique topics and topic counts
+    const topicCounts: Record<string, number> = {};
     rawData.nodes.forEach(node => {
       if (node.topics && Array.isArray(node.topics)) {
-        node.topics.forEach(topic => allTopics.add(topic.toLowerCase()));
+        node.topics.forEach(topic => {
+          const normalizedTopic = topic.toLowerCase();
+          topicCounts[normalizedTopic] = (topicCounts[normalizedTopic] || 0) + 1;
+        });
       }
     });
-    const totalTopics = allTopics.size;
+    const totalTopics = Object.keys(topicCounts).length;
+
+    // Top topics sorted by count
+    const topTopics = Object.entries(topicCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([topic, count]) => ({ topic, count }));
 
     const totalClusters = rawData.total_clusters;
     const totalEdges = rawData.total_edges;
@@ -211,6 +220,7 @@ const Dashboard = () => {
       topLanguages,
       topLanguage: topLanguage ? `${topLanguage.language} (${topLanguage.count})` : 'N/A',
       topClusters,
+      topTopics,
       recentActivity,
     };
   }, [rawData, timelineData]);
@@ -292,7 +302,7 @@ const Dashboard = () => {
               </div>
 
               {/* Charts Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 {/* Language Distribution */}
                 <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
                   <div className="flex items-center justify-between mb-6">
@@ -323,8 +333,10 @@ const Dashboard = () => {
                   )}
                 </div>
 
-                {/* Activity Timeline */}
-                <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
+                {/* Right Column: Activity + Topics */}
+                <div className="flex flex-col gap-6">
+                  {/* Activity Timeline */}
+                  <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-text-muted" />
@@ -333,22 +345,39 @@ const Dashboard = () => {
                       </h3>
                     </div>
                     {stats?.recentActivity !== undefined && stats.recentActivity > 0 && (
-                      <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                      <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full font-medium">
                         +{stats.recentActivity} {t('dashboard.last_3_months')}
                       </span>
                     )}
                   </div>
 
                   {/* Activity bars */}
-                  <div className="flex items-end gap-1 h-32">
+                  <div className="flex items-end gap-1.5 h-32 pt-8">
                     {activityData.map((data, idx) => {
                       const height = (data.count / maxActivity) * 100;
+                      const isRecent = idx >= activityData.length - 3;
                       return (
-                        <div key={idx} className="flex-1 flex flex-col justify-end group h-full">
+                        <div
+                          key={idx}
+                          className="flex-1 flex flex-col items-center justify-end group h-full relative"
+                        >
+                          {/* Hover tooltip */}
+                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                            <div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                              <div className="font-medium">{data.count} repos</div>
+                              <div className="text-gray-300">{data.date}</div>
+                            </div>
+                            <div className="w-2 h-2 bg-gray-800 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
+                          </div>
+
+                          {/* Bar */}
                           <div
-                            className="w-full bg-action-primary/80 hover:bg-action-primary rounded-t transition-all cursor-pointer"
-                            style={{ height: `${Math.max(height, 4)}%` }}
-                            title={`${data.date}: ${data.count} repos`}
+                            className={`w-full rounded-t transition-all duration-300 cursor-pointer hover:opacity-90 ${
+                              isRecent
+                                ? 'bg-gradient-to-t from-blue-500 to-blue-400 shadow-sm'
+                                : 'bg-gradient-to-t from-blue-400/70 to-blue-300/70'
+                            }`}
+                            style={{ height: `${Math.max(height, 8)}%` }}
                             onClick={() => navigate(`/data?month=${data.date}`)}
                           />
                         </div>
@@ -358,8 +387,11 @@ const Dashboard = () => {
 
                   {/* Date labels */}
                   {activityData.length > 0 && (
-                    <div className="flex justify-between mt-2 text-[10px] text-text-muted">
+                    <div className="flex justify-between mt-3 text-[10px] text-text-muted font-medium">
                       <span>{activityData[0]?.date}</span>
+                      <span className="text-text-dim">
+                        {activityData[Math.floor(activityData.length / 2)]?.date}
+                      </span>
                       <span>{activityData[activityData.length - 1]?.date}</span>
                     </div>
                   )}
@@ -369,6 +401,53 @@ const Dashboard = () => {
                       {t('dashboard.no_activity')}
                     </div>
                   )}
+                </div>
+
+                {/* Popular Topics */}
+                <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-text-muted" />
+                      <h3 className="text-sm font-semibold text-text-main">
+                        {t('dashboard.popular_topics')}
+                      </h3>
+                    </div>
+                    <span className="text-xs text-text-muted">
+                      {t('dashboard.top_12')}
+                    </span>
+                  </div>
+
+                  {/* Topics cloud */}
+                  <div className="flex flex-wrap gap-2">
+                    {stats?.topTopics.map((item, idx) => {
+                      // Color intensity based on count ranking
+                      const intensity = 1 - (idx / (stats.topTopics.length - 1)) * 0.6;
+                      return (
+                        <button
+                          key={item.topic}
+                          onClick={() => navigate(`/data?topic=${encodeURIComponent(item.topic)}`)}
+                          className="group px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-md hover:scale-105"
+                          style={{
+                            backgroundColor: `rgba(59, 130, 246, ${intensity * 0.15})`,
+                            color: `rgba(37, 99, 235, ${0.7 + intensity * 0.3})`,
+                            border: `1px solid rgba(59, 130, 246, ${intensity * 0.3})`,
+                          }}
+                        >
+                          <span>{item.topic}</span>
+                          <span className="ml-1.5 text-xs opacity-60">
+                            {item.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {(!stats?.topTopics || stats.topTopics.length === 0) && (
+                    <div className="flex items-center justify-center h-20 text-text-muted text-sm">
+                      {t('dashboard.no_topics')}
+                    </div>
+                  )}
+                </div>
                 </div>
               </div>
 
