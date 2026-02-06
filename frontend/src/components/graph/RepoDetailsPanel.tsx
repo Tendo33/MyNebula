@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GraphNode } from '../../types';
-import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart, Link2, ChevronRight, User, GitFork, Copy, Check } from 'lucide-react';
+import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart, Link2, ChevronRight } from 'lucide-react';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
 import { clsx } from 'clsx';
 
@@ -16,7 +16,7 @@ interface RelatedRepoItemProps {
   matchReason?: string;
 }
 
-type RelatedTab = 'similar' | 'sameTags' | 'sameOwner' | 'sameLang';
+type RelatedTab = 'similar' | 'sameTags' | 'sameLang';
 
 /** Related repository item component */
 const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchReason }) => {
@@ -75,7 +75,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   const { rawData, setSelectedNode } = useGraph();
   const neighborIds = useNodeNeighbors(node.id);
   const [activeTab, setActiveTab] = useState<RelatedTab>('similar');
-  const [copied, setCopied] = useState(false);
+
 
   // Get related repos by different dimensions
   const relatedReposByDimension = useMemo(() => {
@@ -106,11 +106,6 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           .slice(0, 10)
       : [];
 
-    // 3. Same owner
-    const sameOwner = rawData.nodes
-      .filter(n => n.id !== node.id && n.owner === node.owner)
-      .sort((a, b) => b.stargazers_count - a.stargazers_count)
-      .slice(0, 10);
 
     // 4. Same language
     const sameLang = node.language
@@ -120,7 +115,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           .slice(0, 10)
       : [];
 
-    return { similar, sameTags, sameOwner, sameLang };
+    return { similar, sameTags, sameLang };
   }, [rawData, neighborIds, node]);
 
   // Get current tab's repos
@@ -131,20 +126,11 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
     setSelectedNode(repo);
   };
 
-  // Copy git clone command
-  const handleCopyClone = () => {
-    const cloneUrl = `git clone https://github.com/${node.full_name}.git`;
-    navigator.clipboard.writeText(cloneUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
 
-  // Tab counts
+
   const tabCounts = {
     similar: relatedReposByDimension.similar.length,
     sameTags: relatedReposByDimension.sameTags.length,
-    sameOwner: relatedReposByDimension.sameOwner.length,
     sameLang: relatedReposByDimension.sameLang.length,
   };
 
@@ -322,21 +308,6 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               )}
             </button>
             <button
-              onClick={() => setActiveTab('sameOwner')}
-              className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors',
-                activeTab === 'sameOwner'
-                  ? 'bg-white shadow-sm text-text-main font-medium'
-                  : 'text-text-muted hover:text-text-main'
-              )}
-            >
-              <User className="w-3 h-3" />
-              <span>{t('repoDetails.sameOwner', 'Author')}</span>
-              {tabCounts.sameOwner > 0 && (
-                <span className="text-[10px] text-text-dim">({tabCounts.sameOwner})</span>
-              )}
-            </button>
-            <button
               onClick={() => setActiveTab('sameLang')}
               className={clsx(
                 'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors',
@@ -369,7 +340,6 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             <div className="py-6 text-center text-sm text-text-muted bg-bg-sidebar rounded-lg border border-border-light/50">
               {activeTab === 'similar' && t('repoDetails.noSimilar', 'No similar repos found')}
               {activeTab === 'sameTags' && t('repoDetails.noSameTags', 'No repos with same tags')}
-              {activeTab === 'sameOwner' && t('repoDetails.noSameOwner', 'No other repos from this author')}
               {activeTab === 'sameLang' && t('repoDetails.noSameLang', 'No repos with same language')}
             </div>
           )}
@@ -388,33 +358,31 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               <ExternalLink className="w-4 h-4" />
               <span>GitHub</span>
             </a>
-            <a
-              href={`${node.html_url}/stargazers`}
+
+             {/* Deep Wiki */}
+             <a
+              href={`https://deepwiki.com/${node.full_name}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 px-3 py-2 border border-border-light hover:bg-bg-hover text-text-main text-sm rounded-md transition-colors"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md ml-auto"
+              title="View on DeepWiki"
             >
-              <Star className="w-4 h-4 text-orange-500" />
+              <img src="https://deepwiki.com/favicon.ico" alt="DeepWiki" className="w-4 h-4 rounded-sm bg-white" />
+              <span>DeepWiki</span>
             </a>
-            <a
-              href={`${node.html_url}/fork`}
+
+             {/* zRead */}
+             <a
+              href={`https://zread.ai/${node.full_name}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 px-3 py-2 border border-border-light hover:bg-bg-hover text-text-main text-sm rounded-md transition-colors"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
+              title="View on zRead"
             >
-              <GitFork className="w-4 h-4" />
+               <img src="https://zread.ai/favicon.ico" alt="zRead" className="w-4 h-4 rounded-sm bg-white" />
+              <span>zRead</span>
             </a>
-            <button
-              onClick={handleCopyClone}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 border border-border-light hover:bg-bg-hover text-text-main text-sm rounded-md transition-colors"
-              title="Copy git clone command"
-            >
-              {copied ? (
-                <Check className="w-4 h-4 text-green-500" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
-            </button>
+
           </div>
 
           {/* Clone command preview */}

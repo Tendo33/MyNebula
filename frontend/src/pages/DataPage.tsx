@@ -100,8 +100,8 @@ const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) => {
       }}
       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium hover:opacity-80 transition-opacity"
       style={{
-        backgroundColor: cluster.color + '20',
-        color: cluster.color,
+        backgroundColor: cluster.color + '30',
+        color: '#374151',
       }}
     >
       <div
@@ -331,18 +331,18 @@ const DataPage = () => {
                         <Layers className="w-4 h-4" />
                         <span>{t('data.filter_by_cluster')}:</span>
                       </div>
-                  {rawData.clusters.slice(0, 8).map(cluster => (
+                  {rawData.clusters.map(cluster => (
                     <button
                       key={cluster.id}
                       onClick={() => handleClusterFilter(cluster.id)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                         filters.selectedClusters.has(cluster.id)
                           ? 'ring-2 ring-offset-1'
-                          : 'opacity-60 hover:opacity-100'
+                          : 'hover:opacity-80'
                       }`}
                       style={{
-                        backgroundColor: cluster.color + '20',
-                        color: cluster.color,
+                        backgroundColor: cluster.color + '30',
+                        color: '#374151',
                         '--tw-ring-color': cluster.color,
                       } as React.CSSProperties}
                     >
@@ -351,14 +351,9 @@ const DataPage = () => {
                         style={{ backgroundColor: cluster.color }}
                       />
                       {cluster.name || `Cluster ${cluster.id}`}
-                      <span className="opacity-60">({cluster.repo_count})</span>
+                      <span className="opacity-75">({cluster.repo_count})</span>
                     </button>
                   ))}
-                  {rawData.clusters.length > 8 && (
-                    <span className="text-xs text-text-muted">
-                      +{rawData.clusters.length - 8} more
-                    </span>
-                  )}
                 </div>
               )}
             </div>

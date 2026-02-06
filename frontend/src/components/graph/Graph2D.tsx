@@ -141,6 +141,9 @@ const Graph2D: React.FC = () => {
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const { width, height } = useResizeObserver(containerRef);
 
+  // Image cache for avatars
+  const imageCache = useRef<Map<string, HTMLImageElement | 'loading' | 'error'>>(new Map());
+
   // Global state
   const {
     filteredData,
@@ -156,6 +159,9 @@ const Graph2D: React.FC = () => {
   // Local state for graph-specific interactions
   const [localHoverNode, setLocalHoverNode] = useState<ProcessedNode | null>(null);
   const activeHoverNode = localHoverNode || (hoveredNode as ProcessedNode | null);
+
+  // Counter to trigger re-render when images load
+  const [, forceUpdate] = useState(0);
 
   // Get neighbors of hovered node for highlighting
   const hoverNeighbors = useNodeNeighbors(activeHoverNode?.id);
@@ -357,7 +363,7 @@ const Graph2D: React.FC = () => {
 
   // Custom node painting
   const paintNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-    const { x, y, name, stargazers_count } = node as ProcessedNode;
+    const { x, y, name, stargazers_count, owner_avatar_url } = node as ProcessedNode;
     if (x === undefined || y === undefined) return;
 
     const radius = calculateNodeRadius(stargazers_count);
@@ -365,11 +371,52 @@ const Graph2D: React.FC = () => {
     const isHovered = activeHoverNode?.id === node.id;
     const isSelected = selectedNode?.id === node.id;
 
-    // Draw node circle
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
+    // Try to draw avatar image
+    let avatarDrawn = false;
+    if (owner_avatar_url) {
+      const cached = imageCache.current.get(owner_avatar_url);
+
+      if (cached === undefined) {
+        // Start loading image
+        imageCache.current.set(owner_avatar_url, 'loading');
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          imageCache.current.set(owner_avatar_url, img);
+          // Trigger re-render by updating state
+          forceUpdate(n => n + 1);
+        };
+        img.onerror = () => {
+          imageCache.current.set(owner_avatar_url, 'error');
+        };
+        img.src = owner_avatar_url;
+      } else if (cached instanceof HTMLImageElement) {
+        // Draw cached image in circular clip
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.clip();
+
+        // Draw image to fill the circle
+        ctx.drawImage(
+          cached,
+          x - radius,
+          y - radius,
+          radius * 2,
+          radius * 2
+        );
+        ctx.restore();
+        avatarDrawn = true;
+      }
+    }
+
+    // Fallback: Draw solid color circle if no avatar
+    if (!avatarDrawn) {
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
 
     // Draw border for selected/hovered nodes
     if (isHovered || isSelected) {

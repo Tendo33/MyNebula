@@ -21,6 +21,7 @@ interface ProcessedNode {
   color: string;
   size: number;
   stargazers_count: number;
+  owner_avatar_url?: string;
   x: number;
   y: number;
   z: number;
@@ -127,6 +128,7 @@ const Graph3D: React.FC = () => {
         color: n.color || COLORS.NODE_DEFAULT,
         size: n.size,
         stargazers_count: n.stargazers_count,
+        owner_avatar_url: n.owner_avatar_url,
         // Use pre-computed 3D positions scaled up
         x: n.x * POSITION_SCALE,
         y: n.y * POSITION_SCALE,
@@ -291,38 +293,81 @@ const Graph3D: React.FC = () => {
     const processedNode = node as ProcessedNode;
     const size = calculateNodeSize(processedNode.stargazers_count);
     const color = getNodeColor(processedNode);
-
-    // Create sphere geometry
-    const geometry = new THREE.SphereGeometry(size, 16, 16);
-
-    // Create material with proper color handling
     const isTransparent = color.includes('rgba');
-    // Use simpler material if HQ rendering is disabled
-    const material = settings.hqRendering
-      ? new THREE.MeshLambertMaterial({
-          color: isTransparent ? '#6B7280' : color,
-          transparent: isTransparent,
-          opacity: isTransparent ? 0.3 : 1,
-        })
-      : new THREE.MeshBasicMaterial({
-          color: isTransparent ? '#6B7280' : color,
-          transparent: isTransparent,
-          opacity: isTransparent ? 0.3 : 1,
-        });
 
-    const mesh = new THREE.Mesh(geometry, material);
+    // Create a group to hold both avatar sprite and optional label
+    const group = new THREE.Group();
+
+    // Try to create avatar sprite if URL exists
+    if (processedNode.owner_avatar_url) {
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.crossOrigin = 'anonymous';
+
+      // Create sprite with avatar texture
+      textureLoader.load(
+        processedNode.owner_avatar_url,
+        (texture) => {
+          // Create circular sprite material
+          const spriteMaterial = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            opacity: isTransparent ? 0.3 : 1,
+          });
+          const sprite = new THREE.Sprite(spriteMaterial);
+          sprite.scale.set(size * 2, size * 2, 1);
+          group.add(sprite);
+        },
+        undefined,
+        () => {
+          // On error, create fallback sphere
+          const geometry = new THREE.SphereGeometry(size, 16, 16);
+          const material = new THREE.MeshBasicMaterial({
+            color: isTransparent ? '#6B7280' : color,
+            transparent: isTransparent,
+            opacity: isTransparent ? 0.3 : 1,
+          });
+          group.add(new THREE.Mesh(geometry, material));
+        }
+      );
+
+      // Add placeholder sphere while loading
+      const placeholderGeometry = new THREE.SphereGeometry(size, 8, 8);
+      const placeholderMaterial = new THREE.MeshBasicMaterial({
+        color: isTransparent ? '#6B7280' : color,
+        transparent: true,
+        opacity: 0.3,
+      });
+      const placeholder = new THREE.Mesh(placeholderGeometry, placeholderMaterial);
+      placeholder.name = 'placeholder';
+      group.add(placeholder);
+    } else {
+      // No avatar URL, create colored sphere
+      const geometry = new THREE.SphereGeometry(size, 16, 16);
+      const material = settings.hqRendering
+        ? new THREE.MeshLambertMaterial({
+            color: isTransparent ? '#6B7280' : color,
+            transparent: isTransparent,
+            opacity: isTransparent ? 0.3 : 1,
+          })
+        : new THREE.MeshBasicMaterial({
+            color: isTransparent ? '#6B7280' : color,
+            transparent: isTransparent,
+            opacity: isTransparent ? 0.3 : 1,
+          });
+      group.add(new THREE.Mesh(geometry, material));
+    }
 
     // Add sprite label for important nodes
     if (processedNode.stargazers_count > 1000 ||
         activeHoverNode?.id === processedNode.id ||
         selectedNode?.id === processedNode.id) {
-      const sprite = createTextSprite(processedNode.name);
-      sprite.position.set(0, size + 5, 0);
-      mesh.add(sprite);
+      const labelSprite = createTextSprite(processedNode.name);
+      labelSprite.position.set(0, size + 5, 0);
+      group.add(labelSprite);
     }
 
-    return mesh;
-  }, [getNodeColor, activeHoverNode, selectedNode]);
+    return group;
+  }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering]);
 
   // Create text sprite for labels
   const createTextSprite = (text: string): THREE.Sprite => {
