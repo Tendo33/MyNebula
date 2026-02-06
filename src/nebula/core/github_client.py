@@ -6,14 +6,12 @@ This module provides async GitHub API operations including:
 - Repository metadata
 """
 
-import base64
 from datetime import datetime
 
 import httpx
 from pydantic import BaseModel
 
 from nebula.utils import get_logger
-from nebula.utils.decorator_utils import async_retry_decorator
 
 logger = get_logger(__name__)
 
@@ -237,50 +235,6 @@ class GitHubClient:
 
         return repos, was_truncated
 
-    @async_retry_decorator(max_retries=2, delay=0.5)
-    async def get_readme(
-        self,
-        owner: str,
-        repo: str,
-        max_length: int = 10000,
-    ) -> str | None:
-        """Get README content for a repository.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-            max_length: Maximum content length to return
-
-        Returns:
-            README content as string, or None if not found
-        """
-        try:
-            response = await self.client.get(f"/repos/{owner}/{repo}/readme")
-
-            if response.status_code == 404:
-                return None
-
-            response.raise_for_status()
-            data = response.json()
-
-            # Decode base64 content
-            content = base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
-
-            # Truncate if too long
-            if len(content) > max_length:
-                content = content[:max_length] + "\n... [truncated]"
-
-            return content
-
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                return None
-            logger.warning(f"Failed to get README for {owner}/{repo}: {e}")
-            return None
-        except Exception as e:
-            logger.warning(f"Error getting README for {owner}/{repo}: {e}")
-            return None
-
     async def get_star_lists(self) -> list[GitHubStarList]:
         """Get user's star lists using GraphQL API.
 
@@ -363,16 +317,6 @@ class GitHubClient:
         except Exception as e:
             logger.warning(f"Failed to fetch star lists (may not be available): {e}")
             return []
-
-    async def get_rate_limit(self) -> dict:
-        """Get current rate limit status.
-
-        Returns:
-            Rate limit information
-        """
-        response = await self.client.get("/rate_limit")
-        response.raise_for_status()
-        return response.json()
 
     async def close(self) -> None:
         """Close the HTTP client."""

@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-06
+
 ### Added
+- 3D-to-2D graph visualization transition
+- Enhanced clustering with semantic grouping
+- Multi-dimensional filtering (language, star count, time range)
+- Real-time sync progress tracking
+- User-defined Star Lists support
+
+### Changed
+- Improved graph node layout and performance
+- Refactored backend sync architecture for better reliability
+
+### Removed
+- Deprecated 3D graph visualization code
+- Unused GitHub API methods (`get_readme`, `get_rate_limit`)
+- Debug console logs in production pages
+
+### Added (from previous)
 - Async decorators support (`async_timing_decorator`, `async_retry_decorator`, `async_catch_exceptions`)
 
 ## [0.1.0] - 2026-01-20
@@ -41,5 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/yourusername/nebula/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/yourusername/nebula/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/yourusername/nebula/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yourusername/nebula/releases/tag/v0.1.0

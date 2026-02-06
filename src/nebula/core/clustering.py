@@ -287,18 +287,6 @@ class ClusteringService:
                 random_state=42,
             )
 
-    def _init_hdbscan(self):
-        """Lazily initialize HDBSCAN clusterer."""
-        if self._clusterer is None:
-            import hdbscan
-
-            self._clusterer = hdbscan.HDBSCAN(
-                min_cluster_size=self.min_cluster_size,
-                min_samples=self.min_samples,
-                metric="euclidean",
-                cluster_selection_method=self.cluster_selection_method,
-            )
-
     def fit_transform(
         self,
         embeddings: list[list[float]],
@@ -372,8 +360,7 @@ class ClusteringService:
             n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
             logger.info(
-                f"HDBSCAN found {n_clusters} clusters "
-                f"(noise points: {(labels == -1).sum()})"
+                f"HDBSCAN found {n_clusters} clusters (noise points: {(labels == -1).sum()})"
             )
 
             # Check if we need fallback clustering
@@ -426,37 +413,6 @@ class ClusteringService:
             coords_3d=coords_3d.tolist(),
             cluster_centers=cluster_centers,
         )
-
-    def transform_new(
-        self,
-        new_embeddings: list[list[float]],
-        reference_embeddings: list[list[float]],
-        reference_coords: list[list[float]],
-    ) -> list[list[float]]:
-        """Transform new embeddings to 3D space using existing reference.
-
-        Args:
-            new_embeddings: New embedding vectors to transform
-            reference_embeddings: Existing embeddings for fitting
-            reference_coords: Existing 3D coordinates
-
-        Returns:
-            3D coordinates for new embeddings
-        """
-        if not new_embeddings:
-            return []
-
-        self._init_umap()
-
-        # Fit on reference data
-        ref_array = np.array(reference_embeddings)
-        self._umap_reducer.fit(ref_array)
-
-        # Transform new data
-        new_array = np.array(new_embeddings)
-        new_coords = self._umap_reducer.transform(new_array)
-
-        return new_coords.tolist()
 
 
 def generate_cluster_name(

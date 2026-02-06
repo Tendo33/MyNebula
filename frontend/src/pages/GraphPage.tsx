@@ -126,7 +126,6 @@ const GraphPage = () => {
       // Step 1: Sync stars
       updateStepStatus('stars', 'running');
       const starsResult = await startStarSync('incremental');
-      console.log('Stars sync started:', starsResult);
 
       const starsSuccess = await waitForTaskComplete(starsResult.task_id);
       if (!starsSuccess) {
@@ -139,7 +138,6 @@ const GraphPage = () => {
       updateStepStatus('summaries', 'running');
       try {
         const summariesResult = await startSummaries();
-        console.log('Summaries started:', summariesResult);
         const summariesSuccess = await waitForTaskComplete(summariesResult.task_id);
         if (!summariesSuccess) {
           console.warn('Summaries generation had issues, continuing...');
@@ -152,7 +150,6 @@ const GraphPage = () => {
       // Step 3: Compute embeddings
       updateStepStatus('embeddings', 'running');
       const embeddingResult = await startEmbedding();
-      console.log('Embedding started:', embeddingResult);
 
       const embeddingSuccess = await waitForTaskComplete(embeddingResult.task_id);
       if (!embeddingSuccess) {
@@ -164,7 +161,6 @@ const GraphPage = () => {
       // Step 4: Run clustering
       updateStepStatus('clustering', 'running');
       const clusterResult = await startClustering();
-      console.log('Clustering started:', clusterResult);
 
       const clusterSuccess = await waitForTaskComplete(clusterResult.task_id);
       if (!clusterSuccess) {
