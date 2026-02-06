@@ -32,24 +32,26 @@ MyNebula 是一个现代化的 GitHub 星标管理与探索工具。它通过语
 
 ### 方案 A：Docker Compose (推荐)
 
-一键部署完整应用栈（包含数据库、后端与预构建的前端）：
+一键部署完整应用栈（包含数据库、后端与预构建的前端），无需手动建表：
 
 ```bash
-# 1. 克隆仓库
+# 1. 克隆仓库 (或只下载 docker-compose.yml + .env.example)
 git clone https://github.com/yourusername/mynebula.git
 cd mynebula
 
 # 2. 配置环境变量
 cp .env.example .env
-# 编辑 .env 文件，务必填写 GITHUB_TOKEN 和 EMBEDDING_API_KEY
+# 编辑 .env 文件，务必填写 GITHUB_TOKEN、EMBEDDING_API_KEY、LLM_API_KEY
 
-# 3. 启动所有服务
-docker-compose up -d --build
+# 3. 启动所有服务 (自动拉取镜像、创建数据库和表)
+docker compose up -d
 ```
 
 访问：
-- **Web 界面**: [http://localhost:8000](http://localhost:8000) (默认端口)
-- **API 文档**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Web 界面**: [http://localhost:8000](http://localhost:8000) (端口由 `API_PORT` 配置)
+- **API 文档**: [http://localhost:8000/docs](http://localhost:8000/docs) (需 `DEBUG=true`)
+
+> 详细部署文档请查阅 [Docker 部署指南](doc/DOCKER_DEPLOY.md)。
 
 ### 方案 B：本地开发模式
 

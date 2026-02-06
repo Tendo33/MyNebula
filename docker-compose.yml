@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # ==================== Database ====================
   db:
@@ -24,46 +22,42 @@ services:
 
   # ==================== Backend API + Frontend ====================
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+    image: simonsun3/mynebula:latest
     container_name: mynebula-api
     environment:
-      # 强制内部端口为 8000，防止 .env 中的 API_PORT (宿主机端口) 影响容器内监听端口
+      # ---------- 内部固定配置 (勿修改) ----------
       - API_PORT=8000
-      - APP_NAME=${APP_NAME:-mynebula}
-      - APP_VERSION=${APP_VERSION:-0.1.0}
-      - DEBUG=${DEBUG:-true}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - LOG_FILE=${LOG_FILE:-logs/app.log}
-
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
+      - DATABASE_URL=
+
+      # ---------- 数据库凭证 ----------
       - DATABASE_USER=${DATABASE_USER:-mynebula}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD:-mynebula_secret}
       - DATABASE_NAME=${DATABASE_NAME:-mynebula}
-      # 确保清空 DATABASE_URL，防止 .env 中的本地连接字符串 (localhost) 覆盖上述配置
-      - DATABASE_URL=
 
+      # ---------- 应用配置 ----------
+      - APP_NAME=${APP_NAME:-mynebula}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+      # ---------- GitHub ----------
       - GITHUB_TOKEN=${GITHUB_TOKEN}
 
+      # ---------- Embedding 服务 ----------
       - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-large-zh-v1.5}
       - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-1024}
 
+      # ---------- LLM 服务 ----------
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
 
+      # ---------- 同步配置 ----------
       - SYNC_BATCH_SIZE=${SYNC_BATCH_SIZE:-100}
       - README_MAX_LENGTH=${README_MAX_LENGTH:-10000}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-
-    env_file:
-      - .env
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
