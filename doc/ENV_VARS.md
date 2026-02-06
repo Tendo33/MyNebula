@@ -10,7 +10,7 @@
    ```
 
 2. 编辑 `.env` 文件，至少配置以下必填项：
-   - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
+   - `GITHUB_TOKEN`
    - `EMBEDDING_API_KEY`
 
 ---
@@ -83,34 +83,19 @@ DATABASE_NAME=mynebula
 
 ## GitHub 配置 ⚠️ 必填
 
-### OAuth App 配置
-
 | 变量名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| `GITHUB_CLIENT_ID` | string | ✅ | OAuth App Client ID |
-| `GITHUB_CLIENT_SECRET` | string | ✅ | OAuth App Client Secret |
-| `GITHUB_REDIRECT_URI` | string | ❌ | 回调 URL，默认 `http://localhost:8000/api/auth/callback` |
+| `GITHUB_TOKEN` | string | ✅ | Personal Access Token (PAT) |
 
-### 开发测试配置（可选）
+### 获取 GitHub Token
 
-| 变量名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| `GITHUB_TOKEN` | string | ❌ | Personal Access Token（用于开发测试，跳过 OAuth） |
-
-### 创建 OAuth App
-
-1. 访问 https://github.com/settings/developers
-2. 点击 "New OAuth App"
-3. 填写信息：
-   - **Application name**: MyNebula
-   - **Homepage URL**: `http://localhost:3000`
-   - **Authorization callback URL**: `http://localhost:8000/api/auth/callback`
-4. 创建后复制 Client ID 和 Client Secret
+1. 访问 https://github.com/settings/tokens
+2. 生成新的 Token (Fine-grained 或 Classic)
+3. 确保勾选读取 Star 列表的权限
+4. 将 Token 填入 `.env`
 
 ```bash
-GITHUB_CLIENT_ID=Ov23liXXXXXXXXXXXXXX
-GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/callback
+GITHUB_TOKEN=your_pat_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ---
@@ -226,7 +211,6 @@ LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 | 变量名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `API_PORT` | integer | `8000` | 后端 API 端口映射 |
-| `FRONTEND_PORT` | integer | `3000` | 前端端口映射 |
 | `VITE_API_BASE_URL` | string | `http://localhost:8000` | 前端连接的 API 地址 |
 
 ---
@@ -253,10 +237,8 @@ DATABASE_USER=mynebula
 DATABASE_PASSWORD=mynebula_secret
 DATABASE_NAME=mynebula
 
-# ==================== GitHub OAuth ====================
-GITHUB_CLIENT_ID=your_client_id
-GITHUB_CLIENT_SECRET=your_client_secret
-GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/callback
+# ==================== GitHub Token ====================
+GITHUB_TOKEN=your_pat_xxxxxxxxxxxxxxxx
 
 # ==================== Embedding (OpenAI 兼容接口) ====================
 EMBEDDING_API_KEY=your_embedding_api_key
@@ -290,10 +272,8 @@ DATABASE_USER=mynebula
 DATABASE_PASSWORD=your_secure_database_password
 DATABASE_NAME=mynebula
 
-# ==================== GitHub OAuth ====================
-GITHUB_CLIENT_ID=your_production_client_id
-GITHUB_CLIENT_SECRET=your_production_client_secret
-GITHUB_REDIRECT_URI=https://your-domain.com/api/auth/callback
+# ==================== GitHub Token ====================
+GITHUB_TOKEN=your_production_pat
 
 # ==================== Embedding (OpenAI 兼容接口) ====================
 EMBEDDING_API_KEY=your_embedding_api_key
@@ -303,7 +283,6 @@ EMBEDDING_DIMENSIONS=1024
 
 # ==================== Docker Compose ====================
 API_PORT=8000
-FRONTEND_PORT=3000
 VITE_API_BASE_URL=https://your-domain.com
 ```
 

@@ -16,7 +16,7 @@
 
 ## ✨ Features
 
-- 🌐 **星云图谱 (Nebula Graph)**: 3D 可视化你的 Star 列表，相似项目自动聚类
+- 🌐 **星云图谱 (Nebula Graph)**: 2D 可视化你的 Star 列表，相似项目自动聚类
 - 🔍 **语义搜索 (Semantic Search)**: 自然语言查询，如"找一个轻量级的 Python 依赖管理工具"
 - 🤖 **AI 摘要 (AI Summary)**: 自动生成仓库的一句话总结
 - ⏰ **时间旅行 (Time Travel)**: 时间轴展示你的技术兴趣演变
@@ -48,8 +48,7 @@ docker-compose logs -f
 ```
 
 服务启动后：
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
+- **Web Interface**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs (开发模式)
 
 ### Option B: 本地开发模式
@@ -59,7 +58,7 @@ docker-compose logs -f
 - Python 3.10+
 - Node.js 20+
 - Docker (仅用于 PostgreSQL)
-- GitHub OAuth App
+- GitHub Personal Access Token
 
 #### 1. 安装依赖
 
@@ -106,7 +105,8 @@ cd frontend && npm run dev
 ```
 
 访问：
-- Frontend: http://localhost:5173
+- Web Interface (Prod-like): http://localhost:8000
+- Web Interface (Dev): http://localhost:5173
 - API Docs: http://localhost:8000/docs
 
 ---
@@ -119,24 +119,20 @@ cd frontend && npm run dev
 
 | 变量组 | 必填 | 说明 |
 |--------|------|------|
-| `GITHUB_*` | ✅ | GitHub OAuth 认证 |
+| `GITHUB_TOKEN` | ✅ | GitHub Personal Access Token |
 | `EMBEDDING_*` | ✅ | Embedding 服务配置 |
 | `DATABASE_*` | ❌ | 数据库配置（有默认值） |
 | `LLM_*` | ❌ | LLM 服务（用于 AI 摘要） |
 
-### GitHub OAuth 配置
+### GitHub Token 配置
 
-1. 访问 https://github.com/settings/developers
-2. 创建新的 OAuth App
-3. 设置 Callback URL:
-   - 开发环境: `http://localhost:8000/api/auth/callback`
-   - 生产环境: `https://your-domain.com/api/auth/callback`
-4. 将 Client ID 和 Client Secret 填入 `.env`
+1. 访问 https://github.com/settings/tokens
+2. 生成新的 Token (Fine-grained 或 Classic)
+3. 确保勾选读取 Star 列表的权限
+4. 将 Token 填入 `.env`
 
 ```bash
-GITHUB_CLIENT_ID=your_client_id
-GITHUB_CLIENT_SECRET=your_client_secret
-GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/callback
+GITHUB_TOKEN=your_github_pat...
 ```
 
 ### Embedding 提供商
@@ -167,8 +163,8 @@ EMBEDDING_DIMENSIONS=1024
 │                     MyNebula Architecture                        │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌──────────────────┐         ┌──────────────────┐              │
-│  │  React Frontend  │  HTTP   │  FastAPI Backend │              │
-│  │  (3D Force Graph)│◄───────►│                  │              │
+│  │  React Frontend  │ Served  │  FastAPI Backend │              │
+│  │  (SPA)           │◄───────►│                  │              │
 │  └──────────────────┘         └────────┬─────────┘              │
 │                                        │                         │
 │         ┌──────────────────────────────┼──────────────┐         │
@@ -186,7 +182,6 @@ EMBEDDING_DIMENSIONS=1024
 mynebula/
 ├── src/nebula/
 │   ├── api/                # FastAPI routes
-│   │   ├── auth.py         # GitHub OAuth
 │   │   ├── repos.py        # Repository CRUD & search
 │   │   ├── graph.py        # Graph visualization data
 │   │   └── sync.py         # Star synchronization
@@ -201,7 +196,7 @@ mynebula/
 │   ├── schemas/            # Pydantic schemas
 │   ├── utils/              # Utility functions
 │   └── main.py             # Application entry
-├── frontend/               # React frontend (coming soon)
+├── frontend/               # React frontend
 ├── alembic/                # Database migrations
 ├── docker-compose.yml      # Docker configuration
 └── pyproject.toml          # Project dependencies
@@ -245,7 +240,7 @@ uv run alembic downgrade -1
 
 ### Phase 1: 基础架构 ✅
 - [x] PostgreSQL + pgvector 向量数据库
-- [x] GitHub OAuth 认证流程
+- [x] GitHub Token 接入
 - [x] 多提供商 Embedding 服务
 - [x] Star 列表同步 API
 
@@ -262,7 +257,7 @@ uv run alembic downgrade -1
 - [x] AI 摘要生成
 
 ### Phase 4: 前端可视化 ✅
-- [x] React + Three.js 3D 力导图
+- [x] React + 2D 力导图
 - [x] 节点交互 (悬停/点击)
 - [x] 语义搜索 UI
 - [x] 时间轴滑块
@@ -272,6 +267,7 @@ uv run alembic downgrade -1
 - [x] Docker Compose 配置
 - [x] 部署文档
 - [x] 环境变量说明
+- [x] 前端后端集成部署
 
 ### Future Enhancements
 - [ ] 多用户支持
