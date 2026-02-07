@@ -16,14 +16,19 @@ export const Sidebar = () => {
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-60 bg-bg-sidebar border-r border-border-light flex flex-col z-50">
       {/* Header / Brand */}
-      <div className="flex items-center gap-2 px-4 h-12 mt-2 cursor-default select-none transition-colors hover:bg-bg-hover mx-2 rounded-sm mb-2">
+      <a
+        href="https://github.com/Tendo33/MyNebula"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 px-4 h-12 mt-2 cursor-pointer select-none transition-colors hover:bg-bg-hover mx-2 rounded-sm mb-2"
+      >
         <div className="w-5 h-5 flex items-center justify-center text-text-main">
            <Github className="w-4 h-4" />
         </div>
         <span className="text-sm font-semibold text-text-main truncate">
           {t('app.title')}
         </span>
-      </div>
+      </a>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 space-y-1">
