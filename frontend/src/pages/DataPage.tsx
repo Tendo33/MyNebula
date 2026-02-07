@@ -88,8 +88,9 @@ interface ClusterBadgeProps {
 }
 
 const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) => {
+  const { t } = useTranslation();
   if (!cluster) {
-    return <span className="text-text-dim italic text-xs">Unclustered</span>;
+    return <span className="text-text-dim italic text-xs">{t('data.unclustered')}</span>;
   }
 
   return (
@@ -243,8 +244,7 @@ const DataPage = () => {
   // Format date
   const formatDate = (dateStr: string | undefined): string => {
     if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   return (
@@ -308,7 +308,7 @@ const DataPage = () => {
                     <div className="flex items-center gap-2">
                        <div className="flex items-center gap-1 text-xs text-text-muted">
                         <Calendar className="w-4 h-4" />
-                        <span>Filter:</span>
+                        <span>{t('data.filter_label')}</span>
                       </div>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-action-primary/10 text-action-primary ring-1 ring-inset ring-action-primary/20">
                         {monthFilter}
@@ -444,7 +444,7 @@ const DataPage = () => {
                           </td>
                           <td className="px-4 py-3 max-w-md">
                             <p className="line-clamp-2 text-sm text-text-muted" title={repo.ai_summary || repo.description}>
-                                {repo.ai_summary || repo.description || <span className="italic text-text-dim">No summary</span>}
+                                {repo.ai_summary || repo.description || <span className="italic text-text-dim">{t('data.no_summary')}</span>}
                             </p>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-center">
@@ -473,7 +473,7 @@ const DataPage = () => {
                           </td>
                           <td className="px-4 py-3 max-w-md hidden">
                             <p className="truncate text-text-muted text-xs">
-                              {repo.description || <span className="italic text-text-dim">No description</span>}
+                              {repo.description || <span className="italic text-text-dim">{t('data.no_description')}</span>}
                             </p>
                           </td>
                         </tr>

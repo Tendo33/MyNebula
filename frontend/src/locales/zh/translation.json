@@ -22,7 +22,11 @@
     "clear_filters": "清除筛选",
     "clear_all_filters": "清除所有筛选",
     "show_all": "显示全部",
-    "view_all": "查看全部"
+    "view_all": "查看全部",
+    "error": "错误",
+    "cancel": "取消",
+    "confirm": "确认",
+    "n_a": "暂无"
   },
   "dashboard": {
     "title": "宇宙探索器",
@@ -51,7 +55,8 @@
     "top_12": "Top 12",
     "no_data": "暂无数据",
     "no_activity": "暂无活动数据",
-    "no_topics": "暂无标签数据"
+    "no_topics": "暂无标签数据",
+    "repos_count": "{{count}} 个仓库"
   },
   "graph": {
     "clusters": "聚类",
@@ -60,7 +65,11 @@
     "showing_repos": "显示 {{count}} 个仓库",
     "loading_data": "正在加载图谱数据...",
     "empty_title": "暂无数据",
-    "empty_hint": "同步你的 GitHub 星标开始探索"
+    "empty_hint": "同步你的 GitHub 星标开始探索",
+    "max_clusters": "最大簇数（越小越粗）",
+    "recluster": "重新聚类",
+    "reclustering": "聚类中...",
+    "recluster_hint": "用当前设置重新聚类"
   },
   "data": {
     "repository": "仓库",
@@ -76,18 +85,52 @@
     "no_results": "未找到结果",
     "no_data": "暂无数据",
     "summary": "AI 摘要",
-    "last_commit": "最后提交"
+    "last_commit": "最后提交",
+    "filter_label": "筛选:",
+    "unclustered": "未分类",
+    "no_summary": "暂无摘要",
+    "no_description": "暂无描述"
   },
   "settings": {
     "title": "设置",
     "language": "语言",
+    "language_desc": "更改界面显示语言",
     "appearance": "外观",
     "hq_rendering": "高质量渲染",
+    "hq_rendering_desc": "启用高质量视觉效果",
     "show_trajectories": "显示轨迹",
+    "show_trajectories_desc": "显示节点之间的连接路径",
     "connection": "连接",
     "api_endpoint": "API 端点",
     "github_token_status": "GitHub 令牌状态",
-    "connected": "已连接"
+    "connected": "已连接",
+    "scheduled_sync": "定时同步",
+    "enable_scheduled_sync": "启用定时同步",
+    "enable_scheduled_sync_desc": "每天自动增量更新 Star 数据",
+    "execution_time": "执行时间",
+    "last_run": "上次运行",
+    "next_run": "下次运行",
+    "data_management": "数据管理",
+    "repo_stats": "仓库统计",
+    "total_repos": "总仓库数",
+    "synced": "已同步",
+    "vectorized": "已向量化",
+    "summarized": "已生成摘要",
+    "full_refresh": "全量刷新",
+    "full_refresh_desc": "重新获取所有 Star 数据，重新生成 AI 摘要和向量嵌入。这是一个耗时操作，会消耗 API 额度。",
+    "execute_full_refresh": "执行全量刷新",
+    "refreshing": "处理中...",
+    "confirm_full_refresh_title": "确认全量刷新?",
+    "confirm_full_refresh_desc": "此操作将重置并重新处理所有 {{count}} 个仓库的数据，包括：",
+    "confirm_step_fetch": "重新从 GitHub 获取所有 Star 数据",
+    "confirm_step_summarize": "重新生成所有 AI 摘要和标签",
+    "confirm_step_embed": "重新计算所有向量嵌入",
+    "confirm_step_cluster": "重新执行聚类分析",
+    "confirm_warning": "⚠️ 这可能需要较长时间并消耗大量 API 额度",
+    "load_schedule_error": "加载调度数据失败",
+    "update_schedule_error": "更新调度设置失败",
+    "update_time_error": "更新调度时间失败",
+    "full_refresh_error": "启动全量刷新失败"
   },
   "repoDetails": {
     "close": "关闭",
@@ -97,7 +140,8 @@
     "unknown": "未知",
     "starred_at": "收藏于",
     "ai_summary": "AI 摘要",
-    "view_on_github": "在 GitHub 上查看"
+    "view_on_github": "在 GitHub 上查看",
+    "no_ai_summary": "暂无 AI 摘要,请同步数据以生成智能洞察"
   },
   "errors": {
     "sync_failed": "同步失败，请检查是否已配置 GITHUB_TOKEN",
@@ -112,6 +156,28 @@
     "allDone": "所有任务已成功完成",
     "steps": "步骤",
     "overallProgress": "总进度",
-    "viewResults": "查看结果"
+    "viewResults": "查看结果",
+    "step_stars_label": "获取 GitHub 星标",
+    "step_stars_desc": "同步已收藏的仓库",
+    "step_summaries_label": "生成 AI 摘要",
+    "step_summaries_desc": "创建智能描述和标签",
+    "step_embeddings_label": "计算数据向量",
+    "step_embeddings_desc": "构建语义表示",
+    "step_clustering_label": "执行聚类分析",
+    "step_clustering_desc": "按知识领域进行组织"
+  },
+  "time": {
+    "never_run": "从未运行",
+    "not_set": "未设置",
+    "just_now": "刚刚",
+    "minutes_ago": "{{count}} 分钟前",
+    "hours_ago": "{{count}} 小时前",
+    "days_ago": "{{count}} 天前",
+    "status": {
+      "success": "成功",
+      "failed": "失败",
+      "running": "运行中",
+      "unknown": "未知"
+    }
   }
 }

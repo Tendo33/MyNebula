@@ -85,19 +85,20 @@ export const triggerFullRefresh = async (): Promise<FullRefreshResponse> => {
  * 格式化下次运行时间为用户友好的字符串
  * @param nextRunAt ISO 时间字符串
  * @param timezone 用户时区
+ * @param t 翻译函数
  */
-export const formatNextRunTime = (nextRunAt: string | null, timezone: string): string => {
-	if (!nextRunAt) return '未设置';
+export const formatNextRunTime = (nextRunAt: string | null, timezone: string, t: any): string => {
+	if (!nextRunAt) return t("time.not_set");
 
 	try {
 		const date = new Date(nextRunAt);
-		return date.toLocaleString('zh-CN', {
+		return date.toLocaleString(undefined, {
 			timeZone: timezone,
-			year: 'numeric',
-			month: '2-digit',
-			day: '2-digit',
-			hour: '2-digit',
-			minute: '2-digit',
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
 		});
 	} catch {
 		return nextRunAt;
@@ -107,9 +108,10 @@ export const formatNextRunTime = (nextRunAt: string | null, timezone: string): s
 /**
  * 格式化上次运行时间
  * @param lastRunAt ISO 时间字符串
+ * @param t 翻译函数
  */
-export const formatLastRunTime = (lastRunAt: string | null): string => {
-	if (!lastRunAt) return '从未运行';
+export const formatLastRunTime = (lastRunAt: string | null, t: any): string => {
+	if (!lastRunAt) return t("time.never_run");
 
 	try {
 		const date = new Date(lastRunAt);
@@ -119,12 +121,12 @@ export const formatLastRunTime = (lastRunAt: string | null): string => {
 		const diffDays = Math.floor(diffHours / 24);
 
 		if (diffDays > 0) {
-			return `${diffDays} 天前`;
+			return t("time.days_ago", { count: diffDays });
 		} else if (diffHours > 0) {
-			return `${diffHours} 小时前`;
+			return t("time.hours_ago", { count: diffHours });
 		} else {
 			const diffMinutes = Math.floor(diffMs / (1000 * 60));
-			return diffMinutes > 0 ? `${diffMinutes} 分钟前` : '刚刚';
+			return diffMinutes > 0 ? t("time.minutes_ago", { count: diffMinutes }) : t("time.just_now");
 		}
 	} catch {
 		return lastRunAt;
@@ -134,16 +136,17 @@ export const formatLastRunTime = (lastRunAt: string | null): string => {
 /**
  * 获取运行状态的显示文本和颜色
  * @param status 运行状态
+ * @param t 翻译函数
  */
-export const getStatusDisplay = (status: string | null): { text: string; color: string } => {
+export const getStatusDisplay = (status: string | null, t: any): { text: string; color: string } => {
 	switch (status) {
-		case 'success':
-			return { text: '成功', color: 'text-green-600' };
-		case 'failed':
-			return { text: '失败', color: 'text-red-600' };
-		case 'running':
-			return { text: '运行中', color: 'text-blue-600' };
+		case "success":
+			return { text: t("time.status.success"), color: "text-green-600" };
+		case "failed":
+			return { text: t("time.status.failed"), color: "text-red-600" };
+		case "running":
+			return { text: t("time.status.running"), color: "text-blue-600" };
 		default:
-			return { text: '未知', color: 'text-gray-500' };
+			return { text: t("time.status.unknown"), color: "text-gray-500" };
 	}
 };

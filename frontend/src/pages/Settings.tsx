@@ -43,7 +43,7 @@ const Settings = () => {
       setSchedule(scheduleData);
       setSyncInfo(infoData);
     } catch (err) {
-      setError('加载调度数据失败');
+      setError(t('settings.load_schedule_error'));
       console.error('Failed to load schedule data:', err);
     }
   }, []);
@@ -66,7 +66,7 @@ const Settings = () => {
       const updated = await updateSchedule(newConfig);
       setSchedule(updated);
     } catch (err) {
-      setError('更新调度设置失败');
+      setError(t('settings.update_schedule_error'));
       console.error('Failed to update schedule:', err);
     } finally {
       setScheduleLoading(false);
@@ -87,7 +87,7 @@ const Settings = () => {
       const updated = await updateSchedule(newConfig);
       setSchedule(updated);
     } catch (err) {
-      setError('更新调度时间失败');
+      setError(t('settings.update_time_error'));
       console.error('Failed to update schedule time:', err);
     } finally {
       setScheduleLoading(false);
@@ -103,7 +103,7 @@ const Settings = () => {
       // Reload data to show updated status
       await loadScheduleData();
     } catch (err) {
-      setError('启动全量刷新失败');
+      setError(t('settings.full_refresh_error'));
       console.error('Failed to trigger full refresh:', err);
     } finally {
       setRefreshLoading(false);
@@ -139,14 +139,14 @@ const Settings = () => {
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-sm font-medium text-text-main">{t('settings.language')}</span>
-                                <span className="text-xs text-text-muted">Change the language of the interface</span>
+                                <span className="text-xs text-text-muted">{t('settings.language_desc')}</span>
                             </div>
                         </div>
                         <button
                             onClick={toggleLanguage}
                             className="h-8 px-3 rounded-md text-sm font-medium border border-border-light bg-white hover:bg-bg-hover text-text-main transition-colors min-w-[80px] text-center shadow-sm"
                         >
-                            {i18n.language === 'en' ? 'English' : '中文'}
+                            {i18n.language === 'en' ? 'English' : '简体中文'}
                         </button>
                     </div>
 
@@ -161,7 +161,7 @@ const Settings = () => {
                             </div>
                              <div className="flex flex-col">
                                 <span className="text-sm font-medium text-text-main">{t('settings.hq_rendering')}</span>
-                                <span className="text-xs text-text-muted">Enable high-quality visual effects</span>
+                                <span className="text-xs text-text-muted">{t('settings.hq_rendering_desc')}</span>
                             </div>
                         </div>
                         <button
@@ -188,7 +188,7 @@ const Settings = () => {
                             </div>
                              <div className="flex flex-col">
                                 <span className="text-sm font-medium text-text-main">{t('settings.show_trajectories')}</span>
-                                <span className="text-xs text-text-muted">Show connection paths between nodes</span>
+                                <span className="text-xs text-text-muted">{t('settings.show_trajectories_desc')}</span>
                             </div>
                         </div>
                          <button
@@ -242,7 +242,7 @@ const Settings = () => {
 
             {/* Scheduled Sync */}
             <section>
-                <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">定时同步</h2>
+                <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">{t('settings.scheduled_sync')}</h2>
 
                 {error && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex items-center gap-2">
@@ -265,8 +265,8 @@ const Settings = () => {
                                 <Clock className="w-5 h-5 text-text-muted group-hover:text-text-main" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-sm font-medium text-text-main">启用定时同步</span>
-                                <span className="text-xs text-text-muted">每天自动增量更新 Star 数据</span>
+                                <span className="text-sm font-medium text-text-main">{t('settings.enable_scheduled_sync')}</span>
+                                <span className="text-xs text-text-muted">{t('settings.enable_scheduled_sync_desc')}</span>
                             </div>
                         </div>
                         <button
@@ -293,7 +293,7 @@ const Settings = () => {
                       <div className="p-3 pl-14">
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2">
-                            <label className="text-sm text-text-muted">执行时间:</label>
+                            <label className="text-sm text-text-muted">{t('settings.execution_time')}:</label>
                             <select
                               value={schedule.schedule_hour}
                               onChange={(e) => handleTimeChange(Number(e.target.value), schedule.schedule_minute)}
@@ -324,21 +324,21 @@ const Settings = () => {
                     {/* Schedule Status */}
                     <div className="p-3 pl-14 space-y-1">
                       <div className="flex items-center gap-2 text-xs text-text-muted">
-                        <span>上次运行:</span>
+                        <span>{t('settings.last_run')}:</span>
                         <span className="text-text-main">
-                          {schedule ? formatLastRunTime(schedule.last_run_at) : '加载中...'}
+                          {schedule ? formatLastRunTime(schedule.last_run_at, t) : t('common.loading')}
                         </span>
                         {schedule?.last_run_status && (
-                          <span className={clsx("font-medium", getStatusDisplay(schedule.last_run_status).color)}>
-                            ({getStatusDisplay(schedule.last_run_status).text})
+                          <span className={clsx("font-medium", getStatusDisplay(schedule.last_run_status, t).color)}>
+                            ({getStatusDisplay(schedule.last_run_status, t).text})
                           </span>
                         )}
                       </div>
                       {schedule?.is_enabled && schedule.next_run_at && (
                         <div className="flex items-center gap-2 text-xs text-text-muted">
-                          <span>下次运行:</span>
+                          <span>{t('settings.next_run')}:</span>
                           <span className="text-text-main">
-                            {formatNextRunTime(schedule.next_run_at, schedule.timezone)}
+                            {formatNextRunTime(schedule.next_run_at, schedule.timezone, t)}
                           </span>
                         </div>
                       )}
@@ -350,35 +350,35 @@ const Settings = () => {
 
             {/* Data Management */}
             <section>
-                <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">数据管理</h2>
+                <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">{t('settings.data_management')}</h2>
                 <div className="space-y-2">
                     {/* Repository Statistics */}
                     <div className="p-3">
                         <div className="flex items-center gap-2 mb-3">
                             <Database className="w-4 h-4 text-text-muted" />
-                            <label className="text-sm font-medium text-text-main">仓库统计</label>
+                            <label className="text-sm font-medium text-text-main">{t('settings.repo_stats')}</label>
                         </div>
                         <div className="grid grid-cols-2 gap-4 bg-bg-sidebar/50 rounded-md p-4">
                           <div>
                             <div className="text-2xl font-semibold text-text-main">{syncInfo?.total_repos ?? '-'}</div>
-                            <div className="text-xs text-text-muted">总仓库数</div>
+                            <div className="text-xs text-text-muted">{t('settings.total_repos')}</div>
                           </div>
                           <div>
                             <div className="text-2xl font-semibold text-text-main">{syncInfo?.synced_repos ?? '-'}</div>
-                            <div className="text-xs text-text-muted">已同步</div>
+                            <div className="text-xs text-text-muted">{t('settings.synced')}</div>
                           </div>
                           <div>
                             <div className="text-2xl font-semibold text-text-main">{syncInfo?.embedded_repos ?? '-'}</div>
-                            <div className="text-xs text-text-muted">已向量化</div>
+                            <div className="text-xs text-text-muted">{t('settings.vectorized')}</div>
                           </div>
                           <div>
                             <div className="text-2xl font-semibold text-text-main">{syncInfo?.summarized_repos ?? '-'}</div>
-                            <div className="text-xs text-text-muted">已生成摘要</div>
+                            <div className="text-xs text-text-muted">{t('settings.summarized')}</div>
                           </div>
                         </div>
                         {syncInfo?.last_sync_at && (
                           <div className="mt-2 text-xs text-text-muted">
-                            上次同步: {new Date(syncInfo.last_sync_at).toLocaleString('zh-CN')}
+                            {t('settings.last_run')}: {new Date(syncInfo.last_sync_at).toLocaleString()}
                           </div>
                         )}
                     </div>
@@ -387,10 +387,10 @@ const Settings = () => {
                     <div className="p-3">
                         <div className="flex items-center gap-2 mb-3">
                             <RefreshCw className="w-4 h-4 text-text-muted" />
-                            <label className="text-sm font-medium text-text-main">全量刷新</label>
+                            <label className="text-sm font-medium text-text-main">{t('settings.full_refresh')}</label>
                         </div>
                         <p className="text-xs text-text-muted mb-3">
-                          重新获取所有 Star 数据，重新生成 AI 摘要和向量嵌入。这是一个耗时操作，会消耗 API 额度。
+                            {t('settings.full_refresh_desc')}
                         </p>
                         <button
                           onClick={() => setShowConfirmDialog(true)}
@@ -404,12 +404,12 @@ const Settings = () => {
                           {refreshLoading ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              处理中...
+                              {t('settings.refreshing')}
                             </>
                           ) : (
                             <>
                               <RefreshCw className="w-4 h-4" />
-                              执行全量刷新
+                              {t('settings.execute_full_refresh')}
                             </>
                           )}
                         </button>
@@ -426,32 +426,32 @@ const Settings = () => {
                 <div className="p-2 bg-red-100 rounded-full">
                   <AlertTriangle className="w-6 h-6 text-red-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">确认全量刷新?</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t('settings.confirm_full_refresh_title')}</h3>
               </div>
               <p className="text-sm text-gray-600 mb-6">
-                此操作将重置并重新处理所有 {syncInfo?.total_repos ?? 0} 个仓库的数据，包括：
+                {t('settings.confirm_full_refresh_desc', { count: syncInfo?.total_repos ?? 0 })}
               </p>
               <ul className="text-sm text-gray-600 mb-6 space-y-1 list-disc list-inside">
-                <li>重新从 GitHub 获取所有 Star 数据</li>
-                <li>重新生成所有 AI 摘要和标签</li>
-                <li>重新计算所有向量嵌入</li>
-                <li>重新执行聚类分析</li>
+                <li>{t('settings.confirm_step_fetch')}</li>
+                <li>{t('settings.confirm_step_summarize')}</li>
+                <li>{t('settings.confirm_step_embed')}</li>
+                <li>{t('settings.confirm_step_cluster')}</li>
               </ul>
               <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mb-6">
-                ⚠️ 这可能需要较长时间并消耗大量 API 额度
+                {t('settings.confirm_warning')}
               </p>
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowConfirmDialog(false)}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                 >
-                  取消
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleFullRefresh}
                   className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
                 >
-                  确认刷新
+                  {t('settings.execute_full_refresh')}
                 </button>
               </div>
             </div>

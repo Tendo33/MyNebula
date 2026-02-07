@@ -93,8 +93,10 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
   </div>
 );
 
-const LanguageBar: React.FC<LanguageBarProps> = ({ language, count, percentage, color }) => (
-  <div className="group">
+const LanguageBar: React.FC<LanguageBarProps> = ({ language, count, percentage, color }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="group">
     <div className="flex items-center justify-between mb-1.5">
       <div className="flex items-center gap-2">
         <div
@@ -103,7 +105,7 @@ const LanguageBar: React.FC<LanguageBarProps> = ({ language, count, percentage, 
         />
         <span className="text-sm font-medium text-text-main">{language}</span>
       </div>
-      <span className="text-xs text-text-muted tabular-nums">{count} repos</span>
+      <span className="text-xs text-text-muted tabular-nums">{t('dashboard.repos_count', { count })}</span>
     </div>
     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
       <div
@@ -116,36 +118,40 @@ const LanguageBar: React.FC<LanguageBarProps> = ({ language, count, percentage, 
     </div>
   </div>
 );
+};
 
-const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywords, onClick }) => (
-  <div
-    className="p-4 rounded-lg border border-border-light bg-white hover:shadow-md hover:border-gray-300 transition-all cursor-pointer"
-    onClick={onClick}
-  >
-    <div className="flex items-start gap-3">
-      <div
-        className="w-4 h-4 rounded-full mt-0.5 ring-1 ring-black/10 flex-shrink-0"
-        style={{ backgroundColor: color }}
-      />
-      <div className="flex-1 min-w-0">
-        <h4 className="text-sm font-semibold text-text-main truncate">{name}</h4>
-        <p className="text-xs text-text-muted mt-0.5">{repoCount} repositories</p>
-        {keywords.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {keywords.slice(0, 4).map((keyword, idx) => (
-              <span
-                key={idx}
-                className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded"
-              >
-                {keyword}
-              </span>
-            ))}
-          </div>
-        )}
+const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywords, onClick }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="p-4 rounded-lg border border-border-light bg-white hover:shadow-md hover:border-gray-300 transition-all cursor-pointer"
+      onClick={onClick}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="w-4 h-4 rounded-full mt-0.5 ring-1 ring-black/10 flex-shrink-0"
+          style={{ backgroundColor: color }}
+        />
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-semibold text-text-main truncate">{name}</h4>
+          <p className="text-xs text-text-muted mt-0.5">{t('common.repositories', { count: repoCount })}</p>
+          {keywords.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {keywords.slice(0, 4).map((keyword, idx) => (
+                <span
+                  key={idx}
+                  className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded"
+                >
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ============================================================================
 // Main Component
@@ -218,7 +224,7 @@ const Dashboard = () => {
       totalClusters,
       totalEdges,
       topLanguages,
-      topLanguage: topLanguage ? `${topLanguage.language} (${topLanguage.count})` : 'N/A',
+      topLanguage: topLanguage ? `${topLanguage.language} (${topLanguage.count})` : t('common.n_a'),
       topClusters,
       topTopics,
       recentActivity,
@@ -364,7 +370,7 @@ const Dashboard = () => {
                           {/* Hover tooltip */}
                           <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
                             <div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                              <div className="font-medium">{data.count} repos</div>
+                              <div className="font-medium">{t('dashboard.repos_count', { count: data.count })}</div>
                               <div className="text-gray-300">{data.date}</div>
                             </div>
                             <div className="w-2 h-2 bg-gray-800 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
@@ -448,45 +454,45 @@ const Dashboard = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Clusters Grid */}
+            {stats?.topClusters && stats.topClusters.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-text-main">
+                    {t('dashboard.top_clusters')}
+                  </h3>
+                  <button
+                    onClick={() => navigate('/graph')}
+                    className="text-xs text-action-primary hover:text-action-hover transition-colors flex items-center gap-1"
+                  >
+                    {t('common.view_all')}
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {stats.topClusters.map((cluster) => (
+                    <ClusterCard
+                      key={cluster.id}
+                      name={cluster.name || `Cluster ${cluster.id}`}
+                      color={cluster.color}
+                      repoCount={cluster.repo_count}
+                      keywords={cluster.keywords || []}
+                      onClick={() => handleClusterClick(cluster.id)}
+                    />
+                  ))}
                 </div>
               </div>
-
-              {/* Clusters Grid */}
-              {stats?.topClusters && stats.topClusters.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-text-main">
-                      {t('dashboard.top_clusters')}
-                    </h3>
-                    <button
-                      onClick={() => navigate('/graph')}
-                      className="text-xs text-action-primary hover:text-action-hover transition-colors flex items-center gap-1"
-                    >
-                      {t('common.view_all')}
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {stats.topClusters.map((cluster) => (
-                      <ClusterCard
-                        key={cluster.id}
-                        name={cluster.name || `Cluster ${cluster.id}`}
-                        color={cluster.color}
-                        repoCount={cluster.repo_count}
-                        keywords={cluster.keywords || []}
-                        onClick={() => handleClusterClick(cluster.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
-  );
+            )}
+          </div>
+        )}
+      </section>
+    </main>
+  </div>
+);
 };
 
 export default Dashboard;

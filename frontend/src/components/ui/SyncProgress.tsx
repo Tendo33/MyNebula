@@ -78,10 +78,11 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
   isOpen,
   onClose,
   steps,
-  title = 'Syncing Data',
+  title,
   canClose = false,
 }) => {
   const { t } = useTranslation();
+  const displayTitle = title || t('sync.title', 'Syncing Data');
 
   // Calculate overall progress
   const completedSteps = steps.filter(s => s.status === 'completed').length;
@@ -123,7 +124,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
                   ? t('sync.completed', 'Sync Completed')
                   : hasFailed
                   ? t('sync.failed', 'Sync Failed')
-                  : title}
+                  : displayTitle}
               </h3>
               <p className="text-sm text-text-muted">
                 {allCompleted

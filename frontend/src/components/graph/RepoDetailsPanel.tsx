@@ -20,6 +20,7 @@ type RelatedTab = 'similar' | 'sameTags' | 'sameLang';
 
 /** Related repository item component */
 const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchReason }) => {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onClick}
@@ -51,7 +52,7 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
           )}
         </div>
         <p className="text-xs text-text-muted truncate mt-0.5">
-          {repo.description || repo.ai_summary || 'No description'}
+          {repo.description || repo.ai_summary || t('data.no_description')}
         </p>
         {matchReason && (
           <span className="text-[10px] text-purple-600 mt-0.5">{matchReason}</span>
@@ -164,7 +165,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                 </div>
                 <p className="text-xs text-text-dim">{node.owner}</p>
                 <p className="text-sm text-text-muted leading-relaxed mt-1">
-                {node.description || 'No description available'}
+                {node.description || t('repoDetails.no_description')}
                 </p>
             </div>
         </div>
@@ -298,7 +299,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             </div>
             <div className="bg-bg-sidebar p-3 rounded-md border border-border-light/50">
                  <p className="text-sm text-text-main leading-relaxed">
-                    {node.ai_summary || "No AI summary available for this repository yet. Sync data to generate insights."}
+                    {node.ai_summary || t('repoDetails.no_ai_summary')}
                 </p>
             </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
@@ -8,7 +8,7 @@ import ClusterPanel from '../components/graph/ClusterPanel';
 import StarListPanel from '../components/graph/StarListPanel';
 import { SearchInput } from '../components/ui/SearchInput';
 import { RepoDetailsPanel } from '../components/graph/RepoDetailsPanel';
-import { SyncProgress, SyncStep } from '../components/ui/SyncProgress';
+import { SyncProgress, SyncStep, SyncStepStatus } from '../components/ui/SyncProgress';
 import { startStarSync, getSyncStatus, startEmbedding, startClustering, startSummaries } from '../api/sync';
 import { useGraph } from '../contexts/GraphContext';
 import { Loader2, Filter, X } from 'lucide-react';
@@ -60,12 +60,21 @@ const GraphPage = () => {
 
   // Sync progress state
   const [showSyncProgress, setShowSyncProgress] = useState(false);
-  const [syncSteps, setSyncSteps] = useState<SyncStep[]>([
-    { id: 'stars', label: 'Fetching GitHub Stars', description: 'Syncing your starred repositories', status: 'pending' },
-    { id: 'summaries', label: 'Generating AI Summaries', description: 'Creating intelligent descriptions and tags', status: 'pending' },
-    { id: 'embeddings', label: 'Computing Embeddings', description: 'Building semantic representations', status: 'pending' },
-    { id: 'clustering', label: 'Clustering Repositories', description: 'Organizing into knowledge groups', status: 'pending' },
+  const [syncSteps, setSyncSteps] = useState<{id: string, status: SyncStepStatus, progress?: number, error?: string}[]>([
+    { id: 'stars', status: 'pending' },
+    { id: 'summaries', status: 'pending' },
+    { id: 'embeddings', status: 'pending' },
+    { id: 'clustering', status: 'pending' },
   ]);
+
+  // Compute translated steps for rendering
+  const translatedSteps = useMemo(() => {
+    return syncSteps.map(step => ({
+      ...step,
+      label: t(`sync.step_${step.id}_label`),
+      description: t(`sync.step_${step.id}_desc`),
+    }));
+  }, [syncSteps, t]);
 
   // Close details panel
   const handleCloseDetails = useCallback(() => {
@@ -110,10 +119,10 @@ const GraphPage = () => {
   // Reset all steps
   const resetSteps = () => {
     setSyncSteps([
-      { id: 'stars', label: 'Fetching GitHub Stars', description: 'Syncing your starred repositories', status: 'pending' },
-      { id: 'summaries', label: 'Generating AI Summaries', description: 'Creating intelligent descriptions and tags', status: 'pending' },
-      { id: 'embeddings', label: 'Computing Embeddings', description: 'Building semantic representations', status: 'pending' },
-      { id: 'clustering', label: 'Clustering Repositories', description: 'Organizing into knowledge groups', status: 'pending' },
+      { id: 'stars', status: 'pending' },
+      { id: 'summaries', status: 'pending' },
+      { id: 'embeddings', status: 'pending' },
+      { id: 'clustering', status: 'pending' },
     ]);
   };
 
@@ -130,7 +139,7 @@ const GraphPage = () => {
 
       const starsSuccess = await waitForTaskComplete(starsResult.task_id);
       if (!starsSuccess) {
-        updateStepStatus('stars', 'failed', 'Failed to sync GitHub stars');
+        updateStepStatus('stars', 'failed', t('errors.sync_stars_failed'));
         throw new Error(t('errors.sync_stars_failed'));
       }
       updateStepStatus('stars', 'completed');
@@ -154,7 +163,7 @@ const GraphPage = () => {
 
       const embeddingSuccess = await waitForTaskComplete(embeddingResult.task_id);
       if (!embeddingSuccess) {
-        updateStepStatus('embeddings', 'failed', 'Failed to compute embeddings');
+        updateStepStatus('embeddings', 'failed', t('errors.embedding_failed'));
         throw new Error(t('errors.embedding_failed'));
       }
       updateStepStatus('embeddings', 'completed');
@@ -165,7 +174,7 @@ const GraphPage = () => {
 
       const clusterSuccess = await waitForTaskComplete(clusterResult.task_id);
       if (!clusterSuccess) {
-        updateStepStatus('clustering', 'failed', 'Failed to cluster repositories');
+        updateStepStatus('clustering', 'failed', t('errors.clustering_failed'));
         throw new Error(t('errors.clustering_failed'));
       }
       updateStepStatus('clustering', 'completed');
@@ -315,7 +324,7 @@ const GraphPage = () => {
       <SyncProgress
         isOpen={showSyncProgress}
         onClose={handleSyncProgressClose}
-        steps={syncSteps}
+        steps={translatedSteps}
         title={t('sync.title', 'Syncing Data')}
         canClose={!syncing}
       />

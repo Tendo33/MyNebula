@@ -231,7 +231,7 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-muted">
-                  最大簇数（越小越粗）
+                  {t('graph.max_clusters')}
                 </span>
                 <span className="text-xs font-mono tabular-nums text-text-dim">
                   {settings.maxClusters}
@@ -257,9 +257,9 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
                   ? 'bg-gray-100 text-gray-400 border-border-light cursor-not-allowed'
                   : 'bg-white text-text-main border-border-light hover:bg-bg-hover'
               )}
-              title="用当前设置重新聚类"
+              title={t('graph.recluster_hint')}
             >
-              {reclustering ? '聚类中…' : '重新聚类'}
+              {reclustering ? t('graph.reclustering') : t('graph.recluster')}
             </button>
           </div>
         </div>

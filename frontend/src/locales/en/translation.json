@@ -1,7 +1,10 @@
 {
   "app": {
     "title": "MyNebula",
-    "user": "User"
+    "user": "User",
+    "login": "Login",
+    "logout": "Logout",
+    "guest": "Guest"
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -19,7 +22,11 @@
     "clear_filters": "Clear filters",
     "clear_all_filters": "Clear all filters",
     "show_all": "Show all",
-    "view_all": "View all"
+    "view_all": "View all",
+    "error": "Error",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "n_a": "N/A"
   },
   "dashboard": {
     "title": "Universe Explorer",
@@ -47,7 +54,8 @@
     "top_12": "Top 12",
     "no_data": "No data available",
     "no_activity": "No activity data",
-    "no_topics": "No topics available"
+    "no_topics": "No topics available",
+    "repos_count": "{{count}} repos"
   },
   "graph": {
     "clusters": "Clusters",
@@ -56,7 +64,11 @@
     "showing_repos": "Showing {{count}} repos",
     "loading_data": "Loading graph data...",
     "empty_title": "No Data",
-    "empty_hint": "Sync your GitHub stars to start exploring"
+    "empty_hint": "Sync your GitHub stars to start exploring",
+    "max_clusters": "Max Clusters (Smaller is coarser)",
+    "recluster": "Re-cluster",
+    "reclustering": "Clustering...",
+    "recluster_hint": "Re-cluster with current settings"
   },
   "data": {
     "repository": "Repository",
@@ -72,18 +84,52 @@
     "no_results": "No results found",
     "no_data": "No data available",
     "summary": "Summary",
-    "last_commit": "Last Commit"
+    "last_commit": "Last Commit",
+    "filter_label": "Filter:",
+    "unclustered": "Unclustered",
+    "no_summary": "No summary",
+    "no_description": "No description"
   },
   "settings": {
     "title": "Settings",
     "language": "Language",
+    "language_desc": "Change the language of the interface",
     "appearance": "Appearance",
     "hq_rendering": "High Quality Rendering",
+    "hq_rendering_desc": "Enable high-quality visual effects",
     "show_trajectories": "Show Trajectories",
+    "show_trajectories_desc": "Show connection paths between nodes",
     "connection": "Connection",
     "api_endpoint": "API Endpoint",
     "github_token_status": "GitHub Token Status",
-    "connected": "Connected"
+    "connected": "Connected",
+    "scheduled_sync": "Scheduled Sync",
+    "enable_scheduled_sync": "Enable Scheduled Sync",
+    "enable_scheduled_sync_desc": "Automatically update star data incrementally every day",
+    "execution_time": "Execution Time",
+    "last_run": "Last Run",
+    "next_run": "Next Run",
+    "data_management": "Data Management",
+    "repo_stats": "Repository Statistics",
+    "total_repos": "Total Repos",
+    "synced": "Synced",
+    "vectorized": "Vectorized",
+    "summarized": "Summarized",
+    "full_refresh": "Full Refresh",
+    "full_refresh_desc": "Re-fetch all star data, re-generate AI summaries and embeddings. This is time-consuming and consumes API credits.",
+    "execute_full_refresh": "Execute Full Refresh",
+    "refreshing": "Refreshing...",
+    "confirm_full_refresh_title": "Confirm Full Refresh?",
+    "confirm_full_refresh_desc": "This will reset and re-process data for all {{count}} repositories, including:",
+    "confirm_step_fetch": "Re-fetch all star data from GitHub",
+    "confirm_step_summarize": "Re-generate all AI summaries and tags",
+    "confirm_step_embed": "Re-calculate all embeddings",
+    "confirm_step_cluster": "Re-run cluster analysis",
+    "confirm_warning": "⚠️ This may take a long time and consume significant API credits",
+    "load_schedule_error": "Failed to load schedule data",
+    "update_schedule_error": "Failed to update schedule settings",
+    "update_time_error": "Failed to update schedule time",
+    "full_refresh_error": "Failed to start full refresh"
   },
   "repoDetails": {
     "close": "Close",
@@ -93,7 +139,8 @@
     "unknown": "Unknown",
     "starred_at": "Starred",
     "ai_summary": "AI Summary",
-    "view_on_github": "View on GitHub"
+    "view_on_github": "View on GitHub",
+    "no_ai_summary": "No AI summary available for this repository yet. Sync data to generate insights."
   },
   "errors": {
     "sync_failed": "Sync failed. Please check if GITHUB_TOKEN is configured.",
@@ -108,6 +155,28 @@
     "allDone": "All tasks completed successfully",
     "steps": "steps",
     "overallProgress": "Overall Progress",
-    "viewResults": "View Results"
+    "viewResults": "View Results",
+    "step_stars_label": "Fetching GitHub Stars",
+    "step_stars_desc": "Syncing your starred repositories",
+    "step_summaries_label": "Generating AI Summaries",
+    "step_summaries_desc": "Creating intelligent descriptions and tags",
+    "step_embeddings_label": "Computing Embeddings",
+    "step_embeddings_desc": "Building semantic representations",
+    "step_clustering_label": "Clustering Repositories",
+    "step_clustering_desc": "Organizing into knowledge groups"
+  },
+  "time": {
+    "never_run": "Never Run",
+    "not_set": "Not Set",
+    "just_now": "just now",
+    "minutes_ago": "{{count}} minutes ago",
+    "hours_ago": "{{count}} hours ago",
+    "days_ago": "{{count}} days ago",
+    "status": {
+      "success": "Success",
+      "failed": "Failed",
+      "running": "Running",
+      "unknown": "Unknown"
+    }
   }
 }
