@@ -1,15 +1,18 @@
-"""Clustering service using UMAP + HDBSCAN.
+"""Semantic clustering service with embedding-space clustering.
 
-This module provides semantic clustering of repositories based on their embeddings.
-Includes collision resolution to prevent node overlap in 3D visualization.
+This module clusters repositories in normalized embedding space for semantic
+fidelity, while using UMAP solely for 3D visualization coordinates.
 
 Key features:
-- Adaptive clustering with automatic parameter tuning
-- Noise point assignment to ensure all nodes have a cluster
-- Fallback to hierarchical clustering when HDBSCAN produces too few clusters
+- Embedding-space HDBSCAN clustering for robust semantic grouping
+- Soft post-merge of highly similar clusters to reduce fragmentation
+- Noise point assignment to ensure all nodes are attached to a cluster
 """
 
 import math
+import re
+from collections import Counter
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel
@@ -176,20 +179,112 @@ def estimate_cluster_count(n_samples: int, min_clusters: int = 3) -> int:
     return min(result, n_samples)
 
 
+def normalize_embeddings(embeddings: np.ndarray) -> np.ndarray:
+    """L2-normalize embeddings for cosine-like distance computations."""
+    if embeddings.size == 0:
+        return embeddings
+
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    norms = np.where(norms == 0, 1.0, norms)
+    return embeddings / norms
+
+
+def relabel_clusters(labels: np.ndarray) -> np.ndarray:
+    """Relabel cluster IDs to contiguous integers while preserving noise as -1."""
+    unique_labels = sorted({int(label) for label in labels.tolist() if int(label) != -1})
+    mapping = {label: idx for idx, label in enumerate(unique_labels)}
+    relabeled = np.array([mapping.get(int(label), -1) for label in labels], dtype=int)
+    return relabeled
+
+
+def merge_similar_clusters(
+    labels: np.ndarray,
+    embeddings: np.ndarray,
+    similarity_threshold: float = 0.9,
+    target_max_clusters: int | None = None,
+    min_similarity_for_forced_merge: float = 0.45,
+) -> np.ndarray:
+    """Merge clusters with very similar centroids.
+
+    This is used as a post-processing step to reduce over-fragmentation and to
+    enforce a soft target maximum cluster count without forcing arbitrary splits.
+    """
+    merged_labels = labels.copy()
+    if len(merged_labels) == 0:
+        return merged_labels
+
+    max_iterations = max(50, len(set(merged_labels.tolist())) * 4)
+
+    for _ in range(max_iterations):
+        cluster_ids = sorted(
+            {int(cluster_id) for cluster_id in merged_labels.tolist() if cluster_id != -1}
+        )
+
+        if len(cluster_ids) <= 1:
+            break
+
+        centers: dict[int, np.ndarray] = {}
+        sizes: dict[int, int] = {}
+
+        for cluster_id in cluster_ids:
+            mask = merged_labels == cluster_id
+            sizes[cluster_id] = int(mask.sum())
+            center = embeddings[mask].mean(axis=0)
+            center_norm = np.linalg.norm(center)
+            centers[cluster_id] = center / center_norm if center_norm > 0 else center
+
+        best_pair: tuple[int, int] | None = None
+        best_similarity = -1.0
+
+        for i, cluster_i in enumerate(cluster_ids):
+            center_i = centers[cluster_i]
+            for cluster_j in cluster_ids[i + 1 :]:
+                similarity = float(np.dot(center_i, centers[cluster_j]))
+                if not np.isfinite(similarity):
+                    continue
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_pair = (cluster_i, cluster_j)
+
+        if best_pair is None:
+            break
+
+        need_force_reduce = (
+            target_max_clusters is not None and len(cluster_ids) > target_max_clusters
+        )
+        can_merge_by_similarity = best_similarity >= similarity_threshold
+        can_merge_by_target = (
+            need_force_reduce and best_similarity >= min_similarity_for_forced_merge
+        )
+
+        if not can_merge_by_similarity and not can_merge_by_target:
+            break
+
+        cluster_a, cluster_b = best_pair
+        keep_cluster, drop_cluster = (
+            (cluster_a, cluster_b)
+            if sizes[cluster_a] >= sizes[cluster_b]
+            else (cluster_b, cluster_a)
+        )
+        merged_labels[merged_labels == drop_cluster] = keep_cluster
+
+    return relabel_clusters(merged_labels)
+
+
 def fallback_hierarchical_clustering(
-    coords: np.ndarray,
+    feature_vectors: np.ndarray,
     n_clusters: int,
 ) -> np.ndarray:
     """Perform hierarchical clustering as fallback when HDBSCAN fails.
 
     Args:
-        coords: Nx3 array of 3D coordinates
+        feature_vectors: NxD feature vectors used for clustering
         n_clusters: Target number of clusters
 
     Returns:
         Array of cluster labels (0 to n_clusters-1)
     """
-    n_samples = len(coords)
+    n_samples = len(feature_vectors)
 
     # Safety check: n_clusters cannot exceed n_samples
     effective_n_clusters = min(n_clusters, n_samples)
@@ -212,7 +307,7 @@ def fallback_hierarchical_clustering(
         metric="euclidean",
         linkage="ward",
     )
-    labels = clustering.fit_predict(coords)
+    labels = clustering.fit_predict(feature_vectors)
 
     return labels
 
@@ -227,15 +322,14 @@ class ClusterResult(BaseModel):
 
 
 class ClusteringService:
-    """Service for clustering embeddings using UMAP + HDBSCAN.
+    """Service for semantic clustering with embedding-space clustering.
 
-    This service reduces high-dimensional embeddings to 3D for visualization
-    and groups similar items into clusters.
+    This service follows a two-stage strategy:
+    1. Cluster on normalized high-dimensional embeddings (semantic fidelity)
+    2. Project to 3D with UMAP for visualization layout
 
-    Key improvements over basic HDBSCAN:
-    - Uses 'leaf' cluster selection for more fine-grained clusters
-    - Assigns noise points to nearest clusters (no orphaned nodes)
-    - Falls back to hierarchical clustering if too few clusters are found
+    Compared with clustering on UMAP coordinates, this keeps related repositories
+    together more reliably for diverse users and mixed technical domains.
 
     Usage:
         service = ClusteringService()
@@ -259,12 +353,12 @@ class ClusteringService:
         Args:
             n_neighbors: UMAP parameter for local neighborhood size
             min_dist: UMAP parameter for minimum distance between points
-            min_cluster_size: HDBSCAN minimum cluster size (lowered for more clusters)
-            min_samples: HDBSCAN min samples (lowered for more sensitivity)
-            cluster_selection_method: HDBSCAN method - 'leaf' for fine-grained, 'eom' for larger
-            min_clusters: Minimum expected number of clusters (triggers fallback if not met)
-            target_min_clusters: If set, ensure final cluster count is at least this value
-            target_max_clusters: If set, ensure final cluster count is at most this value
+            min_cluster_size: HDBSCAN minimum cluster size
+            min_samples: HDBSCAN min samples
+            cluster_selection_method: HDBSCAN method
+            min_clusters: Minimum expected number of clusters (fallback heuristic)
+            target_min_clusters: Optional lower bound hint for fallback only
+            target_max_clusters: Soft target upper bound via semantic merge
             assign_all_points: Whether to assign noise points to nearest clusters
         """
         self.n_neighbors = n_neighbors
@@ -300,12 +394,10 @@ class ClusteringService:
         node_sizes: list[float] | None = None,
         resolve_overlap: bool = True,
     ) -> ClusterResult:
-        """Reduce dimensions and cluster embeddings.
+        """Cluster embeddings and generate 3D coordinates for visualization.
 
-        This method uses an adaptive clustering strategy:
-        1. First tries HDBSCAN with 'leaf' mode for fine-grained clusters
-        2. Assigns noise points to nearest clusters if assign_all_points=True
-        3. Falls back to hierarchical clustering if too few clusters are found
+        Clustering is performed in normalized embedding space for semantic quality.
+        UMAP is used only for coordinate generation.
 
         Args:
             embeddings: List of embedding vectors
@@ -324,7 +416,8 @@ class ClusteringService:
                 cluster_centers={},
             )
 
-        embeddings_array = np.array(embeddings)
+        embeddings_array = np.array(embeddings, dtype=np.float32)
+        normalized_embeddings = normalize_embeddings(embeddings_array)
         n_samples = len(embeddings)
 
         logger.info(f"Clustering {n_samples} embeddings")
@@ -345,17 +438,17 @@ class ClusteringService:
             coords_3d = np.array(existing_coords)
             logger.info("Using existing 3D coordinates")
         else:
-            coords_3d = self._umap_reducer.fit_transform(embeddings_array)
+            coords_3d = self._umap_reducer.fit_transform(normalized_embeddings)
             logger.info("Generated new 3D coordinates via UMAP")
 
-        # Clustering strategy
+        # Clustering strategy in embedding space
         if n_samples < 3:
             # Too few samples for meaningful clustering
             labels = np.array([0] * n_samples)
             n_clusters = 1
             logger.info("Too few samples, assigning all to cluster 0")
         else:
-            # Try HDBSCAN first with optimized parameters
+            # Try HDBSCAN first in normalized embedding space
             import hdbscan
 
             clusterer = hdbscan.HDBSCAN(
@@ -364,7 +457,7 @@ class ClusteringService:
                 metric="euclidean",
                 cluster_selection_method=self.cluster_selection_method,
             )
-            labels = clusterer.fit_predict(coords_3d)
+            labels = clusterer.fit_predict(normalized_embeddings)
             n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
             logger.info(
@@ -383,7 +476,9 @@ class ClusteringService:
                     f"HDBSCAN produced only {n_clusters} clusters, "
                     f"falling back to hierarchical clustering with {expected_clusters} clusters"
                 )
-                labels = fallback_hierarchical_clustering(coords_3d, expected_clusters)
+                labels = fallback_hierarchical_clustering(
+                    normalized_embeddings, expected_clusters
+                )
                 n_clusters = len(set(labels))
             elif self.assign_all_points and (labels == -1).any():
                 # Assign noise points to nearest clusters
@@ -391,42 +486,32 @@ class ClusteringService:
                     coords_3d, labels, embeddings_array
                 )
 
-        # Ensure labels is a numpy array for further processing
-        labels = np.array(labels)
+        labels = np.array(labels, dtype=int)
+        labels = relabel_clusters(labels)
+
+        # Soft merge highly similar clusters to reduce fragmentation.
+        labels = merge_similar_clusters(
+            labels=labels,
+            embeddings=normalized_embeddings,
+            similarity_threshold=0.9,
+            target_max_clusters=self.target_max_clusters,
+            min_similarity_for_forced_merge=0.5,
+        )
         n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
-        # Enforce a target cluster count range (optional).
-        # This provides stable UX: user can ask for "no more than N clusters"
-        # without manually tuning HDBSCAN/UMAP parameters.
-        if (
-            self.target_max_clusters is not None
-            and n_samples >= max(2, self.target_max_clusters)
-            and n_clusters > self.target_max_clusters
-        ):
-            logger.info(
-                f"Cluster count {n_clusters} exceeds target_max_clusters={self.target_max_clusters}; "
-                "merging via hierarchical clustering"
+        # Fallback for pathological cases: no clusters after processing
+        if n_clusters == 0 and n_samples >= 2:
+            fallback_target = self.target_min_clusters or self.min_clusters or 2
+            fallback_target = min(max(2, fallback_target), n_samples)
+            logger.warning(
+                "No valid clusters after processing; applying hierarchical fallback "
+                f"with {fallback_target} clusters"
             )
             labels = fallback_hierarchical_clustering(
-                coords_3d, self.target_max_clusters
+                normalized_embeddings, fallback_target
             )
-            labels = np.array(labels)
-            n_clusters = len(set(labels))
-
-        if (
-            self.target_min_clusters is not None
-            and n_samples >= max(2, self.target_min_clusters)
-            and n_clusters < self.target_min_clusters
-        ):
-            logger.info(
-                f"Cluster count {n_clusters} is below target_min_clusters={self.target_min_clusters}; "
-                "splitting via hierarchical clustering"
-            )
-            labels = fallback_hierarchical_clustering(
-                coords_3d, self.target_min_clusters
-            )
-            labels = np.array(labels)
-            n_clusters = len(set(labels))
+            labels = relabel_clusters(np.array(labels, dtype=int))
+            n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
         logger.info(f"Final clustering: {n_clusters} clusters, all points assigned")
 
@@ -460,6 +545,117 @@ class ClusteringService:
         )
 
 
+TOPIC_SYNONYMS = {
+    "agent-memory": "agent-memory",
+    "agent_memory": "agent-memory",
+    "long-term-memory": "agent-memory",
+    "longterm-memory": "agent-memory",
+    "memory-augmented": "agent-memory",
+    "mem0": "agent-memory",
+    "rag-memory": "agent-memory",
+    "llm-training": "llm-training",
+    "distributed-training": "distributed-training",
+    "distributed-training-framework": "distributed-training",
+    "distributed-systems": "distributed-training",
+    "deepspeed": "distributed-training",
+    "fsdp": "distributed-training",
+    "megatron": "distributed-training",
+}
+
+
+def normalize_topic_token(token: str) -> str:
+    """Normalize one topic/token to improve semantic consistency."""
+    normalized = token.strip().lower().replace("_", "-")
+    normalized = re.sub(r"\s+", "-", normalized)
+    normalized = re.sub(r"-+", "-", normalized)
+    return TOPIC_SYNONYMS.get(normalized, normalized)
+
+
+def normalize_topic_lists(topic_lists: list[list[str]]) -> list[list[str]]:
+    """Normalize topic lists with stable order and uniqueness per repository."""
+    normalized_lists: list[list[str]] = []
+    for topics in topic_lists:
+        seen: set[str] = set()
+        normalized_topics: list[str] = []
+        for topic in topics or []:
+            if not topic:
+                continue
+            normalized = normalize_topic_token(topic)
+            if normalized not in seen:
+                seen.add(normalized)
+                normalized_topics.append(normalized)
+        normalized_lists.append(normalized_topics)
+    return normalized_lists
+
+
+def sanitize_cluster_name(name: str | None) -> str:
+    """Normalize cluster display names to avoid noisy duplicates."""
+    if not name:
+        return "未分类"
+
+    cleaned = " ".join(name.strip().split())
+    cleaned = cleaned.replace("工具集", "工具")
+    cleaned = cleaned.replace("集合", "集")
+    cleaned = re.sub(r"\s+[&+/,，、]\s+", " / ", cleaned)
+    cleaned = cleaned.strip("-_/ ")
+    return cleaned or "未分类"
+
+
+def deduplicate_cluster_entries(
+    entries: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Globally de-duplicate cluster names while keeping meaning stable."""
+    if not entries:
+        return entries
+
+    for entry in entries:
+        entry["name"] = sanitize_cluster_name(entry.get("name"))
+
+    used_names: set[str] = set()
+    for entry in sorted(entries, key=lambda item: item.get("repo_count", 0), reverse=True):
+        base_name = entry["name"]
+        if base_name not in used_names:
+            used_names.add(base_name)
+            continue
+
+        keywords = [k for k in (entry.get("keywords") or []) if k]
+        suffix_source = keywords[0] if keywords else f"{entry.get('repo_count', 0)}"
+        suffix = suffix_source.replace(" ", "")[:12] if suffix_source else "variant"
+
+        candidate = f"{base_name} · {suffix}"
+        seq = 2
+        while candidate in used_names:
+            candidate = f"{base_name} · {suffix}{seq}"
+            seq += 1
+
+        entry["name"] = candidate
+        used_names.add(candidate)
+
+    return entries
+
+
+def build_cluster_naming_inputs(
+    cluster_repos: list[Any],
+) -> tuple[list[str], list[str], list[list[str]], list[str]]:
+    """Build normalized and stable inputs for cluster naming."""
+    if not cluster_repos:
+        return [], [], [], []
+
+    sorted_repos = sorted(
+        cluster_repos,
+        key=lambda repo: (
+            -(repo.stargazers_count or 0),
+            repo.full_name or "",
+        ),
+    )
+
+    repo_names = [repo.full_name for repo in sorted_repos]
+    descriptions = [repo.description or "" for repo in sorted_repos]
+    topics = normalize_topic_lists([repo.topics or [] for repo in sorted_repos])
+    languages = [repo.language or "" for repo in sorted_repos]
+    return repo_names, descriptions, topics, languages
+
+
 def generate_cluster_name(
     repo_names: list[str],
     descriptions: list[str],
@@ -478,11 +674,10 @@ def generate_cluster_name(
     Returns:
         Tuple of (name, description, keywords)
     """
-    from collections import Counter
+    normalized_topics = normalize_topic_lists(topics)
 
-    # Flatten and count topics
     all_topics = []
-    for topic_list in topics:
+    for topic_list in normalized_topics:
         if topic_list:
             all_topics.extend(topic_list)
 
@@ -520,11 +715,13 @@ def generate_cluster_name(
 
     # Generate name
     if top_topics:
-        name = " & ".join(top_topics[:2]).title()
+        name = " / ".join(top_topics[:2]).title()
     elif common_words:
         name = " ".join(common_words[:2]).title()
     else:
         name = f"Cluster ({len(repo_names)} repos)"
+
+    name = sanitize_cluster_name(name)
 
     # Generate description
     description = f"A cluster of {len(repo_names)} repositories"
@@ -532,7 +729,10 @@ def generate_cluster_name(
         description += f" related to {', '.join(top_topics[:3])}"
 
     # Keywords
-    keywords = list(set(top_topics[:5] + common_words[:3]))
+    keywords: list[str] = []
+    for keyword in top_topics[:5] + common_words[:3]:
+        if keyword and keyword not in keywords:
+            keywords.append(keyword)
 
     return name, description, keywords
 
@@ -577,17 +777,16 @@ def get_clustering_service() -> ClusteringService:
     """Get global clustering service instance."""
     global _clustering_service
     if _clustering_service is None:
-        # Fewer, more stable clusters by default (aim for 4-8 clusters).
-        # - Larger min_cluster_size/min_samples => less fragmentation
-        # - Larger n_neighbors => more global structure in UMAP
-        # - Target range provides consistent UX without manual tuning
+        # Stable defaults for mixed user datasets.
+        # - Clustering runs in embedding space (not UMAP coordinates)
+        # - target_max_clusters is treated as a soft cap via post-merge
         _clustering_service = ClusteringService(
             n_neighbors=40,
             min_cluster_size=20,
             min_samples=8,
             cluster_selection_method="eom",
-            min_clusters=4,
-            target_min_clusters=4,
+            min_clusters=3,
+            target_min_clusters=None,
             target_max_clusters=8,
         )
     return _clustering_service

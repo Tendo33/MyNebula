@@ -1052,7 +1052,7 @@ def _derive_clustering_params_for_max_clusters(
     This is intentionally heuristic. The goal is stable UX, not perfect clustering.
     """
     safe_max_clusters = max(2, min(int(max_clusters), 20))
-    target_min_clusters = max(2, safe_max_clusters // 2)
+    min_clusters = max(2, safe_max_clusters // 3)
 
     # Roughly aim for average cluster size around n/max_clusters.
     # Use a slightly smaller min_cluster_size so HDBSCAN can still form clusters.
@@ -1068,7 +1068,7 @@ def _derive_clustering_params_for_max_clusters(
         "n_neighbors": n_neighbors,
         "min_cluster_size": min_cluster_size,
         "min_samples": min_samples,
-        "target_min_clusters": target_min_clusters,
+        "min_clusters": min_clusters,
         "target_max_clusters": safe_max_clusters,
     }
 
@@ -1089,6 +1089,8 @@ async def run_clustering_task(
     """
     from nebula.core.clustering import (
         ClusteringService,
+        build_cluster_naming_inputs,
+        deduplicate_cluster_entries,
         generate_cluster_name,
         generate_cluster_name_llm,
     )
@@ -1126,10 +1128,12 @@ async def run_clustering_task(
             logger.info(f"Running clustering on {len(repos)} repos for user {user_id}")
 
             # Extract embeddings and node sizes (based on star count for collision resolution)
+            repos_with_embeddings: list[StarredRepo] = []
             embeddings = []
             node_sizes = []
             for repo in repos:
                 if repo.embedding is not None:
+                    repos_with_embeddings.append(repo)
                     embeddings.append(repo.embedding)
                     # Calculate node size based on star count (log scale)
                     # This ensures larger (more popular) repos have more space
@@ -1137,6 +1141,19 @@ async def run_clustering_task(
 
                     size = math.log10(max(repo.stargazers_count, 1) + 1) * 0.5 + 0.5
                     node_sizes.append(min(size, 3.0))  # Cap at 3.0
+
+            if len(repos_with_embeddings) != len(repos):
+                logger.warning(
+                    "Skipping "
+                    f"{len(repos) - len(repos_with_embeddings)} repos with missing embeddings "
+                    "during clustering"
+                )
+                for repo in repos:
+                    if repo.embedding is None:
+                        repo.cluster_id = None
+                        repo.coord_x = None
+                        repo.coord_y = None
+                        repo.coord_z = None
 
             if len(embeddings) < 5:
                 task.status = "completed"
@@ -1148,7 +1165,7 @@ async def run_clustering_task(
             # Run clustering with collision resolution.
             # Use a user-friendly max-clusters control to derive stable parameters.
             derived = _derive_clustering_params_for_max_clusters(
-                n_samples=len(embeddings),
+                n_samples=len(repos_with_embeddings),
                 max_clusters=max_clusters,
             )
             clustering_service = ClusteringService(
@@ -1157,8 +1174,8 @@ async def run_clustering_task(
                 min_cluster_size=derived["min_cluster_size"],
                 min_samples=derived["min_samples"],
                 cluster_selection_method="eom",
-                min_clusters=derived["target_min_clusters"],
-                target_min_clusters=derived["target_min_clusters"],
+                min_clusters=derived["min_clusters"],
+                target_min_clusters=None,
                 target_max_clusters=derived["target_max_clusters"],
                 assign_all_points=True,
             )
@@ -1183,24 +1200,27 @@ async def run_clustering_task(
 
             # Create new clusters
             cluster_map: dict[int, Cluster] = {}
+            cluster_entries: list[dict] = []
+            sorted_cluster_ids = sorted(
+                {cluster_id for cluster_id in cluster_result.labels if cluster_id != -1}
+            )
 
-            for cluster_id in set(cluster_result.labels):
-                if cluster_id == -1:
-                    continue  # Skip noise
-
+            for cluster_id in sorted_cluster_ids:
                 # Get repos in this cluster
                 cluster_repo_indices = [
                     i
                     for i, label in enumerate(cluster_result.labels)
                     if label == cluster_id
                 ]
-                cluster_repos = [repos[i] for i in cluster_repo_indices]
+                cluster_repos = [repos_with_embeddings[i] for i in cluster_repo_indices]
+
+                if not cluster_repos:
+                    continue
 
                 # Extract info for naming
-                repo_names = [r.full_name for r in cluster_repos]
-                descriptions = [r.description or "" for r in cluster_repos]
-                topics = [r.topics or [] for r in cluster_repos]
-                languages = [r.language or "" for r in cluster_repos]
+                repo_names, descriptions, topics, languages = build_cluster_naming_inputs(
+                    cluster_repos
+                )
 
                 # Generate cluster name
                 try:
@@ -1221,21 +1241,34 @@ async def run_clustering_task(
                 # Get cluster center
                 center = cluster_result.cluster_centers.get(cluster_id, [0, 0, 0])
 
-                # Create cluster record
+                cluster_entries.append(
+                    {
+                        "cluster_id": cluster_id,
+                        "name": name,
+                        "description": description,
+                        "keywords": keywords,
+                        "repo_count": len(cluster_repos),
+                        "center": center,
+                    }
+                )
+
+            cluster_entries = deduplicate_cluster_entries(cluster_entries)
+
+            for entry in cluster_entries:
+                center = entry["center"]
                 cluster = Cluster(
                     user_id=user_id,
-                    name=name,
-                    description=description,
-                    keywords=keywords,
-                    repo_count=len(cluster_repos),
+                    name=entry["name"],
+                    description=entry["description"],
+                    keywords=entry["keywords"],
+                    repo_count=entry["repo_count"],
                     center_x=center[0] if len(center) > 0 else None,
                     center_y=center[1] if len(center) > 1 else None,
                     center_z=center[2] if len(center) > 2 else None,
                 )
                 db.add(cluster)
                 await db.flush()  # Get the ID
-
-                cluster_map[cluster_id] = cluster
+                cluster_map[entry["cluster_id"]] = cluster
 
             await db.commit()
 
@@ -1243,7 +1276,7 @@ async def run_clustering_task(
             assigned_count = 0
             unassigned_count = 0
 
-            for i, repo in enumerate(repos):
+            for i, repo in enumerate(repos_with_embeddings):
                 if i < len(cluster_result.labels):
                     label = cluster_result.labels[i]
 
@@ -1270,7 +1303,7 @@ async def run_clustering_task(
                         repo.coord_y = coords[1] if len(coords) > 1 else None
                         repo.coord_z = coords[2] if len(coords) > 2 else None
 
-            task.processed_items = len(repos)
+            task.processed_items = len(repos_with_embeddings)
             task.status = "completed"
             task.completed_at = datetime.utcnow()
             await db.commit()

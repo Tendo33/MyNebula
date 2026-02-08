@@ -21,6 +21,32 @@ from nebula.utils.decorator_utils import async_retry_decorator
 logger = get_logger(__name__)
 
 
+def _normalize_semantic_tags(tags: list[str] | None) -> list[str]:
+    """Normalize tags for more consistent semantic embeddings."""
+    if not tags:
+        return []
+
+    from nebula.core.clustering import normalize_topic_token
+
+    normalized_tags: list[str] = []
+    seen: set[str] = set()
+    for raw_tag in tags:
+        if not raw_tag:
+            continue
+
+        canonical_tag = normalize_topic_token(raw_tag)
+        for candidate in (canonical_tag, raw_tag.strip()):
+            if not candidate:
+                continue
+            candidate_key = candidate.lower()
+            if candidate_key in seen:
+                continue
+            seen.add(candidate_key)
+            normalized_tags.append(candidate)
+
+    return normalized_tags
+
+
 class EmbeddingResult(BaseModel):
     """Result of an embedding operation."""
 
@@ -171,10 +197,13 @@ class EmbeddingService:
 
         # Prefer LLM-generated tags over raw topics
         # LLM tags are semantically normalized and more meaningful for clustering
-        if ai_tags:
-            parts.append(f"Tags: {', '.join(ai_tags)}")
-        elif topics:
-            parts.append(f"Topics: {', '.join(topics)}")
+        normalized_ai_tags = _normalize_semantic_tags(ai_tags)
+        normalized_topics = _normalize_semantic_tags(topics)
+
+        if normalized_ai_tags:
+            parts.append(f"Tags: {', '.join(normalized_ai_tags)}")
+        elif normalized_topics:
+            parts.append(f"Topics: {', '.join(normalized_topics)}")
 
         # Include readme summary if available (additional context)
         if readme_summary:

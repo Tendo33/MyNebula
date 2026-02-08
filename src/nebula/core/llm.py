@@ -164,23 +164,49 @@ class LLMService:
         Returns:
             Tuple of (name, description, keywords)
         """
+        from nebula.core.clustering import normalize_topic_lists, sanitize_cluster_name
+
+        normalized_topics = normalize_topic_lists(topics)
+
         # Build context
         repos_info = []
         for i, name in enumerate(repo_names[:10]):  # Limit to 10 repos
             desc = descriptions[i] if i < len(descriptions) else ""
-            topic = ", ".join(topics[i][:5]) if i < len(topics) and topics[i] else ""
+            topic = (
+                ", ".join(normalized_topics[i][:5])
+                if i < len(normalized_topics) and normalized_topics[i]
+                else ""
+            )
             lang = languages[i] if i < len(languages) else ""
             repos_info.append(f"- {name}: {desc} [{lang}] ({topic})")
 
         repos_text = "\n".join(repos_info)
-        all_topics = []
-        for t in topics:
+        topic_counts: dict[str, int] = {}
+        for t in normalized_topics:
             if t:
-                all_topics.extend(t)
-        unique_topics = list(set(all_topics))[:20]
+                for topic in t:
+                    topic_counts[topic] = topic_counts.get(topic, 0) + 1
 
-        all_languages = [lang for lang in languages if lang]
-        unique_languages = list(set(all_languages))
+        unique_topics = [
+            topic
+            for topic, _ in sorted(
+                topic_counts.items(),
+                key=lambda item: (-item[1], item[0]),
+            )[:20]
+        ]
+
+        language_counts: dict[str, int] = {}
+        for language in languages:
+            if language:
+                language_counts[language] = language_counts.get(language, 0) + 1
+
+        unique_languages = [
+            language
+            for language, _ in sorted(
+                language_counts.items(),
+                key=lambda item: (-item[1], item[0]),
+            )
+        ]
 
         prompt = f"""分析以下 GitHub 仓库集合，生成一个简洁的集群描述。
 
@@ -212,14 +238,14 @@ class LLMService:
             # Parse response
             parts = response.strip().split("|")
             if len(parts) >= 3:
-                name = parts[0].strip()
+                name = sanitize_cluster_name(parts[0].strip())
                 description = parts[1].strip()
                 keywords = [k.strip() for k in parts[2].split(",")]
                 return name, description, keywords[:5]
             else:
                 # Fallback parsing
                 lines = response.strip().split("\n")
-                name = lines[0] if lines else "技术项目集"
+                name = sanitize_cluster_name(lines[0] if lines else "技术项目集")
                 description = (
                     lines[1] if len(lines) > 1 else f"包含 {len(repo_names)} 个相关仓库"
                 )
