@@ -14,6 +14,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -82,6 +83,12 @@ class User(Base):
     )
     sync_tasks: Mapped[list["SyncTask"]] = relationship(
         "SyncTask", back_populates="user", cascade="all, delete-orphan"
+    )
+    taxonomy_versions: Mapped[list["TaxonomyVersion"]] = relationship(
+        "TaxonomyVersion", back_populates="user", cascade="all, delete-orphan"
+    )
+    taxonomy_overrides: Mapped[list["UserTaxonomyOverride"]] = relationship(
+        "UserTaxonomyOverride", back_populates="user", cascade="all, delete-orphan"
     )
     sync_schedule: Mapped[Optional["SyncSchedule"]] = relationship(
         "SyncSchedule",
@@ -304,6 +311,178 @@ class Cluster(Base):
 
     def __repr__(self) -> str:
         return f"<Cluster(id={self.id}, name={self.name}, count={self.repo_count})>"
+
+
+class TaxonomyVersion(Base):
+    """Taxonomy version snapshot.
+
+    A version can be global (`user_id` is null) or user-specific.
+    """
+
+    __tablename__ = "taxonomy_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(String(50), default="auto")
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    stats: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="taxonomy_versions")
+    terms: Mapped[list["TaxonomyTerm"]] = relationship(
+        "TaxonomyTerm", back_populates="version", cascade="all, delete-orphan"
+    )
+    mappings: Mapped[list["TaxonomyMapping"]] = relationship(
+        "TaxonomyMapping", back_populates="version", cascade="all, delete-orphan"
+    )
+    candidates: Mapped[list["TaxonomyCandidate"]] = relationship(
+        "TaxonomyCandidate", back_populates="version", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index("ix_taxonomy_versions_user_status", "user_id", "status"),
+    )
+
+
+class TaxonomyTerm(Base):
+    """Canonical taxonomy term within a version."""
+
+    __tablename__ = "taxonomy_terms"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    version_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("taxonomy_versions.id"), nullable=False, index=True
+    )
+    term: Mapped[str] = mapped_column(String(255), nullable=False)
+    normalized_term: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    aliases: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    term_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    version: Mapped["TaxonomyVersion"] = relationship(
+        "TaxonomyVersion", back_populates="terms"
+    )
+
+    __table_args__ = (
+        Index("ix_taxonomy_terms_version_normalized", "version_id", "normalized_term"),
+    )
+
+
+class TaxonomyMapping(Base):
+    """Resolved source term to canonical term mapping."""
+
+    __tablename__ = "taxonomy_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    version_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("taxonomy_versions.id"), nullable=False, index=True
+    )
+    source_term: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_normalized: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    canonical_term: Mapped[str] = mapped_column(String(255), nullable=False)
+    canonical_normalized: Mapped[str] = mapped_column(
+        String(255), nullable=False, index=True
+    )
+    confidence_score: Mapped[float] = mapped_column(Float, default=0.0)
+    confidence_level: Mapped[str] = mapped_column(String(20), default="low", index=True)
+    evidence: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    version: Mapped["TaxonomyVersion"] = relationship(
+        "TaxonomyVersion", back_populates="mappings"
+    )
+
+    __table_args__ = (
+        Index("ix_taxonomy_mappings_version_source", "version_id", "source_normalized"),
+    )
+
+
+class TaxonomyCandidate(Base):
+    """Candidate term relationship generated by offline analysis."""
+
+    __tablename__ = "taxonomy_candidates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    version_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("taxonomy_versions.id"), nullable=False, index=True
+    )
+    left_term: Mapped[str] = mapped_column(String(255), nullable=False)
+    left_normalized: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    right_term: Mapped[str] = mapped_column(String(255), nullable=False)
+    right_normalized: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    score: Mapped[float] = mapped_column(Float, default=0.0)
+    confidence_level: Mapped[str] = mapped_column(String(20), default="low", index=True)
+    decision: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    evidence: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    version: Mapped["TaxonomyVersion"] = relationship(
+        "TaxonomyVersion", back_populates="candidates"
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_taxonomy_candidates_version_pair",
+            "version_id",
+            "left_normalized",
+            "right_normalized",
+        ),
+    )
+
+
+class UserTaxonomyOverride(Base):
+    """User-specific override for source-term canonical mapping."""
+
+    __tablename__ = "user_taxonomy_overrides"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    source_term: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_normalized: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    canonical_term: Mapped[str] = mapped_column(String(255), nullable=False)
+    canonical_normalized: Mapped[str] = mapped_column(
+        String(255), nullable=False, index=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="taxonomy_overrides")
+
+    __table_args__ = (
+        Index(
+            "ix_user_taxonomy_overrides_user_source",
+            "user_id",
+            "source_normalized",
+            unique=True,
+        ),
+    )
 
 
 class SyncSchedule(Base):

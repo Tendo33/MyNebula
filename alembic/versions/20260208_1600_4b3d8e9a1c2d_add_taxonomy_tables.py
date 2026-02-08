@@ -1,0 +1,310 @@
+"""add_taxonomy_tables
+
+Revision ID: 4b3d8e9a1c2d
+Revises: 9f536c54833a
+Create Date: 2026-02-08 16:00:00.000000
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+from alembic import op
+
+# revision identifiers, used by Alembic.
+revision: str = "4b3d8e9a1c2d"
+down_revision: str | None = "9f536c54833a"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    """Upgrade database schema."""
+    op.create_table(
+        "taxonomy_versions",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.Integer(), nullable=True),
+        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("source", sa.String(length=50), nullable=False),
+        sa.Column("status", sa.String(length=20), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False),
+        sa.Column("stats", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_taxonomy_versions_user_id_users")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_taxonomy_versions")),
+    )
+    op.create_index(
+        op.f("ix_taxonomy_versions_user_id"),
+        "taxonomy_versions",
+        ["user_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_versions_status"),
+        "taxonomy_versions",
+        ["status"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_versions_is_active"),
+        "taxonomy_versions",
+        ["is_active"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_taxonomy_versions_user_status",
+        "taxonomy_versions",
+        ["user_id", "status"],
+        unique=False,
+    )
+
+    op.create_table(
+        "taxonomy_terms",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("version_id", sa.Integer(), nullable=False),
+        sa.Column("term", sa.String(length=255), nullable=False),
+        sa.Column("normalized_term", sa.String(length=255), nullable=False),
+        sa.Column("aliases", postgresql.ARRAY(sa.String()), nullable=True),
+        sa.Column("term_metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["version_id"], ["taxonomy_versions.id"], name=op.f("fk_taxonomy_terms_version_id_taxonomy_versions")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_taxonomy_terms")),
+    )
+    op.create_index(
+        op.f("ix_taxonomy_terms_version_id"),
+        "taxonomy_terms",
+        ["version_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_terms_normalized_term"),
+        "taxonomy_terms",
+        ["normalized_term"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_taxonomy_terms_version_normalized",
+        "taxonomy_terms",
+        ["version_id", "normalized_term"],
+        unique=False,
+    )
+
+    op.create_table(
+        "taxonomy_mappings",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("version_id", sa.Integer(), nullable=False),
+        sa.Column("source_term", sa.String(length=255), nullable=False),
+        sa.Column("source_normalized", sa.String(length=255), nullable=False),
+        sa.Column("canonical_term", sa.String(length=255), nullable=False),
+        sa.Column("canonical_normalized", sa.String(length=255), nullable=False),
+        sa.Column("confidence_score", sa.Float(), nullable=False),
+        sa.Column("confidence_level", sa.String(length=20), nullable=False),
+        sa.Column("evidence", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["version_id"], ["taxonomy_versions.id"], name=op.f("fk_taxonomy_mappings_version_id_taxonomy_versions")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_taxonomy_mappings")),
+    )
+    op.create_index(
+        op.f("ix_taxonomy_mappings_version_id"),
+        "taxonomy_mappings",
+        ["version_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_mappings_source_normalized"),
+        "taxonomy_mappings",
+        ["source_normalized"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_mappings_canonical_normalized"),
+        "taxonomy_mappings",
+        ["canonical_normalized"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_mappings_confidence_level"),
+        "taxonomy_mappings",
+        ["confidence_level"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_taxonomy_mappings_version_source",
+        "taxonomy_mappings",
+        ["version_id", "source_normalized"],
+        unique=False,
+    )
+
+    op.create_table(
+        "taxonomy_candidates",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("version_id", sa.Integer(), nullable=False),
+        sa.Column("left_term", sa.String(length=255), nullable=False),
+        sa.Column("left_normalized", sa.String(length=255), nullable=False),
+        sa.Column("right_term", sa.String(length=255), nullable=False),
+        sa.Column("right_normalized", sa.String(length=255), nullable=False),
+        sa.Column("score", sa.Float(), nullable=False),
+        sa.Column("confidence_level", sa.String(length=20), nullable=False),
+        sa.Column("decision", sa.String(length=20), nullable=False),
+        sa.Column("evidence", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["version_id"], ["taxonomy_versions.id"], name=op.f("fk_taxonomy_candidates_version_id_taxonomy_versions")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_taxonomy_candidates")),
+    )
+    op.create_index(
+        op.f("ix_taxonomy_candidates_version_id"),
+        "taxonomy_candidates",
+        ["version_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_candidates_left_normalized"),
+        "taxonomy_candidates",
+        ["left_normalized"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_candidates_right_normalized"),
+        "taxonomy_candidates",
+        ["right_normalized"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_candidates_confidence_level"),
+        "taxonomy_candidates",
+        ["confidence_level"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_taxonomy_candidates_decision"),
+        "taxonomy_candidates",
+        ["decision"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_taxonomy_candidates_version_pair",
+        "taxonomy_candidates",
+        ["version_id", "left_normalized", "right_normalized"],
+        unique=False,
+    )
+
+    op.create_table(
+        "user_taxonomy_overrides",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column("source_term", sa.String(length=255), nullable=False),
+        sa.Column("source_normalized", sa.String(length=255), nullable=False),
+        sa.Column("canonical_term", sa.String(length=255), nullable=False),
+        sa.Column("canonical_normalized", sa.String(length=255), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False),
+        sa.Column("note", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_user_taxonomy_overrides_user_id_users")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_user_taxonomy_overrides")),
+    )
+    op.create_index(
+        op.f("ix_user_taxonomy_overrides_user_id"),
+        "user_taxonomy_overrides",
+        ["user_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_user_taxonomy_overrides_source_normalized"),
+        "user_taxonomy_overrides",
+        ["source_normalized"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_user_taxonomy_overrides_canonical_normalized"),
+        "user_taxonomy_overrides",
+        ["canonical_normalized"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_user_taxonomy_overrides_is_active"),
+        "user_taxonomy_overrides",
+        ["is_active"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_user_taxonomy_overrides_user_source",
+        "user_taxonomy_overrides",
+        ["user_id", "source_normalized"],
+        unique=True,
+    )
+
+
+def downgrade() -> None:
+    """Downgrade database schema."""
+    op.drop_index("ix_user_taxonomy_overrides_user_source", table_name="user_taxonomy_overrides")
+    op.drop_index(op.f("ix_user_taxonomy_overrides_is_active"), table_name="user_taxonomy_overrides")
+    op.drop_index(op.f("ix_user_taxonomy_overrides_canonical_normalized"), table_name="user_taxonomy_overrides")
+    op.drop_index(op.f("ix_user_taxonomy_overrides_source_normalized"), table_name="user_taxonomy_overrides")
+    op.drop_index(op.f("ix_user_taxonomy_overrides_user_id"), table_name="user_taxonomy_overrides")
+    op.drop_table("user_taxonomy_overrides")
+
+    op.drop_index("ix_taxonomy_candidates_version_pair", table_name="taxonomy_candidates")
+    op.drop_index(op.f("ix_taxonomy_candidates_decision"), table_name="taxonomy_candidates")
+    op.drop_index(op.f("ix_taxonomy_candidates_confidence_level"), table_name="taxonomy_candidates")
+    op.drop_index(op.f("ix_taxonomy_candidates_right_normalized"), table_name="taxonomy_candidates")
+    op.drop_index(op.f("ix_taxonomy_candidates_left_normalized"), table_name="taxonomy_candidates")
+    op.drop_index(op.f("ix_taxonomy_candidates_version_id"), table_name="taxonomy_candidates")
+    op.drop_table("taxonomy_candidates")
+
+    op.drop_index("ix_taxonomy_mappings_version_source", table_name="taxonomy_mappings")
+    op.drop_index(op.f("ix_taxonomy_mappings_confidence_level"), table_name="taxonomy_mappings")
+    op.drop_index(op.f("ix_taxonomy_mappings_canonical_normalized"), table_name="taxonomy_mappings")
+    op.drop_index(op.f("ix_taxonomy_mappings_source_normalized"), table_name="taxonomy_mappings")
+    op.drop_index(op.f("ix_taxonomy_mappings_version_id"), table_name="taxonomy_mappings")
+    op.drop_table("taxonomy_mappings")
+
+    op.drop_index("ix_taxonomy_terms_version_normalized", table_name="taxonomy_terms")
+    op.drop_index(op.f("ix_taxonomy_terms_normalized_term"), table_name="taxonomy_terms")
+    op.drop_index(op.f("ix_taxonomy_terms_version_id"), table_name="taxonomy_terms")
+    op.drop_table("taxonomy_terms")
+
+    op.drop_index("ix_taxonomy_versions_user_status", table_name="taxonomy_versions")
+    op.drop_index(op.f("ix_taxonomy_versions_is_active"), table_name="taxonomy_versions")
+    op.drop_index(op.f("ix_taxonomy_versions_status"), table_name="taxonomy_versions")
+    op.drop_index(op.f("ix_taxonomy_versions_user_id"), table_name="taxonomy_versions")
+    op.drop_table("taxonomy_versions")

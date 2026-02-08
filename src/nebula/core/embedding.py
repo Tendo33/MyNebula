@@ -21,30 +21,21 @@ from nebula.utils.decorator_utils import async_retry_decorator
 logger = get_logger(__name__)
 
 
-def _normalize_semantic_tags(tags: list[str] | None) -> list[str]:
+def _normalize_semantic_tags(
+    tags: list[str] | None,
+    taxonomy_mapping: dict[str, str] | None = None,
+) -> list[str]:
     """Normalize tags for more consistent semantic embeddings."""
     if not tags:
         return []
 
-    from nebula.core.clustering import normalize_topic_token
+    from nebula.core.taxonomy import normalize_topics_with_mapping
 
-    normalized_tags: list[str] = []
-    seen: set[str] = set()
-    for raw_tag in tags:
-        if not raw_tag:
-            continue
-
-        canonical_tag = normalize_topic_token(raw_tag)
-        for candidate in (canonical_tag, raw_tag.strip()):
-            if not candidate:
-                continue
-            candidate_key = candidate.lower()
-            if candidate_key in seen:
-                continue
-            seen.add(candidate_key)
-            normalized_tags.append(candidate)
-
-    return normalized_tags
+    return normalize_topics_with_mapping(
+        tags,
+        taxonomy_mapping=taxonomy_mapping,
+        preserve_original=True,
+    )
 
 
 class EmbeddingResult(BaseModel):
@@ -164,6 +155,7 @@ class EmbeddingService:
         language: str | None = None,
         ai_summary: str | None = None,
         ai_tags: list[str] | None = None,
+        taxonomy_mapping: dict[str, str] | None = None,
     ) -> str:
         """Build text for repository embedding.
 
@@ -179,6 +171,7 @@ class EmbeddingService:
             language: Primary programming language
             ai_summary: LLM-generated summary (preferred over description)
             ai_tags: LLM-generated semantic tags (preferred over topics)
+            taxonomy_mapping: Optional source->canonical mapping for topic normalization
 
         Returns:
             Combined text for embedding
@@ -197,8 +190,8 @@ class EmbeddingService:
 
         # Prefer LLM-generated tags over raw topics
         # LLM tags are semantically normalized and more meaningful for clustering
-        normalized_ai_tags = _normalize_semantic_tags(ai_tags)
-        normalized_topics = _normalize_semantic_tags(topics)
+        normalized_ai_tags = _normalize_semantic_tags(ai_tags, taxonomy_mapping)
+        normalized_topics = _normalize_semantic_tags(topics, taxonomy_mapping)
 
         if normalized_ai_tags:
             parts.append(f"Tags: {', '.join(normalized_ai_tags)}")

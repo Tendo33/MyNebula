@@ -17,6 +17,7 @@ from nebula.core.config import get_sync_settings
 from nebula.core.embedding import get_embedding_service
 from nebula.core.github_client import GitHubClient
 from nebula.core.llm import get_llm_service
+from nebula.core.taxonomy import load_active_taxonomy_mapping
 from nebula.db import (
     Cluster,
     StarList,
@@ -599,6 +600,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 
             # Compute embeddings using LLM-enhanced content
             embedding_service = get_embedding_service()
+            taxonomy_mapping = await load_active_taxonomy_mapping(db, user_id)
             processed = 0
 
             # Build texts for batch processing with LLM content priority
@@ -611,6 +613,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                     language=repo.language,
                     ai_summary=repo.ai_summary,
                     ai_tags=repo.ai_tags,
+                    taxonomy_mapping=taxonomy_mapping,
                 )
                 texts.append(text)
                 repo.embedding_text = text
@@ -1126,6 +1129,7 @@ async def run_clustering_task(
             await db.commit()
 
             logger.info(f"Running clustering on {len(repos)} repos for user {user_id}")
+            taxonomy_mapping = await load_active_taxonomy_mapping(db, user_id)
 
             # Extract embeddings and node sizes (based on star count for collision resolution)
             repos_with_embeddings: list[StarredRepo] = []
@@ -1219,7 +1223,8 @@ async def run_clustering_task(
 
                 # Extract info for naming
                 repo_names, descriptions, topics, languages = build_cluster_naming_inputs(
-                    cluster_repos
+                    cluster_repos,
+                    taxonomy_mapping=taxonomy_mapping,
                 )
 
                 # Generate cluster name

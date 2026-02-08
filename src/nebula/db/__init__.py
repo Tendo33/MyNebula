@@ -16,9 +16,14 @@ from .models import (
     Cluster,
     StarList,
     StarredRepo,
+    TaxonomyCandidate,
+    TaxonomyMapping,
+    TaxonomyTerm,
+    TaxonomyVersion,
     SyncSchedule,
     SyncTask,
     User,
+    UserTaxonomyOverride,
 )
 
 __all__ = [
@@ -33,6 +38,11 @@ __all__ = [
     "StarredRepo",
     "StarList",
     "Cluster",
+    "TaxonomyVersion",
+    "TaxonomyTerm",
+    "TaxonomyMapping",
+    "TaxonomyCandidate",
+    "UserTaxonomyOverride",
     "SyncSchedule",
     "SyncTask",
 ]

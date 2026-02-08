@@ -24,6 +24,17 @@ from nebula.utils import get_logger
 logger = get_logger(__name__)
 
 
+def _map_topic_with_fallback(
+    token: str,
+    taxonomy_mapping: dict[str, str] | None = None,
+) -> str:
+    """Map one token via taxonomy mapping and local synonym fallback."""
+    from nebula.core.taxonomy import map_topic_token
+
+    mapped = map_topic_token(token, taxonomy_mapping=taxonomy_mapping)
+    return TOPIC_SYNONYMS.get(mapped, mapped)
+
+
 def resolve_collisions(
     coords: np.ndarray,
     node_sizes: list[float] | None = None,
@@ -565,13 +576,13 @@ TOPIC_SYNONYMS = {
 
 def normalize_topic_token(token: str) -> str:
     """Normalize one topic/token to improve semantic consistency."""
-    normalized = token.strip().lower().replace("_", "-")
-    normalized = re.sub(r"\s+", "-", normalized)
-    normalized = re.sub(r"-+", "-", normalized)
-    return TOPIC_SYNONYMS.get(normalized, normalized)
+    return _map_topic_with_fallback(token)
 
 
-def normalize_topic_lists(topic_lists: list[list[str]]) -> list[list[str]]:
+def normalize_topic_lists(
+    topic_lists: list[list[str]],
+    taxonomy_mapping: dict[str, str] | None = None,
+) -> list[list[str]]:
     """Normalize topic lists with stable order and uniqueness per repository."""
     normalized_lists: list[list[str]] = []
     for topics in topic_lists:
@@ -580,7 +591,7 @@ def normalize_topic_lists(topic_lists: list[list[str]]) -> list[list[str]]:
         for topic in topics or []:
             if not topic:
                 continue
-            normalized = normalize_topic_token(topic)
+            normalized = _map_topic_with_fallback(topic, taxonomy_mapping)
             if normalized not in seen:
                 seen.add(normalized)
                 normalized_topics.append(normalized)
@@ -636,6 +647,7 @@ def deduplicate_cluster_entries(
 
 def build_cluster_naming_inputs(
     cluster_repos: list[Any],
+    taxonomy_mapping: dict[str, str] | None = None,
 ) -> tuple[list[str], list[str], list[list[str]], list[str]]:
     """Build normalized and stable inputs for cluster naming."""
     if not cluster_repos:
@@ -651,7 +663,10 @@ def build_cluster_naming_inputs(
 
     repo_names = [repo.full_name for repo in sorted_repos]
     descriptions = [repo.description or "" for repo in sorted_repos]
-    topics = normalize_topic_lists([repo.topics or [] for repo in sorted_repos])
+    topics = normalize_topic_lists(
+        [repo.topics or [] for repo in sorted_repos],
+        taxonomy_mapping=taxonomy_mapping,
+    )
     languages = [repo.language or "" for repo in sorted_repos]
     return repo_names, descriptions, topics, languages
 
