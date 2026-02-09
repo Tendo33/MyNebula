@@ -1,10 +1,13 @@
 import numpy as np
 
 from nebula.core.clustering import (
+    ClusteringService,
     build_cluster_naming_inputs,
     deduplicate_cluster_entries,
+    generate_incremental_coords,
     merge_similar_clusters,
     normalize_topic_lists,
+    pick_incremental_cluster,
     sanitize_cluster_name,
 )
 
@@ -91,3 +94,77 @@ def test_build_cluster_naming_inputs_sorts_by_stars_and_normalizes_topics():
 
     assert repo_names == ["a/first", "z/second"]
     assert topics[0] == ["agent-memory"]
+
+
+def test_pick_incremental_cluster_prefers_highest_similarity():
+    cluster_embeddings = {
+        10: [1.0, 0.0, 0.0],
+        11: [0.0, 1.0, 0.0],
+    }
+
+    cluster_id, similarity = pick_incremental_cluster(
+        embedding=[0.9, 0.1, 0.0],
+        cluster_embeddings=cluster_embeddings,
+        min_similarity=0.6,
+    )
+
+    assert cluster_id == 10
+    assert similarity > 0.9
+
+
+def test_pick_incremental_cluster_returns_none_when_similarity_low():
+    cluster_embeddings = {
+        10: [1.0, 0.0, 0.0],
+    }
+
+    cluster_id, similarity = pick_incremental_cluster(
+        embedding=[0.0, 1.0, 0.0],
+        cluster_embeddings=cluster_embeddings,
+        min_similarity=0.3,
+    )
+
+    assert cluster_id is None
+    assert similarity == 0.0
+
+
+def test_generate_incremental_coords_is_deterministic():
+    center = [0.3, -0.2, 1.1]
+
+    first = generate_incremental_coords(center, seed=42, radius=0.1)
+    second = generate_incremental_coords(center, seed=42, radius=0.1)
+
+    assert first == second
+    assert first != center
+
+
+def test_clustering_projection_does_not_import_umap(monkeypatch):
+    import builtins
+
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "umap":
+            raise AssertionError("UMAP should not be imported for layout projection")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+
+    service = ClusteringService(min_cluster_size=2, min_samples=1)
+    result = service.fit_transform(
+        embeddings=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+        resolve_overlap=False,
+    )
+
+    assert len(result.coords_3d) == 2
+    assert len(result.coords_3d[0]) == 3
+
+
+def test_clustering_projection_is_deterministic_for_same_input():
+    service = ClusteringService(min_cluster_size=2, min_samples=1)
+    embeddings = [[1.0, 0.0, 0.0], [0.8, 0.2, 0.0], [0.0, 1.0, 0.0]]
+
+    first = service.fit_transform(embeddings=embeddings, resolve_overlap=False)
+    second = service.fit_transform(embeddings=embeddings, resolve_overlap=False)
+
+    assert first.coords_3d == second.coords_3d
+

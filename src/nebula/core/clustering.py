@@ -1,10 +1,11 @@
 """Semantic clustering service with embedding-space clustering.
 
 This module clusters repositories in normalized embedding space for semantic
-fidelity, while using UMAP solely for 3D visualization coordinates.
+fidelity, while using a lightweight PCA projection for 3D visualization coordinates.
 
 Key features:
 - Embedding-space HDBSCAN clustering for robust semantic grouping
+- PCA-based 3D projection for lightweight and deterministic layout
 - Soft post-merge of highly similar clusters to reduce fragmentation
 - Noise point assignment to ensure all nodes are attached to a cluster
 """
@@ -17,6 +18,7 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel
 from sklearn.cluster import AgglomerativeClustering
+from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
 from nebula.utils import get_logger
@@ -45,7 +47,7 @@ def resolve_collisions(
     """Resolve node collisions in 3D space using force-directed repulsion.
 
     This algorithm iteratively pushes overlapping nodes apart while trying
-    to preserve the overall cluster structure from UMAP.
+    to preserve the overall projected cluster structure.
 
     Args:
         coords: Nx3 array of 3D coordinates
@@ -208,6 +210,75 @@ def relabel_clusters(labels: np.ndarray) -> np.ndarray:
     return relabeled
 
 
+def normalize_vector(vector: list[float] | np.ndarray) -> np.ndarray:
+    """Normalize one embedding vector for cosine similarity calculations."""
+    arr = np.array(vector, dtype=np.float32)
+    norm = float(np.linalg.norm(arr))
+    if norm == 0.0:
+        return arr
+    return arr / norm
+
+
+def pick_incremental_cluster(
+    embedding: list[float] | np.ndarray,
+    cluster_embeddings: dict[int, list[float] | np.ndarray],
+    min_similarity: float = 0.68,
+) -> tuple[int | None, float]:
+    """Pick the closest existing cluster for incremental assignment."""
+    if not cluster_embeddings:
+        return None, 0.0
+
+    normalized_embedding = normalize_vector(embedding)
+    if normalized_embedding.size == 0:
+        return None, 0.0
+
+    best_cluster: int | None = None
+    best_similarity = -1.0
+
+    for cluster_id, center_embedding in cluster_embeddings.items():
+        normalized_center = normalize_vector(center_embedding)
+        if normalized_center.size == 0:
+            continue
+
+        similarity = float(np.dot(normalized_embedding, normalized_center))
+        if not np.isfinite(similarity):
+            continue
+
+        if similarity > best_similarity:
+            best_similarity = similarity
+            best_cluster = cluster_id
+
+    if best_cluster is None or best_similarity < min_similarity:
+        return None, 0.0
+
+    return best_cluster, best_similarity
+
+
+def generate_incremental_coords(
+    center: list[float] | np.ndarray,
+    seed: int,
+    radius: float = 0.12,
+) -> list[float]:
+    """Generate deterministic coordinates near a cluster center."""
+    base = np.array(center, dtype=np.float32).flatten()
+    if base.size < 3:
+        base = np.pad(base, (0, 3 - base.size), mode="constant")
+    elif base.size > 3:
+        base = base[:3]
+
+    rng = np.random.default_rng(seed & 0xFFFFFFFF)
+    direction = rng.normal(size=3).astype(np.float32)
+    norm = float(np.linalg.norm(direction))
+    if norm == 0.0:
+        direction = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    else:
+        direction = direction / norm
+
+    magnitude = radius * (0.6 + float(rng.random()) * 0.8)
+    coords = base + direction * magnitude
+    return [float(coords[0]), float(coords[1]), float(coords[2])]
+
+
 def merge_similar_clusters(
     labels: np.ndarray,
     embeddings: np.ndarray,
@@ -337,9 +408,9 @@ class ClusteringService:
 
     This service follows a two-stage strategy:
     1. Cluster on normalized high-dimensional embeddings (semantic fidelity)
-    2. Project to 3D with UMAP for visualization layout
+    2. Project to 3D with PCA for visualization layout
 
-    Compared with clustering on UMAP coordinates, this keeps related repositories
+    Compared with clustering on projection coordinates, this keeps related repositories
     together more reliably for diverse users and mixed technical domains.
 
     Usage:
@@ -362,8 +433,8 @@ class ClusteringService:
         """Initialize clustering service.
 
         Args:
-            n_neighbors: UMAP parameter for local neighborhood size
-            min_dist: UMAP parameter for minimum distance between points
+            n_neighbors: Legacy layout parameter (kept for compatibility)
+            min_dist: Legacy layout parameter (kept for compatibility)
             min_cluster_size: HDBSCAN minimum cluster size
             min_samples: HDBSCAN min samples
             cluster_selection_method: HDBSCAN method
@@ -382,21 +453,27 @@ class ClusteringService:
         self.target_max_clusters = target_max_clusters
         self.assign_all_points = assign_all_points
 
-        self._umap_reducer = None
-        self._clusterer = None
+    def _project_embeddings_to_3d(self, normalized_embeddings: np.ndarray) -> np.ndarray:
+        """Project normalized embeddings to deterministic 3D coordinates via PCA."""
+        n_samples, n_features = normalized_embeddings.shape
+        n_components = min(3, n_samples, n_features)
 
-    def _init_umap(self):
-        """Lazily initialize UMAP reducer."""
-        if self._umap_reducer is None:
-            import umap
+        if n_components <= 0:
+            return np.zeros((n_samples, 3), dtype=np.float32)
 
-            self._umap_reducer = umap.UMAP(
-                n_components=3,
-                n_neighbors=self.n_neighbors,
-                min_dist=self.min_dist,
-                metric="cosine",
-                random_state=42,
-            )
+        reducer = PCA(n_components=n_components)
+        reduced = reducer.fit_transform(normalized_embeddings)
+
+        coords = np.zeros((n_samples, 3), dtype=np.float32)
+        coords[:, :n_components] = reduced.astype(np.float32)
+
+        if n_samples > 1:
+            coords -= coords.mean(axis=0, keepdims=True)
+            std = coords.std(axis=0, keepdims=True)
+            std = np.where(std < 1e-6, 1.0, std)
+            coords = coords / std
+
+        return coords
 
     def fit_transform(
         self,
@@ -408,7 +485,7 @@ class ClusteringService:
         """Cluster embeddings and generate 3D coordinates for visualization.
 
         Clustering is performed in normalized embedding space for semantic quality.
-        UMAP is used only for coordinate generation.
+        PCA is used only for coordinate generation.
 
         Args:
             embeddings: List of embedding vectors
@@ -434,23 +511,18 @@ class ClusteringService:
         logger.info(f"Clustering {n_samples} embeddings")
 
         # Adjust parameters for small datasets
-        effective_n_neighbors = min(self.n_neighbors, n_samples - 1)
         effective_min_cluster_size = min(max(2, self.min_cluster_size), n_samples)
         effective_min_samples = min(
             max(1, self.min_samples), effective_min_cluster_size
         )
-
-        # UMAP dimensionality reduction
-        self._init_umap()
-        self._umap_reducer.n_neighbors = effective_n_neighbors
 
         if existing_coords and len(existing_coords) == n_samples:
             # Use existing coordinates if available
             coords_3d = np.array(existing_coords)
             logger.info("Using existing 3D coordinates")
         else:
-            coords_3d = self._umap_reducer.fit_transform(normalized_embeddings)
-            logger.info("Generated new 3D coordinates via UMAP")
+            coords_3d = self._project_embeddings_to_3d(normalized_embeddings)
+            logger.info("Generated new 3D coordinates via PCA projection")
 
         # Clustering strategy in embedding space
         if n_samples < 3:
@@ -793,7 +865,7 @@ def get_clustering_service() -> ClusteringService:
     global _clustering_service
     if _clustering_service is None:
         # Stable defaults for mixed user datasets.
-        # - Clustering runs in embedding space (not UMAP coordinates)
+        # - Clustering runs in embedding space (not projection coordinates)
         # - target_max_clusters is treated as a soft cap via post-merge
         _clustering_service = ClusteringService(
             n_neighbors=40,

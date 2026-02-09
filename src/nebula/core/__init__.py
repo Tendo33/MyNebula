@@ -4,7 +4,7 @@ This module contains the core services and logic for MyNebula:
 - config: Extended configuration management
 - embedding: Unified embedding service for multiple providers
 - github_client: GitHub API wrapper
-- clustering: UMAP + HDBSCAN clustering
+- clustering: PCA layout + HDBSCAN clustering
 - summarizer: AI-powered summarization
 """
 

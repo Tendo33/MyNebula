@@ -234,7 +234,12 @@ class SchedulerService:
             await db.commit()
             await db.refresh(cluster_task)
 
-            await run_clustering_task(schedule.user_id, cluster_task.id, use_llm=True)
+            await run_clustering_task(
+                schedule.user_id,
+                cluster_task.id,
+                use_llm=True,
+                incremental=True,
+            )
 
             # Update schedule on success
             schedule.last_run_status = "success"

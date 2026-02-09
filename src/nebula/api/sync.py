@@ -3,10 +3,13 @@
 Handles GitHub star synchronization and processing tasks.
 """
 
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Literal
 from zoneinfo import ZoneInfo
+
+import math
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -1063,8 +1066,8 @@ def _derive_clustering_params_for_max_clusters(
     min_cluster_size = max(5, int(approx_cluster_size * 0.9))
     min_samples = max(2, int(min_cluster_size * 0.4))
 
-    # Coarser (smaller max_clusters) => more global structure in UMAP.
-    # Finer (larger max_clusters) => more local structure.
+    # Coarser (smaller max_clusters) => broader semantic grouping.
+    # Finer (larger max_clusters) => more local grouping.
     n_neighbors = int(max(15, min(60, 10 + (50 - 2 * safe_max_clusters))))
 
     return {
@@ -1076,11 +1079,36 @@ def _derive_clustering_params_for_max_clusters(
     }
 
 
+def _fallback_cluster_center_coords(seed: int) -> list[float]:
+    """Build deterministic fallback cluster center coordinates."""
+    angle = (seed % 360) * (math.pi / 180.0)
+    radius = 1.8 + (seed % 7) * 0.1
+    z = ((seed % 9) - 4) * 0.18
+    return [math.cos(angle) * radius, math.sin(angle) * radius, z]
+
+
+def _ensure_unique_cluster_name(name: str, used_names: set[str]) -> str:
+    """Ensure cluster names stay unique without renaming existing clusters."""
+    if name not in used_names:
+        used_names.add(name)
+        return name
+
+    candidate = name
+    suffix = 2
+    while candidate in used_names:
+        candidate = f"{name} · {suffix}"
+        suffix += 1
+
+    used_names.add(candidate)
+    return candidate
+
+
 async def run_clustering_task(
     user_id: int,
     task_id: int,
     use_llm: bool = True,
     max_clusters: int = 8,
+    incremental: bool = False,
 ):
     """Background task to run clustering on user's repos.
 
@@ -1089,13 +1117,20 @@ async def run_clustering_task(
         task_id: Sync task ID
         use_llm: Whether to use LLM for cluster naming
         max_clusters: User-friendly knob for controlling clustering granularity
+        incremental: Keep existing graph stable and only place new/unassigned repos
     """
+    import numpy as np
+
     from nebula.core.clustering import (
         ClusteringService,
         build_cluster_naming_inputs,
         deduplicate_cluster_entries,
         generate_cluster_name,
         generate_cluster_name_llm,
+        generate_incremental_coords,
+        normalize_vector,
+        pick_incremental_cluster,
+        sanitize_cluster_name,
     )
     from nebula.db.database import get_db_context
 
@@ -1109,7 +1144,6 @@ async def run_clustering_task(
             task.started_at = datetime.utcnow()
             await db.commit()
 
-            # Get all embedded repos
             result = await db.execute(
                 select(StarredRepo).where(
                     StarredRepo.user_id == user_id,
@@ -1128,23 +1162,22 @@ async def run_clustering_task(
             task.total_items = len(repos)
             await db.commit()
 
-            logger.info(f"Running clustering on {len(repos)} repos for user {user_id}")
+            logger.info(
+                f"Running clustering on {len(repos)} repos for user {user_id} "
+                f"(incremental={incremental})"
+            )
             taxonomy_mapping = await load_active_taxonomy_mapping(db, user_id)
 
-            # Extract embeddings and node sizes (based on star count for collision resolution)
             repos_with_embeddings: list[StarredRepo] = []
-            embeddings = []
-            node_sizes = []
+            embeddings: list[list[float]] = []
+            node_sizes: list[float] = []
+
             for repo in repos:
                 if repo.embedding is not None:
                     repos_with_embeddings.append(repo)
                     embeddings.append(repo.embedding)
-                    # Calculate node size based on star count (log scale)
-                    # This ensures larger (more popular) repos have more space
-                    import math
-
                     size = math.log10(max(repo.stargazers_count, 1) + 1) * 0.5 + 0.5
-                    node_sizes.append(min(size, 3.0))  # Cap at 3.0
+                    node_sizes.append(min(size, 3.0))
 
             if len(repos_with_embeddings) != len(repos):
                 logger.warning(
@@ -1159,6 +1192,362 @@ async def run_clustering_task(
                         repo.coord_y = None
                         repo.coord_z = None
 
+            incremental_applied = False
+
+            if incremental:
+                clusters_result = await db.execute(
+                    select(Cluster).where(Cluster.user_id == user_id)
+                )
+                existing_clusters = clusters_result.scalars().all()
+                clusters_by_id = {cluster.id: cluster for cluster in existing_clusters}
+                valid_cluster_ids = set(clusters_by_id)
+
+                repos_needing_cluster = [
+                    repo
+                    for repo in repos_with_embeddings
+                    if repo.cluster_id not in valid_cluster_ids
+                ]
+                repos_needing_coords = [
+                    repo
+                    for repo in repos_with_embeddings
+                    if repo.cluster_id in valid_cluster_ids
+                    and (
+                        repo.coord_x is None
+                        or repo.coord_y is None
+                        or repo.coord_z is None
+                    )
+                ]
+                has_existing_layout = any(
+                    repo.cluster_id in valid_cluster_ids
+                    and repo.coord_x is not None
+                    and repo.coord_y is not None
+                    and repo.coord_z is not None
+                    for repo in repos_with_embeddings
+                )
+
+                if (
+                    valid_cluster_ids
+                    and has_existing_layout
+                    and len(repos_needing_cluster) < len(repos_with_embeddings)
+                ):
+                    incremental_applied = True
+
+                    repos_by_cluster: dict[int, list[StarredRepo]] = defaultdict(list)
+                    for repo in repos_with_embeddings:
+                        if repo.cluster_id in valid_cluster_ids:
+                            repos_by_cluster[repo.cluster_id].append(repo)
+
+                    cluster_embeddings: dict[int, list[float]] = {}
+                    cluster_counts: dict[int, int] = {}
+                    cluster_coords: dict[int, list[float]] = {}
+
+                    for cluster_id, cluster in clusters_by_id.items():
+                        members = repos_by_cluster.get(cluster_id, [])
+
+                        member_embeddings = [
+                            repo.embedding for repo in members if repo.embedding is not None
+                        ]
+                        if member_embeddings:
+                            center_embedding = normalize_vector(
+                                np.mean(
+                                    np.array(member_embeddings, dtype=np.float32),
+                                    axis=0,
+                                )
+                            ).tolist()
+                            cluster_embeddings[cluster_id] = center_embedding
+                            cluster_counts[cluster_id] = len(member_embeddings)
+                        elif cluster.center_embedding is not None:
+                            cluster_embeddings[cluster_id] = normalize_vector(
+                                cluster.center_embedding
+                            ).tolist()
+                            cluster_counts[cluster_id] = max(cluster.repo_count or 0, 1)
+
+                        if (
+                            cluster.center_x is not None
+                            and cluster.center_y is not None
+                            and cluster.center_z is not None
+                        ):
+                            cluster_coords[cluster_id] = [
+                                float(cluster.center_x),
+                                float(cluster.center_y),
+                                float(cluster.center_z),
+                            ]
+                        else:
+                            member_coords = [
+                                [repo.coord_x, repo.coord_y, repo.coord_z]
+                                for repo in members
+                                if repo.coord_x is not None
+                                and repo.coord_y is not None
+                                and repo.coord_z is not None
+                            ]
+                            if member_coords:
+                                center = np.mean(
+                                    np.array(member_coords, dtype=np.float32), axis=0
+                                )
+                                cluster_coords[cluster_id] = [
+                                    float(center[0]),
+                                    float(center[1]),
+                                    float(center[2]),
+                                ]
+                            else:
+                                cluster_coords[cluster_id] = _fallback_cluster_center_coords(
+                                    cluster_id
+                                )
+
+                    if not cluster_embeddings:
+                        incremental_applied = False
+                    else:
+                        repos_needing_cluster.sort(
+                            key=lambda repo: (
+                                repo.starred_at.isoformat() if repo.starred_at else "",
+                                repo.id,
+                            )
+                        )
+
+                        new_cluster_repos: dict[int, list[StarredRepo]] = defaultdict(list)
+                        next_temp_cluster_id = -1
+
+                        for repo in repos_needing_cluster:
+                            best_cluster_id, _ = pick_incremental_cluster(
+                                embedding=repo.embedding,
+                                cluster_embeddings=cluster_embeddings,
+                                min_similarity=0.72,
+                            )
+
+                            if best_cluster_id is None:
+                                temp_cluster_id = next_temp_cluster_id
+                                next_temp_cluster_id -= 1
+
+                                candidate_existing = {
+                                    cluster_id: center
+                                    for cluster_id, center in cluster_embeddings.items()
+                                    if cluster_id > 0
+                                }
+                                nearest_cluster_id, _ = pick_incremental_cluster(
+                                    embedding=repo.embedding,
+                                    cluster_embeddings=candidate_existing,
+                                    min_similarity=-1.0,
+                                )
+                                if nearest_cluster_id is not None:
+                                    anchor = cluster_coords.get(
+                                        nearest_cluster_id,
+                                        _fallback_cluster_center_coords(nearest_cluster_id),
+                                    )
+                                else:
+                                    anchor = _fallback_cluster_center_coords(
+                                        int(repo.github_repo_id or repo.id or abs(temp_cluster_id))
+                                    )
+
+                                seed = int(repo.github_repo_id or repo.id or abs(temp_cluster_id))
+                                cluster_coords[temp_cluster_id] = generate_incremental_coords(
+                                    anchor,
+                                    seed=seed + abs(temp_cluster_id),
+                                    radius=0.45,
+                                )
+                                cluster_embeddings[temp_cluster_id] = normalize_vector(
+                                    repo.embedding
+                                ).tolist()
+                                cluster_counts[temp_cluster_id] = 1
+                                repo.cluster_id = temp_cluster_id
+                                new_cluster_repos[temp_cluster_id].append(repo)
+                                continue
+
+                            repo.cluster_id = best_cluster_id
+                            previous_count = max(cluster_counts.get(best_cluster_id, 0), 1)
+                            previous_center = np.array(
+                                cluster_embeddings[best_cluster_id], dtype=np.float32
+                            )
+                            blended_center = (
+                                previous_center * previous_count
+                                + normalize_vector(repo.embedding)
+                            ) / (previous_count + 1)
+                            cluster_embeddings[best_cluster_id] = normalize_vector(
+                                blended_center
+                            ).tolist()
+                            cluster_counts[best_cluster_id] = previous_count + 1
+
+                        used_names = {
+                            sanitize_cluster_name(cluster.name)
+                            for cluster in existing_clusters
+                            if cluster.name
+                        }
+                        temp_cluster_to_db_id: dict[int, int] = {}
+
+                        for temp_cluster_id, cluster_repos in sorted(
+                            new_cluster_repos.items(),
+                            key=lambda item: item[0],
+                        ):
+                            repo_names, descriptions, topics, languages = (
+                                build_cluster_naming_inputs(
+                                    cluster_repos,
+                                    taxonomy_mapping=taxonomy_mapping,
+                                )
+                            )
+
+                            try:
+                                if use_llm:
+                                    name, description, keywords = (
+                                        await generate_cluster_name_llm(
+                                            repo_names,
+                                            descriptions,
+                                            topics,
+                                            languages,
+                                        )
+                                    )
+                                else:
+                                    name, description, keywords = generate_cluster_name(
+                                        repo_names,
+                                        descriptions,
+                                        topics,
+                                    )
+                            except Exception as e:
+                                logger.warning(
+                                    f"Incremental cluster naming failed: {e}, using heuristic"
+                                )
+                                name, description, keywords = generate_cluster_name(
+                                    repo_names,
+                                    descriptions,
+                                    topics,
+                                )
+
+                            sanitized_name = sanitize_cluster_name(name)
+                            unique_name = _ensure_unique_cluster_name(
+                                sanitized_name,
+                                used_names,
+                            )
+                            center = cluster_coords.get(
+                                temp_cluster_id,
+                                _fallback_cluster_center_coords(abs(temp_cluster_id)),
+                            )
+                            center_embedding = cluster_embeddings.get(temp_cluster_id)
+
+                            new_cluster = Cluster(
+                                user_id=user_id,
+                                name=unique_name,
+                                description=description,
+                                keywords=keywords,
+                                repo_count=len(cluster_repos),
+                                center_embedding=center_embedding,
+                                center_x=center[0],
+                                center_y=center[1],
+                                center_z=center[2],
+                            )
+                            db.add(new_cluster)
+                            await db.flush()
+
+                            temp_cluster_to_db_id[temp_cluster_id] = new_cluster.id
+                            if center_embedding is not None:
+                                cluster_embeddings[new_cluster.id] = center_embedding
+                            cluster_coords[new_cluster.id] = center
+
+                        for repo in repos_with_embeddings:
+                            if repo.cluster_id in temp_cluster_to_db_id:
+                                repo.cluster_id = temp_cluster_to_db_id[repo.cluster_id]
+
+                        repos_to_position_ids = {
+                            repo.id
+                            for repo in repos_needing_cluster + repos_needing_coords
+                        }
+
+                        for repo in repos_with_embeddings:
+                            if repo.id not in repos_to_position_ids:
+                                continue
+                            if repo.cluster_id is None:
+                                continue
+
+                            center = cluster_coords.get(
+                                repo.cluster_id,
+                                _fallback_cluster_center_coords(repo.cluster_id),
+                            )
+                            seed = int(repo.github_repo_id or repo.id or repo.cluster_id)
+                            coords = generate_incremental_coords(
+                                center,
+                                seed=seed,
+                                radius=0.2,
+                            )
+                            repo.coord_x = coords[0]
+                            repo.coord_y = coords[1]
+                            repo.coord_z = coords[2]
+
+                        all_clusters_result = await db.execute(
+                            select(Cluster).where(Cluster.user_id == user_id)
+                        )
+                        all_clusters = all_clusters_result.scalars().all()
+                        all_clusters_by_id = {cluster.id: cluster for cluster in all_clusters}
+                        final_repos_by_cluster: dict[int, list[StarredRepo]] = defaultdict(
+                            list
+                        )
+
+                        for repo in repos_with_embeddings:
+                            if repo.cluster_id in all_clusters_by_id:
+                                final_repos_by_cluster[repo.cluster_id].append(repo)
+
+                        for cluster in all_clusters:
+                            members = final_repos_by_cluster.get(cluster.id, [])
+                            if not members:
+                                await db.delete(cluster)
+                                continue
+
+                            cluster.repo_count = len(members)
+
+                            member_embeddings = [
+                                repo.embedding for repo in members if repo.embedding is not None
+                            ]
+                            if member_embeddings:
+                                center_embedding = normalize_vector(
+                                    np.mean(
+                                        np.array(member_embeddings, dtype=np.float32),
+                                        axis=0,
+                                    )
+                                ).tolist()
+                                cluster.center_embedding = center_embedding
+
+                            member_coords = [
+                                [repo.coord_x, repo.coord_y, repo.coord_z]
+                                for repo in members
+                                if repo.coord_x is not None
+                                and repo.coord_y is not None
+                                and repo.coord_z is not None
+                            ]
+                            if member_coords:
+                                center = np.mean(
+                                    np.array(member_coords, dtype=np.float32), axis=0
+                                )
+                                cluster.center_x = float(center[0])
+                                cluster.center_y = float(center[1])
+                                cluster.center_z = float(center[2])
+
+                        assigned_count = sum(
+                            1 for repo in repos_with_embeddings if repo.cluster_id is not None
+                        )
+                        unassigned_count = len(repos_with_embeddings) - assigned_count
+                        cluster_count = len(
+                            {
+                                repo.cluster_id
+                                for repo in repos_with_embeddings
+                                if repo.cluster_id is not None
+                            }
+                        )
+
+                        task.processed_items = len(repos_with_embeddings)
+                        task.error_details = {
+                            "mode": "incremental",
+                            "new_or_reassigned": len(repos_needing_cluster),
+                            "positioned": len(repos_to_position_ids),
+                        }
+                        task.status = "completed"
+                        task.completed_at = datetime.utcnow()
+                        await db.commit()
+
+                        logger.info(
+                            f"Incremental clustering completed for user {user_id}: "
+                            f"{cluster_count} clusters, {assigned_count} repos assigned, "
+                            f"{unassigned_count} unassigned"
+                        )
+
+            if incremental_applied:
+                return
+
             if len(embeddings) < 5:
                 task.status = "completed"
                 task.completed_at = datetime.utcnow()
@@ -1166,8 +1555,6 @@ async def run_clustering_task(
                 await db.commit()
                 return
 
-            # Run clustering with collision resolution.
-            # Use a user-friendly max-clusters control to derive stable parameters.
             derived = _derive_clustering_params_for_max_clusters(
                 n_samples=len(repos_with_embeddings),
                 max_clusters=max_clusters,
@@ -1190,19 +1577,15 @@ async def run_clustering_task(
                 resolve_overlap=True,
             )
 
-            # Delete existing clusters for this user
-            await db.execute(select(Cluster).where(Cluster.user_id == user_id))
             existing_clusters = (
                 (await db.execute(select(Cluster).where(Cluster.user_id == user_id)))
                 .scalars()
                 .all()
             )
-
             for cluster in existing_clusters:
                 await db.delete(cluster)
             await db.commit()
 
-            # Create new clusters
             cluster_map: dict[int, Cluster] = {}
             cluster_entries: list[dict] = []
             sorted_cluster_ids = sorted(
@@ -1210,7 +1593,6 @@ async def run_clustering_task(
             )
 
             for cluster_id in sorted_cluster_ids:
-                # Get repos in this cluster
                 cluster_repo_indices = [
                     i
                     for i, label in enumerate(cluster_result.labels)
@@ -1221,30 +1603,40 @@ async def run_clustering_task(
                 if not cluster_repos:
                     continue
 
-                # Extract info for naming
                 repo_names, descriptions, topics, languages = build_cluster_naming_inputs(
                     cluster_repos,
                     taxonomy_mapping=taxonomy_mapping,
                 )
 
-                # Generate cluster name
                 try:
                     if use_llm:
                         name, description, keywords = await generate_cluster_name_llm(
-                            repo_names, descriptions, topics, languages
+                            repo_names,
+                            descriptions,
+                            topics,
+                            languages,
                         )
                     else:
                         name, description, keywords = generate_cluster_name(
-                            repo_names, descriptions, topics
+                            repo_names,
+                            descriptions,
+                            topics,
                         )
                 except Exception as e:
                     logger.warning(f"Cluster naming failed: {e}, using heuristic")
                     name, description, keywords = generate_cluster_name(
-                        repo_names, descriptions, topics
+                        repo_names,
+                        descriptions,
+                        topics,
                     )
 
-                # Get cluster center
                 center = cluster_result.cluster_centers.get(cluster_id, [0, 0, 0])
+                cluster_embedding = normalize_vector(
+                    np.mean(
+                        np.array([embeddings[i] for i in cluster_repo_indices], dtype=np.float32),
+                        axis=0,
+                    )
+                ).tolist()
 
                 cluster_entries.append(
                     {
@@ -1254,6 +1646,7 @@ async def run_clustering_task(
                         "keywords": keywords,
                         "repo_count": len(cluster_repos),
                         "center": center,
+                        "center_embedding": cluster_embedding,
                     }
                 )
 
@@ -1267,17 +1660,17 @@ async def run_clustering_task(
                     description=entry["description"],
                     keywords=entry["keywords"],
                     repo_count=entry["repo_count"],
+                    center_embedding=entry.get("center_embedding"),
                     center_x=center[0] if len(center) > 0 else None,
                     center_y=center[1] if len(center) > 1 else None,
                     center_z=center[2] if len(center) > 2 else None,
                 )
                 db.add(cluster)
-                await db.flush()  # Get the ID
+                await db.flush()
                 cluster_map[entry["cluster_id"]] = cluster
 
             await db.commit()
 
-            # Update repos with cluster assignments and coordinates
             assigned_count = 0
             unassigned_count = 0
 
@@ -1285,12 +1678,10 @@ async def run_clustering_task(
                 if i < len(cluster_result.labels):
                     label = cluster_result.labels[i]
 
-                    # Assign cluster (skip noise points, though they should be rare now)
                     if label != -1 and label in cluster_map:
                         repo.cluster_id = cluster_map[label].id
                         assigned_count += 1
                     else:
-                        # Fallback: assign to first available cluster if label not in map
                         if cluster_map and label == -1:
                             first_cluster = next(iter(cluster_map.values()))
                             repo.cluster_id = first_cluster.id
@@ -1301,7 +1692,6 @@ async def run_clustering_task(
                         else:
                             unassigned_count += 1
 
-                    # Update 3D coordinates
                     if i < len(cluster_result.coords_3d):
                         coords = cluster_result.coords_3d[i]
                         repo.coord_x = coords[0] if len(coords) > 0 else None
@@ -1309,6 +1699,7 @@ async def run_clustering_task(
                         repo.coord_z = coords[2] if len(coords) > 2 else None
 
             task.processed_items = len(repos_with_embeddings)
+            task.error_details = {"mode": "full"}
             task.status = "completed"
             task.completed_at = datetime.utcnow()
             await db.commit()
@@ -1340,13 +1731,17 @@ async def start_clustering(
         le=20,
         description="Maximum number of clusters (lower = coarser, higher = finer)",
     ),
+    incremental: bool = Query(
+        default=False,
+        description="Incremental mode keeps existing graph stable and only adds new/unassigned repos",
+    ),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Start clustering on user's repos.
 
     This will:
-    1. Run UMAP dimensionality reduction
+    1. Run PCA dimensionality projection
     2. Apply HDBSCAN clustering
     3. Generate cluster names (using LLM if enabled)
     4. Update repo coordinates and cluster assignments
@@ -1390,7 +1785,12 @@ async def start_clustering(
 
     # Start background task
     background_tasks.add_task(
-        run_clustering_task, user.id, task.id, use_llm, max_clusters
+        run_clustering_task,
+        user.id,
+        task.id,
+        use_llm,
+        max_clusters,
+        incremental,
     )
 
     return SyncStartResponse(
@@ -1499,7 +1899,12 @@ async def full_refresh_task(user_id: int, task_id: int):
             await db.commit()
             await db.refresh(cluster_task)
 
-            await run_clustering_task(user_id, cluster_task.id, use_llm=True)
+            await run_clustering_task(
+                user_id,
+                cluster_task.id,
+                use_llm=True,
+                incremental=False,
+            )
 
             # Mark complete
             task.status = "completed"
