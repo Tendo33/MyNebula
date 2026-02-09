@@ -3,13 +3,12 @@
 Handles GitHub star synchronization and processing tasks.
 """
 
+import math
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Literal
 from zoneinfo import ZoneInfo
-
-import math
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -1103,6 +1102,24 @@ def _ensure_unique_cluster_name(name: str, used_names: set[str]) -> str:
     return candidate
 
 
+def _resolve_cluster_assignments(
+    repos: list[StarredRepo],
+    provisional_assignments: dict[int, int],
+    temp_cluster_to_db_id: dict[int, int],
+) -> dict[int, int]:
+    """Resolve provisional repo->cluster assignments to persisted cluster IDs."""
+    resolved: dict[int, int] = {}
+    for repo in repos:
+        provisional_cluster_id = provisional_assignments.get(repo.id)
+        if provisional_cluster_id is None:
+            continue
+        resolved[repo.id] = temp_cluster_to_db_id.get(
+            provisional_cluster_id,
+            provisional_cluster_id,
+        )
+    return resolved
+
+
 async def run_clustering_task(
     user_id: int,
     task_id: int,
@@ -1305,6 +1322,7 @@ async def run_clustering_task(
                         )
 
                         new_cluster_repos: dict[int, list[StarredRepo]] = defaultdict(list)
+                        provisional_assignments: dict[int, int] = {}
                         next_temp_cluster_id = -1
 
                         for repo in repos_needing_cluster:
@@ -1348,11 +1366,11 @@ async def run_clustering_task(
                                     repo.embedding
                                 ).tolist()
                                 cluster_counts[temp_cluster_id] = 1
-                                repo.cluster_id = temp_cluster_id
+                                provisional_assignments[repo.id] = temp_cluster_id
                                 new_cluster_repos[temp_cluster_id].append(repo)
                                 continue
 
-                            repo.cluster_id = best_cluster_id
+                            provisional_assignments[repo.id] = best_cluster_id
                             previous_count = max(cluster_counts.get(best_cluster_id, 0), 1)
                             previous_center = np.array(
                                 cluster_embeddings[best_cluster_id], dtype=np.float32
@@ -1440,9 +1458,13 @@ async def run_clustering_task(
                                 cluster_embeddings[new_cluster.id] = center_embedding
                             cluster_coords[new_cluster.id] = center
 
-                        for repo in repos_with_embeddings:
-                            if repo.cluster_id in temp_cluster_to_db_id:
-                                repo.cluster_id = temp_cluster_to_db_id[repo.cluster_id]
+                        resolved_assignments = _resolve_cluster_assignments(
+                            repos_needing_cluster,
+                            provisional_assignments,
+                            temp_cluster_to_db_id,
+                        )
+                        for repo in repos_needing_cluster:
+                            repo.cluster_id = resolved_assignments.get(repo.id)
 
                         repos_to_position_ids = {
                             repo.id

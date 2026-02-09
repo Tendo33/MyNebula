@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Any
 
-
 HIGH_CONFIDENCE_THRESHOLD = 0.78
 MEDIUM_CONFIDENCE_THRESHOLD = 0.58
 
