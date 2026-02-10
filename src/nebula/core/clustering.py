@@ -5,9 +5,9 @@ fidelity, while using PCA for both clustering feature reduction and 3D
 visualization coordinates.
 
 Key features:
-- PCA-reduced feature-space HDBSCAN clustering for robust semantic grouping
+- PCA-reduced feature-space hierarchical clustering for robust semantic grouping
 - Soft post-merge of highly similar clusters to reduce fragmentation
-- Noise point assignment to ensure all nodes are attached to a cluster
+- Stable full assignment of all nodes
 """
 
 import math
@@ -294,7 +294,7 @@ def fallback_hierarchical_clustering(
     feature_vectors: np.ndarray,
     n_clusters: int,
 ) -> np.ndarray:
-    """Perform hierarchical clustering as fallback when HDBSCAN fails.
+    """Perform hierarchical clustering with a bounded target cluster count.
 
     Args:
         feature_vectors: NxD feature vectors used for clustering
@@ -370,13 +370,13 @@ class ClusteringService:
         Args:
             n_neighbors: Reserved for backward compatibility (unused with PCA)
             min_dist: Reserved for backward compatibility (unused with PCA)
-            min_cluster_size: HDBSCAN minimum cluster size
-            min_samples: HDBSCAN min samples
-            cluster_selection_method: HDBSCAN method
-            min_clusters: Minimum expected number of clusters (fallback heuristic)
-            target_min_clusters: Optional lower bound hint for fallback only
+            min_cluster_size: Reserved for backward compatibility
+            min_samples: Reserved for backward compatibility
+            cluster_selection_method: Reserved for backward compatibility
+            min_clusters: Minimum expected number of clusters
+            target_min_clusters: Optional lower bound hint
             target_max_clusters: Soft target upper bound via semantic merge
-            assign_all_points: Whether to assign noise points to nearest clusters
+            assign_all_points: Reserved for backward compatibility
         """
         self.n_neighbors = n_neighbors
         self.min_dist = min_dist
@@ -396,11 +396,7 @@ class ClusteringService:
         normalized_embeddings: np.ndarray,
         target_dim: int = 30,
     ) -> np.ndarray:
-        """Reduce normalized embeddings for density-based clustering.
-
-        HDBSCAN can degrade in very high dimensions. Reducing to a moderate PCA
-        feature space improves density contrast and cluster discoverability.
-        """
+        """Reduce normalized embeddings for stable high-dimensional clustering."""
         n_samples, n_features = normalized_embeddings.shape
         if n_samples < 2:
             return normalized_embeddings
@@ -475,12 +471,6 @@ class ClusteringService:
 
         logger.info(f"Clustering {n_samples} embeddings")
 
-        # Adjust parameters for small datasets
-        effective_min_cluster_size = min(max(2, self.min_cluster_size), n_samples)
-        effective_min_samples = min(
-            max(1, self.min_samples), effective_min_cluster_size
-        )
-
         # Dimensionality reduction for clustering stability in high dimensions.
         clustering_features = self._reduce_for_clustering(
             normalized_embeddings=normalized_embeddings,
@@ -502,43 +492,20 @@ class ClusteringService:
             n_clusters = 1
             logger.info("Too few samples, assigning all to cluster 0")
         else:
-            # Try HDBSCAN first in normalized embedding space
-            import hdbscan
-
-            clusterer = hdbscan.HDBSCAN(
-                min_cluster_size=effective_min_cluster_size,
-                min_samples=effective_min_samples,
-                metric="euclidean",
-                cluster_selection_method=self.cluster_selection_method,
-            )
-            labels = clusterer.fit_predict(clustering_features)
-            n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-
-            logger.info(
-                f"HDBSCAN found {n_clusters} clusters (noise points: {(labels == -1).sum()})"
-            )
-
-            # Check if we need fallback clustering
+            # Estimate a stable cluster count and cluster directly with hierarchy.
             expected_clusters = estimate_cluster_count(n_samples, self.min_clusters)
             if self.target_min_clusters is not None:
                 expected_clusters = max(expected_clusters, self.target_min_clusters)
             if self.target_max_clusters is not None:
                 expected_clusters = min(expected_clusters, self.target_max_clusters)
-
-            if n_clusters < self.min_clusters and n_samples >= 5:
-                logger.warning(
-                    f"HDBSCAN produced only {n_clusters} clusters, "
-                    f"falling back to hierarchical clustering with {expected_clusters} clusters"
-                )
-                labels = fallback_hierarchical_clustering(
-                    clustering_features, expected_clusters
-                )
-                n_clusters = len(set(labels))
-            elif self.assign_all_points and (labels == -1).any():
-                # Assign noise points to nearest clusters
-                labels = assign_noise_to_nearest_cluster(
-                    coords_3d, labels, embeddings_array
-                )
+            labels = fallback_hierarchical_clustering(
+                clustering_features, expected_clusters
+            )
+            n_clusters = len(set(labels))
+            logger.info(
+                f"Hierarchical clustering produced {n_clusters} clusters "
+                f"(target: {expected_clusters})"
+            )
 
         labels = np.array(labels, dtype=int)
         labels = relabel_clusters(labels)

@@ -1057,26 +1057,20 @@ def _derive_clustering_params_for_max_clusters(
     """Derive clustering parameters from a user-friendly 'max clusters' knob.
 
     This is intentionally heuristic. The goal is stable UX, not perfect clustering.
-
-    Key insight: for diverse GitHub stars, HDBSCAN needs a LOW min_cluster_size
-    to discover natural groupings. We then rely on merge_similar_clusters() to
-    consolidate into the target range. Aggressive min_cluster_size causes HDBSCAN
-    to classify everything as noise.
     """
     safe_max_clusters = max(2, min(int(max_clusters), 20))
     safe_min_clusters = max(2, safe_max_clusters // 3)
     if min_clusters is not None:
         safe_min_clusters = max(2, min(int(min_clusters), safe_max_clusters))
 
-    # Use a conservative min_cluster_size so HDBSCAN can find clusters in
-    # diverse, spread-out data. The post-merge step handles consolidation.
+    # Keep backward-compatible knobs even though clustering is now hierarchical.
     # For 180 repos: min_cluster_size = max(3, min(10, 180//20)) = max(3, 9) = 9
     approx_min_size = max(3, n_samples // 20)
     min_cluster_size = min(approx_min_size, 10)
     min_samples = max(1, min(3, min_cluster_size // 3))
 
-    # Coarser (smaller max_clusters) => more global structure in UMAP.
-    # Finer (larger max_clusters) => more local structure.
+    # Coarser (smaller max_clusters) => stronger consolidation pressure.
+    # Finer (larger max_clusters) => preserves more local distinctions.
     n_neighbors = int(max(15, min(60, 10 + (50 - 2 * safe_max_clusters))))
 
     return {
@@ -1500,8 +1494,8 @@ async def start_clustering(
     """Start clustering on user's repos.
 
     This will:
-    1. Run UMAP dimensionality reduction
-    2. Apply HDBSCAN clustering
+    1. Run PCA dimensionality reduction
+    2. Apply hierarchical clustering
     3. Generate cluster names (using LLM if enabled)
     4. Update repo coordinates and cluster assignments
 

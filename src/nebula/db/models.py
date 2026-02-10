@@ -152,7 +152,7 @@ class StarredRepo(Base):
         Integer, ForeignKey("clusters.id"), nullable=True, index=True
     )
 
-    # 3D coordinates for visualization (after UMAP)
+    # 3D coordinates for visualization (after PCA projection)
     coord_x: Mapped[float | None] = mapped_column(nullable=True)
     coord_y: Mapped[float | None] = mapped_column(nullable=True)
     coord_z: Mapped[float | None] = mapped_column(nullable=True)
