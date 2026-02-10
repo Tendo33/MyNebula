@@ -170,7 +170,11 @@ const GraphPage = () => {
 
       // Step 4: Run clustering
       updateStepStatus('clustering', 'running');
-      const clusterResult = await startClustering(true, settings.maxClusters);
+      const clusterResult = await startClustering(
+        true,
+        settings.maxClusters,
+        settings.minClusters
+      );
 
       const clusterSuccess = await waitForTaskComplete(clusterResult.task_id);
       if (!clusterSuccess) {

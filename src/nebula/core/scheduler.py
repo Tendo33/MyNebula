@@ -234,7 +234,14 @@ class SchedulerService:
             await db.commit()
             await db.refresh(cluster_task)
 
-            await run_clustering_task(schedule.user_id, cluster_task.id, use_llm=True)
+            # Use incremental mode for scheduled syncs to preserve existing layout.
+            # Only new repos get assigned to existing clusters; the graph stays stable.
+            await run_clustering_task(
+                schedule.user_id,
+                cluster_task.id,
+                use_llm=True,
+                incremental=True,
+            )
 
             # Update schedule on success
             schedule.last_run_status = "success"

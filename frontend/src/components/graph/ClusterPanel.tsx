@@ -126,7 +126,11 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
 
     try {
       setReclustering(true);
-      const started = await startClustering(true, settings.maxClusters);
+      const started = await startClustering(
+        true,
+        settings.maxClusters,
+        settings.minClusters
+      );
 
       // Poll until clustering completes, then refresh graph data
       // (Keeps this lightweight vs. the full 4-step sync flow)
@@ -144,7 +148,7 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
     } finally {
       setReclustering(false);
     }
-  }, [reclustering, refreshData, settings.maxClusters]);
+  }, [reclustering, refreshData, settings.maxClusters, settings.minClusters]);
 
   // Get clusters with node counts
   const clustersWithCounts = useMemo(() => {
@@ -243,7 +247,41 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
                 max={20}
                 step={1}
                 value={settings.maxClusters}
-                onChange={(e) => updateSettings({ maxClusters: Number(e.target.value) })}
+                onChange={(e) => {
+                  const nextMax = Number(e.target.value);
+                  if (nextMax < settings.minClusters) {
+                    // Only link when bounds would be invalid (max < min)
+                    updateSettings({ maxClusters: nextMax, minClusters: nextMax });
+                    return;
+                  }
+                  updateSettings({ maxClusters: nextMax });
+                }}
+                className="w-full mt-2"
+              />
+
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xs text-text-muted">
+                  {t('graph.min_clusters', { defaultValue: '最小簇数（越大越细）' })}
+                </span>
+                <span className="text-xs font-mono tabular-nums text-text-dim">
+                  {settings.minClusters}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={2}
+                max={20}
+                step={1}
+                value={settings.minClusters}
+                onChange={(e) => {
+                  const nextMin = Number(e.target.value);
+                  if (nextMin > settings.maxClusters) {
+                    // Only link when bounds would be invalid (min > max)
+                    updateSettings({ minClusters: nextMin, maxClusters: nextMin });
+                    return;
+                  }
+                  updateSettings({ minClusters: nextMin });
+                }}
                 className="w-full mt-2"
               />
             </div>

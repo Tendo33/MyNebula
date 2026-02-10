@@ -152,6 +152,7 @@ class LLMService:
         descriptions: list[str],
         topics: list[list[str]],
         languages: list[str],
+        existing_cluster_names: list[str] | None = None,
     ) -> tuple[str, str, list[str]]:
         """Generate cluster name, description, and keywords using LLM.
 
@@ -160,6 +161,8 @@ class LLMService:
             descriptions: Descriptions of repos
             topics: Topics/tags of repos
             languages: Primary languages of repos
+            existing_cluster_names: Names already assigned to other clusters,
+                used to ensure this cluster gets a unique and distinctive name.
 
         Returns:
             Tuple of (name, description, keywords)
@@ -208,47 +211,69 @@ class LLMService:
             )
         ]
 
-        prompt = f"""分析以下 GitHub 仓库集合，生成一个简洁的集群描述。
+        # Build the exclusion constraint for uniqueness
+        exclusion_block = ""
+        if existing_cluster_names:
+            names_list = ", ".join(f'"{n}"' for n in existing_cluster_names)
+            exclusion_block = (
+                f"\n\n已有的集群名称（你必须避免使用相同或相似的名称）:\n{names_list}"
+            )
+
+        prompt = f"""分析以下 GitHub 仓库集合，生成一个简洁且有区分度的集群描述。
 
 仓库列表 ({len(repo_names)} 个):
 {repos_text}
 
 主要编程语言: {", ".join(unique_languages[:5])}
-常见标签: {", ".join(unique_topics[:10])}
+常见标签: {", ".join(unique_topics[:10])}{exclusion_block}
 
-请按以下格式输出（使用 | 分隔）:
+请按以下格式输出（使用 | 分隔，只输出一行）:
 名称|描述|关键词1,关键词2,关键词3
 
 要求:
-1. 名称: 2-4 个词，概括这组仓库的主题
-2. 描述: 一句话说明这组仓库的共同特点
-3. 关键词: 3-5 个关键词
+1. 名称: 2-5 个中文词，准确概括这组仓库的**核心差异化主题**（不要使用宽泛的"LLM"、"AI"等词，要具体到应用场景或技术领域）
+2. 描述: 一句话说明这组仓库区别于其他集群的独特共同特点
+3. 关键词: 3-5 个关键词，尽量具体
 
 示例输出格式:
-机器学习工具|用于数据科学和机器学习的 Python 工具库|机器学习,数据科学,Python,深度学习"""
+RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检索,知识库,LangChain
+代码生成助手|AI驱动的代码自动生成与补全工具|代码生成,Copilot,IDE插件"""
 
         try:
             response = await self.complete(
                 prompt=prompt,
-                system_prompt="你是一个技术分析专家，擅长分析和总结 GitHub 项目。请用中文回答。",
-                max_tokens=4096,
-                temperature=0.5,
+                system_prompt=(
+                    "你是一个技术分析专家，擅长分析和分类 GitHub 项目。"
+                    "你的任务是为每个集群生成独特且有区分度的名称。"
+                    "请用中文回答，只输出要求的格式，不要输出其他内容。"
+                ),
+                max_tokens=2560,
+                temperature=0.3,
             )
 
-            # Parse response
-            parts = response.strip().split("|")
+            # Parse response - take only the first non-empty line
+            response_line = ""
+            for line in response.strip().split("\n"):
+                line = line.strip()
+                if line and "|" in line:
+                    response_line = line
+                    break
+
+            if not response_line:
+                response_line = response.strip().split("\n")[0]
+
+            parts = response_line.split("|")
             if len(parts) >= 3:
                 name = sanitize_cluster_name(parts[0].strip())
                 description = parts[1].strip()
-                keywords = [k.strip() for k in parts[2].split(",")]
+                keywords = [k.strip() for k in parts[2].split(",") if k.strip()]
                 return name, description, keywords[:5]
             else:
                 # Fallback parsing
-                lines = response.strip().split("\n")
-                name = sanitize_cluster_name(lines[0] if lines else "技术项目集")
-                description = (
-                    lines[1] if len(lines) > 1 else f"包含 {len(repo_names)} 个相关仓库"
+                name = sanitize_cluster_name(
+                    response_line if response_line else "技术项目集"
                 )
+                description = f"包含 {len(repo_names)} 个相关仓库"
                 keywords = unique_topics[:5] if unique_topics else ["github", "开源"]
                 return name, description, keywords
 

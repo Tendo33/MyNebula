@@ -77,6 +77,8 @@ export interface GraphSettings {
   hqRendering: boolean;
   /** User-friendly knob for clustering granularity (lower = coarser) */
   maxClusters: number;
+  /** Lower bound hint for desired cluster count */
+  minClusters: number;
 }
 
 interface GraphState {
@@ -148,6 +150,7 @@ const defaultSettings: GraphSettings = {
   showTrajectories: true,
   hqRendering: true,
   maxClusters: 8,
+  minClusters: 3,
 };
 
 const GraphContext = createContext<GraphContextValue | null>(null);

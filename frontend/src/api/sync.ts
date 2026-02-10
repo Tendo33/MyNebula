@@ -68,10 +68,15 @@ export const startSummaries = async () => {
  */
 export const startClustering = async (
   useLlm: boolean = true,
-  maxClusters: number = 8
+  maxClusters: number = 8,
+  minClusters: number = 2
 ) => {
 	const response = await client.post<SyncStartResponse>("/sync/clustering", null, {
-		params: { use_llm: useLlm, max_clusters: maxClusters },
+		params: {
+			use_llm: useLlm,
+			max_clusters: maxClusters,
+			min_clusters: minClusters,
+		},
 	});
 	return response.data;
 };

@@ -1046,19 +1046,28 @@ def _derive_clustering_params_for_max_clusters(
     *,
     n_samples: int,
     max_clusters: int,
+    min_clusters: int | None = None,
 ) -> dict:
     """Derive clustering parameters from a user-friendly 'max clusters' knob.
 
     This is intentionally heuristic. The goal is stable UX, not perfect clustering.
+
+    Key insight: for diverse GitHub stars, HDBSCAN needs a LOW min_cluster_size
+    to discover natural groupings. We then rely on merge_similar_clusters() to
+    consolidate into the target range. Aggressive min_cluster_size causes HDBSCAN
+    to classify everything as noise.
     """
     safe_max_clusters = max(2, min(int(max_clusters), 20))
-    min_clusters = max(2, safe_max_clusters // 3)
+    safe_min_clusters = max(2, safe_max_clusters // 3)
+    if min_clusters is not None:
+        safe_min_clusters = max(2, min(int(min_clusters), safe_max_clusters))
 
-    # Roughly aim for average cluster size around n/max_clusters.
-    # Use a slightly smaller min_cluster_size so HDBSCAN can still form clusters.
-    approx_cluster_size = max(2, int(n_samples / safe_max_clusters))
-    min_cluster_size = max(5, int(approx_cluster_size * 0.9))
-    min_samples = max(2, int(min_cluster_size * 0.4))
+    # Use a conservative min_cluster_size so HDBSCAN can find clusters in
+    # diverse, spread-out data. The post-merge step handles consolidation.
+    # For 180 repos: min_cluster_size = max(3, min(10, 180//20)) = max(3, 9) = 9
+    approx_min_size = max(3, n_samples // 20)
+    min_cluster_size = min(approx_min_size, 10)
+    min_samples = max(1, min(3, min_cluster_size // 3))
 
     # Coarser (smaller max_clusters) => more global structure in UMAP.
     # Finer (larger max_clusters) => more local structure.
@@ -1068,7 +1077,7 @@ def _derive_clustering_params_for_max_clusters(
         "n_neighbors": n_neighbors,
         "min_cluster_size": min_cluster_size,
         "min_samples": min_samples,
-        "min_clusters": min_clusters,
+        "min_clusters": safe_min_clusters,
         "target_max_clusters": safe_max_clusters,
     }
 
@@ -1078,6 +1087,8 @@ async def run_clustering_task(
     task_id: int,
     use_llm: bool = True,
     max_clusters: int = 8,
+    min_clusters: int | None = None,
+    incremental: bool = False,
 ):
     """Background task to run clustering on user's repos.
 
@@ -1086,13 +1097,19 @@ async def run_clustering_task(
         task_id: Sync task ID
         use_llm: Whether to use LLM for cluster naming
         max_clusters: User-friendly knob for controlling clustering granularity
+        min_clusters: Optional lower bound hint for cluster count
+        incremental: If True, only assign new repos to existing clusters
+            without re-running full clustering. Existing repo positions and
+            cluster assignments are preserved. Use for daily updates.
     """
     from nebula.core.clustering import (
         ClusteringService,
+        assign_new_repos_incrementally,
         build_cluster_naming_inputs,
         deduplicate_cluster_entries,
         generate_cluster_name,
         generate_cluster_name_llm,
+        normalize_embeddings,
     )
     from nebula.db.database import get_db_context
 
@@ -1162,11 +1179,132 @@ async def run_clustering_task(
                 await db.commit()
                 return
 
+            # ── Incremental mode: only assign NEW repos to existing clusters ──
+            if incremental:
+                import numpy as np
+
+                # Separate repos into "existing" (have coords + cluster) and "new"
+                existing_repos = []
+                existing_embs = []
+                existing_crds = []
+                new_repos = []
+                new_embs = []
+                new_sizes = []
+
+                # Build a map from DB cluster_id -> label index for existing repos
+                existing_cluster_ids: list[int] = []
+
+                for i, repo in enumerate(repos_with_embeddings):
+                    has_position = (
+                        repo.coord_x is not None
+                        and repo.coord_y is not None
+                        and repo.coord_z is not None
+                        and repo.cluster_id is not None
+                    )
+                    if has_position:
+                        existing_repos.append(repo)
+                        existing_embs.append(embeddings[i])
+                        existing_crds.append([repo.coord_x, repo.coord_y, repo.coord_z])
+                        existing_cluster_ids.append(repo.cluster_id)
+                    else:
+                        new_repos.append(repo)
+                        new_embs.append(embeddings[i])
+                        new_sizes.append(node_sizes[i])
+
+                # If no new repos, nothing to do
+                if not new_repos:
+                    logger.info("Incremental mode: no new repos to assign")
+                    task.status = "completed"
+                    task.completed_at = datetime.utcnow()
+                    task.processed_items = 0
+                    await db.commit()
+                    return
+
+                # If no existing repos have positions, fall through to full clustering
+                if not existing_repos:
+                    logger.info(
+                        "Incremental mode: no existing repos with positions, "
+                        "falling back to full clustering"
+                    )
+                    incremental = False  # Will fall through to full clustering below
+                else:
+                    logger.info(
+                        f"Incremental mode: {len(existing_repos)} existing repos, "
+                        f"{len(new_repos)} new repos to assign"
+                    )
+
+                    existing_embs_arr = normalize_embeddings(
+                        np.array(existing_embs, dtype=np.float32)
+                    )
+                    existing_crds_arr = np.array(existing_crds, dtype=np.float64)
+                    # Use DB cluster_id directly as labels for nearest-neighbor assignment
+                    existing_lbls_arr = np.array(existing_cluster_ids, dtype=int)
+                    new_embs_arr = normalize_embeddings(
+                        np.array(new_embs, dtype=np.float32)
+                    )
+
+                    result_incr = assign_new_repos_incrementally(
+                        existing_embeddings=existing_embs_arr,
+                        existing_coords=existing_crds_arr,
+                        existing_labels=existing_lbls_arr,
+                        new_embeddings=new_embs_arr,
+                        new_node_sizes=new_sizes,
+                        k_neighbors=5,
+                        noise_scale=0.15,
+                    )
+
+                    # Update new repos with assigned coordinates and cluster IDs
+                    for i, repo in enumerate(new_repos):
+                        coords = result_incr.new_coords[i]
+                        repo.coord_x = coords[0]
+                        repo.coord_y = coords[1]
+                        repo.coord_z = coords[2]
+                        # The label from incremental assign is the DB cluster_id
+                        repo.cluster_id = int(result_incr.new_labels[i])
+
+                    # Update cluster repo counts
+                    cluster_ids_to_update = set(
+                        int(label) for label in result_incr.new_labels
+                    )
+                    for cid in cluster_ids_to_update:
+                        cluster_obj = await db.get(Cluster, cid)
+                        if cluster_obj:
+                            count_result = await db.execute(
+                                select(StarredRepo).where(
+                                    StarredRepo.user_id == user_id,
+                                    StarredRepo.cluster_id == cid,
+                                )
+                            )
+                            cluster_obj.repo_count = len(count_result.scalars().all())
+
+                    task.processed_items = len(new_repos)
+                    task.status = "completed"
+                    task.completed_at = datetime.utcnow()
+                    await db.commit()
+
+                    logger.info(
+                        f"Incremental clustering completed for user {user_id}: "
+                        f"{len(new_repos)} new repos assigned to existing clusters"
+                    )
+                    return
+
+            # ── Full clustering mode ──
+
             # Run clustering with collision resolution.
             # Use a user-friendly max-clusters control to derive stable parameters.
             derived = _derive_clustering_params_for_max_clusters(
                 n_samples=len(repos_with_embeddings),
                 max_clusters=max_clusters,
+                min_clusters=min_clusters,
+            )
+            logger.info(
+                "Clustering params: "
+                f"max_clusters={max_clusters}, min_clusters={min_clusters}, "
+                f"derived_min_clusters={derived['min_clusters']}, "
+                f"derived_target_max_clusters={derived['target_max_clusters']}, "
+                f"min_cluster_size={derived['min_cluster_size']}, "
+                f"min_samples={derived['min_samples']}, "
+                f"n_neighbors={derived['n_neighbors']}"
             )
             clustering_service = ClusteringService(
                 n_neighbors=derived["n_neighbors"],
@@ -1175,7 +1313,7 @@ async def run_clustering_task(
                 min_samples=derived["min_samples"],
                 cluster_selection_method="eom",
                 min_clusters=derived["min_clusters"],
-                target_min_clusters=None,
+                target_min_clusters=derived["min_clusters"],
                 target_max_clusters=derived["target_max_clusters"],
                 assign_all_points=True,
             )
@@ -1205,6 +1343,9 @@ async def run_clustering_task(
                 {cluster_id for cluster_id in cluster_result.labels if cluster_id != -1}
             )
 
+            # Track assigned names so each subsequent LLM call avoids duplicates
+            assigned_names: list[str] = []
+
             for cluster_id in sorted_cluster_ids:
                 # Get repos in this cluster
                 cluster_repo_indices = [
@@ -1218,15 +1359,19 @@ async def run_clustering_task(
                     continue
 
                 # Extract info for naming
-                repo_names, descriptions, topics, languages = build_cluster_naming_inputs(
-                    cluster_repos
+                repo_names, descriptions, topics, languages = (
+                    build_cluster_naming_inputs(cluster_repos)
                 )
 
-                # Generate cluster name
+                # Generate cluster name (pass existing names to enforce uniqueness)
                 try:
                     if use_llm:
                         name, description, keywords = await generate_cluster_name_llm(
-                            repo_names, descriptions, topics, languages
+                            repo_names,
+                            descriptions,
+                            topics,
+                            languages,
+                            existing_cluster_names=assigned_names or None,
                         )
                     else:
                         name, description, keywords = generate_cluster_name(
@@ -1237,6 +1382,8 @@ async def run_clustering_task(
                     name, description, keywords = generate_cluster_name(
                         repo_names, descriptions, topics
                     )
+
+                assigned_names.append(name)
 
                 # Get cluster center
                 center = cluster_result.cluster_centers.get(cluster_id, [0, 0, 0])
@@ -1335,6 +1482,12 @@ async def start_clustering(
         le=20,
         description="Maximum number of clusters (lower = coarser, higher = finer)",
     ),
+    min_clusters: int = Query(
+        default=3,
+        ge=2,
+        le=20,
+        description="Minimum desired clusters (must be <= max_clusters)",
+    ),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
@@ -1354,6 +1507,12 @@ async def start_clustering(
     Returns:
         Task information
     """
+    if min_clusters > max_clusters:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="min_clusters must be less than or equal to max_clusters",
+        )
+
     user = await get_default_user(db)
 
     # Check for existing running task
@@ -1385,7 +1544,12 @@ async def start_clustering(
 
     # Start background task
     background_tasks.add_task(
-        run_clustering_task, user.id, task.id, use_llm, max_clusters
+        run_clustering_task,
+        user_id=user.id,
+        task_id=task.id,
+        use_llm=use_llm,
+        max_clusters=max_clusters,
+        min_clusters=min_clusters,
     )
 
     return SyncStartResponse(

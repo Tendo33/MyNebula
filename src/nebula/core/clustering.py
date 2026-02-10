@@ -27,9 +27,9 @@ logger = get_logger(__name__)
 def resolve_collisions(
     coords: np.ndarray,
     node_sizes: list[float] | None = None,
-    min_distance: float = 0.15,
-    iterations: int = 50,
-    repulsion_strength: float = 0.1,
+    min_distance: float = 0.35,
+    iterations: int = 100,
+    repulsion_strength: float = 0.5,
 ) -> np.ndarray:
     """Resolve node collisions in 3D space using force-directed repulsion.
 
@@ -41,7 +41,7 @@ def resolve_collisions(
         node_sizes: Optional list of node sizes (used for distance calculation)
         min_distance: Minimum distance between node centers
         iterations: Number of iterations for collision resolution
-        repulsion_strength: How strongly nodes repel each other
+        repulsion_strength: How strongly nodes repel each other (0.5 = fix half the overlap per step)
 
     Returns:
         Adjusted Nx3 coordinates with resolved collisions
@@ -56,8 +56,10 @@ def resolve_collisions(
     if node_sizes is None:
         node_sizes = [1.0] * n
 
+    rng = np.random.RandomState(42)
+
     for iteration in range(iterations):
-        moved = False
+        collision_count = 0
         displacements = np.zeros_like(result)
 
         for i in range(n):
@@ -72,31 +74,40 @@ def resolve_collisions(
                 required_dist = min_distance * (size_i + size_j) / 2
 
                 # If nodes are too close, push them apart
-                if dist < required_dist and dist > 0.001:
+                if dist < required_dist and dist > 1e-6:
                     # Calculate repulsion direction
                     direction = diff / dist
                     overlap = required_dist - dist
 
-                    # Apply displacement (split evenly between both nodes)
+                    # Apply displacement proportional to overlap
                     displacement = direction * overlap * repulsion_strength
                     displacements[i] += displacement
                     displacements[j] -= displacement
-                    moved = True
-                elif dist <= 0.001:
-                    # Nodes are at same position, add random displacement
-                    random_dir = np.random.randn(3)
-                    random_dir /= np.linalg.norm(random_dir) + 0.001
-                    displacements[i] += random_dir * min_distance * repulsion_strength
-                    displacements[j] -= random_dir * min_distance * repulsion_strength
-                    moved = True
+                    collision_count += 1
+                elif dist <= 1e-6:
+                    # Nodes are at same position, add deterministic random displacement
+                    random_dir = rng.randn(3)
+                    norm = np.linalg.norm(random_dir)
+                    if norm > 0:
+                        random_dir /= norm
+                    else:
+                        random_dir = np.array([1.0, 0.0, 0.0])
+                    displacements[i] += random_dir * min_distance * 0.5
+                    displacements[j] -= random_dir * min_distance * 0.5
+                    collision_count += 1
 
         # Apply displacements
         result += displacements
 
         # Early exit if no collisions were found
-        if not moved:
+        if collision_count == 0:
             logger.debug(f"Collision resolution converged at iteration {iteration}")
             break
+
+        if iteration % 20 == 0 and iteration > 0:
+            logger.debug(
+                f"Collision resolution iteration {iteration}: {collision_count} collisions remaining"
+            )
 
     return result
 
@@ -191,7 +202,9 @@ def normalize_embeddings(embeddings: np.ndarray) -> np.ndarray:
 
 def relabel_clusters(labels: np.ndarray) -> np.ndarray:
     """Relabel cluster IDs to contiguous integers while preserving noise as -1."""
-    unique_labels = sorted({int(label) for label in labels.tolist() if int(label) != -1})
+    unique_labels = sorted(
+        {int(label) for label in labels.tolist() if int(label) != -1}
+    )
     mapping = {label: idx for idx, label in enumerate(unique_labels)}
     relabeled = np.array([mapping.get(int(label), -1) for label in labels], dtype=int)
     return relabeled
@@ -217,7 +230,11 @@ def merge_similar_clusters(
 
     for _ in range(max_iterations):
         cluster_ids = sorted(
-            {int(cluster_id) for cluster_id in merged_labels.tolist() if cluster_id != -1}
+            {
+                int(cluster_id)
+                for cluster_id in merged_labels.tolist()
+                if cluster_id != -1
+            }
         )
 
         if len(cluster_ids) <= 1:
@@ -499,6 +516,25 @@ class ClusteringService:
         )
         n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
+        # Guardrail: keep final cluster count within the configured lower bound.
+        # merge_similar_clusters() is a soft optimization and may reduce too much.
+        if (
+            self.target_min_clusters is not None
+            and n_clusters < self.target_min_clusters
+            and n_samples >= self.target_min_clusters
+        ):
+            min_target = self.target_min_clusters
+            if self.target_max_clusters is not None:
+                min_target = min(min_target, self.target_max_clusters)
+            min_target = min(max(2, min_target), n_samples)
+            logger.warning(
+                "Cluster merge reduced clusters below target_min_clusters; "
+                f"rebuilding with hierarchical fallback to {min_target} clusters"
+            )
+            labels = fallback_hierarchical_clustering(normalized_embeddings, min_target)
+            labels = relabel_clusters(np.array(labels, dtype=int))
+            n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+
         # Fallback for pathological cases: no clusters after processing
         if n_clusters == 0 and n_samples >= 2:
             fallback_target = self.target_min_clusters or self.min_clusters or 2
@@ -515,15 +551,21 @@ class ClusteringService:
 
         logger.info(f"Final clustering: {n_clusters} clusters, all points assigned")
 
+        # Scale UMAP output to give nodes more room before collision resolution.
+        # UMAP with min_dist=0.1 packs points tightly; scaling by 2x gives
+        # better baseline spacing while preserving relative structure.
+        if n_samples > 1:
+            coords_3d = coords_3d * 2.0
+
         # Resolve node collisions to prevent overlap
         if resolve_overlap and n_samples > 1:
             logger.info("Resolving node collisions...")
             coords_3d = resolve_collisions(
                 coords=coords_3d,
                 node_sizes=node_sizes,
-                min_distance=0.15,
-                iterations=50,
-                repulsion_strength=0.1,
+                min_distance=0.35,
+                iterations=100,
+                repulsion_strength=0.5,
             )
             logger.info("Collision resolution complete")
 
@@ -612,7 +654,9 @@ def deduplicate_cluster_entries(
         entry["name"] = sanitize_cluster_name(entry.get("name"))
 
     used_names: set[str] = set()
-    for entry in sorted(entries, key=lambda item: item.get("repo_count", 0), reverse=True):
+    for entry in sorted(
+        entries, key=lambda item: item.get("repo_count", 0), reverse=True
+    ):
         base_name = entry["name"]
         if base_name not in used_names:
             used_names.add(base_name)
@@ -742,6 +786,7 @@ async def generate_cluster_name_llm(
     descriptions: list[str],
     topics: list[list[str]],
     languages: list[str] | None = None,
+    existing_cluster_names: list[str] | None = None,
 ) -> tuple[str, str, list[str]]:
     """Generate cluster name, description, and keywords using LLM.
 
@@ -753,6 +798,8 @@ async def generate_cluster_name_llm(
         descriptions: Descriptions of repos
         topics: Topics/tags of repos
         languages: Primary languages of repos (optional)
+        existing_cluster_names: Names already assigned to other clusters,
+            used to ensure uniqueness.
 
     Returns:
         Tuple of (name, description, keywords)
@@ -766,6 +813,112 @@ async def generate_cluster_name_llm(
         descriptions=descriptions,
         topics=topics,
         languages=languages or [],
+        existing_cluster_names=existing_cluster_names,
+    )
+
+
+class IncrementalAssignResult(BaseModel):
+    """Result of incremental assignment for new repos."""
+
+    new_coords: list[list[float]]  # 3D coordinates for each new repo
+    new_labels: list[int]  # Cluster label for each new repo
+
+
+def assign_new_repos_incrementally(
+    existing_embeddings: np.ndarray,
+    existing_coords: np.ndarray,
+    existing_labels: np.ndarray,
+    new_embeddings: np.ndarray,
+    new_node_sizes: list[float] | None = None,
+    k_neighbors: int = 5,
+    noise_scale: float = 0.15,
+) -> IncrementalAssignResult:
+    """Assign new repos to existing clusters and interpolate their 3D coordinates.
+
+    Instead of re-running UMAP and re-clustering everything, this function:
+    1. Finds K nearest neighbors of each new repo in embedding space
+    2. Interpolates 3D coordinates from those neighbors (weighted by similarity)
+    3. Assigns the new repo to the cluster of its nearest neighbor
+
+    This preserves the existing graph layout and only adds new nodes.
+
+    Args:
+        existing_embeddings: NxD normalized embeddings for existing repos
+        existing_coords: Nx3 coordinates of existing repos
+        existing_labels: N cluster labels for existing repos
+        new_embeddings: MxD normalized embeddings for new repos
+        new_node_sizes: Optional sizes for new nodes (for collision resolution)
+        k_neighbors: Number of neighbors for interpolation
+        noise_scale: Scale of random offset to avoid exact overlap with neighbors
+
+    Returns:
+        IncrementalAssignResult with coordinates and labels for new repos
+    """
+    if len(new_embeddings) == 0:
+        return IncrementalAssignResult(new_coords=[], new_labels=[])
+
+    n_existing = len(existing_embeddings)
+    n_new = len(new_embeddings)
+
+    logger.info(
+        f"Incrementally assigning {n_new} new repos using {n_existing} existing repos"
+    )
+
+    # Effective k: can't use more neighbors than existing points
+    effective_k = min(k_neighbors, n_existing)
+
+    # Find nearest existing neighbors for each new embedding
+    nn = NearestNeighbors(n_neighbors=effective_k, metric="cosine")
+    nn.fit(existing_embeddings)
+    distances, indices = nn.kneighbors(new_embeddings)
+
+    new_coords = np.zeros((n_new, 3), dtype=np.float64)
+    new_labels = np.zeros(n_new, dtype=int)
+
+    rng = np.random.RandomState(42)
+
+    for i in range(n_new):
+        neighbor_indices = indices[i]
+        neighbor_distances = distances[i]
+
+        # Convert cosine distances to similarity weights (cosine dist = 1 - similarity)
+        similarities = np.clip(1.0 - neighbor_distances, 0.01, 1.0)
+        weights = similarities / similarities.sum()
+
+        # Weighted average of neighbor coordinates
+        neighbor_coords = existing_coords[neighbor_indices]
+        interpolated = np.average(neighbor_coords, axis=0, weights=weights)
+
+        # Add small random offset to avoid exact overlap
+        offset = rng.randn(3) * noise_scale
+        new_coords[i] = interpolated + offset
+
+        # Assign cluster label from nearest neighbor (highest weight)
+        new_labels[i] = int(existing_labels[neighbor_indices[0]])
+
+    # Run collision resolution between new nodes and all existing+new nodes
+    all_coords = np.vstack([existing_coords, new_coords])
+    all_sizes = list(
+        [1.0] * n_existing + (new_node_sizes if new_node_sizes else [1.0] * n_new)
+    )
+
+    resolved = resolve_collisions(
+        coords=all_coords,
+        node_sizes=all_sizes,
+        min_distance=0.35,
+        iterations=60,
+        repulsion_strength=0.5,
+    )
+
+    # Extract only the new coordinates (existing ones stay put mostly,
+    # but we only return new ones to minimize disruption)
+    new_coords_resolved = resolved[n_existing:]
+
+    logger.info(f"Incremental assignment complete: {n_new} repos assigned")
+
+    return IncrementalAssignResult(
+        new_coords=new_coords_resolved.tolist(),
+        new_labels=new_labels.tolist(),
     )
 
 
