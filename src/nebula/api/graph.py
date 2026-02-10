@@ -22,6 +22,9 @@ from nebula.utils import get_logger
 logger = get_logger(__name__)
 router = APIRouter()
 
+UNCATEGORIZED_STAR_LIST_ID = -1
+UNCATEGORIZED_STAR_LIST_NAME = "未分类"
+
 # Color palette for clusters
 CLUSTER_COLORS = [
     "#FF6B6B",  # Red
@@ -111,12 +114,26 @@ async def get_graph_data(
     star_list_names = {sl.id: sl.name for sl in star_lists}
 
     # Build nodes
+    uncategorized_repo_count = 0
     nodes = []
     for repo in repos:
         # Calculate node size based on stars (log scale)
         import math
 
         size = 1.0 + math.log10(max(repo.stargazers_count, 1)) * 0.5
+
+        star_list_id = (
+            repo.star_list_id
+            if repo.star_list_id is not None
+            else UNCATEGORIZED_STAR_LIST_ID
+        )
+        star_list_name = (
+            star_list_names.get(repo.star_list_id)
+            if repo.star_list_id is not None
+            else UNCATEGORIZED_STAR_LIST_NAME
+        )
+        if repo.star_list_id is None:
+            uncategorized_repo_count += 1
 
         node = GraphNode(
             id=repo.id,
@@ -134,10 +151,8 @@ async def get_graph_data(
             cluster_id=repo.cluster_id,
             color=cluster_colors.get(repo.cluster_id) if repo.cluster_id else "#808080",
             size=size,
-            star_list_id=repo.star_list_id,
-            star_list_name=star_list_names.get(repo.star_list_id)
-            if repo.star_list_id
-            else None,
+            star_list_id=star_list_id,
+            star_list_name=star_list_name,
             stargazers_count=repo.stargazers_count,
             ai_summary=repo.ai_summary,
             ai_tags=repo.ai_tags,
@@ -203,6 +218,15 @@ async def get_graph_data(
         )
         for sl in star_lists
     ]
+    if uncategorized_repo_count > 0:
+        star_list_infos.append(
+            StarListInfo(
+                id=UNCATEGORIZED_STAR_LIST_ID,
+                name=UNCATEGORIZED_STAR_LIST_NAME,
+                description=None,
+                repo_count=uncategorized_repo_count,
+            )
+        )
 
     return GraphData(
         nodes=nodes,
@@ -212,7 +236,7 @@ async def get_graph_data(
         total_nodes=len(nodes),
         total_edges=len(edges),
         total_clusters=len(clusters),
-        total_star_lists=len(star_lists),
+        total_star_lists=len(star_list_infos),
     )
 
 

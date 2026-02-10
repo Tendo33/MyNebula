@@ -1,10 +1,11 @@
 """Semantic clustering service with embedding-space clustering.
 
 This module clusters repositories in normalized embedding space for semantic
-fidelity, while using UMAP solely for 3D visualization coordinates.
+fidelity, while using PCA for both clustering feature reduction and 3D
+visualization coordinates.
 
 Key features:
-- Embedding-space HDBSCAN clustering for robust semantic grouping
+- PCA-reduced feature-space HDBSCAN clustering for robust semantic grouping
 - Soft post-merge of highly similar clusters to reduce fragmentation
 - Noise point assignment to ensure all nodes are attached to a cluster
 """
@@ -17,6 +18,7 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel
 from sklearn.cluster import AgglomerativeClustering
+from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
 from nebula.utils import get_logger
@@ -34,7 +36,7 @@ def resolve_collisions(
     """Resolve node collisions in 3D space using force-directed repulsion.
 
     This algorithm iteratively pushes overlapping nodes apart while trying
-    to preserve the overall cluster structure from UMAP.
+    to preserve the overall projection structure.
 
     Args:
         coords: Nx3 array of 3D coordinates
@@ -341,12 +343,10 @@ class ClusterResult(BaseModel):
 class ClusteringService:
     """Service for semantic clustering with embedding-space clustering.
 
-    This service follows a two-stage strategy:
-    1. Cluster on normalized high-dimensional embeddings (semantic fidelity)
-    2. Project to 3D with UMAP for visualization layout
-
-    Compared with clustering on UMAP coordinates, this keeps related repositories
-    together more reliably for diverse users and mixed technical domains.
+    This service follows a three-stage strategy:
+    1. L2-normalize high-dimensional embeddings
+    2. Reduce to PCA feature space for clustering robustness in high dimensions
+    3. Project to 3D with PCA for visualization layout
 
     Usage:
         service = ClusteringService()
@@ -368,8 +368,8 @@ class ClusteringService:
         """Initialize clustering service.
 
         Args:
-            n_neighbors: UMAP parameter for local neighborhood size
-            min_dist: UMAP parameter for minimum distance between points
+            n_neighbors: Reserved for backward compatibility (unused with PCA)
+            min_dist: Reserved for backward compatibility (unused with PCA)
             min_cluster_size: HDBSCAN minimum cluster size
             min_samples: HDBSCAN min samples
             cluster_selection_method: HDBSCAN method
@@ -388,21 +388,57 @@ class ClusteringService:
         self.target_max_clusters = target_max_clusters
         self.assign_all_points = assign_all_points
 
-        self._umap_reducer = None
+        self._coord_reducer = None
         self._clusterer = None
 
-    def _init_umap(self):
-        """Lazily initialize UMAP reducer."""
-        if self._umap_reducer is None:
-            import umap
+    @staticmethod
+    def _reduce_for_clustering(
+        normalized_embeddings: np.ndarray,
+        target_dim: int = 30,
+    ) -> np.ndarray:
+        """Reduce normalized embeddings for density-based clustering.
 
-            self._umap_reducer = umap.UMAP(
-                n_components=3,
-                n_neighbors=self.n_neighbors,
-                min_dist=self.min_dist,
-                metric="cosine",
-                random_state=42,
-            )
+        HDBSCAN can degrade in very high dimensions. Reducing to a moderate PCA
+        feature space improves density contrast and cluster discoverability.
+        """
+        n_samples, n_features = normalized_embeddings.shape
+        if n_samples < 2:
+            return normalized_embeddings
+
+        n_components = min(target_dim, n_samples - 1, n_features)
+        if n_components < 2:
+            return normalized_embeddings
+
+        reducer = PCA(n_components=n_components, random_state=42)
+        reduced = reducer.fit_transform(normalized_embeddings)
+        logger.info(
+            f"Generated PCA clustering features: {n_features}D -> {n_components}D "
+            f"(explained_variance={float(np.sum(reducer.explained_variance_ratio_)):.3f})"
+        )
+        return reduced.astype(np.float32, copy=False)
+
+    @staticmethod
+    def _project_to_3d(normalized_embeddings: np.ndarray) -> np.ndarray:
+        """Project embeddings into 3D coordinates for visualization using PCA."""
+        n_samples, n_features = normalized_embeddings.shape
+        if n_samples == 0:
+            return np.zeros((0, 3), dtype=np.float32)
+        if n_samples == 1:
+            return np.zeros((1, 3), dtype=np.float32)
+
+        n_components = min(3, n_samples, n_features)
+        reducer = PCA(n_components=n_components, random_state=42)
+        reduced = reducer.fit_transform(normalized_embeddings).astype(
+            np.float32, copy=False
+        )
+
+        if n_components == 3:
+            return reduced
+
+        # Keep output shape stable (Nx3) for downstream rendering.
+        padded = np.zeros((n_samples, 3), dtype=np.float32)
+        padded[:, :n_components] = reduced
+        return padded
 
     def fit_transform(
         self,
@@ -413,8 +449,8 @@ class ClusteringService:
     ) -> ClusterResult:
         """Cluster embeddings and generate 3D coordinates for visualization.
 
-        Clustering is performed in normalized embedding space for semantic quality.
-        UMAP is used only for coordinate generation.
+        Clustering is performed in PCA-reduced feature space for robustness.
+        Coordinates are generated with PCA (3D).
 
         Args:
             embeddings: List of embedding vectors
@@ -440,23 +476,24 @@ class ClusteringService:
         logger.info(f"Clustering {n_samples} embeddings")
 
         # Adjust parameters for small datasets
-        effective_n_neighbors = min(self.n_neighbors, n_samples - 1)
         effective_min_cluster_size = min(max(2, self.min_cluster_size), n_samples)
         effective_min_samples = min(
             max(1, self.min_samples), effective_min_cluster_size
         )
 
-        # UMAP dimensionality reduction
-        self._init_umap()
-        self._umap_reducer.n_neighbors = effective_n_neighbors
+        # Dimensionality reduction for clustering stability in high dimensions.
+        clustering_features = self._reduce_for_clustering(
+            normalized_embeddings=normalized_embeddings,
+            target_dim=30,
+        )
 
         if existing_coords and len(existing_coords) == n_samples:
             # Use existing coordinates if available
             coords_3d = np.array(existing_coords)
             logger.info("Using existing 3D coordinates")
         else:
-            coords_3d = self._umap_reducer.fit_transform(normalized_embeddings)
-            logger.info("Generated new 3D coordinates via UMAP")
+            coords_3d = self._project_to_3d(normalized_embeddings)
+            logger.info("Generated new 3D coordinates via PCA")
 
         # Clustering strategy in embedding space
         if n_samples < 3:
@@ -474,7 +511,7 @@ class ClusteringService:
                 metric="euclidean",
                 cluster_selection_method=self.cluster_selection_method,
             )
-            labels = clusterer.fit_predict(normalized_embeddings)
+            labels = clusterer.fit_predict(clustering_features)
             n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
             logger.info(
@@ -494,7 +531,7 @@ class ClusteringService:
                     f"falling back to hierarchical clustering with {expected_clusters} clusters"
                 )
                 labels = fallback_hierarchical_clustering(
-                    normalized_embeddings, expected_clusters
+                    clustering_features, expected_clusters
                 )
                 n_clusters = len(set(labels))
             elif self.assign_all_points and (labels == -1).any():
@@ -531,7 +568,7 @@ class ClusteringService:
                 "Cluster merge reduced clusters below target_min_clusters; "
                 f"rebuilding with hierarchical fallback to {min_target} clusters"
             )
-            labels = fallback_hierarchical_clustering(normalized_embeddings, min_target)
+            labels = fallback_hierarchical_clustering(clustering_features, min_target)
             labels = relabel_clusters(np.array(labels, dtype=int))
             n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
@@ -544,16 +581,14 @@ class ClusteringService:
                 f"with {fallback_target} clusters"
             )
             labels = fallback_hierarchical_clustering(
-                normalized_embeddings, fallback_target
+                clustering_features, fallback_target
             )
             labels = relabel_clusters(np.array(labels, dtype=int))
             n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
         logger.info(f"Final clustering: {n_clusters} clusters, all points assigned")
 
-        # Scale UMAP output to give nodes more room before collision resolution.
-        # UMAP with min_dist=0.1 packs points tightly; scaling by 2x gives
-        # better baseline spacing while preserving relative structure.
+        # Scale projected output to give nodes more room before collision resolution.
         if n_samples > 1:
             coords_3d = coords_3d * 2.0
 
@@ -835,7 +870,7 @@ def assign_new_repos_incrementally(
 ) -> IncrementalAssignResult:
     """Assign new repos to existing clusters and interpolate their 3D coordinates.
 
-    Instead of re-running UMAP and re-clustering everything, this function:
+    Instead of re-running global projection and re-clustering everything, this function:
     1. Finds K nearest neighbors of each new repo in embedding space
     2. Interpolates 3D coordinates from those neighbors (weighted by similarity)
     3. Assigns the new repo to the cluster of its nearest neighbor
@@ -931,7 +966,7 @@ def get_clustering_service() -> ClusteringService:
     global _clustering_service
     if _clustering_service is None:
         # Stable defaults for mixed user datasets.
-        # - Clustering runs in embedding space (not UMAP coordinates)
+        # - Clustering runs in PCA-reduced embedding space
         # - target_max_clusters is treated as a soft cap via post-merge
         _clustering_service = ClusteringService(
             n_neighbors=40,

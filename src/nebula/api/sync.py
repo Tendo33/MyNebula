@@ -564,10 +564,12 @@ async def compute_embeddings_task(user_id: int, task_id: int):
             repos_needing_llm = [r for r in repos if not r.ai_summary or not r.ai_tags]
 
             if repos_needing_llm:
+                total_llm_repos = len(repos_needing_llm)
                 logger.info(
-                    f"Generating summaries/tags for {len(repos_needing_llm)} repos before embedding"
+                    f"Generating summaries/tags for {total_llm_repos} repos before embedding"
                 )
-                for repo in repos_needing_llm:
+
+                for i, repo in enumerate(repos_needing_llm, 1):
                     try:
                         (
                             summary,
@@ -592,10 +594,14 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                                 repo.topics[:5] if repo.topics else ["开源项目"]
                             )
 
+                    if i % 5 == 0:
+                        logger.info(
+                            f"Generating summaries progress: {i}/{total_llm_repos}"
+                        )
+                        await db.commit()
+
                 await db.commit()
-                logger.info(
-                    f"LLM enhancement complete for {len(repos_needing_llm)} repos"
-                )
+                logger.info(f"LLM enhancement complete for {total_llm_repos} repos")
 
             # Compute embeddings using LLM-enhanced content
             embedding_service = get_embedding_service()
@@ -1580,18 +1586,36 @@ async def full_refresh_task(user_id: int, task_id: int):
 
     from nebula.db.database import get_db_context
 
-    async with get_db_context() as db:
-        try:
+    async def _update_main_task(**fields) -> bool:
+        async with get_db_context() as db:
             task = await db.get(SyncTask, task_id)
             if not task:
-                return
-
-            task.status = "running"
-            task.started_at = datetime.utcnow()
+                return False
+            for key, value in fields.items():
+                setattr(task, key, value)
             await db.commit()
+            return True
 
-            # Step 1: Reset all processing flags
-            logger.info(f"Full refresh: Resetting all repos for user {user_id}")
+    async def _create_sub_task(task_type: str) -> int:
+        async with get_db_context() as db:
+            sub_task = SyncTask(user_id=user_id, task_type=task_type, status="pending")
+            db.add(sub_task)
+            await db.commit()
+            await db.refresh(sub_task)
+            return sub_task.id
+
+    try:
+        task_exists = await _update_main_task(
+            status="running",
+            started_at=datetime.utcnow(),
+            error_message=None,
+        )
+        if not task_exists:
+            return
+
+        # Step 1: Reset all processing flags
+        logger.info(f"Full refresh: Resetting all repos for user {user_id}")
+        async with get_db_context() as db:
             result = await db.execute(
                 update(StarredRepo)
                 .where(StarredRepo.user_id == user_id)
@@ -1607,82 +1631,57 @@ async def full_refresh_task(user_id: int, task_id: int):
             )
             reset_count = result.rowcount
             await db.commit()
-            logger.info(f"Full refresh: Reset {reset_count} repos")
+        logger.info(f"Full refresh: Reset {reset_count} repos")
 
-            task.total_items = reset_count
-            task.error_details = {"phase": "reset", "reset_count": reset_count}
-            await db.commit()
+        await _update_main_task(
+            total_items=reset_count,
+            error_details={"phase": "reset", "reset_count": reset_count},
+        )
 
-            # Step 2: Create and run star sync task (full mode)
-            logger.info(f"Full refresh: Starting full star sync for user {user_id}")
-            stars_task = SyncTask(
-                user_id=user_id,
-                task_type="stars",
-                status="pending",
-            )
-            db.add(stars_task)
-            await db.commit()
-            await db.refresh(stars_task)
+        # Step 2: Create and run star sync task (full mode)
+        logger.info(f"Full refresh: Starting full star sync for user {user_id}")
+        stars_task_id = await _create_sub_task("stars")
+        await sync_stars_task(user_id, stars_task_id, "full")
 
-            await sync_stars_task(user_id, stars_task.id, "full")
+        await _update_main_task(
+            error_details={"phase": "stars", "reset_count": reset_count},
+            processed_items=1,
+        )
 
-            task.error_details = {"phase": "stars", "reset_count": reset_count}
-            task.processed_items = 1
-            await db.commit()
+        # Step 3: Create and run embedding task (includes LLM summaries)
+        logger.info(f"Full refresh: Computing embeddings for user {user_id}")
+        embed_task_id = await _create_sub_task("embedding")
+        await compute_embeddings_task(user_id, embed_task_id)
 
-            # Step 3: Create and run embedding task (includes LLM summaries)
-            logger.info(f"Full refresh: Computing embeddings for user {user_id}")
-            embed_task = SyncTask(
-                user_id=user_id,
-                task_type="embedding",
-                status="pending",
-            )
-            db.add(embed_task)
-            await db.commit()
-            await db.refresh(embed_task)
+        await _update_main_task(
+            error_details={"phase": "embeddings", "reset_count": reset_count},
+            processed_items=2,
+        )
 
-            await compute_embeddings_task(user_id, embed_task.id)
+        # Step 4: Create and run clustering task
+        logger.info(f"Full refresh: Running clustering for user {user_id}")
+        cluster_task_id = await _create_sub_task("cluster")
+        await run_clustering_task(user_id, cluster_task_id, use_llm=True)
 
-            task.error_details = {"phase": "embeddings", "reset_count": reset_count}
-            task.processed_items = 2
-            await db.commit()
-
-            # Step 4: Create and run clustering task
-            logger.info(f"Full refresh: Running clustering for user {user_id}")
-            cluster_task = SyncTask(
-                user_id=user_id,
-                task_type="cluster",
-                status="pending",
-            )
-            db.add(cluster_task)
-            await db.commit()
-            await db.refresh(cluster_task)
-
-            await run_clustering_task(user_id, cluster_task.id, use_llm=True)
-
-            # Mark complete
-            task.status = "completed"
-            task.completed_at = datetime.utcnow()
-            task.processed_items = 3
-            task.error_details = {
+        await _update_main_task(
+            status="completed",
+            completed_at=datetime.utcnow(),
+            processed_items=3,
+            error_details={
                 "phase": "complete",
                 "reset_count": reset_count,
                 "steps_completed": ["reset", "stars", "embeddings", "clustering"],
-            }
-            await db.commit()
+            },
+        )
+        logger.info(f"Full refresh completed for user {user_id}")
 
-            logger.info(f"Full refresh completed for user {user_id}")
-
-        except Exception as e:
-            logger.exception(f"Full refresh failed for user {user_id}: {e}")
-
-            async with get_db_context() as db:
-                task = await db.get(SyncTask, task_id)
-                if task:
-                    task.status = "failed"
-                    task.error_message = str(e)
-                    task.completed_at = datetime.utcnow()
-                    await db.commit()
+    except Exception as e:
+        logger.exception(f"Full refresh failed for user {user_id}: {e}")
+        await _update_main_task(
+            status="failed",
+            error_message=str(e),
+            completed_at=datetime.utcnow(),
+        )
 
 
 # ==================== Schedule Management ====================
