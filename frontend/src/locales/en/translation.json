@@ -66,6 +66,7 @@
     "empty_title": "No Data",
     "empty_hint": "Sync your GitHub stars to start exploring",
     "max_clusters": "Max Clusters (Smaller is coarser)",
+    "min_clusters": "Min Clusters (Larger is finer)",
     "recluster": "Re-cluster",
     "reclustering": "Clustering...",
     "recluster_hint": "Re-cluster with current settings"
@@ -92,6 +93,12 @@
   },
   "settings": {
     "title": "Settings",
+    "admin_access": "Admin Access",
+    "login_required_desc": "Sign in with admin credentials to view and change settings",
+    "username": "Username",
+    "password": "Password",
+    "login_failed": "Login failed, please check username or password",
+    "operations": "Operations",
     "language": "Language",
     "language_desc": "Change the language of the interface",
     "appearance": "Appearance",

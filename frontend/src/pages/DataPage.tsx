@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Sidebar } from '../components/layout/Sidebar';
+import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { SearchInput } from '../components/ui/SearchInput';
 import { useGraph } from '../contexts/GraphContext';
 import { ClusterInfo } from '../types';
@@ -265,6 +266,8 @@ const DataPage = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <LanguageSwitch />
+
             {/* Search */}
             <div className="w-64">
               <SearchInput

@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { GraphProvider, useGraph } from './contexts/GraphContext';
+import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import Dashboard from './pages/Dashboard';
 import GraphPage from './pages/GraphPage';
 import DataPage from './pages/DataPage';
@@ -47,9 +48,11 @@ function AppContent() {
 function App() {
   return (
     <GraphProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <AdminAuthProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </AdminAuthProvider>
     </GraphProvider>
   );
 }

@@ -34,8 +34,10 @@ from nebula.schemas import (
 )
 from nebula.utils import compute_content_hash, compute_topics_hash, get_logger
 
+from .auth import require_admin
+
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 def _to_utc(dt: datetime | None) -> datetime | None:

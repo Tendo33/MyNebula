@@ -67,6 +67,7 @@
     "empty_title": "暂无数据",
     "empty_hint": "同步你的 GitHub 星标开始探索",
     "max_clusters": "最大簇数（越小越粗）",
+    "min_clusters": "最小簇数（越大越细）",
     "recluster": "重新聚类",
     "reclustering": "聚类中...",
     "recluster_hint": "用当前设置重新聚类"
@@ -93,6 +94,12 @@
   },
   "settings": {
     "title": "设置",
+    "admin_access": "管理员访问",
+    "login_required_desc": "请输入管理员账号密码以查看和修改设置",
+    "username": "用户名",
+    "password": "密码",
+    "login_failed": "登录失败，请检查用户名或密码",
+    "operations": "操作",
     "language": "语言",
     "language_desc": "更改界面显示语言",
     "appearance": "外观",

@@ -180,6 +180,22 @@ class AppSettings(BaseSettings):
         description="GitHub Personal Access Token for API access",
     )
 
+    # Admin auth (for protecting mutating operations and settings page)
+    admin_username: str = Field(
+        default="admin",
+        description="Admin username for settings access",
+    )
+    admin_password: str = Field(
+        default="",
+        description="Admin password for settings access",
+    )
+    admin_session_ttl_hours: int = Field(
+        default=24,
+        ge=1,
+        le=168,
+        description="Admin session TTL in hours",
+    )
+
     # Logging
     log_level: str = Field(default="INFO", description="Log level")
     log_file: str = Field(default="logs/app.log", description="Log file path")

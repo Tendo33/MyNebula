@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
+import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { useGraph } from '../contexts/GraphContext';
 import { DashboardSkeleton } from '../components/ui/Skeleton';
 import { Book, Code, Layers, TrendingUp, ArrowRight, Calendar, Hash, Tag } from 'lucide-react';
@@ -264,13 +265,16 @@ const Dashboard = () => {
             </h2>
           </div>
 
-          <button
-            onClick={() => navigate('/graph')}
-            className="flex items-center gap-2 text-sm text-text-muted hover:text-text-main transition-colors"
-          >
-            <span>{t('dashboard.explore_graph')}</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            <LanguageSwitch />
+            <button
+              onClick={() => navigate('/graph')}
+              className="flex items-center gap-2 text-sm text-text-muted hover:text-text-main transition-colors"
+            >
+              <span>{t('dashboard.explore_graph')}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </header>
 
         <section className="flex-1 p-8 overflow-auto">
