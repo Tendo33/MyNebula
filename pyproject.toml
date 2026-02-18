@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mynebula"
-version = "0.2.3"
+version = "0.2.4"
 description = "Transform your GitHub Stars into a semantic knowledge nebula"
 readme = "README.md"
 license = {file = "LICENSE"}

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-02-18
+
+### Changed
+- Version bump release
+
 ## [0.2.1] - 2026-02-07
 
 ### Fixed
@@ -65,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/yourusername/nebula/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/yourusername/nebula/compare/v0.1.0...v0.2.0
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/Tendo33/mynebula/compare/v0.2.3...v0.2.4
+[0.2.0]: https://github.com/Tendo33/mynebula/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yourusername/nebula/releases/tag/v0.1.0
