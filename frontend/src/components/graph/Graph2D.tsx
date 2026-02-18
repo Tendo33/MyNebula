@@ -760,11 +760,6 @@ const Graph2D: React.FC = () => {
               )}
             </div>
           )}
-
-          {/* Hint to click */}
-          <div className="text-[10px] text-text-dim mt-2 pt-2 border-t border-border-light/50">
-            Click for details & related repos
-          </div>
         </div>
       )}
     </div>
