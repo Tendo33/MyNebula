@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-02-18
+
+### Changed
+- Schedule sync, graph/timeline improvements, i18n updates
+- Add README.zh.md
+
 ## [0.2.4] - 2026-02-18
 
 ### Changed
@@ -70,7 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/Tendo33/mynebula/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/Tendo33/mynebula/compare/v0.2.3...v0.2.4
 [0.2.0]: https://github.com/Tendo33/mynebula/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yourusername/nebula/releases/tag/v0.1.0
