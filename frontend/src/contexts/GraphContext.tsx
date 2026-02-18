@@ -287,13 +287,23 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Filter by search query
     if (filters.searchQuery.trim()) {
       const query = filters.searchQuery.toLowerCase().trim();
-      filteredNodes = filteredNodes.filter(
-        node =>
-          node.name.toLowerCase().includes(query) ||
-          node.full_name.toLowerCase().includes(query) ||
-          (node.description?.toLowerCase().includes(query) ?? false) ||
-          (node.language?.toLowerCase().includes(query) ?? false)
-      );
+      const starQueryMatch = query.match(/^stars:\s*>\s*(\d+)$/);
+
+      if (starQueryMatch) {
+        const minStarsFromQuery = Number.parseInt(starQueryMatch[1], 10);
+        filteredNodes = filteredNodes.filter(node => node.stargazers_count > minStarsFromQuery);
+      } else {
+        filteredNodes = filteredNodes.filter(
+          node =>
+            node.name.toLowerCase().includes(query) ||
+            node.full_name.toLowerCase().includes(query) ||
+            (node.description?.toLowerCase().includes(query) ?? false) ||
+            (node.ai_summary?.toLowerCase().includes(query) ?? false) ||
+            (node.language?.toLowerCase().includes(query) ?? false) ||
+            (node.ai_tags?.some(tag => tag.toLowerCase().includes(query)) ?? false) ||
+            (node.topics?.some(topic => topic.toLowerCase().includes(query)) ?? false)
+        );
+      }
     }
 
     // Filter by minimum stars

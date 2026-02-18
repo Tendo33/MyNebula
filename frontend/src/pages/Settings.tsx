@@ -42,6 +42,17 @@ import {
   type SyncInfoResponse,
 } from '../api/schedule';
 
+interface TaskProgressUpdate {
+  state: string;
+  progress: number;
+  error: string | null;
+}
+
+interface TaskCompletionResult {
+  success: boolean;
+  error: string | null;
+}
+
 const Settings = () => {
   const { t } = useTranslation();
   const {
@@ -87,6 +98,22 @@ const Settings = () => {
     [syncSteps, t]
   );
 
+  const githubTokenStatus = useMemo(() => {
+    if (syncInfo?.github_token_configured === true) {
+      return { state: 'connected' as const, label: t('settings.connected') };
+    }
+
+    if (syncInfo?.github_token_configured === false) {
+      return { state: 'not_configured' as const, label: t('settings.not_configured') };
+    }
+
+    if (error) {
+      return { state: 'unknown' as const, label: t('settings.status_unknown') };
+    }
+
+    return { state: 'loading' as const, label: t('common.loading') };
+  }, [syncInfo, error, t]);
+
   const loadScheduleData = useCallback(async () => {
     try {
       setError(null);
@@ -109,29 +136,49 @@ const Settings = () => {
     loadScheduleData();
   }, [isAuthenticated, loadScheduleData]);
 
-  const waitForTaskComplete = async (taskId: number): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const poll = async () => {
-        try {
-          const status = await getSyncStatus(taskId);
-          if (status.status === 'completed') {
-            resolve(true);
-          } else if (status.status === 'failed') {
-            console.error('Task failed:', status.error_message);
-            resolve(false);
-          } else {
-            setTimeout(poll, 2000);
-          }
-        } catch (err) {
-          console.error('Poll status error:', err);
-          resolve(false);
+  const waitForTaskComplete = async (
+    taskId: number,
+    onProgress?: (update: TaskProgressUpdate) => void
+  ): Promise<TaskCompletionResult> => {
+    while (true) {
+      try {
+        const status = await getSyncStatus(taskId);
+        const progress = Number.isFinite(status.progress_percent)
+          ? Math.max(0, Math.min(100, status.progress_percent))
+          : 0;
+
+        onProgress?.({
+          state: status.status,
+          progress,
+          error: status.error_message,
+        });
+
+        if (status.status === 'completed') {
+          return { success: true, error: null };
         }
-      };
-      setTimeout(poll, 1000);
-    });
+
+        if (status.status === 'failed') {
+          console.error('Task failed:', status.error_message);
+          return { success: false, error: status.error_message };
+        }
+      } catch (err) {
+        console.error('Poll status error:', err);
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'poll_status_failed',
+        };
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   };
 
-  const updateStepStatus = (stepId: string, status: SyncStepStatus, stepError?: string) => {
+  const updateStepStatus = (
+    stepId: string,
+    status: SyncStepStatus,
+    stepError?: string,
+    progress?: number
+  ) => {
     setSyncSteps((prev) =>
       prev.map((step) =>
         step.id === stepId
@@ -139,6 +186,12 @@ const Settings = () => {
               ...step,
               status,
               error: stepError,
+              progress:
+                progress !== undefined
+                  ? Math.max(0, Math.min(100, Math.round(progress)))
+                  : status === 'running'
+                  ? step.progress
+                  : undefined,
             }
           : step
       )
@@ -147,10 +200,10 @@ const Settings = () => {
 
   const resetSteps = () => {
     setSyncSteps([
-      { id: 'stars', status: 'pending' },
-      { id: 'summaries', status: 'pending' },
-      { id: 'embeddings', status: 'pending' },
-      { id: 'clustering', status: 'pending' },
+      { id: 'stars', status: 'pending', progress: 0 },
+      { id: 'summaries', status: 'pending', progress: 0 },
+      { id: 'embeddings', status: 'pending', progress: 0 },
+      { id: 'clustering', status: 'pending', progress: 0 },
     ]);
   };
 
@@ -226,49 +279,66 @@ const Settings = () => {
       setShowSyncProgress(true);
       resetSteps();
 
-      updateStepStatus('stars', 'running');
+      updateStepStatus('stars', 'running', undefined, 0);
       setSyncStep(t('sync.step_stars_label'));
       const starsResult = await startStarSync('incremental');
-      const starsSuccess = await waitForTaskComplete(starsResult.task_id);
-      if (!starsSuccess) {
-        updateStepStatus('stars', 'failed', t('errors.sync_stars_failed'));
-        throw new Error(t('errors.sync_stars_failed'));
+      const starsResultStatus = await waitForTaskComplete(starsResult.task_id, ({ progress }) => {
+        updateStepStatus('stars', 'running', undefined, progress);
+      });
+      if (!starsResultStatus.success) {
+        const starsError = starsResultStatus.error || t('errors.sync_stars_failed');
+        updateStepStatus('stars', 'failed', starsError);
+        throw new Error(starsError);
       }
-      updateStepStatus('stars', 'completed');
+      updateStepStatus('stars', 'completed', undefined, 100);
 
-      updateStepStatus('summaries', 'running');
+      updateStepStatus('summaries', 'running', undefined, 0);
       setSyncStep(t('sync.step_summaries_label'));
       try {
         const summariesResult = await startSummaries();
-        await waitForTaskComplete(summariesResult.task_id);
+        const summariesStatus = await waitForTaskComplete(
+          summariesResult.task_id,
+          ({ progress }) => {
+            updateStepStatus('summaries', 'running', undefined, progress);
+          }
+        );
+        if (!summariesStatus.success) {
+          console.warn('Summaries generation skipped:', summariesStatus.error);
+        }
       } catch (err) {
         console.warn('Summaries generation skipped:', err);
       }
-      updateStepStatus('summaries', 'completed');
+      updateStepStatus('summaries', 'completed', undefined, 100);
 
-      updateStepStatus('embeddings', 'running');
+      updateStepStatus('embeddings', 'running', undefined, 0);
       setSyncStep(t('sync.step_embeddings_label'));
       const embeddingResult = await startEmbedding();
-      const embeddingSuccess = await waitForTaskComplete(embeddingResult.task_id);
-      if (!embeddingSuccess) {
-        updateStepStatus('embeddings', 'failed', t('errors.embedding_failed'));
-        throw new Error(t('errors.embedding_failed'));
+      const embeddingStatus = await waitForTaskComplete(embeddingResult.task_id, ({ progress }) => {
+        updateStepStatus('embeddings', 'running', undefined, progress);
+      });
+      if (!embeddingStatus.success) {
+        const embeddingError = embeddingStatus.error || t('errors.embedding_failed');
+        updateStepStatus('embeddings', 'failed', embeddingError);
+        throw new Error(embeddingError);
       }
-      updateStepStatus('embeddings', 'completed');
+      updateStepStatus('embeddings', 'completed', undefined, 100);
 
-      updateStepStatus('clustering', 'running');
+      updateStepStatus('clustering', 'running', undefined, 0);
       setSyncStep(t('sync.step_clustering_label'));
       const clusterResult = await startClustering(
         true,
         settings.maxClusters,
         settings.minClusters
       );
-      const clusterSuccess = await waitForTaskComplete(clusterResult.task_id);
-      if (!clusterSuccess) {
-        updateStepStatus('clustering', 'failed', t('errors.clustering_failed'));
-        throw new Error(t('errors.clustering_failed'));
+      const clusterStatus = await waitForTaskComplete(clusterResult.task_id, ({ progress }) => {
+        updateStepStatus('clustering', 'running', undefined, progress);
+      });
+      if (!clusterStatus.success) {
+        const clusterError = clusterStatus.error || t('errors.clustering_failed');
+        updateStepStatus('clustering', 'failed', clusterError);
+        throw new Error(clusterError);
       }
-      updateStepStatus('clustering', 'completed');
+      updateStepStatus('clustering', 'completed', undefined, 100);
 
       await refreshData();
       await loadScheduleData();
@@ -287,9 +357,9 @@ const Settings = () => {
 
     try {
       const started = await startClustering(true, settings.maxClusters, settings.minClusters);
-      const success = await waitForTaskComplete(started.task_id);
-      if (!success) {
-        throw new Error(t('errors.clustering_failed'));
+      const clusterStatus = await waitForTaskComplete(started.task_id);
+      if (!clusterStatus.success) {
+        throw new Error(clusterStatus.error || t('errors.clustering_failed'));
       }
 
       await refreshData();
@@ -609,9 +679,25 @@ const Settings = () => {
                     <Shield className="w-4 h-4 text-text-muted" />
                     <label className="text-sm font-medium text-text-main">{t('settings.github_token_status')}</label>
                   </div>
-                  <div className="flex items-center gap-2 text-green-700 text-sm font-medium bg-green-50 px-3 py-1 rounded-full border border-green-200">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                    {t('settings.connected')}
+                  <div
+                    className={clsx(
+                      'flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full border',
+                      githubTokenStatus.state === 'connected' && 'text-green-700 bg-green-50 border-green-200',
+                      githubTokenStatus.state === 'not_configured' && 'text-amber-700 bg-amber-50 border-amber-200',
+                      githubTokenStatus.state === 'unknown' && 'text-gray-700 bg-gray-100 border-gray-200',
+                      githubTokenStatus.state === 'loading' && 'text-gray-600 bg-gray-50 border-gray-200'
+                    )}
+                  >
+                    <div
+                      className={clsx(
+                        'w-2 h-2 rounded-full',
+                        githubTokenStatus.state === 'connected' && 'bg-green-500 animate-pulse',
+                        githubTokenStatus.state === 'not_configured' && 'bg-amber-500',
+                        githubTokenStatus.state === 'unknown' && 'bg-gray-500',
+                        githubTokenStatus.state === 'loading' && 'bg-gray-400 animate-pulse'
+                      )}
+                    />
+                    {githubTokenStatus.label}
                   </div>
                 </div>
               </div>

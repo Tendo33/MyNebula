@@ -164,6 +164,7 @@ const Graph2D: React.FC = () => {
   // Local state for graph-specific interactions
   const [localHoverNode, setLocalHoverNode] = useState<ProcessedNode | null>(null);
   const activeHoverNode = localHoverNode || (hoveredNode as ProcessedNode | null);
+  const autoFitKeyRef = useRef<string | null>(null);
 
   // Counter to trigger re-render when images load
   const [, forceUpdate] = useState(0);
@@ -205,6 +206,11 @@ const Graph2D: React.FC = () => {
       })),
     };
   }, [filteredData]);
+
+  const layoutKey = useMemo(
+    () => `${processedData.nodes.length}:${processedData.links.length}`,
+    [processedData.nodes.length, processedData.links.length]
+  );
 
   // Group nodes by cluster for hull drawing
   const clusterGroups = useMemo(() => {
@@ -326,16 +332,28 @@ const Graph2D: React.FC = () => {
 
   }, [processedData.nodes]);
 
-  // Zoom to fit after initial render
+  const tryAutoFit = useCallback(() => {
+    if (!graphRef.current || processedData.nodes.length === 0) return;
+    if (autoFitKeyRef.current === layoutKey) return;
+
+    graphRef.current.zoomToFit(400, ZOOM_TO_FIT_PADDING);
+    autoFitKeyRef.current = layoutKey;
+  }, [layoutKey, processedData.nodes.length]);
+
+  // Reset auto-fit state when layout shape changes
   useEffect(() => {
-    if (graphRef.current && processedData.nodes.length > 0) {
-      // Wait for simulation to stabilize
-      const timer = setTimeout(() => {
-        graphRef.current?.zoomToFit(400, ZOOM_TO_FIT_PADDING);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [processedData.nodes.length]);
+    autoFitKeyRef.current = null;
+  }, [layoutKey]);
+
+  // Fallback auto-fit after initial render in case engine-stop callback is delayed
+  useEffect(() => {
+    if (processedData.nodes.length === 0) return;
+
+    const timer = setTimeout(() => {
+      tryAutoFit();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [processedData.nodes.length, tryAutoFit]);
 
   // Get node color based on state
   const getNodeColor = useCallback((node: ProcessedNode): string => {
@@ -679,11 +697,7 @@ const Graph2D: React.FC = () => {
         warmupTicks={100}
 
         // After engine stops
-        onEngineStop={() => {
-          if (graphRef.current) {
-            graphRef.current.zoomToFit(400, ZOOM_TO_FIT_PADDING);
-          }
-        }}
+        onEngineStop={tryAutoFit}
       />
 
       {/* Hover info overlay - Enhanced with full info */}

@@ -297,6 +297,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           e.preventDefault();
           if (results[selectedIndex]) {
             handleSelectResult(results[selectedIndex]);
+          } else if (query.trim()) {
+            const normalizedQuery = query.trim();
+            addRecentSearch(normalizedQuery);
+            setSearchQuery(normalizedQuery);
+            onClose();
           }
           break;
         case 'Escape':
@@ -308,7 +313,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, results, selectedIndex, onClose]);
+  }, [isOpen, results, selectedIndex, query, addRecentSearch, setSearchQuery, onClose]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -484,7 +489,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                     {quickFilters.starRanges.map(range => (
                       <button
                         key={range.min}
-                        onClick={() => handleQuickFilter(`stars:>${range.min}`)}
+                        onClick={() => {
+                          const starQuery = `stars:>${range.min}`;
+                          addRecentSearch(starQuery);
+                          setSearchQuery(starQuery);
+                          onClose();
+                        }}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-full transition-colors"
                       >
                         <Star className="w-3 h-3" />

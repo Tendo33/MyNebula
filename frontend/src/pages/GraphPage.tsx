@@ -27,6 +27,7 @@ const GraphPage = () => {
     selectedNode,
     setSelectedNode,
     filters,
+    setSelectedClusters,
     setSearchQuery,
     clearFilters,
   } = useGraph();
@@ -39,11 +40,28 @@ const GraphPage = () => {
       if (node) {
         setSelectedNode(node);
         // Clear the URL parameter after selecting
-        searchParams.delete('node');
-        setSearchParams(searchParams, { replace: true });
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('node');
+        setSearchParams(nextParams, { replace: true });
       }
     }
   }, [searchParams, rawData, setSelectedNode, setSearchParams]);
+
+  // Handle URL parameter for cluster filter
+  useEffect(() => {
+    const clusterIdParam = searchParams.get('cluster');
+    if (!clusterIdParam || !rawData) return;
+
+    const clusterId = parseInt(clusterIdParam, 10);
+    if (Number.isFinite(clusterId) && rawData.clusters.some(cluster => cluster.id === clusterId)) {
+      clearFilters();
+      setSelectedClusters([clusterId]);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('cluster');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, rawData, setSearchParams, clearFilters, setSelectedClusters]);
 
   // Local UI state
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);

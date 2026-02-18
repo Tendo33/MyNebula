@@ -1924,6 +1924,9 @@ async def get_sync_info(
         Sync status information
     """
     user = await get_default_user(db)
+    from nebula.core.config import get_app_settings
+
+    app_settings = get_app_settings()
 
     # Get repository statistics
     stats_result = await db.execute(
@@ -1961,6 +1964,7 @@ async def get_sync_info(
 
     return SyncInfoResponse(
         last_sync_at=user.last_sync_at,
+        github_token_configured=bool(app_settings.github_token),
         total_repos=stats.total or 0,
         synced_repos=user.synced_stars or 0,
         embedded_repos=stats.embedded or 0,

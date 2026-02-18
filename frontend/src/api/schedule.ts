@@ -27,6 +27,7 @@ export interface ScheduleResponse extends ScheduleConfig {
  */
 export interface SyncInfoResponse {
 	last_sync_at: string | null;
+	github_token_configured: boolean;
 	total_repos: number;
 	synced_repos: number;
 	embedded_repos: number;

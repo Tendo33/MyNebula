@@ -8,7 +8,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { ClusterInfo } from '../types';
 import {
   Loader2, ChevronUp, ChevronDown,
-  ChevronLeft, ChevronRight, X, Layers, Calendar
+  ChevronLeft, ChevronRight, X, Layers, Calendar, Tag
 } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router-dom';
 
@@ -125,6 +125,7 @@ const DataPage = () => {
   const { rawData, filters, toggleCluster, clearClusterFilter, loading } = useGraph();
   const [searchParams, setSearchParams] = useSearchParams();
   const monthFilter = searchParams.get('month');
+  const topicFilter = searchParams.get('topic');
 
   // Local state
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -176,6 +177,14 @@ const DataPage = () => {
       );
     }
 
+    // Apply topic filter
+    if (topicFilter) {
+      const normalizedTopic = topicFilter.toLowerCase();
+      filtered = filtered.filter(
+        node => (node.topics || []).some(topic => topic.toLowerCase() === normalizedTopic)
+      );
+    }
+
     // Sort
     filtered.sort((a, b) => {
       let comparison = 0;
@@ -210,7 +219,7 @@ const DataPage = () => {
     });
 
     return filtered;
-  }, [rawData, localSearch, filters.selectedClusters, sortConfig, clusterMap]);
+  }, [rawData, localSearch, filters.selectedClusters, monthFilter, topicFilter, sortConfig, clusterMap]);
 
   // Pagination
   const totalPages = Math.ceil(processedData.length / pageSize);
@@ -278,7 +287,7 @@ const DataPage = () => {
             </div>
 
             {/* Clear filters */}
-            {(filters.selectedClusters.size > 0 || localSearch.trim() || monthFilter) && (
+            {(filters.selectedClusters.size > 0 || localSearch.trim() || monthFilter || topicFilter) && (
               <button
                 onClick={() => {
                   clearClusterFilter();
@@ -304,7 +313,7 @@ const DataPage = () => {
           ) : (
             <div className="space-y-4">
               {/* Filter chips */}
-              {(rawData && rawData.clusters.length > 0) || monthFilter ? (
+              {(rawData && rawData.clusters.length > 0) || monthFilter || topicFilter ? (
                 <div className="flex items-center gap-4 flex-wrap">
                   {/* Month Filter Chip */}
                   {monthFilter && (
@@ -317,10 +326,34 @@ const DataPage = () => {
                         {monthFilter}
                         <button
                           onClick={() => {
-                            searchParams.delete('month');
-                            setSearchParams(searchParams);
+                            const nextParams = new URLSearchParams(searchParams);
+                            nextParams.delete('month');
+                            setSearchParams(nextParams);
                           }}
                           className="hover:bg-action-primary/20 rounded-full p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Topic Filter Chip */}
+                  {topicFilter && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 text-xs text-text-muted">
+                        <Tag className="w-4 h-4" />
+                        <span>{t('data.filter_label')}</span>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 ring-1 ring-inset ring-purple-200">
+                        {t('data.topic', 'Topic')}: {topicFilter}
+                        <button
+                          onClick={() => {
+                            const nextParams = new URLSearchParams(searchParams);
+                            nextParams.delete('topic');
+                            setSearchParams(nextParams);
+                          }}
+                          className="hover:bg-purple-200 rounded-full p-0.5"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -484,8 +517,8 @@ const DataPage = () => {
 
                       {paginatedData.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="px-4 py-12 text-center text-text-muted">
-                            {localSearch || filters.selectedClusters.size > 0
+                          <td colSpan={8} className="px-4 py-12 text-center text-text-muted">
+                            {localSearch || filters.selectedClusters.size > 0 || monthFilter || topicFilter
                               ? t('data.no_results')
                               : t('data.no_data')
                             }

@@ -35,6 +35,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragHandle, setDragHandle] = useState<'start' | 'end' | 'range' | null>(null);
   const [localRange, setLocalRange] = useState<[number, number] | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Get points from timeline data
@@ -71,31 +72,39 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
     return `${monthNames[parseInt(month) - 1]} ${year}`;
   };
 
-  // Handle mouse down on bar
-  const handleBarMouseDown = useCallback((index: number, e: React.MouseEvent) => {
+  // Handle pointer down on bar
+  const handleBarPointerDown = useCallback((index: number, e: React.PointerEvent) => {
     e.preventDefault();
 
     if (!currentRange) {
       // Start new selection
       setLocalRange([index, index]);
       setDragHandle('end');
+      setDragOffset(0);
     } else if (index === currentRange[0]) {
+      setLocalRange(currentRange);
       setDragHandle('start');
+      setDragOffset(0);
     } else if (index === currentRange[1]) {
+      setLocalRange(currentRange);
       setDragHandle('end');
+      setDragOffset(0);
     } else if (index > currentRange[0] && index < currentRange[1]) {
+      setLocalRange(currentRange);
       setDragHandle('range');
+      setDragOffset(index - currentRange[0]);
     } else {
       // Click outside range - start new selection
       setLocalRange([index, index]);
       setDragHandle('end');
+      setDragOffset(0);
     }
 
     setIsDragging(true);
   }, [currentRange]);
 
-  // Handle mouse move during drag
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  // Handle pointer move during drag
+  const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isDragging || !containerRef.current || points.length === 0) return;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -112,16 +121,20 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
         case 'end':
           return [prev[0], Math.max(index, prev[0])];
         case 'range':
-          // TODO: Implement range drag
-          return prev;
+          {
+            const rangeWidth = prev[1] - prev[0];
+            const maxStart = Math.max(0, points.length - 1 - rangeWidth);
+            const nextStart = Math.max(0, Math.min(index - dragOffset, maxStart));
+            return [nextStart, nextStart + rangeWidth];
+          }
         default:
           return prev;
       }
     });
-  }, [isDragging, dragHandle, points.length]);
+  }, [isDragging, dragHandle, points.length, dragOffset]);
 
-  // Handle mouse up
-  const handleMouseUp = useCallback(() => {
+  // Handle pointer up
+  const handlePointerUp = useCallback(() => {
     if (isDragging && localRange) {
       // Commit the range
       if (localRange[0] === 0 && localRange[1] === points.length - 1) {
@@ -134,6 +147,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
     setIsDragging(false);
     setDragHandle(null);
     setLocalRange(null);
+    setDragOffset(0);
   }, [isDragging, localRange, points.length, setTimeRange]);
 
   // Clear selection
@@ -141,17 +155,17 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
     setTimeRange(null);
   }, [setTimeRange]);
 
-  // Attach global mouse events for dragging
+  // Attach global pointer events for dragging
   useEffect(() => {
     if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
       return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
       };
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handlePointerMove, handlePointerUp]);
 
   // Empty state
   if (points.length === 0) {
@@ -187,7 +201,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
       <div
         ref={containerRef}
         className="flex items-end gap-0.5 h-14 cursor-crosshair select-none"
-        onMouseDown={(e) => {
+        onPointerDown={(e) => {
           // Handle click on empty space
           if (!containerRef.current || points.length === 0) return;
 
@@ -196,7 +210,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
           const barWidth = rect.width / points.length;
           const index = Math.max(0, Math.min(points.length - 1, Math.floor(x / barWidth)));
 
-          handleBarMouseDown(index, e);
+          handleBarPointerDown(index, e);
         }}
       >
         {points.map((point, idx) => {

@@ -47,6 +47,9 @@ class SyncInfoResponse(BaseModel):
     """Schema for comprehensive sync status information."""
 
     last_sync_at: datetime | None = Field(None, description="Last sync completion time")
+    github_token_configured: bool = Field(
+        ..., description="Whether GitHub token is configured for sync operations"
+    )
     total_repos: int = Field(..., description="Total number of starred repositories")
     synced_repos: int = Field(..., description="Number of synced repositories")
     embedded_repos: int = Field(
