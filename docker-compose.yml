@@ -40,6 +40,8 @@ services:
       - APP_NAME=${APP_NAME:-mynebula}
       - DEBUG=${DEBUG:-false}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
 
       # ---------- GitHub ----------
       - GITHUB_TOKEN=${GITHUB_TOKEN}
