@@ -1,10 +1,30 @@
 import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { LayoutDashboard, Network, Settings, Database, Github } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 
+const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MAX_WIDTH = 420;
+const SIDEBAR_DEFAULT_WIDTH = 240;
+const SIDEBAR_WIDTH_KEY = 'mynebula.sidebar.width';
+
+const clampSidebarWidth = (width: number) =>
+  Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width));
+
 export const Sidebar = () => {
   const { t } = useTranslation();
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window === 'undefined') {
+      return SIDEBAR_DEFAULT_WIDTH;
+    }
+
+    const storedWidth = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    return Number.isFinite(storedWidth)
+      ? clampSidebarWidth(storedWidth)
+      : SIDEBAR_DEFAULT_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
 
   const navItems = [
     { icon: LayoutDashboard, label: t('sidebar.dashboard'), path: '/' },
@@ -13,8 +33,40 @@ export const Sidebar = () => {
     { icon: Settings, label: t('sidebar.settings'), path: '/settings' },
   ];
 
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+    window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      setSidebarWidth(clampSidebarWidth(event.clientX));
+    };
+
+    const handlePointerUp = () => {
+      setIsResizing(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-60 bg-bg-sidebar border-r border-border-light flex flex-col z-50">
+    <aside
+      className="fixed left-0 top-0 bottom-0 bg-bg-sidebar border-r border-border-light flex flex-col z-50"
+      style={{ width: `${sidebarWidth}px` }}
+    >
       {/* Header / Brand */}
       <a
         href="https://github.com/Tendo33/MyNebula"
@@ -55,6 +107,24 @@ export const Sidebar = () => {
       </nav>
 
       {/* Optional User/Footer Area could go here */}
+
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        onPointerDown={(event) => {
+          event.preventDefault();
+          setIsResizing(true);
+        }}
+        className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize group"
+      >
+        <div
+          className={clsx(
+            'absolute top-0 right-0 h-full w-px transition-colors',
+            isResizing ? 'bg-action-primary/60' : 'bg-transparent group-hover:bg-border-light'
+          )}
+        />
+      </div>
     </aside>
   );
 };

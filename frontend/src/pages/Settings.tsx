@@ -327,7 +327,7 @@ const Settings = () => {
   return (
     <div className="flex min-h-screen bg-bg-main text-text-main">
       <Sidebar />
-      <main className="flex-1 ml-60 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
         <header className="flex items-center justify-between h-14 px-8 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40">
           <h1 className="text-base font-semibold text-text-main select-none tracking-tight">
             {t('settings.title')}

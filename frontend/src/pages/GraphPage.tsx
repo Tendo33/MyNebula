@@ -72,7 +72,7 @@ const GraphPage = () => {
     <div className="flex min-h-screen bg-bg-main text-text-main">
       <Sidebar />
 
-      <main className="flex-1 ml-60 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
         {/* Header */}
         <header className="flex items-center justify-between h-14 px-6 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 transition-all">
           <div className="flex items-center gap-3 select-none">
