@@ -74,6 +74,9 @@ EMBEDDING_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
 
 # [推荐] LLM API Key (AI 摘要)
 LLM_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
+
+# [可选] LLM 输出语言（zh=中文，en=英文）
+LLM_OUTPUT_LANGUAGE=zh
 ```
 
 > **安全提示**：生产环境请务必修改 `DATABASE_PASSWORD`，不要使用默认值。
@@ -160,6 +163,7 @@ docker compose up -d
 |------|--------|------|
 | `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | API 地址 |
 | `LLM_MODEL` | `Qwen/Qwen2.5-7B-Instruct` | 模型名称 |
+| `LLM_OUTPUT_LANGUAGE` | `zh` | LLM 输出语言（`zh` 或 `en`） |
 
 ### 不需要配置的变量（已从 .env.example 移除）
 

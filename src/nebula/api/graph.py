@@ -1,7 +1,10 @@
 """Graph visualization API routes.
 
-Provides data for 3D force graph visualization.
+Provides data for force graph visualization and timeline analytics.
 """
+
+import math
+from typing import Literal, Sequence
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -23,7 +26,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 UNCATEGORIZED_STAR_LIST_ID = -1
-UNCATEGORIZED_STAR_LIST_NAME = "未分类"
+UNCATEGORIZED_STAR_LIST_NAME = "Uncategorized"
 
 # Color palette for clusters
 CLUSTER_COLORS = [
@@ -40,6 +43,83 @@ CLUSTER_COLORS = [
     "#F8B500",  # Orange
     "#00CED1",  # Dark Cyan
 ]
+
+
+def _cosine_similarity(vec_a: Sequence[float], vec_b: Sequence[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    if len(vec_a) != len(vec_b) or not vec_a:
+        return 0.0
+
+    dot = 0.0
+    norm_a = 0.0
+    norm_b = 0.0
+    for i in range(len(vec_a)):
+        a = float(vec_a[i])
+        b = float(vec_b[i])
+        dot += a * b
+        norm_a += a * a
+        norm_b += b * b
+
+    if norm_a <= 0 or norm_b <= 0:
+        return 0.0
+
+    return dot / (math.sqrt(norm_a) * math.sqrt(norm_b))
+
+
+def _build_similarity_edges_knn(
+    repo_ids: list[int],
+    embeddings: list[Sequence[float]],
+    min_similarity: float = 0.7,
+    k: int = 8,
+) -> list[GraphEdge]:
+    """Build undirected similarity edges using per-node k-nearest neighbors."""
+    if k <= 0 or not repo_ids or not embeddings:
+        return []
+
+    n = min(len(repo_ids), len(embeddings))
+    if n <= 1:
+        return []
+
+    pair_scores: dict[tuple[int, int], float] = {}
+
+    for i in range(n):
+        source_id = repo_ids[i]
+        source_embedding = embeddings[i]
+        if not source_embedding:
+            continue
+
+        candidates: list[tuple[float, int]] = []
+        for j in range(n):
+            if i == j:
+                continue
+            target_embedding = embeddings[j]
+            if not target_embedding:
+                continue
+            similarity = _cosine_similarity(source_embedding, target_embedding)
+            if similarity >= min_similarity:
+                candidates.append((similarity, j))
+
+        if not candidates:
+            continue
+
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        for similarity, j in candidates[:k]:
+            target_id = repo_ids[j]
+            edge_key = (
+                (source_id, target_id)
+                if source_id < target_id
+                else (target_id, source_id)
+            )
+            existing = pair_scores.get(edge_key)
+            if existing is None or similarity > existing:
+                pair_scores[edge_key] = similarity
+
+    edges = [
+        GraphEdge(source=source, target=target, weight=weight)
+        for (source, target), weight in pair_scores.items()
+    ]
+    edges.sort(key=lambda edge: edge.weight, reverse=True)
+    return edges
 
 
 async def get_default_user(db: AsyncSession) -> User | None:
@@ -164,33 +244,20 @@ async def get_graph_data(
         )
         nodes.append(node)
 
-    # Build edges (optional, expensive for large datasets)
+    # Build edges (optional, bounded kNN for compatibility with older clients)
     edges = []
     if include_edges and len(repos) < 500:  # Limit for performance
-        # Compute pairwise similarities for nearby nodes
-        # This is a simplified version - in production, use spatial indexing
-        from nebula.core.embedding import get_embedding_service
-
-        embedding_service = get_embedding_service()
-
-        for i, repo1 in enumerate(repos):
-            if repo1.embedding is None:
-                continue
-            for repo2 in repos[i + 1 :]:
-                if repo2.embedding is None:
-                    continue
-
-                similarity = await embedding_service.compute_similarity(
-                    repo1.embedding, repo2.embedding
-                )
-                if similarity >= min_similarity:
-                    edges.append(
-                        GraphEdge(
-                            source=repo1.id,
-                            target=repo2.id,
-                            weight=similarity,
-                        )
-                    )
+        repos_with_embeddings = [
+            repo for repo in repos if repo.embedding is not None and len(repo.embedding) > 0
+        ]
+        repo_ids = [repo.id for repo in repos_with_embeddings]
+        embeddings = [repo.embedding for repo in repos_with_embeddings]
+        edges = _build_similarity_edges_knn(
+            repo_ids=repo_ids,
+            embeddings=embeddings,
+            min_similarity=min_similarity,
+            k=8,
+        )
 
     # Build cluster info
     cluster_infos = [
@@ -237,6 +304,52 @@ async def get_graph_data(
         total_edges=len(edges),
         total_clusters=len(clusters),
         total_star_lists=len(star_list_infos),
+    )
+
+
+@router.get("/edges", response_model=list[GraphEdge])
+async def get_graph_edges(
+    strategy: Literal["knn"] = Query(default="knn"),
+    k: int = Query(default=8, ge=1, le=30, description="K nearest neighbors per node"),
+    min_similarity: float = Query(
+        default=0.7, ge=0.5, le=0.99, description="Minimum edge similarity"
+    ),
+    max_nodes: int = Query(
+        default=1000,
+        ge=50,
+        le=5000,
+        description="Maximum number of nodes to include when building edges",
+    ),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Get similarity edges for the graph as a separate heavy request."""
+    if strategy != "knn":
+        return []
+
+    user = await get_default_user(db)
+    if not user:
+        return []
+
+    repos_result = await db.execute(
+        select(StarredRepo)
+        .where(
+            StarredRepo.user_id == user.id,
+            StarredRepo.is_embedded == True,  # noqa: E712
+            StarredRepo.embedding.isnot(None),
+        )
+        .order_by(StarredRepo.stargazers_count.desc())
+        .limit(max_nodes)
+    )
+    repos = repos_result.scalars().all()
+
+    repo_ids = [repo.id for repo in repos if repo.embedding is not None and len(repo.embedding) > 0]
+    embeddings = [repo.embedding for repo in repos if repo.embedding is not None and len(repo.embedding) > 0]
+
+    return _build_similarity_edges_knn(
+        repo_ids=repo_ids,
+        embeddings=embeddings,
+        min_similarity=min_similarity,
+        k=k,
     )
 
 

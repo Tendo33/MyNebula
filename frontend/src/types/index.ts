@@ -14,11 +14,11 @@ export interface GraphNode {
 	y: number;
 	z: number;
 	// Clustering
-	cluster_id?: number;
+	cluster_id: number | null;
 	color: string;
 	size: number;
 	// User's star list (GitHub user-defined category)
-	star_list_id?: number;
+	star_list_id: number | null;
 	star_list_name?: string;
 	// Stats
 	stargazers_count: number;

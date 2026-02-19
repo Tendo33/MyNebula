@@ -167,6 +167,7 @@ For full details, see `.env.example` and `doc/ENV_VARS.md`.
 | GitHub | `GITHUB_TOKEN` | Required for star sync and list sync |
 | Embedding | `EMBEDDING_API_KEY` | Required for vector embeddings |
 | LLM | `LLM_API_KEY` | Optional, recommended for summaries/cluster naming |
+| LLM | `LLM_OUTPUT_LANGUAGE` | LLM output language for summaries/cluster names (`zh` or `en`) |
 | Admin | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Admin access for settings and mutating operations |
 | Server | `API_PORT` | Public service port (default: 8000) |
 | App | `DEBUG` | Enables `/docs` and debug behavior |

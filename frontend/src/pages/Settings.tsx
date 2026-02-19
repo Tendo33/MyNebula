@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
@@ -27,7 +28,9 @@ import {
   startEmbedding,
   startStarSync,
   startSummaries,
+  getSyncJobStatus,
   getSyncStatus,
+  type SyncJobStatusResponse,
 } from '../api/sync';
 import {
   formatLastRunTime,
@@ -41,6 +44,7 @@ import {
   type ScheduleResponse,
   type SyncInfoResponse,
 } from '../api/schedule';
+import { getAdminAuthConfig } from '../api/auth';
 
 interface TaskProgressUpdate {
   state: string;
@@ -52,6 +56,20 @@ interface TaskCompletionResult {
   success: boolean;
   error: string | null;
 }
+
+const createPipelineSyncSteps = (): { id: string; status: SyncStepStatus; progress?: number; error?: string }[] => ([
+  { id: 'stars', status: 'pending', progress: 0 },
+  { id: 'summaries', status: 'pending', progress: 0 },
+  { id: 'embeddings', status: 'pending', progress: 0 },
+  { id: 'clustering', status: 'pending', progress: 0 },
+]);
+
+const createFullRefreshSteps = (): { id: string; status: SyncStepStatus; progress?: number; error?: string }[] => ([
+  { id: 'reset', status: 'pending', progress: 0 },
+  { id: 'stars', status: 'pending', progress: 0 },
+  { id: 'embeddings', status: 'pending', progress: 0 },
+  { id: 'clustering', status: 'pending', progress: 0 },
+]);
 
 const Settings = () => {
   const { t } = useTranslation();
@@ -77,26 +95,33 @@ const Settings = () => {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [adminAuthConfigured, setAdminAuthConfigured] = useState<boolean | null>(null);
+  const [progressTitle, setProgressTitle] = useState('');
 
   const [showSyncProgress, setShowSyncProgress] = useState(false);
   const [syncSteps, setSyncSteps] = useState<
     { id: string; status: SyncStepStatus; progress?: number; error?: string }[]
-  >([
-    { id: 'stars', status: 'pending' },
-    { id: 'summaries', status: 'pending' },
-    { id: 'embeddings', status: 'pending' },
-    { id: 'clustering', status: 'pending' },
-  ]);
+  >(createPipelineSyncSteps);
 
   const translatedSteps = useMemo(
     () =>
       syncSteps.map((step) => ({
         ...step,
-        label: t(`sync.step_${step.id}_label`),
-        description: t(`sync.step_${step.id}_desc`),
+        label: t(
+          `sync.step_${step.id}_label`,
+          step.id === 'reset' ? t('settings.confirm_step_fetch') : step.id
+        ),
+        description: t(
+          `sync.step_${step.id}_desc`,
+          step.id === 'reset' ? t('settings.full_refresh_desc') : ''
+        ),
       })),
     [syncSteps, t]
   );
+
+  useEffect(() => {
+    setProgressTitle(t('sync.title', 'Syncing Data'));
+  }, [t]);
 
   const githubTokenStatus = useMemo(() => {
     if (syncInfo?.github_token_configured === true) {
@@ -136,6 +161,17 @@ const Settings = () => {
     loadScheduleData();
   }, [isAuthenticated, loadScheduleData]);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      setAdminAuthConfigured(true);
+      return;
+    }
+
+    getAdminAuthConfig()
+      .then((config) => setAdminAuthConfigured(config.enabled))
+      .catch(() => setAdminAuthConfigured(null));
+  }, [isAuthenticated]);
+
   const waitForTaskComplete = async (
     taskId: number,
     onProgress?: (update: TaskProgressUpdate) => void
@@ -173,6 +209,33 @@ const Settings = () => {
     }
   };
 
+  const waitForJobComplete = async (
+    taskId: number,
+    onProgress?: (job: SyncJobStatusResponse) => void
+  ): Promise<TaskCompletionResult> => {
+    while (true) {
+      try {
+        const job = await getSyncJobStatus(taskId);
+        onProgress?.(job);
+
+        if (job.status === 'completed') {
+          return { success: true, error: null };
+        }
+
+        if (job.status === 'failed') {
+          return { success: false, error: job.last_error };
+        }
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'poll_job_status_failed',
+        };
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  };
+
   const updateStepStatus = (
     stepId: string,
     status: SyncStepStatus,
@@ -199,16 +262,72 @@ const Settings = () => {
   };
 
   const resetSteps = () => {
-    setSyncSteps([
-      { id: 'stars', status: 'pending', progress: 0 },
-      { id: 'summaries', status: 'pending', progress: 0 },
-      { id: 'embeddings', status: 'pending', progress: 0 },
-      { id: 'clustering', status: 'pending', progress: 0 },
-    ]);
+    setSyncSteps(createPipelineSyncSteps());
+  };
+
+  const resetFullRefreshStepState = () => {
+    setSyncSteps(createFullRefreshSteps());
+  };
+
+  const updateFullRefreshProgress = (job: SyncJobStatusResponse) => {
+    const phaseOrder = ['reset', 'stars', 'embeddings', 'clustering'] as const;
+    const normalizedPhase =
+      job.phase === 'cluster'
+        ? 'clustering'
+        : job.phase === 'complete'
+        ? 'clustering'
+        : job.phase;
+    const currentIndex = phaseOrder.findIndex((phase) => phase === normalizedPhase);
+    if (currentIndex >= 0) {
+      setSyncStep(t(`sync.step_${phaseOrder[currentIndex]}_label`, phaseOrder[currentIndex]));
+    }
+
+    setSyncSteps((previous) =>
+      previous.map((step, index) => {
+        if (job.status === 'completed') {
+          return { ...step, status: 'completed', progress: 100, error: undefined };
+        }
+
+        if (job.status === 'failed') {
+          if (currentIndex >= 0 && index < currentIndex) {
+            return { ...step, status: 'completed', progress: 100, error: undefined };
+          }
+          if (step.id === normalizedPhase || (currentIndex < 0 && index === previous.length - 1)) {
+            return {
+              ...step,
+              status: 'failed',
+              error: job.last_error || undefined,
+            };
+          }
+          return { ...step, status: 'pending', progress: 0, error: undefined };
+        }
+
+        if (currentIndex >= 0 && index < currentIndex) {
+          return { ...step, status: 'completed', progress: 100, error: undefined };
+        }
+        if (currentIndex >= 0 && index === currentIndex) {
+          const perStepProgress = Math.max(
+            0,
+            Math.min(100, ((job.progress_percent - currentIndex * 25) / 25) * 100)
+          );
+          return {
+            ...step,
+            status: 'running',
+            progress: Math.round(perStepProgress),
+            error: undefined,
+          };
+        }
+        return { ...step, status: 'pending', progress: 0, error: undefined };
+      })
+    );
   };
 
   const handleAdminLogin = async (e: FormEvent) => {
     e.preventDefault();
+    if (adminAuthConfigured === false) {
+      setLoginError(t('settings.admin_not_configured'));
+      return;
+    }
     setLoginLoading(true);
     setLoginError(null);
 
@@ -217,7 +336,11 @@ const Settings = () => {
       setLoginPassword('');
       await loadScheduleData();
     } catch (err) {
-      setLoginError(t('settings.login_failed'));
+      if (isAxiosError(err) && err.response?.status === 503) {
+        setLoginError(t('settings.admin_not_configured'));
+      } else {
+        setLoginError(t('settings.login_failed'));
+      }
       console.error('Admin login failed:', err);
     } finally {
       setLoginLoading(false);
@@ -277,6 +400,7 @@ const Settings = () => {
       setError(null);
       setSyncing(true);
       setShowSyncProgress(true);
+      setProgressTitle(t('sync.title', 'Syncing Data'));
       resetSteps();
 
       updateStepStatus('stars', 'running', undefined, 0);
@@ -375,15 +499,32 @@ const Settings = () => {
   const handleFullRefresh = async () => {
     setShowConfirmDialog(false);
     setRefreshLoading(true);
+    setError(null);
+    setSyncing(true);
+    setShowSyncProgress(true);
+    setProgressTitle(t('settings.full_refresh'));
+    resetFullRefreshStepState();
 
     try {
-      await triggerFullRefresh();
+      const started = await triggerFullRefresh();
+      const fullRefreshStatus = await waitForJobComplete(started.task_id, updateFullRefreshProgress);
+      if (!fullRefreshStatus.success) {
+        throw new Error(fullRefreshStatus.error || t('settings.full_refresh_error'));
+      }
+
+      setSyncSteps((prev) =>
+        prev.map((step) => ({ ...step, status: 'completed', progress: 100, error: undefined }))
+      );
+
+      await refreshData();
       await loadScheduleData();
     } catch (err) {
       setError(t('settings.full_refresh_error'));
       console.error('Failed to trigger full refresh:', err);
     } finally {
       setRefreshLoading(false);
+      setSyncing(false);
+      setSyncStep('');
     }
   };
 
@@ -434,6 +575,12 @@ const Settings = () => {
               </div>
 
               <form className="space-y-4" onSubmit={handleAdminLogin}>
+                {adminAuthConfigured === false && (
+                  <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                    {t('settings.admin_not_configured')}
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs text-text-muted mb-1">{t('settings.username')}</label>
                   <div className="relative">
@@ -469,10 +616,10 @@ const Settings = () => {
 
                 <button
                   type="submit"
-                  disabled={loginLoading}
+                  disabled={loginLoading || adminAuthConfigured === false}
                   className={clsx(
                     'w-full h-10 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2',
-                    loginLoading
+                    loginLoading || adminAuthConfigured === false
                       ? 'bg-gray-100 text-gray-400 border border-border-light cursor-not-allowed'
                       : 'bg-black text-white hover:bg-gray-800'
                   )}
@@ -840,6 +987,11 @@ const Settings = () => {
                       {t('settings.last_run')}: {new Date(syncInfo.last_sync_at).toLocaleString()}
                     </div>
                   )}
+                  {syncInfo?.single_user_mode && (
+                    <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                      {t('settings.single_user_mode_notice')}
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-3">
@@ -917,7 +1069,7 @@ const Settings = () => {
         isOpen={showSyncProgress}
         onClose={handleSyncProgressClose}
         steps={translatedSteps}
-        title={t('sync.title', 'Syncing Data')}
+        title={progressTitle || t('sync.title', 'Syncing Data')}
         canClose={!syncing}
       />
     </div>

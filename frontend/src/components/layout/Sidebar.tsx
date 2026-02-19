@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Network, Settings, Database, Github } from 'lucide-react';
+import { LayoutDashboard, Network, Settings, Database, Github, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +25,10 @@ export const Sidebar = () => {
       : SIDEBAR_DEFAULT_WIDTH;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const navItems = [
     { icon: LayoutDashboard, label: t('sidebar.dashboard'), path: '/' },
@@ -34,12 +38,26 @@ export const Sidebar = () => {
   ];
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+    const effectiveWidth = isMobile ? 0 : sidebarWidth;
+    document.documentElement.style.setProperty('--sidebar-width', `${effectiveWidth}px`);
     window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
+  }, [sidebarWidth, isMobile]);
 
   useEffect(() => {
-    if (!isResizing) return;
+    const handleResize = () => {
+      const nextIsMobile = window.innerWidth < 1024;
+      setIsMobile(nextIsMobile);
+      if (!nextIsMobile) {
+        setMobileOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing || isMobile) return;
 
     const handlePointerMove = (event: PointerEvent) => {
       setSidebarWidth(clampSidebarWidth(event.clientX));
@@ -60,13 +78,35 @@ export const Sidebar = () => {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [isResizing]);
+  }, [isResizing, isMobile]);
 
   return (
-    <aside
-      className="fixed left-0 top-0 bottom-0 bg-bg-sidebar border-r border-border-light flex flex-col z-50"
-      style={{ width: `${sidebarWidth}px` }}
-    >
+    <>
+      {isMobile && (
+        <button
+          onClick={() => setMobileOpen((prev) => !prev)}
+          className="fixed left-3 top-3 z-[70] inline-flex h-9 w-9 items-center justify-center rounded-md border border-border-light bg-white/95 text-text-main shadow-sm backdrop-blur-sm"
+          aria-label={mobileOpen ? t('common.close') : t('common.open_menu', 'Open menu')}
+        >
+          {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </button>
+      )}
+
+      {isMobile && mobileOpen && (
+        <button
+          className="fixed inset-0 z-[55] bg-black/40"
+          onClick={() => setMobileOpen(false)}
+          aria-label={t('common.close')}
+        />
+      )}
+
+      <aside
+        className={clsx(
+          'fixed left-0 top-0 bottom-0 bg-bg-sidebar border-r border-border-light flex flex-col z-[60] transition-transform duration-200',
+          isMobile ? (mobileOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
+        )}
+        style={{ width: `${isMobile ? Math.min(sidebarWidth, 300) : sidebarWidth}px` }}
+      >
       {/* Header / Brand */}
       <a
         href="https://github.com/Tendo33/MyNebula"
@@ -88,6 +128,11 @@ export const Sidebar = () => {
           <NavLink
             key={item.path}
             to={item.path}
+            onClick={() => {
+              if (isMobile) {
+                setMobileOpen(false);
+              }
+            }}
             className={({ isActive }) =>
               clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 group select-none',
@@ -108,23 +153,26 @@ export const Sidebar = () => {
 
       {/* Optional User/Footer Area could go here */}
 
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize sidebar"
-        onPointerDown={(event) => {
-          event.preventDefault();
-          setIsResizing(true);
-        }}
-        className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize group"
-      >
+      {!isMobile && (
         <div
-          className={clsx(
-            'absolute top-0 right-0 h-full w-px transition-colors',
-            isResizing ? 'bg-action-primary/60' : 'bg-transparent group-hover:bg-border-light'
-          )}
-        />
-      </div>
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            setIsResizing(true);
+          }}
+          className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize group"
+        >
+          <div
+            className={clsx(
+              'absolute top-0 right-0 h-full w-px transition-colors',
+              isResizing ? 'bg-action-primary/60' : 'bg-transparent group-hover:bg-border-light'
+            )}
+          />
+        </div>
+      )}
     </aside>
+    </>
   );
 };

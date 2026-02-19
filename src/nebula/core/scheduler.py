@@ -7,6 +7,7 @@ Uses APScheduler with AsyncIOScheduler for integration with FastAPI's
 async event loop.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -38,6 +39,8 @@ class SchedulerService:
         """Initialize the scheduler service."""
         self._scheduler: AsyncIOScheduler | None = None
         self._running = False
+        self._active_user_tasks: dict[int, asyncio.Task[None]] = {}
+        self._task_lock = asyncio.Lock()
 
     def _get_scheduler(self) -> AsyncIOScheduler:
         """Get or create the scheduler instance."""
@@ -139,27 +142,37 @@ class SchedulerService:
             # Convert current UTC time to user's timezone
             user_tz = ZoneInfo(schedule.timezone)
             user_time = now_utc.astimezone(user_tz)
+            last_run_local = (
+                schedule.last_run_at.astimezone(user_tz) if schedule.last_run_at else None
+            )
 
-            # Check if current time matches scheduled time
-            if (
-                user_time.hour == schedule.schedule_hour
-                and user_time.minute == schedule.schedule_minute
+            from nebula.api.sync import _is_schedule_due
+
+            if not _is_schedule_due(
+                now_local=user_time,
+                schedule_hour=schedule.schedule_hour,
+                schedule_minute=schedule.schedule_minute,
+                last_run_local=last_run_local,
             ):
-                # Avoid running twice in the same minute
-                if schedule.last_run_at:
-                    last_run_local = schedule.last_run_at.astimezone(user_tz)
-                    if (
-                        last_run_local.date() == user_time.date()
-                        and last_run_local.hour == user_time.hour
-                        and last_run_local.minute == user_time.minute
-                    ):
-                        return  # Already ran this minute
+                return
 
+            if await self._has_active_pipeline(schedule.user_id):
                 logger.info(
-                    f"Triggering scheduled sync for user {schedule.user_id} "
-                    f"at {user_time.strftime('%Y-%m-%d %H:%M')} {schedule.timezone}"
+                    f"Skipping scheduled sync for user {schedule.user_id}: pipeline already running"
                 )
-                await self._trigger_user_sync(schedule, db)
+                return
+
+            logger.info(
+                f"Triggering scheduled sync for user {schedule.user_id} "
+                f"at {user_time.strftime('%Y-%m-%d %H:%M')} {schedule.timezone}"
+            )
+
+            schedule.last_run_status = "running"
+            schedule.last_run_error = None
+            schedule.last_run_at = now_utc
+            await db.commit()
+
+            await self._launch_user_pipeline(schedule.user_id)
 
         except Exception as e:
             logger.error(f"Error processing schedule for user {schedule.user_id}: {e}")
@@ -167,94 +180,140 @@ class SchedulerService:
             schedule.last_run_error = str(e)
             await db.commit()
 
-    async def _trigger_user_sync(
+    async def _has_active_pipeline(self, user_id: int) -> bool:
+        """Check whether a scheduler-triggered pipeline is running for the user."""
+        async with self._task_lock:
+            existing = self._active_user_tasks.get(user_id)
+            if existing and existing.done():
+                self._active_user_tasks.pop(user_id, None)
+                return False
+            return existing is not None
+
+    async def _launch_user_pipeline(self, user_id: int) -> None:
+        """Launch a non-blocking scheduled pipeline for the user."""
+        async with self._task_lock:
+            existing = self._active_user_tasks.get(user_id)
+            if existing and not existing.done():
+                return
+
+            task = asyncio.create_task(
+                self._run_user_sync_pipeline(user_id),
+                name=f"scheduled-sync-{user_id}",
+            )
+            self._active_user_tasks[user_id] = task
+
+    async def _create_task_record(
         self,
-        schedule: SyncSchedule,
         db: AsyncSession,
+        user_id: int,
+        task_type: str,
+    ) -> int:
+        """Create and persist a sync task record."""
+        task = SyncTask(
+            user_id=user_id,
+            task_type=task_type,
+            status="pending",
+        )
+        db.add(task)
+        await db.commit()
+        await db.refresh(task)
+        return task.id
+
+    async def _run_user_sync_pipeline(
+        self,
+        user_id: int,
     ) -> None:
-        """Trigger sync tasks for a user.
+        """Run scheduled sync pipeline for a user in a detached task.
 
-        Creates a background task for incremental star sync,
-        which will automatically trigger embedding and clustering
-        updates as needed.
-
-        Args:
-            schedule: The sync schedule triggering this sync.
-            db: Database session.
+        The scheduler check loop never awaits this method directly.
         """
         from nebula.api.sync import (
             compute_embeddings_task,
             run_clustering_task,
             sync_stars_task,
         )
+        from nebula.db.database import get_db_context
 
         try:
-            # Update schedule status
-            schedule.last_run_status = "running"
-            schedule.last_run_at = datetime.now(timezone.utc)
-            await db.commit()
+            async with get_db_context() as db:
+                user = await db.get(User, user_id)
+                if not user:
+                    raise ValueError(f"User {user_id} not found")
 
-            # Get user
-            user = await db.get(User, schedule.user_id)
-            if not user:
-                raise ValueError(f"User {schedule.user_id} not found")
+                active_task_result = await db.execute(
+                    select(SyncTask.id).where(
+                        SyncTask.user_id == user_id,
+                        SyncTask.status.in_(["pending", "running"]),
+                        SyncTask.task_type.in_(
+                            ["stars", "embedding", "cluster", "full_refresh"]
+                        ),
+                    )
+                )
+                active_task_id = active_task_result.scalar_one_or_none()
+                if active_task_id is not None:
+                    logger.info(
+                        f"Skipping scheduled sync for user {user_id}: existing task {active_task_id} is active"
+                    )
+                    schedule = await db.scalar(
+                        select(SyncSchedule).where(SyncSchedule.user_id == user_id)
+                    )
+                    if schedule:
+                        schedule.last_run_status = "success"
+                        schedule.last_run_error = (
+                            "Skipped because another sync task is already running"
+                        )
+                        await db.commit()
+                    return
 
-            # Create sync task for stars
-            stars_task = SyncTask(
-                user_id=schedule.user_id,
-                task_type="stars",
-                status="pending",
-            )
-            db.add(stars_task)
-            await db.commit()
-            await db.refresh(stars_task)
+                stars_task_id = await self._create_task_record(db, user_id, "stars")
 
             # Run sync (incremental mode)
-            await sync_stars_task(schedule.user_id, stars_task.id, "incremental")
+            await sync_stars_task(user_id, stars_task_id, "incremental")
 
-            # Create and run embedding task
-            embed_task = SyncTask(
-                user_id=schedule.user_id,
-                task_type="embedding",
-                status="pending",
-            )
-            db.add(embed_task)
-            await db.commit()
-            await db.refresh(embed_task)
+            async with get_db_context() as db:
+                embed_task_id = await self._create_task_record(db, user_id, "embedding")
+            await compute_embeddings_task(user_id, embed_task_id)
 
-            await compute_embeddings_task(schedule.user_id, embed_task.id)
-
-            # Create and run clustering task
-            cluster_task = SyncTask(
-                user_id=schedule.user_id,
-                task_type="cluster",
-                status="pending",
-            )
-            db.add(cluster_task)
-            await db.commit()
-            await db.refresh(cluster_task)
+            async with get_db_context() as db:
+                cluster_task_id = await self._create_task_record(db, user_id, "cluster")
 
             # Use incremental mode for scheduled syncs to preserve existing layout.
-            # Only new repos get assigned to existing clusters; the graph stays stable.
             await run_clustering_task(
-                schedule.user_id,
-                cluster_task.id,
+                user_id,
+                cluster_task_id,
                 use_llm=True,
                 incremental=True,
             )
 
-            # Update schedule on success
-            schedule.last_run_status = "success"
-            schedule.last_run_error = None
-            await db.commit()
+            async with get_db_context() as db:
+                schedule = await db.scalar(
+                    select(SyncSchedule).where(SyncSchedule.user_id == user_id)
+                )
+                if schedule:
+                    schedule.last_run_status = "success"
+                    schedule.last_run_error = None
+                    await db.commit()
 
-            logger.info(f"Scheduled sync completed for user {schedule.user_id}")
+            logger.info(f"Scheduled sync completed for user {user_id}")
 
         except Exception as e:
-            logger.exception(f"Scheduled sync failed for user {schedule.user_id}: {e}")
-            schedule.last_run_status = "failed"
-            schedule.last_run_error = str(e)
-            await db.commit()
+            logger.exception(f"Scheduled sync failed for user {user_id}: {e}")
+            from nebula.db.database import get_db_context
+
+            async with get_db_context() as db:
+                schedule = await db.scalar(
+                    select(SyncSchedule).where(SyncSchedule.user_id == user_id)
+                )
+                if schedule:
+                    schedule.last_run_status = "failed"
+                    schedule.last_run_error = str(e)
+                    await db.commit()
+        finally:
+            async with self._task_lock:
+                existing = self._active_user_tasks.get(user_id)
+                current = asyncio.current_task()
+                if existing is not None and existing is current:
+                    self._active_user_tasks.pop(user_id, None)
 
 
 def get_scheduler_service() -> SchedulerService:

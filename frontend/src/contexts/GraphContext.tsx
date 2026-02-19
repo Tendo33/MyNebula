@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { GraphData, GraphNode, ClusterInfo, TimelineData } from '../types';
-import { getGraphData, getTimelineData } from '../api/graph';
+import { getGraphData, getGraphEdges, getTimelineData } from '../api/graph';
 
 // ============================================================================
 // Cache Utilities
@@ -202,13 +202,35 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         // Fetch fresh data in background
         Promise.all([
-          getGraphData({ include_edges: true, min_similarity: 0.7 }),
+          getGraphData({ include_edges: false }),
           getTimelineData(),
         ]).then(([graphData, timeline]) => {
           setRawData(graphData);
           setTimelineData(timeline);
           setCachedData(CACHE_KEY_GRAPH, graphData);
           setCachedData(CACHE_KEY_TIMELINE, timeline);
+
+          getGraphEdges({
+            strategy: 'knn',
+            min_similarity: 0.7,
+            k: 8,
+            max_nodes: 1000,
+          }).then((edges) => {
+            setRawData((prev) => {
+              if (!prev) {
+                return prev;
+              }
+              const merged = {
+                ...prev,
+                edges,
+                total_edges: edges.length,
+              };
+              setCachedData(CACHE_KEY_GRAPH, merged);
+              return merged;
+            });
+          }).catch((edgeErr) => {
+            console.warn('Background edge refresh failed:', edgeErr);
+          });
         }).catch(err => {
           console.warn('Background refresh failed:', err);
         });
@@ -218,7 +240,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Fetch fresh data
       const [graphData, timeline] = await Promise.all([
-        getGraphData({ include_edges: true, min_similarity: 0.7 }),
+        getGraphData({ include_edges: false }),
         getTimelineData(),
       ]);
 
@@ -228,6 +250,28 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Cache the data
       setCachedData(CACHE_KEY_GRAPH, graphData);
       setCachedData(CACHE_KEY_TIMELINE, timeline);
+
+      getGraphEdges({
+        strategy: 'knn',
+        min_similarity: 0.7,
+        k: 8,
+        max_nodes: 1000,
+      }).then((edges) => {
+        setRawData((prev) => {
+          if (!prev) {
+            return prev;
+          }
+          const merged = {
+            ...prev,
+            edges,
+            total_edges: edges.length,
+          };
+          setCachedData(CACHE_KEY_GRAPH, merged);
+          return merged;
+        });
+      }).catch((edgeErr) => {
+        console.warn('Failed to load graph edges:', edgeErr);
+      });
     } catch (err) {
       console.error('Failed to load graph data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -246,7 +290,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       clearCache();
 
       const [graphData, timeline] = await Promise.all([
-        getGraphData({ include_edges: true, min_similarity: 0.7 }),
+        getGraphData({ include_edges: false }),
         getTimelineData(),
       ]);
 
@@ -256,6 +300,24 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Update cache with fresh data
       setCachedData(CACHE_KEY_GRAPH, graphData);
       setCachedData(CACHE_KEY_TIMELINE, timeline);
+
+      try {
+        const edges = await getGraphEdges({
+          strategy: 'knn',
+          min_similarity: 0.7,
+          k: 8,
+          max_nodes: 1000,
+        });
+        const merged = {
+          ...graphData,
+          edges,
+          total_edges: edges.length,
+        };
+        setRawData(merged);
+        setCachedData(CACHE_KEY_GRAPH, merged);
+      } catch (edgeErr) {
+        console.warn('Failed to refresh graph edges:', edgeErr);
+      }
     } catch (err) {
       console.error('Failed to refresh graph data:', err);
       setError(err instanceof Error ? err.message : 'Failed to refresh data');
@@ -273,14 +335,14 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Filter by clusters
     if (filters.selectedClusters.size > 0) {
       filteredNodes = filteredNodes.filter(
-        node => node.cluster_id !== undefined && filters.selectedClusters.has(node.cluster_id)
+        node => node.cluster_id != null && filters.selectedClusters.has(node.cluster_id)
       );
     }
 
     // Filter by star lists
     if (filters.selectedStarLists.size > 0) {
       filteredNodes = filteredNodes.filter(
-        node => node.star_list_id !== undefined && filters.selectedStarLists.has(node.star_list_id)
+        node => node.star_list_id != null && filters.selectedStarLists.has(node.star_list_id)
       );
     }
 
@@ -347,7 +409,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const visibleClusterIds = new Set(
       filteredNodes
         .map(n => n.cluster_id)
-        .filter((id): id is number => id !== undefined)
+        .filter((id): id is number => id != null)
     );
     const filteredClusters = rawData.clusters.filter(c => visibleClusterIds.has(c.id));
 
@@ -530,11 +592,11 @@ export const useLanguages = (): string[] => {
 };
 
 /** Get cluster by ID */
-export const useCluster = (clusterId: number | undefined): ClusterInfo | undefined => {
+export const useCluster = (clusterId: number | null): ClusterInfo | undefined => {
   const { rawData } = useGraph();
 
   return useMemo(() => {
-    if (!rawData || clusterId === undefined) return undefined;
+    if (!rawData || clusterId == null) return undefined;
     return rawData.clusters.find(c => c.id === clusterId);
   }, [rawData, clusterId]);
 };

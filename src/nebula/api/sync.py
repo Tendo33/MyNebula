@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nebula.core.config import get_sync_settings
+from nebula.core.config import get_app_settings, get_sync_settings
 from nebula.core.embedding import get_embedding_service
 from nebula.core.github_client import GitHubClient
 from nebula.core.llm import get_llm_service
@@ -27,7 +27,9 @@ from nebula.db import (
     get_db,
 )
 from nebula.schemas import (
+    FullRefreshRequest,
     FullRefreshResponse,
+    JobStatusResponse,
     ScheduleConfig,
     ScheduleResponse,
     SyncInfoResponse,
@@ -47,6 +49,78 @@ def _to_utc(dt: datetime | None) -> datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+
+def _calculate_progress_percent(total_items: int, processed_items: int) -> float:
+    """Calculate bounded progress percentage from counters."""
+    if total_items <= 0:
+        return 0.0
+    percent = (processed_items / total_items) * 100
+    return max(0.0, min(100.0, float(percent)))
+
+
+def _estimate_eta_seconds(
+    started_at: datetime | None,
+    progress_percent: float,
+    now: datetime | None = None,
+) -> int | None:
+    """Estimate remaining seconds from elapsed time and progress."""
+    if started_at is None or progress_percent <= 0 or progress_percent >= 100:
+        return None
+
+    now_ts = now or datetime.utcnow()
+    elapsed_seconds = (now_ts - started_at).total_seconds()
+    if elapsed_seconds <= 0:
+        return None
+
+    total_estimated = elapsed_seconds * (100.0 / progress_percent)
+    remaining = int(max(total_estimated - elapsed_seconds, 0))
+    return remaining if remaining > 0 else None
+
+
+def _resolve_job_phase(
+    task_type: str,
+    status: str,
+    error_details: dict | None,
+) -> str:
+    """Resolve user-facing job phase from task metadata."""
+    if status == "completed":
+        return "completed"
+    if status == "failed":
+        return "failed"
+    if isinstance(error_details, dict):
+        phase = error_details.get("phase")
+        if isinstance(phase, str) and phase:
+            return phase
+    return task_type
+
+
+def _validate_full_refresh_confirmation(confirm: bool) -> None:
+    """Enforce explicit full-refresh confirmation."""
+    if confirm:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Full refresh requires explicit confirmation",
+    )
+
+
+def _is_schedule_due(
+    now_local: datetime,
+    schedule_hour: int,
+    schedule_minute: int,
+    last_run_local: datetime | None,
+) -> bool:
+    """Check whether a schedule is due now and has not run in the same minute."""
+    if now_local.hour != schedule_hour or now_local.minute != schedule_minute:
+        return False
+    if last_run_local is None:
+        return True
+    return not (
+        last_run_local.date() == now_local.date()
+        and last_run_local.hour == now_local.hour
+        and last_run_local.minute == now_local.minute
+    )
 
 
 class SyncMode(str, Enum):
@@ -90,8 +164,6 @@ async def get_default_user(db: AsyncSession) -> User:
 
     if user is None:
         # Try to create a user from GitHub token
-        from nebula.core.config import get_app_settings
-
         settings = get_app_settings()
 
         if not settings.github_token:
@@ -272,8 +344,6 @@ async def sync_stars_task(
             await db.commit()
 
             # Get GitHub token from settings
-            from nebula.core.config import get_app_settings
-
             settings = get_app_settings()
 
             if not settings.github_token:
@@ -421,11 +491,11 @@ async def sync_stars_task(
             if effective_mode == "full" and not was_truncated:
                 # Full sync already has complete data
                 github_repo_ids_from_api = {repo.id for repo in repos}
-            else:
-                # Incremental sync: fetch complete starred ID list for deletion detection
-                # This is fast because we only need the IDs, not full repo metadata
+            elif sync_settings.detect_unstarred_on_incremental:
+                # Optional incremental deletion detection.
+                # This requires fetching the full starred list and can be expensive.
                 logger.info(
-                    "Fetching complete starred repos list for deletion detection..."
+                    "Incremental deletion detection enabled: fetching full starred list..."
                 )
                 try:
                     async with GitHubClient(
@@ -442,6 +512,12 @@ async def sync_stars_task(
                         "Skipping deletion detection."
                     )
                     github_repo_ids_from_api = None
+            else:
+                github_repo_ids_from_api = None
+                logger.info(
+                    "Skipping incremental unstarred deletion detection "
+                    "(SYNC_DETECT_UNSTARRED_ON_INCREMENTAL=false)"
+                )
 
             # Remove repos that are no longer starred
             if github_repo_ids_from_api is not None:
@@ -834,9 +910,7 @@ async def get_sync_status(
             detail="Task not found",
         )
 
-    progress = 0.0
-    if task.total_items > 0:
-        progress = (task.processed_items / task.total_items) * 100
+    progress = _calculate_progress_percent(task.total_items, task.processed_items)
 
     return SyncStatusResponse(
         task_id=task.id,
@@ -847,6 +921,50 @@ async def get_sync_status(
         failed_items=task.failed_items,
         progress_percent=progress,
         error_message=task.error_message,
+        started_at=task.started_at,
+        completed_at=task.completed_at,
+    )
+
+
+@router.get("/jobs/{task_id}", response_model=JobStatusResponse)
+async def get_job_status(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Get aggregated job status for richer progress UI."""
+    user = await get_default_user(db)
+
+    result = await db.execute(
+        select(SyncTask).where(
+            SyncTask.id == task_id,
+            SyncTask.user_id == user.id,
+        )
+    )
+    task = result.scalar_one_or_none()
+
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+
+    progress_percent = _calculate_progress_percent(task.total_items, task.processed_items)
+    phase = _resolve_job_phase(task.task_type, task.status, task.error_details)
+    eta_seconds = (
+        _estimate_eta_seconds(task.started_at, progress_percent)
+        if task.status == "running"
+        else None
+    )
+
+    return JobStatusResponse(
+        task_id=task.id,
+        task_type=task.task_type,
+        status=task.status,
+        phase=phase,
+        progress_percent=progress_percent,
+        eta_seconds=eta_seconds,
+        last_error=task.error_message,
+        retryable=task.status == "failed",
         started_at=task.started_at,
         completed_at=task.completed_at,
     )
@@ -882,9 +1000,9 @@ async def get_all_sync_status(
             total_items=task.total_items,
             processed_items=task.processed_items,
             failed_items=task.failed_items,
-            progress_percent=(task.processed_items / task.total_items * 100)
-            if task.total_items > 0
-            else 0,
+            progress_percent=_calculate_progress_percent(
+                task.total_items, task.processed_items
+            ),
             error_message=task.error_message,
             started_at=task.started_at,
             completed_at=task.completed_at,
@@ -1605,6 +1723,9 @@ async def full_refresh_task(user_id: int, task_id: int):
             status="running",
             started_at=datetime.utcnow(),
             error_message=None,
+            total_items=4,
+            processed_items=0,
+            error_details={"phase": "reset"},
         )
         if not task_exists:
             return
@@ -1630,8 +1751,8 @@ async def full_refresh_task(user_id: int, task_id: int):
         logger.info(f"Full refresh: Reset {reset_count} repos")
 
         await _update_main_task(
-            total_items=reset_count,
             error_details={"phase": "reset", "reset_count": reset_count},
+            processed_items=1,
         )
 
         # Step 2: Create and run star sync task (full mode)
@@ -1641,7 +1762,7 @@ async def full_refresh_task(user_id: int, task_id: int):
 
         await _update_main_task(
             error_details={"phase": "stars", "reset_count": reset_count},
-            processed_items=1,
+            processed_items=2,
         )
 
         # Step 3: Create and run embedding task (includes LLM summaries)
@@ -1651,18 +1772,22 @@ async def full_refresh_task(user_id: int, task_id: int):
 
         await _update_main_task(
             error_details={"phase": "embeddings", "reset_count": reset_count},
-            processed_items=2,
+            processed_items=3,
         )
 
         # Step 4: Create and run clustering task
         logger.info(f"Full refresh: Running clustering for user {user_id}")
+        await _update_main_task(
+            error_details={"phase": "clustering", "reset_count": reset_count},
+            processed_items=3,
+        )
         cluster_task_id = await _create_sub_task("cluster")
         await run_clustering_task(user_id, cluster_task_id, use_llm=True)
 
         await _update_main_task(
             status="completed",
             completed_at=datetime.utcnow(),
-            processed_items=3,
+            processed_items=4,
             error_details={
                 "phase": "complete",
                 "reset_count": reset_count,
@@ -1835,6 +1960,7 @@ async def update_schedule(
 
 @router.post("/full-refresh", response_model=FullRefreshResponse)
 async def trigger_full_refresh(
+    payload: FullRefreshRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
@@ -1857,6 +1983,8 @@ async def trigger_full_refresh(
     Returns:
         Task information for tracking progress
     """
+    _validate_full_refresh_confirmation(payload.confirm)
+
     user = await get_default_user(db)
 
     # Check for existing running full refresh task
@@ -1924,8 +2052,6 @@ async def get_sync_info(
         Sync status information
     """
     user = await get_default_user(db)
-    from nebula.core.config import get_app_settings
-
     app_settings = get_app_settings()
 
     # Get repository statistics
@@ -1965,6 +2091,7 @@ async def get_sync_info(
     return SyncInfoResponse(
         last_sync_at=user.last_sync_at,
         github_token_configured=bool(app_settings.github_token),
+        single_user_mode=app_settings.single_user_mode,
         total_repos=stats.total or 0,
         synced_repos=user.synced_stars or 0,
         embedded_repos=stats.embedded or 0,

@@ -28,6 +28,7 @@ export interface ScheduleResponse extends ScheduleConfig {
 export interface SyncInfoResponse {
 	last_sync_at: string | null;
 	github_token_configured: boolean;
+	single_user_mode: boolean;
 	total_repos: number;
 	synced_repos: number;
 	embedded_repos: number;
@@ -42,6 +43,10 @@ export interface FullRefreshResponse {
 	task_id: number;
 	message: string;
 	reset_count: number;
+}
+
+export interface FullRefreshRequest {
+	confirm: boolean;
 }
 
 // ==================== API Functions ====================
@@ -76,7 +81,8 @@ export const getSyncInfo = async (): Promise<SyncInfoResponse> => {
  * 警告：这是一个耗时操作，会重置所有仓库的处理状态
  */
 export const triggerFullRefresh = async (): Promise<FullRefreshResponse> => {
-	const response = await client.post<FullRefreshResponse>('/sync/full-refresh');
+	const payload: FullRefreshRequest = { confirm: true };
+	const response = await client.post<FullRefreshResponse>('/sync/full-refresh', payload);
 	return response.data;
 };
 

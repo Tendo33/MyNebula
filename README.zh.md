@@ -167,6 +167,7 @@ npm --prefix frontend run build
 | GitHub | `GITHUB_TOKEN` | 必填，用于同步 Star 与收藏夹 |
 | Embedding | `EMBEDDING_API_KEY` | 必填，用于向量化 |
 | LLM | `LLM_API_KEY` | 可选，用于摘要/聚类命名（推荐） |
+| LLM | `LLM_OUTPUT_LANGUAGE` | LLM 生成摘要/聚类名称的输出语言（`zh` 或 `en`） |
 | Admin | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 设置页管理权限 |
 | Server | `API_PORT` | Web 对外端口（默认 8000） |
 | App | `DEBUG` | 开启后可访问 `/docs` |

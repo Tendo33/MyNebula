@@ -211,15 +211,24 @@ class LLMService:
             )
         ]
 
+        is_chinese = self.settings.output_language == "zh"
+
         # Build the exclusion constraint for uniqueness
         exclusion_block = ""
         if existing_cluster_names:
             names_list = ", ".join(f'"{n}"' for n in existing_cluster_names)
-            exclusion_block = (
-                f"\n\n已有的集群名称（你必须避免使用相同或相似的名称）:\n{names_list}"
-            )
+            if is_chinese:
+                exclusion_block = (
+                    f"\n\n已有的集群名称（你必须避免使用相同或相似的名称）:\n{names_list}"
+                )
+            else:
+                exclusion_block = (
+                    "\n\nExisting cluster names (you must avoid reusing or paraphrasing them):\n"
+                    f"{names_list}"
+                )
 
-        prompt = f"""分析以下 GitHub 仓库集合，生成一个简洁且有区分度的集群描述。
+        if is_chinese:
+            prompt = f"""分析以下 GitHub 仓库集合，生成一个简洁且有区分度的集群描述。
 
 仓库列表 ({len(repo_names)} 个):
 {repos_text}
@@ -238,15 +247,37 @@ class LLMService:
 示例输出格式:
 RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检索,知识库,LangChain
 代码生成助手|AI驱动的代码自动生成与补全工具|代码生成,Copilot,IDE插件"""
+            system_prompt = (
+                "你是一个技术分析专家，擅长分析和分类 GitHub 项目。"
+                "你的任务是为每个集群生成独特且有区分度的名称。"
+                "请用中文回答，只输出要求的格式，不要输出其他内容。"
+            )
+        else:
+            prompt = f"""Analyze the following GitHub repositories and generate a concise, distinctive cluster description.
+
+Repositories ({len(repo_names)}):
+{repos_text}
+
+Primary languages: {", ".join(unique_languages[:5])}
+Common topics: {", ".join(unique_topics[:10])}{exclusion_block}
+
+Return one line only with this format (use | as separator):
+Name|Description|keyword1,keyword2,keyword3
+
+Requirements:
+1. Name: 2-5 words, specific and differentiating (avoid broad labels like "AI" or "LLM")
+2. Description: one sentence describing what makes this cluster unique
+3. Keywords: 3-5 specific keywords
+"""
+            system_prompt = (
+                "You are a technical analyst specializing in GitHub project taxonomy. "
+                "Return only the requested single-line format."
+            )
 
         try:
             response = await self.complete(
                 prompt=prompt,
-                system_prompt=(
-                    "你是一个技术分析专家，擅长分析和分类 GitHub 项目。"
-                    "你的任务是为每个集群生成独特且有区分度的名称。"
-                    "请用中文回答，只输出要求的格式，不要输出其他内容。"
-                ),
+                system_prompt=system_prompt,
                 max_tokens=2560,
                 temperature=0.3,
             )
@@ -271,10 +302,18 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
             else:
                 # Fallback parsing
                 name = sanitize_cluster_name(
-                    response_line if response_line else "技术项目集"
+                    response_line if response_line else ("技术项目集" if is_chinese else "Tech Cluster")
                 )
-                description = f"包含 {len(repo_names)} 个相关仓库"
-                keywords = unique_topics[:5] if unique_topics else ["github", "开源"]
+                description = (
+                    f"包含 {len(repo_names)} 个相关仓库"
+                    if is_chinese
+                    else f"Contains {len(repo_names)} related repositories"
+                )
+                keywords = (
+                    unique_topics[:5]
+                    if unique_topics
+                    else (["github", "开源"] if is_chinese else ["github", "open-source"])
+                )
                 return name, description, keywords
 
         except Exception as e:
@@ -302,28 +341,35 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
             readme_content: README content (truncated)
 
         Returns:
-            Summary in Chinese
+            Summary text in configured output language
         """
+        is_chinese = self.settings.output_language == "zh"
+
         # Build context
-        context_parts = [f"仓库: {full_name}"]
+        context_parts = [f"仓库: {full_name}" if is_chinese else f"Repository: {full_name}"]
 
         if language:
-            context_parts.append(f"语言: {language}")
+            context_parts.append(f"语言: {language}" if is_chinese else f"Language: {language}")
 
         if description:
-            context_parts.append(f"描述: {description}")
+            context_parts.append(f"描述: {description}" if is_chinese else f"Description: {description}")
 
         if topics:
-            context_parts.append(f"标签: {', '.join(topics[:10])}")
+            context_parts.append(f"标签: {', '.join(topics[:10])}" if is_chinese else f"Topics: {', '.join(topics[:10])}")
 
         if readme_content:
             # Truncate README to avoid token limits
             readme_truncated = readme_content[:4000]
-            context_parts.append(f"README 摘要:\n{readme_truncated}")
+            context_parts.append(
+                f"README 摘要:\n{readme_truncated}"
+                if is_chinese
+                else f"README excerpt:\n{readme_truncated}"
+            )
 
         context = "\n".join(context_parts)
 
-        prompt = f"""请为以下 GitHub 项目生成一段中文摘要（100-150 字）。
+        if is_chinese:
+            prompt = f"""请为以下 GitHub 项目生成一段中文摘要（100-150 字）。
 
 {context}
 
@@ -334,11 +380,26 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
 4. 字数控制在 100-150 字之间
 
 直接输出摘要内容，不要有其他文字。"""
+            system_prompt = "你是一个技术文档专家，擅长用清晰的语言描述开源项目。"
+        else:
+            prompt = f"""Write a concise English summary (70-120 words) for the GitHub project below.
+
+{context}
+
+Requirements:
+1. Cover core functionality, technical highlights, and use cases
+2. Use clear and professional language
+3. Avoid starting with "This is a..."
+
+Return only the summary text."""
+            system_prompt = (
+                "You are a technical writer who explains open-source projects clearly and accurately."
+            )
 
         try:
             response = await self.complete(
                 prompt=prompt,
-                system_prompt="你是一个技术文档专家，擅长用清晰的语言描述开源项目。",
+                system_prompt=system_prompt,
                 max_tokens=10000,
                 temperature=0.3,
             )
@@ -346,7 +407,11 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
             # Clean up response
             summary = response.strip()
             # Remove common prefixes
-            for prefix in ["摘要:", "总结:", "简介:"]:
+            for prefix in (
+                ["摘要:", "总结:", "简介:"]
+                if is_chinese
+                else ["Summary:", "Overview:", "Description:"]
+            ):
                 if summary.startswith(prefix):
                     summary = summary[len(prefix) :].strip()
 
@@ -357,7 +422,11 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
             # Fallback to description or default
             if description:
                 return description
-            return f"{full_name.split('/')[-1]} - 开源项目"
+            return (
+                f"{full_name.split('/')[-1]} - 开源项目"
+                if is_chinese
+                else f"{full_name.split('/')[-1]} - open source project"
+            )
 
     async def generate_repo_summary_and_tags(
         self,
@@ -384,26 +453,49 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
         """
         import json
 
+        is_chinese = self.settings.output_language == "zh"
+
         # Build structured context
-        context_parts = [f"仓库名称: {full_name}"]
+        context_parts = (
+            [f"仓库名称: {full_name}"]
+            if is_chinese
+            else [f"Repository: {full_name}"]
+        )
 
         if language:
-            context_parts.append(f"主要语言: {language}")
+            context_parts.append(
+                f"主要语言: {language}"
+                if is_chinese
+                else f"Primary language: {language}"
+            )
 
         if description:
-            context_parts.append(f"官方描述: {description}")
+            context_parts.append(
+                f"官方描述: {description}"
+                if is_chinese
+                else f"Description: {description}"
+            )
 
         if topics:
-            context_parts.append(f"GitHub 标签: {', '.join(topics[:10])}")
+            context_parts.append(
+                f"GitHub 标签: {', '.join(topics[:10])}"
+                if is_chinese
+                else f"GitHub topics: {', '.join(topics[:10])}"
+            )
 
         if readme_content:
             # Truncate README to avoid token limits
             readme_truncated = readme_content[:5000]
-            context_parts.append(f"README 内容:\n{readme_truncated}")
+            context_parts.append(
+                f"README 内容:\n{readme_truncated}"
+                if is_chinese
+                else f"README excerpt:\n{readme_truncated}"
+            )
 
         context = "\n".join(context_parts)
 
-        system_prompt = """你是一名资深的开源项目分析师，专注于技术项目的分类和文档撰写。
+        if is_chinese:
+            system_prompt = """你是一名资深的开源项目分析师，专注于技术项目的分类和文档撰写。
 
 你的职责：
 1. 深入理解项目的技术架构和核心价值
@@ -414,8 +506,7 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
 - 必须以纯 JSON 格式输出
 - 不要添加 markdown 代码块标记
 - 不要添加任何额外说明文字"""
-
-        user_prompt = f"""分析以下 GitHub 项目，生成结构化的摘要和标签。
+            user_prompt = f"""分析以下 GitHub 项目，生成结构化的摘要和标签。
 
 ## 项目信息
 {context}
@@ -436,6 +527,39 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
 
 ## 输出格式 (严格按此 JSON 格式)
 {{"summary": "项目摘要内容", "tags": ["标签1", "标签2", "标签3"]}}"""
+        else:
+            system_prompt = """You are a senior technical open-source project analyst focused on software classification and documentation.
+
+Your responsibilities:
+1. Understand project architecture and core value quickly
+2. Write concise, professional English summaries
+3. Extract precise classification tags
+
+Output requirements:
+- Return pure JSON only
+- Do not wrap output in markdown code fences
+- Do not include any extra commentary"""
+            user_prompt = f"""Analyze the GitHub project below and generate a structured summary and tags.
+
+## Repository Info
+{context}
+
+## Output Requirements
+
+### summary
+- length: 70-120 words
+- content: core functionality, technical highlights, and practical use cases
+- style: professional and concise; avoid boilerplate openings
+- language: English
+
+### tags
+- count: 3-7
+- length: 1-4 words each
+- coverage: function category, technical domain, and use case
+- language: English preferred
+
+## Output Format (strict JSON)
+{{"summary": "Project summary content", "tags": ["tag1", "tag2", "tag3"]}}"""
 
         tags: list[str] = []
         summary: str = ""
@@ -488,7 +612,13 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
         except Exception as e:
             logger.warning(f"Summary/tag generation failed for {full_name}: {e}")
             summary = (
-                description if description else f"{full_name.split('/')[-1]} - 开源项目"
+                description
+                if description
+                else (
+                    f"{full_name.split('/')[-1]} - 开源项目"
+                    if is_chinese
+                    else f"{full_name.split('/')[-1]} - open source project"
+                )
             )
 
         # CRITICAL: Ensure tags are never empty
@@ -533,9 +663,8 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
 
         # Fallback 1: Use GitHub topics
         if topics and len(topics) > 0:
-            # Convert English topics to simple Chinese tags or keep as-is
+            # Keep short topics as-is, they generally work as tags.
             for topic in topics[:5]:
-                # Keep short topics as-is, they work as tags
                 if len(topic) <= 15:
                     result_tags.append(topic)
             if result_tags:
@@ -544,7 +673,9 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
         # Fallback 2: Use language
         if language:
             result_tags.append(language)
-            result_tags.append("开源项目")
+            result_tags.append(
+                "开源项目" if self.settings.output_language == "zh" else "open-source"
+            )
             return result_tags
 
         # Fallback 3: Generate from repo name
@@ -553,7 +684,9 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
         parts = repo_name.replace("-", " ").replace("_", " ").split()
         if parts:
             result_tags.append(parts[0])
-        result_tags.append("开源项目")
+        result_tags.append(
+            "开源项目" if self.settings.output_language == "zh" else "open-source"
+        )
 
         return result_tags
 
@@ -594,7 +727,14 @@ RAG检索增强|基于向量检索的大模型知识增强框架|RAG,向量检�
                 if isinstance(result, Exception):
                     logger.warning(f"Summary generation failed: {result}")
                     repo = batch[j]
-                    summaries.append(repo.get("description", "")[:100] or "开源项目")
+                    summaries.append(
+                        repo.get("description", "")[:100]
+                        or (
+                            "开源项目"
+                            if self.settings.output_language == "zh"
+                            else "open source project"
+                        )
+                    )
                 else:
                     summaries.append(result)
 

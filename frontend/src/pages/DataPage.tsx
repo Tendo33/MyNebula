@@ -166,7 +166,7 @@ const DataPage = () => {
     // Apply cluster filter
     if (filters.selectedClusters.size > 0) {
       filtered = filtered.filter(
-        node => node.cluster_id !== undefined && filters.selectedClusters.has(node.cluster_id)
+        node => node.cluster_id != null && filters.selectedClusters.has(node.cluster_id)
       );
     }
 
@@ -203,8 +203,8 @@ const DataPage = () => {
           comparison = (a.starred_at || '').localeCompare(b.starred_at || '');
           break;
         case 'cluster':
-          const clusterA = a.cluster_id !== undefined ? clusterMap.get(a.cluster_id)?.name || '' : '';
-          const clusterB = b.cluster_id !== undefined ? clusterMap.get(b.cluster_id)?.name || '' : '';
+          const clusterA = a.cluster_id != null ? clusterMap.get(a.cluster_id)?.name || '' : '';
+          const clusterB = b.cluster_id != null ? clusterMap.get(b.cluster_id)?.name || '' : '';
           comparison = clusterA.localeCompare(clusterB);
           break;
         case 'summary':
@@ -497,8 +497,8 @@ const DataPage = () => {
                           </td>
                           <td className="px-4 py-3 text-center">
                             <ClusterBadge
-                              cluster={repo.cluster_id !== undefined ? clusterMap.get(repo.cluster_id) : undefined}
-                              onClick={() => repo.cluster_id !== undefined && handleClusterFilter(repo.cluster_id)}
+                              cluster={repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined}
+                              onClick={() => repo.cluster_id != null && handleClusterFilter(repo.cluster_id)}
                             />
                           </td>
                           <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap text-center">

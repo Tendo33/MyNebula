@@ -50,6 +50,9 @@ class SyncInfoResponse(BaseModel):
     github_token_configured: bool = Field(
         ..., description="Whether GitHub token is configured for sync operations"
     )
+    single_user_mode: bool = Field(
+        ..., description="Whether the backend currently runs in single-user mode"
+    )
     total_repos: int = Field(..., description="Total number of starred repositories")
     synced_repos: int = Field(..., description="Number of synced repositories")
     embedded_repos: int = Field(
@@ -78,3 +81,20 @@ class FullRefreshResponse(BaseModel):
     task_id: int = Field(..., description="Background task ID for tracking progress")
     message: str = Field(..., description="Status message")
     reset_count: int = Field(default=0, description="Number of repositories reset")
+
+
+class JobStatusResponse(BaseModel):
+    """Schema for aggregated async job status."""
+
+    task_id: int = Field(..., description="Task ID")
+    task_type: str = Field(..., description="Task type")
+    status: str = Field(..., description="Task status")
+    phase: str = Field(..., description="Current task phase")
+    progress_percent: float = Field(..., description="Progress percentage", ge=0, le=100)
+    eta_seconds: int | None = Field(
+        None, description="Estimated remaining seconds when running"
+    )
+    last_error: str | None = Field(None, description="Latest error message, if any")
+    retryable: bool = Field(..., description="Whether this job can be retried")
+    started_at: datetime | None = Field(None, description="Task start time")
+    completed_at: datetime | None = Field(None, description="Task completion time")

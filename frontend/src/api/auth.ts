@@ -5,6 +5,10 @@ export interface AdminSessionResponse {
   username: string;
 }
 
+export interface AdminAuthConfigResponse {
+  enabled: boolean;
+}
+
 interface LoginPayload {
   username: string;
   password: string;
@@ -22,5 +26,10 @@ export const logoutAdmin = async (): Promise<AdminSessionResponse> => {
 
 export const getAdminSession = async (): Promise<AdminSessionResponse> => {
   const response = await client.get<AdminSessionResponse>('/auth/me');
+  return response.data;
+};
+
+export const getAdminAuthConfig = async (): Promise<AdminAuthConfigResponse> => {
+  const response = await client.get<AdminAuthConfigResponse>('/auth/config');
   return response.data;
 };

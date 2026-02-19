@@ -33,6 +33,12 @@ class AdminSessionResponse(BaseModel):
     username: str
 
 
+class AdminAuthConfigResponse(BaseModel):
+    """Admin auth runtime configuration."""
+
+    enabled: bool
+
+
 def _get_session_secret(settings: AppSettings) -> str:
     raw = f"{settings.admin_username}:{settings.admin_password}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -129,3 +135,11 @@ async def logout_admin(response: Response):
 async def get_admin_session(username: str = Depends(require_admin)):  # noqa: B008
     """Get current admin session info."""
     return AdminSessionResponse(authenticated=True, username=username)
+
+
+@router.get("/config", response_model=AdminAuthConfigResponse)
+async def get_admin_auth_config(
+    settings: AppSettings = Depends(get_app_settings),  # noqa: B008
+):
+    """Get admin auth availability for UI guidance."""
+    return AdminAuthConfigResponse(enabled=is_admin_auth_enabled(settings))

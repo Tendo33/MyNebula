@@ -122,7 +122,7 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
     // Count nodes per cluster from raw data
     const nodeCounts = new Map<number, number>();
     rawData.nodes.forEach(node => {
-      if (node.cluster_id !== undefined) {
+      if (node.cluster_id != null) {
         nodeCounts.set(node.cluster_id, (nodeCounts.get(node.cluster_id) || 0) + 1);
       }
     });

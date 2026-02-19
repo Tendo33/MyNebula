@@ -1,12 +1,15 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { GraphProvider, useGraph } from './contexts/GraphContext';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
-import Dashboard from './pages/Dashboard';
-import GraphPage from './pages/GraphPage';
-import DataPage from './pages/DataPage';
-import Settings from './pages/Settings';
 import CommandPalette from './components/ui/CommandPalette';
 import useCommandPalette from './hooks/useCommandPalette';
+import { ClusterInfo, GraphNode } from './types';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const GraphPage = lazy(() => import('./pages/GraphPage'));
+const DataPage = lazy(() => import('./pages/DataPage'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 // Inner component that uses router hooks
 function AppContent() {
@@ -14,24 +17,26 @@ function AppContent() {
   const { isOpen, close } = useCommandPalette();
   const { setSelectedNode } = useGraph();
 
-  const handleSelectNode = (node: any) => {
+  const handleSelectNode = (node: GraphNode) => {
     setSelectedNode(node);
     navigate('/graph');
   };
 
-  const handleSelectCluster = (cluster: any) => {
+  const handleSelectCluster = (cluster: ClusterInfo) => {
     navigate(`/graph?cluster=${cluster.id}`);
   };
 
   return (
     <>
       <div className="min-h-screen bg-bg-main text-text-main font-sans selection:bg-action-primary/20">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/graph" element={<GraphPage />} />
-          <Route path="/data" element={<DataPage />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-text-muted">Loading...</div>}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/graph" element={<GraphPage />} />
+            <Route path="/data" element={<DataPage />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </Suspense>
       </div>
 
       {/* Global Command Palette (Cmd/Ctrl + K) */}

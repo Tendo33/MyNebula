@@ -17,7 +17,7 @@ interface ProcessedNode extends NodeObject {
   full_name: string;
   description?: string;
   language?: string;
-  cluster_id?: number;
+  cluster_id: number | null;
   color: string;
   size: number;
   stargazers_count: number;
@@ -232,14 +232,14 @@ const Graph2D: React.FC = () => {
     // Configure link force - increased distance for cross-cluster links
     fg.d3Force('link')
       ?.distance((link: any) => {
-        const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : undefined;
-        const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : undefined;
+        const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
+        const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : null;
         // Same cluster: short distance, Different cluster: moderate separation
         return sourceCluster === targetCluster ? 22 : 55;
       })
       .strength((link: any) => {
-        const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : undefined;
-        const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : undefined;
+        const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
+        const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : null;
         // Stronger links within same cluster, very weak for cross-cluster
         return sourceCluster === targetCluster ? 0.7 : 0.05;
       });
@@ -265,7 +265,7 @@ const Graph2D: React.FC = () => {
 
       // Calculate cluster centers
       processedData.nodes.forEach(node => {
-        if (node.cluster_id !== undefined && node.x !== undefined && node.y !== undefined) {
+        if (node.cluster_id != null && node.x !== undefined && node.y !== undefined) {
           const current = clusterCenters.get(node.cluster_id) || { x: 0, y: 0, count: 0 };
           current.x += node.x;
           current.y += node.y;
@@ -316,7 +316,7 @@ const Graph2D: React.FC = () => {
 
       // Apply stronger force toward cluster center (increased from 0.1 to 0.3)
       processedData.nodes.forEach((node: any) => {
-        if (node.cluster_id !== undefined) {
+        if (node.cluster_id != null) {
           const center = clusterCenters.get(node.cluster_id);
           if (center && node.x !== undefined && node.y !== undefined) {
             const k = alpha * 0.2; // Moderate clustering strength
@@ -378,7 +378,7 @@ const Graph2D: React.FC = () => {
     }
 
     // Same cluster as hovered
-    if (activeHoverNode.cluster_id !== undefined &&
+    if (activeHoverNode.cluster_id != null &&
         node.cluster_id === activeHoverNode.cluster_id) {
       return node.color || COLORS.NODE_DEFAULT;
     }
@@ -475,6 +475,14 @@ const Graph2D: React.FC = () => {
       ctx.arc(x, y, radius, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
+    } else if (color === COLORS.NODE_DIM) {
+      // Keep avatar nodes visually dimmed when not in focus.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
+      ctx.fill();
+      ctx.restore();
     }
 
     // Draw border for selected/hovered nodes
@@ -523,7 +531,7 @@ const Graph2D: React.FC = () => {
       ctx.textBaseline = 'middle';
       ctx.fillText(label, x, labelY - textHeight / 2 + padding);
     }
-  }, [getNodeColor, activeHoverNode, selectedNode]);
+  }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering]);
 
   // Node pointer area for click detection
   const paintNodeArea = useCallback((node: any, color: string, ctx: CanvasRenderingContext2D) => {
@@ -547,7 +555,7 @@ const Graph2D: React.FC = () => {
     // Group nodes by cluster
     const nodesByCluster = new Map<number, ProcessedNode[]>();
     nodes.forEach(node => {
-      if (node.cluster_id !== undefined && node.x !== undefined && node.y !== undefined) {
+      if (node.cluster_id != null && node.x !== undefined && node.y !== undefined) {
         const group = nodesByCluster.get(node.cluster_id) || [];
         group.push(node);
         nodesByCluster.set(node.cluster_id, group);

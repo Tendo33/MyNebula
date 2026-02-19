@@ -123,6 +123,10 @@ class LLMSettings(BaseSettings):
         default="Qwen/Qwen2.5-7B-Instruct",
         description="LLM model name",
     )
+    output_language: Literal["zh", "en"] = Field(
+        default="zh",
+        description="Language used in generated summaries and cluster labels",
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="LLM_",
@@ -151,6 +155,12 @@ class SyncSettings(BaseSettings):
         default="incremental",
         description="Default sync mode: incremental (fast) or full (complete)",
     )
+    detect_unstarred_on_incremental: bool = Field(
+        default=False,
+        description=(
+            "Whether incremental sync should fetch the full starred list to detect unstarred repos"
+        ),
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="SYNC_",
@@ -172,6 +182,12 @@ class AppSettings(BaseSettings):
     frontend_url: str = Field(
         default="http://localhost:5173",
         description="Frontend URL for redirects",
+    )
+    single_user_mode: bool = Field(
+        default=True,
+        description=(
+            "Whether API runs in single-user mode (reads use the first user by default)"
+        ),
     )
 
     # GitHub Personal Access Token

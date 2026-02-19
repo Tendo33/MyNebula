@@ -23,6 +23,7 @@ from .repo import (
 from .schedule import (
     FullRefreshRequest,
     FullRefreshResponse,
+    JobStatusResponse,
     ScheduleConfig,
     ScheduleResponse,
     SyncInfoResponse,
@@ -55,4 +56,5 @@ __all__ = [
     "SyncInfoResponse",
     "FullRefreshRequest",
     "FullRefreshResponse",
+    "JobStatusResponse",
 ]

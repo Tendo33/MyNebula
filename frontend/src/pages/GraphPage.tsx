@@ -66,7 +66,23 @@ const GraphPage = () => {
   // Local UI state
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);
   const [starListPanelCollapsed, setStarListPanelCollapsed] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+  const [showFilters, setShowFilters] = useState(
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      const nextIsMobile = window.innerWidth < 1024;
+      setIsMobile(nextIsMobile);
+      setShowFilters((prev) => (nextIsMobile ? prev : true));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Close details panel
   const handleCloseDetails = useCallback(() => {
@@ -92,29 +108,29 @@ const GraphPage = () => {
 
       <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
         {/* Header */}
-        <header className="flex items-center justify-between h-14 px-6 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 transition-all">
+        <header className="flex items-center justify-between h-14 px-4 sm:px-6 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 transition-all">
           <div className="flex items-center gap-3 select-none">
             <h2 className="text-base font-semibold text-text-main tracking-tight">
               {t('sidebar.graph')}
             </h2>
-            <div className="h-4 w-[1px] bg-border-light mx-1" />
-            <span className="text-sm text-text-muted">
+            <div className="hidden sm:block h-4 w-[1px] bg-border-light mx-1" />
+            <span className="hidden sm:inline text-sm text-text-muted">
               {filteredData?.total_nodes !== undefined
                 ? t('dashboard.subtitle', { count: filteredData.total_nodes })
                 : t('dashboard.subtitle_infinite')}
             </span>
             {rawData && filteredData && rawData.total_nodes !== filteredData.total_nodes && (
-              <span className="text-xs text-text-dim">
+              <span className="hidden sm:inline text-xs text-text-dim">
                 / {rawData.total_nodes} {t('common.total')}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitch />
 
             {/* Search */}
-            <div className="w-56 transition-all focus-within:w-64">
+            <div className="w-36 sm:w-56 transition-all sm:focus-within:w-64">
               <SearchInput
                 onSearch={handleSearch}
                 value={filters.searchQuery}
@@ -141,9 +157,23 @@ const GraphPage = () => {
 
         {/* Content Area */}
         <section className="flex-1 relative flex">
+          {isMobile && showFilters && (
+            <button
+              className="absolute inset-0 z-20 bg-black/25"
+              onClick={() => setShowFilters(false)}
+              aria-label={t('common.close')}
+            />
+          )}
+
           {/* Filters sidebar */}
           {showFilters && (
-            <aside className="w-72 flex-shrink-0 border-r border-border-light bg-bg-sidebar p-4 space-y-4 overflow-y-auto z-30 relative">
+            <aside
+              className={`${
+                isMobile
+                  ? 'absolute inset-y-0 left-0 w-[85vw] max-w-sm'
+                  : 'w-72 flex-shrink-0'
+              } border-r border-border-light bg-bg-sidebar p-4 space-y-4 overflow-y-auto z-30 relative`}
+            >
               {/* Clear all filters */}
               {hasActiveFilters && (
                 <button

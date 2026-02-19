@@ -12,6 +12,7 @@ import {
   Sparkles,
   Brain,
   Layers,
+  Database,
 } from 'lucide-react';
 
 // ============================================================================
@@ -46,6 +47,8 @@ const getStepIcon = (stepId: string): React.ReactNode => {
   switch (stepId) {
     case 'stars':
       return <Star className="w-4 h-4" />;
+    case 'reset':
+      return <Database className="w-4 h-4" />;
     case 'summaries':
       return <Sparkles className="w-4 h-4" />;
     case 'embeddings':

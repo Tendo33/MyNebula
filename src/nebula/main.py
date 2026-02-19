@@ -108,6 +108,7 @@ def create_app() -> FastAPI:
             "status": "healthy" if db_healthy else "degraded",
             "database": "connected" if db_healthy else "disconnected",
             "version": settings.app_version,
+            "single_user_mode": settings.single_user_mode,
         }
 
     # 静态文件服务配置

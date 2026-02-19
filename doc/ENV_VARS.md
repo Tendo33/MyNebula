@@ -182,6 +182,7 @@ EMBEDDING_DIMENSIONS=768
 | `LLM_API_KEY` | string | - | API 密钥 |
 | `LLM_BASE_URL` | string | `https://api.siliconflow.cn/v1` | API 基础 URL (OpenAI 兼容) |
 | `LLM_MODEL` | string | `Qwen/Qwen2.5-7B-Instruct` | 模型名称 |
+| `LLM_OUTPUT_LANGUAGE` | string | `zh` | LLM 输出语言（`zh` 或 `en`） |
 
 ### 示例配置
 
@@ -189,6 +190,7 @@ EMBEDDING_DIMENSIONS=768
 LLM_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxx
 LLM_BASE_URL=https://api.siliconflow.cn/v1
 LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
+LLM_OUTPUT_LANGUAGE=zh
 ```
 
 ---
@@ -250,6 +252,7 @@ EMBEDDING_DIMENSIONS=1024
 LLM_API_KEY=your_llm_api_key
 LLM_BASE_URL=https://api.siliconflow.cn/v1
 LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
+LLM_OUTPUT_LANGUAGE=zh
 ```
 
 ### 生产环境

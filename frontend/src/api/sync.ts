@@ -19,6 +19,19 @@ export interface SyncStatusResponse {
   completed_at: string | null;
 }
 
+export interface SyncJobStatusResponse {
+  task_id: number;
+  task_type: string;
+  status: string;
+  phase: string;
+  progress_percent: number;
+  eta_seconds: number | null;
+  last_error: string | null;
+  retryable: boolean;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
 /**
  * 开始同步星标仓库
  * @param mode 同步模式: 'incremental' (增量) 或 'full' (全量)
@@ -45,6 +58,14 @@ export const getSyncStatus = async (taskId: number) => {
 export const getAllSyncStatus = async () => {
 	const response = await client.get<SyncStatusResponse[]>("/sync/status");
 	return response.data;
+};
+
+/**
+ * 获取聚合任务状态（包含阶段和 ETA）
+ */
+export const getSyncJobStatus = async (taskId: number) => {
+  const response = await client.get<SyncJobStatusResponse>(`/sync/jobs/${taskId}`);
+  return response.data;
 };
 
 /**

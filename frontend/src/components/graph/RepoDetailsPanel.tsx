@@ -136,7 +136,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   };
 
   return (
-    <div className="w-96 h-full bg-white border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20">
+    <div className="absolute inset-y-0 right-0 w-full max-w-full sm:static sm:w-96 h-full bg-white border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20">
       {/* Header with Avatar */}
       <div className="relative p-5 border-b border-border-light bg-bg-sidebar">
         <div className="flex items-start gap-3 pr-8">
@@ -254,7 +254,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-purple-600 uppercase tracking-wider">
                 <Tag className="w-3.5 h-3.5" />
-                <span>AI Tags</span>
+                <span>{t('repoDetails.aiTags', 'AI Tags')}</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {node.ai_tags.map((tag, idx) => (
@@ -273,7 +273,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
         {node.topics && node.topics.length > 0 && (
           <div className="space-y-2">
             <div className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                Topics
+                {t('repoDetails.topics', 'Topics')}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {node.topics.slice(0, 8).map((topic, idx) => (
@@ -295,7 +295,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
         <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-action-primary uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>AI Insight</span>
+                <span>{t('repoDetails.aiInsight', 'AI Insight')}</span>
             </div>
             <div className="bg-bg-sidebar p-3 rounded-md border border-border-light/50">
                  <p className="text-sm text-text-main leading-relaxed">
