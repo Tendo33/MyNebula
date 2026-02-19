@@ -4,7 +4,9 @@
 This script updates the version number across all relevant files in the project:
 - pyproject.toml
 - src/nebula/__init__.py
-- config.example.toml
+- src/nebula/core/config.py
+- frontend/package.json
+- doc/ENV_VARS.md
 
 该脚本用于更新项目中所有相关文件的版本号。
 
@@ -49,9 +51,24 @@ class VersionUpdater:
                 '__version__ = "{version}"',
             ),
             (
-                project_root / "config.example.toml",
-                r'^version = "([^"]+)"',
-                'version = "{version}"',
+                project_root / "src" / "nebula" / "core" / "config.py",
+                r' app_version: str = Field\(default="([^"]+)"',
+                ' app_version: str = Field(default="{version}"',
+            ),
+            (
+                project_root / "frontend" / "package.json",
+                r'"version":\s*"([^"]+)"',
+                '"version": "{version}"',
+            ),
+            (
+                project_root / "doc" / "ENV_VARS.md",
+                r'(APP_VERSION=)(\d+\.\d+\.\d+)',
+                r"\g<1>{version}",
+            ),
+            (
+                project_root / "doc" / "ENV_VARS.md",
+                r'(\|\s*`APP_VERSION`\s*\|\s*string\s*\|\s*`)(\d+\.\d+\.\d+)(`\s*\|)',
+                r"\g<1>{version}\g<3>",
             ),
         ]
 
