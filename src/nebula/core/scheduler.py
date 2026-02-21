@@ -228,6 +228,7 @@ class SchedulerService:
         The scheduler check loop never awaits this method directly.
         """
         from nebula.api.sync import (
+            _should_force_full_recluster,
             compute_embeddings_task,
             run_clustering_task,
             sync_stars_task,
@@ -274,15 +275,32 @@ class SchedulerService:
                 embed_task_id = await self._create_task_record(db, user_id, "embedding")
             await compute_embeddings_task(user_id, embed_task_id)
 
+            force_full_recluster = False
+            async with get_db_context() as db:
+                stars_task = await db.get(SyncTask, stars_task_id)
+                user_latest = await db.get(User, user_id)
+                error_details = stars_task.error_details if stars_task else {}
+                new_repos = (
+                    int(error_details.get("new_repos", 0))
+                    if isinstance(error_details, dict)
+                    else 0
+                )
+                total_repos = int(user_latest.total_stars or 0) if user_latest else 0
+                force_full_recluster = _should_force_full_recluster(
+                    total_repos=total_repos,
+                    new_repos=new_repos,
+                    centroid_drift=None,
+                )
+
             async with get_db_context() as db:
                 cluster_task_id = await self._create_task_record(db, user_id, "cluster")
 
-            # Use incremental mode for scheduled syncs to preserve existing layout.
+            # Prefer incremental mode, but switch to full recluster when drift guard trips.
             await run_clustering_task(
                 user_id,
                 cluster_task_id,
                 use_llm=True,
-                incremental=True,
+                incremental=not force_full_recluster,
             )
 
             async with get_db_context() as db:

@@ -3,13 +3,27 @@
 Handles repository CRUD and semantic search operations.
 """
 
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.core.embedding import get_embedding_service
-from nebula.db import StarredRepo, User, get_db
+from nebula.core.relevance import (
+    RelevanceComponents,
+    build_relevance_components,
+    calculate_relevance_score,
+    collect_relevance_reasons,
+    cosine_similarity,
+    merge_repo_tags,
+)
+from nebula.db import RepoRelatedFeedback, StarredRepo, User, get_db
 from nebula.schemas.repo import (
+    RelatedFeedbackRequest,
+    RelatedFeedbackResponse,
+    RelatedRepoResponse,
+    RelatedScoreComponents,
     RepoListResponse,
     RepoResponse,
     RepoSearchRequest,
@@ -36,6 +50,74 @@ async def get_default_user(db: AsyncSession) -> User:
         )
 
     return user
+
+
+def _build_related_result_item(
+    anchor_repo: StarredRepo,
+    candidate_repo: StarredRepo,
+) -> tuple[float, RelevanceComponents, list[str]]:
+    semantic = cosine_similarity(anchor_repo.embedding, candidate_repo.embedding)
+    anchor_tags = merge_repo_tags(anchor_repo.ai_tags, anchor_repo.topics)
+    candidate_tags = merge_repo_tags(candidate_repo.ai_tags, candidate_repo.topics)
+
+    components = build_relevance_components(
+        semantic_similarity=semantic,
+        anchor_tags=anchor_tags,
+        candidate_tags=candidate_tags,
+        same_star_list=(
+            anchor_repo.star_list_id is not None
+            and candidate_repo.star_list_id == anchor_repo.star_list_id
+        ),
+        same_language=(
+            bool(anchor_repo.language)
+            and bool(candidate_repo.language)
+            and anchor_repo.language == candidate_repo.language
+        ),
+    )
+    score = calculate_relevance_score(components)
+    reasons = collect_relevance_reasons(components)
+    return score, components, reasons
+
+
+def _rank_related_candidates(
+    anchor_repo: StarredRepo,
+    candidates: list[StarredRepo],
+    min_score: float,
+    limit: int,
+) -> list[RelatedRepoResponse]:
+    ranked: list[RelatedRepoResponse] = []
+    for candidate in candidates:
+        if candidate.id == anchor_repo.id:
+            continue
+        if candidate.embedding is None:
+            continue
+        score, components, reasons = _build_related_result_item(anchor_repo, candidate)
+        if score < min_score:
+            continue
+
+        ranked.append(
+            RelatedRepoResponse(
+                repo=RepoResponse.model_validate(candidate),
+                score=score,
+                reasons=reasons,
+                components=RelatedScoreComponents(
+                    semantic=components.semantic,
+                    tag_overlap=components.tag_overlap,
+                    same_star_list=components.same_star_list,
+                    same_language=components.same_language,
+                ),
+            )
+        )
+
+    ranked.sort(
+        key=lambda item: (
+            item.score,
+            item.components.semantic,
+            item.repo.stargazers_count,
+        ),
+        reverse=True,
+    )
+    return ranked[:limit]
 
 
 @router.get("", response_model=RepoListResponse)
@@ -140,6 +222,108 @@ async def get_repo(
         )
 
     return RepoResponse.model_validate(repo)
+
+
+@router.get("/{repo_id}/related", response_model=list[RelatedRepoResponse])
+async def get_related_repositories(
+    repo_id: int,
+    limit: int = Query(default=20, ge=1, le=100),
+    min_score: float = Query(default=0.35, ge=0.0, le=1.0),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Get related repositories ranked by hybrid relevance score.
+
+    Unlike graph edges, this endpoint ranks against the full embedded repository set.
+    """
+    user = await get_default_user(db)
+
+    anchor_result = await db.execute(
+        select(StarredRepo).where(
+            StarredRepo.user_id == user.id,
+            StarredRepo.id == repo_id,
+        )
+    )
+    anchor_repo = anchor_result.scalar_one_or_none()
+    if anchor_repo is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    if anchor_repo.embedding is None:
+        return []
+
+    candidate_result = await db.execute(
+        select(StarredRepo).where(
+            StarredRepo.user_id == user.id,
+            StarredRepo.is_embedded == True,  # noqa: E712
+            StarredRepo.embedding.isnot(None),
+            StarredRepo.id != anchor_repo.id,
+        )
+    )
+    candidates = candidate_result.scalars().all()
+
+    return _rank_related_candidates(
+        anchor_repo=anchor_repo,
+        candidates=candidates,
+        min_score=min_score,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/{repo_id}/related-feedback",
+    response_model=RelatedFeedbackResponse,
+)
+async def submit_related_feedback(
+    repo_id: int,
+    request: RelatedFeedbackRequest,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+):
+    """Record user feedback for related repository recommendations."""
+    user = await get_default_user(db)
+
+    anchor_result = await db.execute(
+        select(StarredRepo.id).where(
+            StarredRepo.user_id == user.id,
+            StarredRepo.id == repo_id,
+        )
+    )
+    anchor_exists = anchor_result.scalar_one_or_none()
+    if anchor_exists is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Anchor repository not found",
+        )
+
+    candidate_result = await db.execute(
+        select(StarredRepo.id).where(
+            StarredRepo.user_id == user.id,
+            StarredRepo.id == request.candidate_repo_id,
+        )
+    )
+    candidate_exists = candidate_result.scalar_one_or_none()
+    if candidate_exists is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate repository not found",
+        )
+
+    feedback = RepoRelatedFeedback(
+        user_id=user.id,
+        anchor_repo_id=repo_id,
+        candidate_repo_id=request.candidate_repo_id,
+        feedback=request.feedback,
+        score_snapshot=request.score_snapshot,
+        model_version=request.model_version,
+    )
+    db.add(feedback)
+    await db.commit()
+
+    return RelatedFeedbackResponse(
+        status="ok",
+        message="Feedback recorded",
+    )
 
 
 @router.post("/search", response_model=list[RepoSearchResponse])

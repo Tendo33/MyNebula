@@ -7,7 +7,7 @@ visualization coordinates.
 Key features:
 - PCA-reduced feature-space hierarchical clustering for robust semantic grouping
 - Soft post-merge of highly similar clusters to reduce fragmentation
-- Stable full assignment of all nodes
+- Optional noise-point handling to avoid forcing weak assignments
 """
 
 import math
@@ -21,6 +21,7 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
+from nebula.core.tag_normalization import normalize_tag_list, normalize_tag_token
 from nebula.utils import get_logger
 
 logger = get_logger(__name__)
@@ -233,6 +234,52 @@ def merge_similar_clusters(
     return relabel_clusters(merged_labels)
 
 
+def mark_cluster_outliers(
+    labels: np.ndarray,
+    feature_vectors: np.ndarray,
+    max_noise_ratio: float = 0.15,
+) -> np.ndarray:
+    """Mark far-away points as noise (-1) with bounded ratio."""
+    if len(labels) == 0:
+        return labels
+    if len(labels) != len(feature_vectors):
+        return labels
+
+    updated = labels.copy()
+    candidate_scores: list[tuple[float, int]] = []
+
+    unique_labels = sorted({int(label) for label in labels.tolist() if int(label) != -1})
+    for cluster_id in unique_labels:
+        mask = labels == cluster_id
+        indices = np.where(mask)[0]
+        if len(indices) < 8:
+            continue
+
+        cluster_points = feature_vectors[mask]
+        center = cluster_points.mean(axis=0)
+        distances = np.linalg.norm(cluster_points - center, axis=1)
+        if len(distances) == 0:
+            continue
+
+        median = float(np.median(distances))
+        mad = float(np.median(np.abs(distances - median))) + 1e-6
+
+        for local_idx, global_idx in enumerate(indices):
+            score = (float(distances[local_idx]) - median) / mad
+            if score > 3.5:
+                candidate_scores.append((score, int(global_idx)))
+
+    if not candidate_scores:
+        return updated
+
+    candidate_scores.sort(reverse=True)
+    max_noise = int(max(1, min(len(candidate_scores), len(labels) * max_noise_ratio)))
+    for _, idx in candidate_scores[:max_noise]:
+        updated[idx] = -1
+
+    return updated
+
+
 def fallback_hierarchical_clustering(
     feature_vectors: np.ndarray,
     n_clusters: int,
@@ -306,7 +353,6 @@ class ClusteringService:
         min_clusters: int = 3,
         target_min_clusters: int | None = None,
         target_max_clusters: int | None = None,
-        assign_all_points: bool = True,
     ):
         """Initialize clustering service.
 
@@ -319,7 +365,6 @@ class ClusteringService:
             min_clusters: Minimum expected number of clusters
             target_min_clusters: Optional lower bound hint
             target_max_clusters: Soft target upper bound via semantic merge
-            assign_all_points: Reserved for backward compatibility
         """
         self.n_neighbors = n_neighbors
         self.min_dist = min_dist
@@ -329,7 +374,6 @@ class ClusteringService:
         self.min_clusters = min_clusters
         self.target_min_clusters = target_min_clusters
         self.target_max_clusters = target_max_clusters
-        self.assign_all_points = assign_all_points
 
         self._coord_reducer = None
         self._clusterer = None
@@ -461,6 +505,11 @@ class ClusteringService:
             target_max_clusters=self.target_max_clusters,
             min_similarity_for_forced_merge=0.5,
         )
+        labels = mark_cluster_outliers(
+            labels=labels,
+            feature_vectors=clustering_features,
+            max_noise_ratio=0.15,
+        )
         n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
         # Guardrail: keep final cluster count within the configured lower bound.
@@ -496,7 +545,10 @@ class ClusteringService:
             labels = relabel_clusters(np.array(labels, dtype=int))
             n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
-        logger.info(f"Final clustering: {n_clusters} clusters, all points assigned")
+        noise_points = int(np.sum(labels == -1))
+        logger.info(
+            f"Final clustering: {n_clusters} clusters, noise_points={noise_points}"
+        )
 
         # Scale projected output to give nodes more room before collision resolution.
         if n_samples > 1:
@@ -532,47 +584,14 @@ class ClusteringService:
         )
 
 
-TOPIC_SYNONYMS = {
-    "agent-memory": "agent-memory",
-    "agent_memory": "agent-memory",
-    "long-term-memory": "agent-memory",
-    "longterm-memory": "agent-memory",
-    "memory-augmented": "agent-memory",
-    "mem0": "agent-memory",
-    "rag-memory": "agent-memory",
-    "llm-training": "llm-training",
-    "distributed-training": "distributed-training",
-    "distributed-training-framework": "distributed-training",
-    "distributed-systems": "distributed-training",
-    "deepspeed": "distributed-training",
-    "fsdp": "distributed-training",
-    "megatron": "distributed-training",
-}
-
-
 def normalize_topic_token(token: str) -> str:
     """Normalize one topic/token to improve semantic consistency."""
-    normalized = token.strip().lower().replace("_", "-")
-    normalized = re.sub(r"\s+", "-", normalized)
-    normalized = re.sub(r"-+", "-", normalized)
-    return TOPIC_SYNONYMS.get(normalized, normalized)
+    return normalize_tag_token(token)
 
 
 def normalize_topic_lists(topic_lists: list[list[str]]) -> list[list[str]]:
     """Normalize topic lists with stable order and uniqueness per repository."""
-    normalized_lists: list[list[str]] = []
-    for topics in topic_lists:
-        seen: set[str] = set()
-        normalized_topics: list[str] = []
-        for topic in topics or []:
-            if not topic:
-                continue
-            normalized = normalize_topic_token(topic)
-            if normalized not in seen:
-                seen.add(normalized)
-                normalized_topics.append(normalized)
-        normalized_lists.append(normalized_topics)
-    return normalized_lists
+    return [normalize_tag_list(topics or []) for topics in topic_lists]
 
 
 def sanitize_cluster_name(name: str | None) -> str:

@@ -1,32 +1,19 @@
 import client from './client';
 import { GraphData, GraphEdge, TimelineData } from '../types';
 
-export interface GetGraphDataParams {
-  /** Whether to include similarity edges between nodes */
-  include_edges?: boolean;
-  /** Minimum similarity threshold for edges (0.5-0.95) */
-  min_similarity?: number;
-}
-
 export interface GetGraphEdgesParams {
-  strategy?: 'knn';
   min_similarity?: number;
   k?: number;
   max_nodes?: number;
+  adaptive?: boolean;
 }
 
 /**
  * Fetch graph data for visualization
- * @param params - Query parameters for graph data
  * @returns Complete graph data with nodes, edges, and clusters
  */
-export const getGraphData = async (params?: GetGraphDataParams): Promise<GraphData> => {
-  const response = await client.get<GraphData>('/graph', {
-    params: {
-      include_edges: params?.include_edges ?? false,
-      min_similarity: params?.min_similarity ?? 0.7,
-    },
-  });
+export const getGraphData = async (): Promise<GraphData> => {
+  const response = await client.get<GraphData>('/graph');
   return response.data;
 };
 
@@ -47,10 +34,10 @@ export const getGraphEdges = async (
 ): Promise<GraphEdge[]> => {
   const response = await client.get<GraphEdge[]>('/graph/edges', {
     params: {
-      strategy: params?.strategy ?? 'knn',
-      min_similarity: params?.min_similarity ?? 0.7,
+      min_similarity: params?.min_similarity,
       k: params?.k ?? 8,
       max_nodes: params?.max_nodes ?? 1000,
+      adaptive: params?.adaptive ?? true,
     },
   });
   return response.data;

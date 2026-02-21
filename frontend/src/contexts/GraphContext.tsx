@@ -202,7 +202,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         // Fetch fresh data in background
         Promise.all([
-          getGraphData({ include_edges: false }),
+          getGraphData(),
           getTimelineData(),
         ]).then(([graphData, timeline]) => {
           setRawData(graphData);
@@ -211,10 +211,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setCachedData(CACHE_KEY_TIMELINE, timeline);
 
           getGraphEdges({
-            strategy: 'knn',
-            min_similarity: 0.7,
             k: 8,
             max_nodes: 1000,
+            adaptive: true,
           }).then((edges) => {
             setRawData((prev) => {
               if (!prev) {
@@ -240,7 +239,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Fetch fresh data
       const [graphData, timeline] = await Promise.all([
-        getGraphData({ include_edges: false }),
+        getGraphData(),
         getTimelineData(),
       ]);
 
@@ -252,10 +251,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCachedData(CACHE_KEY_TIMELINE, timeline);
 
       getGraphEdges({
-        strategy: 'knn',
-        min_similarity: 0.7,
         k: 8,
         max_nodes: 1000,
+        adaptive: true,
       }).then((edges) => {
         setRawData((prev) => {
           if (!prev) {
@@ -290,7 +288,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       clearCache();
 
       const [graphData, timeline] = await Promise.all([
-        getGraphData({ include_edges: false }),
+        getGraphData(),
         getTimelineData(),
       ]);
 
@@ -303,10 +301,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       try {
         const edges = await getGraphEdges({
-          strategy: 'knn',
-          min_similarity: 0.7,
           k: 8,
           max_nodes: 1000,
+          adaptive: true,
         });
         const merged = {
           ...graphData,

@@ -5,12 +5,13 @@ Provides data for force graph visualization and timeline analytics.
 
 import math
 from collections.abc import Sequence
-from typing import Literal
 
+import numpy as np
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nebula.core.relevance import cosine_similarity
 from nebula.db import Cluster, StarList, StarredRepo, User, get_db
 from nebula.schemas.graph import (
     ClusterInfo,
@@ -46,29 +47,6 @@ CLUSTER_COLORS = [
 ]
 
 
-def _cosine_similarity(vec_a: Sequence[float], vec_b: Sequence[float]) -> float:
-    """Compute cosine similarity between two vectors."""
-    if vec_a is None or vec_b is None:
-        return 0.0
-    if len(vec_a) != len(vec_b) or len(vec_a) == 0:
-        return 0.0
-
-    dot = 0.0
-    norm_a = 0.0
-    norm_b = 0.0
-    for i in range(len(vec_a)):
-        a = float(vec_a[i])
-        b = float(vec_b[i])
-        dot += a * b
-        norm_a += a * a
-        norm_b += b * b
-
-    if norm_a <= 0 or norm_b <= 0:
-        return 0.0
-
-    return dot / (math.sqrt(norm_a) * math.sqrt(norm_b))
-
-
 def _build_similarity_edges_knn(
     repo_ids: list[int],
     embeddings: list[Sequence[float]],
@@ -98,7 +76,7 @@ def _build_similarity_edges_knn(
             target_embedding = embeddings[j]
             if target_embedding is None or len(target_embedding) == 0:
                 continue
-            similarity = _cosine_similarity(source_embedding, target_embedding)
+            similarity = cosine_similarity(source_embedding, target_embedding)
             if similarity >= min_similarity:
                 candidates.append((similarity, j))
 
@@ -125,6 +103,40 @@ def _build_similarity_edges_knn(
     return edges
 
 
+def _estimate_adaptive_similarity_threshold(
+    embeddings: list[Sequence[float]],
+    *,
+    target_degree: int = 8,
+    min_threshold: float = 0.5,
+    max_threshold: float = 0.95,
+    sample_limit: int = 300,
+) -> float:
+    """Estimate adaptive similarity threshold for stable graph density."""
+    if not embeddings:
+        return 0.7
+
+    n_samples = min(len(embeddings), sample_limit)
+    if n_samples < 3:
+        return 0.7
+
+    arr = np.array(embeddings[:n_samples], dtype=np.float32)
+    norms = np.linalg.norm(arr, axis=1, keepdims=True)
+    norms = np.where(norms == 0, 1.0, norms)
+    arr = arr / norms
+
+    sim_matrix = arr @ arr.T
+    tri_upper = np.triu_indices(n_samples, k=1)
+    sim_values = sim_matrix[tri_upper]
+    if sim_values.size == 0:
+        return 0.7
+
+    degree = max(1, min(target_degree, n_samples - 1))
+    # Approximate quantile producing ~target_degree neighbors per node.
+    quantile = max(0.05, min(0.98, 1.0 - (degree / float(n_samples - 1))))
+    threshold = float(np.quantile(sim_values, quantile))
+    return max(min_threshold, min(max_threshold, threshold))
+
+
 async def get_default_user(db: AsyncSession) -> User | None:
     """Get the first user from database.
 
@@ -137,17 +149,11 @@ async def get_default_user(db: AsyncSession) -> User | None:
 
 @router.get("", response_model=GraphData)
 async def get_graph_data(
-    include_edges: bool = Query(default=False, description="Include similarity edges"),
-    min_similarity: float = Query(
-        default=0.7, ge=0.5, le=0.95, description="Minimum similarity for edges"
-    ),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get graph data for visualization.
 
     Args:
-        include_edges: Whether to compute similarity edges
-        min_similarity: Minimum similarity threshold for edges
         db: Database session
 
     Returns:
@@ -201,8 +207,6 @@ async def get_graph_data(
     nodes = []
     for repo in repos:
         # Calculate node size based on stars (log scale)
-        import math
-
         size = 1.0 + math.log10(max(repo.stargazers_count, 1)) * 0.5
 
         star_list_id = (
@@ -247,20 +251,8 @@ async def get_graph_data(
         )
         nodes.append(node)
 
-    # Build edges (optional, bounded kNN for compatibility with older clients)
+    # Edges are fetched via /graph/edges to avoid blocking node rendering.
     edges = []
-    if include_edges and len(repos) < 500:  # Limit for performance
-        repos_with_embeddings = [
-            repo for repo in repos if repo.embedding is not None and len(repo.embedding) > 0
-        ]
-        repo_ids = [repo.id for repo in repos_with_embeddings]
-        embeddings = [repo.embedding for repo in repos_with_embeddings]
-        edges = _build_similarity_edges_knn(
-            repo_ids=repo_ids,
-            embeddings=embeddings,
-            min_similarity=min_similarity,
-            k=8,
-        )
 
     # Build cluster info
     cluster_infos = [
@@ -312,10 +304,16 @@ async def get_graph_data(
 
 @router.get("/edges", response_model=list[GraphEdge])
 async def get_graph_edges(
-    strategy: Literal["knn"] = Query(default="knn"),
     k: int = Query(default=8, ge=1, le=30, description="K nearest neighbors per node"),
-    min_similarity: float = Query(
-        default=0.7, ge=0.5, le=0.99, description="Minimum edge similarity"
+    min_similarity: float | None = Query(
+        default=None,
+        ge=0.0,
+        le=0.99,
+        description="Manual minimum edge similarity override",
+    ),
+    adaptive: bool = Query(
+        default=True,
+        description="Use adaptive thresholding for edge density",
     ),
     max_nodes: int = Query(
         default=1000,
@@ -326,9 +324,6 @@ async def get_graph_edges(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get similarity edges for the graph as a separate heavy request."""
-    if strategy != "knn":
-        return []
-
     user = await get_default_user(db)
     if not user:
         return []
@@ -348,10 +343,20 @@ async def get_graph_edges(
     repo_ids = [repo.id for repo in repos if repo.embedding is not None and len(repo.embedding) > 0]
     embeddings = [repo.embedding for repo in repos if repo.embedding is not None and len(repo.embedding) > 0]
 
+    if min_similarity is not None:
+        effective_similarity = min_similarity
+    elif adaptive:
+        effective_similarity = _estimate_adaptive_similarity_threshold(
+            embeddings=embeddings,
+            target_degree=k,
+        )
+    else:
+        effective_similarity = 0.7
+
     return _build_similarity_edges_knn(
         repo_ids=repo_ids,
         embeddings=embeddings,
-        min_similarity=min_similarity,
+        min_similarity=effective_similarity,
         k=k,
     )
 

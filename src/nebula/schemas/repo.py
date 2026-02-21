@@ -92,6 +92,40 @@ class RepoSearchResponse(BaseModel):
     highlight: str | None = Field(None, description="Highlighted match snippet")
 
 
+class RelatedScoreComponents(BaseModel):
+    """Explainable components for related-repo scoring."""
+
+    semantic: float = Field(..., ge=0, le=1)
+    tag_overlap: float = Field(..., ge=0, le=1)
+    same_star_list: float = Field(..., ge=0, le=1)
+    same_language: float = Field(..., ge=0, le=1)
+
+
+class RelatedRepoResponse(BaseModel):
+    """Schema for one related repository recommendation."""
+
+    repo: RepoResponse
+    score: float = Field(..., ge=0, le=1)
+    reasons: list[str] = Field(default_factory=list)
+    components: RelatedScoreComponents
+
+
+class RelatedFeedbackRequest(BaseModel):
+    """Schema for recommendation feedback submission."""
+
+    candidate_repo_id: int = Field(..., ge=1)
+    feedback: str = Field(..., pattern="^(helpful|not_helpful)$")
+    score_snapshot: float | None = Field(default=None, ge=0, le=1)
+    model_version: str | None = Field(default=None, max_length=100)
+
+
+class RelatedFeedbackResponse(BaseModel):
+    """Schema for recommendation feedback API response."""
+
+    status: str
+    message: str
+
+
 class RepoListResponse(BaseModel):
     """Schema for paginated repository list."""
 

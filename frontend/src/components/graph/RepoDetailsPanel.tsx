@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GraphNode } from '../../types';
 import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart, Link2, ChevronRight } from 'lucide-react';
-import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
+import { useGraph } from '../../contexts/GraphContext';
 import { clsx } from 'clsx';
+import { getRelatedRepos } from '../../api/repos';
 
 interface RepoDetailsPanelProps {
   node: GraphNode;
@@ -14,12 +15,24 @@ interface RelatedRepoItemProps {
   repo: GraphNode;
   onClick: () => void;
   matchReason?: string;
+  score?: number;
 }
 
 type RelatedTab = 'similar' | 'sameTags' | 'sameLang';
+type RelatedGraphNode = GraphNode & { _score: number; _matchReason: string };
+
+const normalizeTag = (tag: string): string => {
+  return tag
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-')
+    .replace(/[^a-z0-9\-\u4e00-\u9fff]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+};
 
 /** Related repository item component */
-const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchReason }) => {
+const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchReason, score }) => {
   const { t } = useTranslation();
   return (
     <button
@@ -57,6 +70,9 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
         {matchReason && (
           <span className="text-[10px] text-purple-600 mt-0.5">{matchReason}</span>
         )}
+        {score != null && (
+          <span className="text-[10px] text-sky-600 mt-0.5">Score: {(score * 100).toFixed(1)}%</span>
+        )}
       </div>
 
       {/* Stars + Arrow */}
@@ -74,32 +90,92 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
 export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClose }) => {
   const { t } = useTranslation();
   const { rawData, setSelectedNode } = useGraph();
-  const neighborIds = useNodeNeighbors(node.id);
   const [activeTab, setActiveTab] = useState<RelatedTab>('similar');
+  const [remoteSimilar, setRemoteSimilar] = useState<RelatedGraphNode[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarError, setSimilarError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    if (!rawData) {
+      setRemoteSimilar([]);
+      return;
+    }
+
+    const load = async () => {
+      try {
+        setSimilarLoading(true);
+        setSimilarError(null);
+        const items = await getRelatedRepos(node.id, {
+          limit: 20,
+          min_score: 0.35,
+        });
+        if (disposed) return;
+
+        const byId = new Map(rawData.nodes.map((n) => [n.id, n]));
+        const mapped: RelatedGraphNode[] = [];
+        for (const item of items) {
+          const inGraph = byId.get(item.repo.id);
+          if (!inGraph) continue;
+          mapped.push({
+            ...inGraph,
+            _score: item.score,
+            _matchReason: item.reasons.join(' · '),
+          });
+          if (mapped.length >= 10) break;
+        }
+        setRemoteSimilar(mapped);
+      } catch (err) {
+        if (!disposed) {
+          setSimilarError(err instanceof Error ? err.message : 'Failed to load related repos');
+          setRemoteSimilar([]);
+        }
+      } finally {
+        if (!disposed) {
+          setSimilarLoading(false);
+        }
+      }
+    };
+
+    load();
+    return () => {
+      disposed = true;
+    };
+  }, [node.id, rawData]);
 
 
   // Get related repos by different dimensions
   const relatedReposByDimension = useMemo(() => {
-    if (!rawData) return { similar: [], sameTags: [], sameOwner: [], sameLang: [] };
+    if (!rawData) return { similar: [], sameTags: [], sameLang: [] };
 
-    // 1. Semantically similar (neighbors in graph)
-    const similar = rawData.nodes
-      .filter(n => neighborIds.has(n.id))
-      .sort((a, b) => b.stargazers_count - a.stargazers_count)
-      .slice(0, 10);
+    // 1. Semantically similar (from backend related ranking API)
+    const similar = remoteSimilar;
 
     // 2. Same tags (ai_tags or topics overlap)
-    const nodeTags = new Set([...(node.ai_tags || []), ...(node.topics || [])]);
+    const nodeTags = new Set(
+      [...(node.ai_tags || []), ...(node.topics || [])]
+        .map(normalizeTag)
+        .filter(Boolean)
+    );
     const sameTags = nodeTags.size > 0
       ? rawData.nodes
           .filter(n => {
             if (n.id === node.id) return false;
-            const nTags = new Set([...(n.ai_tags || []), ...(n.topics || [])]);
+            const nTags = new Set(
+              [...(n.ai_tags || []), ...(n.topics || [])]
+                .map(normalizeTag)
+                .filter(Boolean)
+            );
             const overlap = [...nodeTags].filter(t => nTags.has(t));
-            return overlap.length >= 2; // At least 2 common tags
+            const overlapRatio = overlap.length / Math.max(Math.min(nodeTags.size, nTags.size), 1);
+            return overlap.length >= 1 && overlapRatio >= 0.25;
           })
           .map(n => {
-            const nTags = new Set([...(n.ai_tags || []), ...(n.topics || [])]);
+            const nTags = new Set(
+              [...(n.ai_tags || []), ...(n.topics || [])]
+                .map(normalizeTag)
+                .filter(Boolean)
+            );
             const overlap = [...nodeTags].filter(t => nTags.has(t));
             return { ...n, _matchReason: overlap.slice(0, 2).join(', ') };
           })
@@ -117,7 +193,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       : [];
 
     return { similar, sameTags, sameLang };
-  }, [rawData, neighborIds, node]);
+  }, [rawData, node, remoteSimilar]);
 
   // Get current tab's repos
   const currentRelatedRepos = relatedReposByDimension[activeTab] || [];
@@ -371,12 +447,17 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                   repo={repo}
                   onClick={() => handleRelatedRepoClick(repo)}
                   matchReason={repo._matchReason}
+                  score={repo._score}
                 />
               ))}
             </div>
           ) : (
             <div className="py-6 text-center text-sm text-text-muted bg-bg-sidebar rounded-lg border border-border-light/50">
-              {activeTab === 'similar' && t('repoDetails.noSimilar', 'No similar repos found')}
+              {activeTab === 'similar' && (
+                similarLoading
+                  ? t('common.loading', 'Loading...')
+                  : (similarError ? t('repoDetails.noSimilar', 'No similar repos found') : t('repoDetails.noSimilar', 'No similar repos found'))
+              )}
               {activeTab === 'sameTags' && t('repoDetails.noSameTags', 'No repos with same tags')}
               {activeTab === 'sameLang' && t('repoDetails.noSameLang', 'No repos with same language')}
             </div>

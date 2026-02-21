@@ -24,7 +24,7 @@ def _normalize_semantic_tags(tags: list[str] | None) -> list[str]:
     if not tags:
         return []
 
-    from nebula.core.clustering import normalize_topic_token
+    from nebula.core.tag_normalization import normalize_tag_token
 
     normalized_tags: list[str] = []
     seen: set[str] = set()
@@ -32,7 +32,7 @@ def _normalize_semantic_tags(tags: list[str] | None) -> list[str]:
         if not raw_tag:
             continue
 
-        canonical_tag = normalize_topic_token(raw_tag)
+        canonical_tag = normalize_tag_token(raw_tag)
         for candidate in (canonical_tag, raw_tag.strip()):
             if not candidate:
                 continue
@@ -150,6 +150,7 @@ class EmbeddingService:
         description: str | None = None,
         topics: list[str] | None = None,
         readme_summary: str | None = None,
+        readme_content: str | None = None,
         language: str | None = None,
         ai_summary: str | None = None,
         ai_tags: list[str] | None = None,
@@ -165,6 +166,7 @@ class EmbeddingService:
             description: Repository description
             topics: Repository topics/tags
             readme_summary: Summarized README content
+            readme_content: Raw README content
             language: Primary programming language
             ai_summary: LLM-generated summary (preferred over description)
             ai_tags: LLM-generated semantic tags (preferred over topics)
@@ -197,8 +199,86 @@ class EmbeddingService:
         # Include readme summary if available (additional context)
         if readme_summary:
             parts.append(readme_summary)
+        elif readme_content:
+            readme_signal = self._extract_readme_signal(readme_content)
+            if readme_signal:
+                parts.append(f"Readme: {readme_signal}")
 
         return "\n".join(parts)
+
+    def _extract_readme_signal(self, readme_content: str, max_chars: int = 1200) -> str:
+        """Extract compact signal from README content for embedding text."""
+        if not readme_content:
+            return ""
+
+        text = readme_content.replace("\r\n", "\n").strip()
+        if not text:
+            return ""
+
+        lines = [line.strip() for line in text.split("\n")]
+        sections: list[str] = []
+        current: list[str] = []
+        current_heading = ""
+
+        def flush_current() -> None:
+            nonlocal current, current_heading
+            if not current:
+                return
+            body = " ".join(x for x in current if x)
+            if not body:
+                current = []
+                return
+            if current_heading:
+                sections.append(f"{current_heading}: {body}")
+            else:
+                sections.append(body)
+            current = []
+
+        headings_of_interest = {
+            "features",
+            "feature",
+            "usage",
+            "quick start",
+            "quickstart",
+            "api",
+            "installation",
+            "overview",
+            "功能",
+            "用法",
+            "快速开始",
+            "安装",
+            "概览",
+        }
+
+        for line in lines:
+            if not line:
+                continue
+            if line.startswith("#"):
+                flush_current()
+                heading = line.lstrip("#").strip().lower()
+                current_heading = heading
+                continue
+            current.append(line)
+            if len(" ".join(current)) > 400:
+                flush_current()
+
+        flush_current()
+
+        if sections:
+            selected: list[str] = []
+            for section in sections:
+                lower = section.lower()
+                if any(keyword in lower for keyword in headings_of_interest):
+                    selected.append(section)
+            if not selected:
+                selected = sections[:3]
+            result = " | ".join(selected)
+        else:
+            result = " ".join(lines[:40])
+
+        if len(result) > max_chars:
+            return result[:max_chars]
+        return result
 
     async def close(self) -> None:
         """Close the client connection."""

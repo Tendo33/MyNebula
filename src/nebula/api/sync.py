@@ -380,97 +380,111 @@ async def sync_stars_task(
             new_count = 0
             updated_count = 0
 
-            for repo in repos:
-                try:
-                    # Check if repo exists
-                    result = await db.execute(
-                        select(StarredRepo).where(
-                            StarredRepo.user_id == user_id,
-                            StarredRepo.github_repo_id == repo.id,
+            async with GitHubClient(access_token=settings.github_token) as readme_client:
+                for repo in repos:
+                    try:
+                        # Check if repo exists
+                        result = await db.execute(
+                            select(StarredRepo).where(
+                                StarredRepo.user_id == user_id,
+                                StarredRepo.github_repo_id == repo.id,
+                            )
                         )
-                    )
-                    existing = result.scalar_one_or_none()
+                        existing = result.scalar_one_or_none()
 
-                    if existing:
-                        # Smart change detection: check if description or topics changed
-                        new_desc_hash = compute_content_hash(repo.description)
-                        new_topics_hash = compute_topics_hash(repo.topics)
+                        if existing:
+                            # Smart change detection: check if description or topics changed
+                            new_desc_hash = compute_content_hash(repo.description)
+                            new_topics_hash = compute_topics_hash(repo.topics)
 
-                        needs_reprocess = False
-                        if existing.description_hash != new_desc_hash:
-                            needs_reprocess = True
-                        if existing.topics_hash != new_topics_hash:
-                            needs_reprocess = True
+                            needs_reprocess = False
+                            if existing.description_hash != new_desc_hash:
+                                needs_reprocess = True
+                            if existing.topics_hash != new_topics_hash:
+                                needs_reprocess = True
 
-                        # If content changed, reset processing flags
-                        if needs_reprocess:
-                            existing.is_embedded = False
-                            existing.is_summarized = False
-                            existing.ai_summary = None
-                            existing.ai_tags = None
-                            existing.embedding = None
+                            # If content changed, reset processing flags
+                            if needs_reprocess:
+                                existing.is_embedded = False
+                                existing.is_summarized = False
+                                existing.ai_summary = None
+                                existing.ai_tags = None
+                                existing.embedding = None
+                                latest_readme = await readme_client.get_repo_readme(
+                                    repo.full_name,
+                                    max_length=sync_settings.readme_max_length,
+                                )
+                                if latest_readme is not None:
+                                    existing.readme_content = latest_readme
+                                    existing.is_readme_fetched = True
+                                logger.info(
+                                    f"Repo {repo.full_name} content changed, marked for reprocessing"
+                                )
+
+                            # Update metadata
+                            existing.description = repo.description
+                            existing.language = repo.language
+                            existing.topics = repo.topics
+                            existing.stargazers_count = repo.stargazers_count
+                            existing.forks_count = repo.forks_count
+                            existing.repo_updated_at = repo.updated_at
+                            existing.repo_pushed_at = repo.pushed_at
+                            existing.owner_avatar_url = repo.owner_avatar_url
+
+                            # Update hashes for future detection
+                            existing.description_hash = new_desc_hash
+                            existing.topics_hash = new_topics_hash
+
+                            updated_count += 1
+                        else:
+                            readme_content = await readme_client.get_repo_readme(
+                                repo.full_name,
+                                max_length=sync_settings.readme_max_length,
+                            )
+                            # Create new with content hashes for future detection
+                            new_repo = StarredRepo(
+                                user_id=user_id,
+                                github_repo_id=repo.id,
+                                full_name=repo.full_name,
+                                owner=repo.owner,
+                                name=repo.name,
+                                description=repo.description,
+                                language=repo.language,
+                                topics=repo.topics,
+                                html_url=repo.html_url,
+                                homepage_url=repo.homepage,
+                                stargazers_count=repo.stargazers_count,
+                                forks_count=repo.forks_count,
+                                watchers_count=repo.watchers_count,
+                                open_issues_count=repo.open_issues_count,
+                                starred_at=repo.starred_at,
+                                repo_created_at=repo.created_at,
+                                repo_updated_at=repo.updated_at,
+                                repo_pushed_at=repo.pushed_at,
+                                owner_avatar_url=repo.owner_avatar_url,
+                                readme_content=readme_content,
+                                is_readme_fetched=readme_content is not None,
+                                # Content hashes for smart change detection
+                                description_hash=compute_content_hash(repo.description),
+                                topics_hash=compute_topics_hash(repo.topics),
+                            )
+                            db.add(new_repo)
+                            new_count += 1
+
+                        processed += 1
+                        task.processed_items = processed
+
+                        # Commit in batches
+                        if processed % sync_settings.batch_size == 0:
+                            await db.commit()
                             logger.info(
-                                f"Repo {repo.full_name} content changed, marked for reprocessing"
+                                f"Synced {processed}/{len(repos)} repos for user {user.username}"
                             )
 
-                        # Update metadata
-                        existing.description = repo.description
-                        existing.language = repo.language
-                        existing.topics = repo.topics
-                        existing.stargazers_count = repo.stargazers_count
-                        existing.forks_count = repo.forks_count
-                        existing.repo_updated_at = repo.updated_at
-                        existing.repo_pushed_at = repo.pushed_at
-                        existing.owner_avatar_url = repo.owner_avatar_url
-
-                        # Update hashes for future detection
-                        existing.description_hash = new_desc_hash
-                        existing.topics_hash = new_topics_hash
-
-                        updated_count += 1
-                    else:
-                        # Create new with content hashes for future detection
-                        new_repo = StarredRepo(
-                            user_id=user_id,
-                            github_repo_id=repo.id,
-                            full_name=repo.full_name,
-                            owner=repo.owner,
-                            name=repo.name,
-                            description=repo.description,
-                            language=repo.language,
-                            topics=repo.topics,
-                            html_url=repo.html_url,
-                            homepage_url=repo.homepage,
-                            stargazers_count=repo.stargazers_count,
-                            forks_count=repo.forks_count,
-                            watchers_count=repo.watchers_count,
-                            open_issues_count=repo.open_issues_count,
-                            starred_at=repo.starred_at,
-                            repo_created_at=repo.created_at,
-                            repo_updated_at=repo.updated_at,
-                            repo_pushed_at=repo.pushed_at,
-                            owner_avatar_url=repo.owner_avatar_url,
-                            # Content hashes for smart change detection
-                            description_hash=compute_content_hash(repo.description),
-                            topics_hash=compute_topics_hash(repo.topics),
-                        )
-                        db.add(new_repo)
-                        new_count += 1
-
-                    processed += 1
-                    task.processed_items = processed
-
-                    # Commit in batches
-                    if processed % sync_settings.batch_size == 0:
-                        await db.commit()
-                        logger.info(
-                            f"Synced {processed}/{len(repos)} repos for user {user.username}"
-                        )
-
-                except Exception as e:
-                    logger.warning(f"Failed to sync repo {repo.full_name}: {e}")
-                    failed += 1
-                    task.failed_items = failed
+                    except Exception as e:
+                        logger.warning(f"Failed to sync repo {repo.full_name}: {e}")
+                        failed += 1
+                        task.failed_items = failed
 
             # Final commit
             await db.commit()
@@ -684,6 +698,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                     full_name=repo.full_name,
                     description=repo.description,
                     topics=repo.topics,
+                    readme_content=repo.readme_content,
                     language=repo.language,
                     ai_summary=repo.ai_summary,
                     ai_tags=repo.ai_tags,
@@ -1194,6 +1209,23 @@ def _derive_clustering_params_for_max_clusters(
     }
 
 
+def _should_force_full_recluster(
+    *,
+    total_repos: int,
+    new_repos: int,
+    centroid_drift: float | None = None,
+    new_repo_ratio_threshold: float = 0.2,
+    centroid_drift_threshold: float = 0.35,
+) -> bool:
+    """Decide whether incremental clustering should upgrade to full recluster."""
+    safe_total = max(1, total_repos)
+    new_ratio = float(new_repos) / float(safe_total)
+    if new_ratio > new_repo_ratio_threshold:
+        return True
+
+    return centroid_drift is not None and centroid_drift > centroid_drift_threshold
+
+
 async def run_clustering_task(
     user_id: int,
     task_id: int,
@@ -1427,7 +1459,6 @@ async def run_clustering_task(
                 min_clusters=derived["min_clusters"],
                 target_min_clusters=derived["min_clusters"],
                 target_max_clusters=derived["target_max_clusters"],
-                assign_all_points=True,
             )
 
             cluster_result = clustering_service.fit_transform(
@@ -1544,16 +1575,9 @@ async def run_clustering_task(
                         repo.cluster_id = cluster_map[label].id
                         assigned_count += 1
                     else:
-                        # Fallback: assign to first available cluster if label not in map
-                        if cluster_map and label == -1:
-                            first_cluster = next(iter(cluster_map.values()))
-                            repo.cluster_id = first_cluster.id
-                            assigned_count += 1
-                            logger.debug(
-                                f"Assigned noise point {repo.full_name} to fallback cluster"
-                            )
-                        else:
-                            unassigned_count += 1
+                        # Keep outliers unassigned to preserve cluster purity.
+                        repo.cluster_id = None
+                        unassigned_count += 1
 
                     # Update 3D coordinates
                     if i < len(cluster_result.coords_3d):

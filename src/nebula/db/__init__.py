@@ -14,6 +14,7 @@ from .database import (
 from .models import (
     Base,
     Cluster,
+    RepoRelatedFeedback,
     StarList,
     StarredRepo,
     SyncSchedule,
@@ -35,4 +36,5 @@ __all__ = [
     "Cluster",
     "SyncSchedule",
     "SyncTask",
+    "RepoRelatedFeedback",
 ]

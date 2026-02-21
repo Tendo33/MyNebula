@@ -318,6 +318,33 @@ class GitHubClient:
             logger.warning(f"Failed to fetch star lists (may not be available): {e}")
             return []
 
+    async def get_repo_readme(
+        self,
+        full_name: str,
+        max_length: int = 10000,
+    ) -> str | None:
+        """Fetch repository README as plain text.
+
+        Args:
+            full_name: Repository full name like ``owner/repo``.
+            max_length: Maximum characters to keep.
+        """
+        try:
+            response = await self.client.get(
+                f"/repos/{full_name}/readme",
+                headers={"Accept": "application/vnd.github.raw+json"},
+            )
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            text = response.text or ""
+            if not text:
+                return None
+            return text[:max_length]
+        except Exception as e:
+            logger.debug(f"Failed to fetch README for {full_name}: {e}")
+            return None
+
     async def close(self) -> None:
         """Close the HTTP client."""
         if self._client is not None:

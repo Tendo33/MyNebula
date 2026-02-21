@@ -349,6 +349,51 @@ class SyncSchedule(Base):
         return f"<SyncSchedule(id={self.id}, user_id={self.user_id}, enabled={self.is_enabled}, time={self.schedule_hour}:{self.schedule_minute:02d})>"
 
 
+class RepoRelatedFeedback(Base):
+    """User feedback for related-repository recommendations."""
+
+    __tablename__ = "repo_related_feedbacks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    anchor_repo_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("starred_repos.id"), nullable=False, index=True
+    )
+    candidate_repo_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("starred_repos.id"), nullable=False, index=True
+    )
+    feedback: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # helpful | not_helpful
+    score_snapshot: Mapped[float | None] = mapped_column(nullable=True)
+    model_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    extra: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_related_feedback_user_anchor_candidate",
+            "user_id",
+            "anchor_repo_id",
+            "candidate_repo_id",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            "<RepoRelatedFeedback("
+            f"user_id={self.user_id}, "
+            f"anchor_repo_id={self.anchor_repo_id}, "
+            f"candidate_repo_id={self.candidate_repo_id}, "
+            f"feedback={self.feedback}"
+            ")>"
+        )
+
+
 class SyncTask(Base):
     """Synchronization task tracking model."""
 
