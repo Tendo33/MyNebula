@@ -37,9 +37,9 @@ const StarListItem: React.FC<StarListItemProps> = ({
     <button
       onClick={onToggle}
       className={clsx(
-        'w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-all text-left',
-        'hover:bg-bg-hover group',
-        isSelected && 'bg-pink-50 ring-1 ring-pink-200'
+        'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left border',
+        'hover:bg-white hover:border-border-light/70 group border-transparent',
+        isSelected && 'bg-pink-50 ring-1 ring-pink-200 border-pink-200/70 shadow-sm'
       )}
     >
       {/* Icon */}
@@ -120,7 +120,7 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
 
   return (
     <div className={clsx(
-      'bg-white border border-border-light rounded-lg shadow-sm overflow-hidden',
+      'bg-white/90 border border-border-light rounded-xl shadow-sm overflow-hidden backdrop-blur-sm',
       'transition-all duration-300',
       className
     )}>

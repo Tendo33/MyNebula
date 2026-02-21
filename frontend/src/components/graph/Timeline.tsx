@@ -174,7 +174,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
 
   return (
     <div className={clsx(
-      'bg-white border border-border-light rounded-lg shadow-sm p-4',
+      'bg-white/90 border border-border-light rounded-xl shadow-sm p-4 backdrop-blur-sm',
       className
     )}>
       {/* Header */}
@@ -231,7 +231,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
                   'w-full rounded-t-sm transition-all duration-150',
                   inRange
                     ? 'bg-action-primary hover:bg-action-hover'
-                    : 'bg-gray-200 hover:bg-gray-300',
+                    : 'bg-gray-200/90 hover:bg-gray-300',
                   (isRangeStart || isRangeEnd) && 'ring-2 ring-action-primary ring-offset-1'
                 )}
                 style={{ height: `${height}px` }}

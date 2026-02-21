@@ -172,7 +172,7 @@ const GraphPage = () => {
                 isMobile
                   ? 'absolute inset-y-0 left-0 w-[85vw] max-w-sm'
                   : 'w-72 flex-shrink-0'
-              } border-r border-border-light bg-bg-sidebar p-4 space-y-4 overflow-y-auto z-30 relative`}
+              } border-r border-border-light bg-bg-sidebar/90 backdrop-blur-sm p-4 space-y-4 overflow-y-auto z-30 relative`}
             >
               {/* Clear all filters */}
               {hasActiveFilters && (
@@ -203,7 +203,7 @@ const GraphPage = () => {
           )}
 
           {/* Graph Container */}
-          <div className="flex-1 min-w-0 relative bg-white flex flex-row overflow-hidden">
+          <div className="flex-1 min-w-0 relative bg-white/80 flex flex-row overflow-hidden">
             <div className="flex-1 relative min-w-0 h-full">
               <Graph2D />
             </div>

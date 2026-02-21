@@ -102,7 +102,7 @@ export const Sidebar = () => {
 
       <aside
         className={clsx(
-          'fixed left-0 top-0 bottom-0 bg-bg-sidebar border-r border-border-light flex flex-col z-[60] transition-transform duration-200',
+          'fixed left-0 top-0 bottom-0 bg-bg-sidebar/95 backdrop-blur-sm border-r border-border-light flex flex-col z-[60] transition-transform duration-200',
           isMobile ? (mobileOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
         )}
         style={{ width: `${isMobile ? Math.min(sidebarWidth, 300) : sidebarWidth}px` }}
@@ -112,7 +112,7 @@ export const Sidebar = () => {
         href="https://github.com/Tendo33/MyNebula"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 px-4 h-12 mt-2 cursor-pointer select-none transition-colors hover:bg-bg-hover mx-2 rounded-sm mb-2"
+        className="flex items-center gap-2 px-4 h-12 mt-2 cursor-pointer select-none transition-colors hover:bg-white mx-2 rounded-lg mb-2 border border-transparent hover:border-border-light"
       >
         <div className="w-5 h-5 flex items-center justify-center text-text-main">
            <Github className="w-4 h-4" />
@@ -135,18 +135,27 @@ export const Sidebar = () => {
             }}
             className={({ isActive }) =>
               clsx(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 group select-none',
+                'relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 group select-none border',
                 isActive
-                  ? 'bg-bg-hover text-text-main font-medium shadow-sm'
-                  : 'text-text-muted hover:bg-bg-hover hover:text-text-main hover:shadow-sm'
+                  ? 'bg-white text-text-main font-medium shadow-sm border-border-light'
+                  : 'text-text-muted border-transparent hover:bg-white/80 hover:text-text-main hover:border-border-light/70'
               )
             }
           >
-            <item.icon className={clsx(
-              "w-4.5 h-4.5",
-              ({ isActive }: { isActive: boolean }) => isActive ? "text-text-main" : "text-text-dim"
-            )} />
-            <span className="truncate">{item.label}</span>
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <span className="absolute left-1 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-action-primary/60" />
+                )}
+                <item.icon
+                  className={clsx(
+                    'h-4 w-4',
+                    isActive ? 'text-text-main' : 'text-text-dim group-hover:text-text-main'
+                  )}
+                />
+                <span className="truncate">{item.label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

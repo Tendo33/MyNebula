@@ -39,9 +39,9 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
     <button
       onClick={onToggle}
       className={clsx(
-        'w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-all text-left',
-        'hover:bg-bg-hover group',
-        isSelected && 'bg-bg-hover ring-1 ring-border-light'
+        'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left border',
+        'hover:bg-white hover:border-border-light/70 group border-transparent',
+        isSelected && 'bg-white ring-1 ring-action-primary/20 border-border-light shadow-sm'
       )}
     >
       {/* Color indicator */}
@@ -70,7 +70,7 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
             {cluster.keywords.slice(0, 3).map((keyword, idx) => (
               <span
                 key={idx}
-                className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded"
+                className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded-full"
               >
                 {keyword}
               </span>
@@ -148,7 +148,7 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
 
   return (
     <div className={clsx(
-      'bg-white border border-border-light rounded-lg shadow-sm overflow-hidden',
+      'bg-white/90 border border-border-light rounded-xl shadow-sm overflow-hidden backdrop-blur-sm',
       'transition-all duration-300',
       className
     )}>

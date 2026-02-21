@@ -57,13 +57,13 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   return (
     <div className={clsx('relative group', className)}>
       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <Search className="h-4 w-4 text-text-dim group-focus-within:text-text-main transition-colors" />
+        <Search className="h-4 w-4 text-text-dim group-focus-within:text-action-primary transition-colors" />
       </div>
       <input
         type="text"
         value={localValue}
         onChange={handleChange}
-        className="block w-full pl-9 pr-8 py-2 h-9 border border-border-light rounded-md leading-5 bg-bg-sidebar text-text-main placeholder-text-dim focus:outline-none focus:bg-white focus:ring-2 focus:ring-action-primary/20 focus:border-action-primary text-sm shadow-sm transition-all duration-200"
+        className="block w-full pl-9 pr-8 py-2 h-9 border border-border-light rounded-lg leading-5 bg-white/85 text-text-main placeholder-text-dim focus:outline-none focus:bg-white focus:ring-2 focus:ring-action-primary/15 focus:border-action-primary text-sm shadow-sm hover:border-gray-300"
         placeholder={placeholder || t('dashboard.search_placeholder')}
         {...props}
       />
@@ -71,7 +71,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         <button
           type="button"
           onClick={handleClear}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-dim hover:text-text-main transition-colors"
+          className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-dim hover:text-text-main"
         >
           <X className="h-4 w-4" />
         </button>

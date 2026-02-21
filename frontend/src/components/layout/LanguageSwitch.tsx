@@ -12,10 +12,10 @@ export const LanguageSwitch = () => {
   return (
     <button
       onClick={toggleLanguage}
-      className="h-8 px-3 rounded-md text-xs font-medium border border-border-light bg-white hover:bg-bg-hover text-text-main transition-colors min-w-[96px] text-center shadow-sm inline-flex items-center justify-center gap-1.5"
+      className="h-8 px-3 rounded-lg text-xs font-semibold border border-border-light bg-white/90 hover:bg-white text-text-main min-w-[96px] text-center shadow-sm inline-flex items-center justify-center gap-1.5"
       title={t('settings.language')}
     >
-      <Globe className="w-3.5 h-3.5" />
+      <Globe className="w-3.5 h-3.5 text-text-dim" />
       <span>{i18n.language === 'en' ? 'EN' : '中'}</span>
     </button>
   );

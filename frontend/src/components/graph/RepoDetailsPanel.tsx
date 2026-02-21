@@ -37,17 +37,17 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-bg-hover transition-colors text-left group"
+      className="w-full flex items-start gap-3 p-3 rounded-xl border border-transparent hover:bg-white hover:border-border-light/70 hover:shadow-sm transition-all text-left group"
     >
       {/* Avatar */}
       {repo.owner_avatar_url ? (
         <img
           src={repo.owner_avatar_url}
           alt={repo.owner}
-          className="w-8 h-8 rounded-md border border-border-light flex-shrink-0"
+          className="w-9 h-9 rounded-lg border border-border-light flex-shrink-0"
         />
       ) : (
-        <div className="w-8 h-8 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
           <span className="text-gray-500 text-xs font-medium">
             {repo.owner?.charAt(0).toUpperCase()}
           </span>
@@ -56,28 +56,36 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-text-main truncate">{repo.name}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-semibold text-text-main truncate">{repo.name}</span>
           {repo.language && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded text-gray-600 flex-shrink-0">
+            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded-full text-gray-600 flex-shrink-0">
               {repo.language}
             </span>
           )}
         </div>
-        <p className="text-xs text-text-muted truncate mt-0.5">
+        <p className="text-xs text-text-muted line-clamp-1 mt-0.5">
           {repo.description || repo.ai_summary || t('data.no_description')}
         </p>
-        {matchReason && (
-          <span className="text-[10px] text-purple-600 mt-0.5">{matchReason}</span>
-        )}
-        {score != null && (
-          <span className="text-[10px] text-sky-600 mt-0.5">Score: {(score * 100).toFixed(1)}%</span>
+        {(matchReason || score != null) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {matchReason && (
+              <span className="max-w-full text-[10px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 line-clamp-1">
+                {matchReason}
+              </span>
+            )}
+            {score != null && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700">
+                {(score * 100).toFixed(1)}%
+              </span>
+            )}
+          </div>
         )}
       </div>
 
       {/* Stars + Arrow */}
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <div className="flex items-center gap-1 text-xs text-text-dim">
+      <div className="flex flex-col items-end justify-between h-full gap-2 flex-shrink-0 pl-1">
+        <div className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
           <Star className="w-3 h-3 text-orange-400" fill="currentColor" />
           <span>{repo.stargazers_count >= 1000 ? `${(repo.stargazers_count / 1000).toFixed(1)}k` : repo.stargazers_count}</span>
         </div>
@@ -212,9 +220,9 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   };
 
   return (
-    <div className="absolute inset-y-0 right-0 w-full max-w-full sm:static sm:w-96 h-full bg-white border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20">
+    <div className="absolute inset-y-0 right-0 w-full max-w-full sm:static sm:w-[25rem] h-full bg-white/95 backdrop-blur-sm border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20">
       {/* Header with Avatar */}
-      <div className="relative p-5 border-b border-border-light bg-bg-sidebar">
+      <div className="relative p-5 border-b border-border-light bg-gradient-to-b from-bg-sidebar to-white">
         <div className="flex items-start gap-3 pr-8">
             {/* Owner Avatar */}
             {node.owner_avatar_url ? (
@@ -254,7 +262,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       </div>
 
       {/* Content */}
-      <div className="p-5 space-y-5 flex-1 overflow-y-auto">
+      <div className="p-5 flex flex-col gap-4 flex-1 overflow-y-auto">
 
         {/* Quick Actions */}
         <div className="flex items-center gap-2">
@@ -262,7 +270,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             href={node.html_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-text-main hover:bg-black text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-text-main hover:bg-black text-white text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
           >
             <ExternalLink className="w-4 h-4" />
             <span>GitHub</span>
@@ -273,7 +281,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             href={`https://deepwiki.com/${node.full_name}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
             title="View on DeepWiki"
           >
             <img src="https://deepwiki.com/favicon.ico" alt="DeepWiki" className="w-4 h-4 rounded-sm bg-white" />
@@ -285,7 +293,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             href={`https://zread.ai/${node.full_name}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-all shadow hover:shadow-md"
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
             title="View on zRead"
           >
             <img src="https://zread.ai/favicon.ico" alt="zRead" className="w-4 h-4 rounded-sm bg-white" />
@@ -305,7 +313,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-3 p-3 rounded-md bg-white border border-border-light shadow-sm">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-white border border-border-light shadow-sm">
                 <div className="p-1.5 bg-orange-50 rounded text-orange-500">
                     <Star className="w-4 h-4" fill="currentColor" />
                 </div>
@@ -314,7 +322,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                     <span className="text-xs text-text-muted capitalize">{t('repoDetails.stars')}</span>
                 </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-md bg-white border border-border-light shadow-sm">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-white border border-border-light shadow-sm">
                  <div className="p-1.5 bg-blue-50 rounded text-blue-500">
                     <Code className="w-4 h-4" />
                 </div>
@@ -373,7 +381,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>{t('repoDetails.aiInsight', 'AI Insight')}</span>
             </div>
-            <div className="bg-bg-sidebar p-3 rounded-md border border-border-light/50">
+            <div className="bg-bg-sidebar p-3 rounded-lg border border-border-light/50">
                  <p className="text-sm text-text-main leading-relaxed">
                     {node.ai_summary || t('repoDetails.no_ai_summary')}
                 </p>
@@ -381,7 +389,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
         </div>
 
         {/* Related Repositories with Tabs */}
-        <div className="space-y-2">
+        <div className="space-y-2 flex flex-col flex-1 min-h-[16rem]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-teal-600 uppercase tracking-wider">
               <Link2 className="w-3.5 h-3.5" />
@@ -390,57 +398,57 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           </div>
 
           {/* Dimension Tabs */}
-          <div className="flex items-center gap-1 p-1 bg-bg-sidebar rounded-lg">
+          <div className="flex items-center gap-1 p-1.5 bg-bg-sidebar/80 rounded-xl border border-border-light/60">
             <button
               onClick={() => setActiveTab('similar')}
               className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors',
+                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
                 activeTab === 'similar'
-                  ? 'bg-white shadow-sm text-text-main font-medium'
+                  ? 'bg-white shadow-sm text-text-main font-medium ring-1 ring-border-light/70'
                   : 'text-text-muted hover:text-text-main'
               )}
             >
               <Link2 className="w-3 h-3" />
               <span>{t('repoDetails.similar', 'Similar')}</span>
               {tabCounts.similar > 0 && (
-                <span className="text-[10px] text-text-dim">({tabCounts.similar})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim">({tabCounts.similar})</span>
               )}
             </button>
             <button
               onClick={() => setActiveTab('sameTags')}
               className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors',
+                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
                 activeTab === 'sameTags'
-                  ? 'bg-white shadow-sm text-text-main font-medium'
+                  ? 'bg-white shadow-sm text-text-main font-medium ring-1 ring-border-light/70'
                   : 'text-text-muted hover:text-text-main'
               )}
             >
               <Tag className="w-3 h-3" />
               <span>{t('repoDetails.sameTags', 'Tags')}</span>
               {tabCounts.sameTags > 0 && (
-                <span className="text-[10px] text-text-dim">({tabCounts.sameTags})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim">({tabCounts.sameTags})</span>
               )}
             </button>
             <button
               onClick={() => setActiveTab('sameLang')}
               className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors',
+                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
                 activeTab === 'sameLang'
-                  ? 'bg-white shadow-sm text-text-main font-medium'
+                  ? 'bg-white shadow-sm text-text-main font-medium ring-1 ring-border-light/70'
                   : 'text-text-muted hover:text-text-main'
               )}
             >
               <Code className="w-3 h-3" />
               <span>{t('repoDetails.sameLang', 'Lang')}</span>
               {tabCounts.sameLang > 0 && (
-                <span className="text-[10px] text-text-dim">({tabCounts.sameLang})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim">({tabCounts.sameLang})</span>
               )}
             </button>
           </div>
 
           {/* Related Repos List */}
           {currentRelatedRepos.length > 0 ? (
-            <div className="bg-bg-sidebar rounded-lg border border-border-light/50 divide-y divide-border-light/50 max-h-56 overflow-y-auto">
+            <div className="flex-1 min-h-0 bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 overflow-y-auto p-1.5">
               {currentRelatedRepos.map((repo: any) => (
                 <RelatedRepoItem
                   key={repo.id}
@@ -452,7 +460,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               ))}
             </div>
           ) : (
-            <div className="py-6 text-center text-sm text-text-muted bg-bg-sidebar rounded-lg border border-border-light/50">
+            <div className="flex-1 min-h-0 px-4 py-6 text-center text-sm text-text-muted bg-bg-sidebar/60 rounded-xl border border-border-light/60 flex items-center justify-center">
               {activeTab === 'similar' && (
                 similarLoading
                   ? t('common.loading', 'Loading...')

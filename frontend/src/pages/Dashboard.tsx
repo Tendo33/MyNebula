@@ -72,8 +72,8 @@ const getLanguageColor = (language: string): string => {
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue, trend, onClick }) => (
   <div
-    className={`bg-white p-6 rounded-lg border border-border-light shadow-sm flex items-start justify-between transition-all ${
-      onClick ? 'cursor-pointer hover:shadow-md hover:border-gray-300' : ''
+    className={`bg-white/90 p-6 rounded-xl border border-border-light shadow-sm flex items-start justify-between transition-all backdrop-blur-sm ${
+      onClick ? 'cursor-pointer hover:shadow-md hover:border-gray-300 hover:-translate-y-0.5' : ''
     }`}
     onClick={onClick}
   >
@@ -125,7 +125,7 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
   const { t } = useTranslation();
   return (
     <div
-      className="p-4 rounded-lg border border-border-light bg-white hover:shadow-md hover:border-gray-300 transition-all cursor-pointer"
+      className="p-4 rounded-xl border border-border-light bg-white/90 hover:shadow-md hover:border-gray-300 hover:-translate-y-0.5 transition-all cursor-pointer backdrop-blur-sm"
       onClick={onClick}
     >
       <div className="flex items-start gap-3">
@@ -141,7 +141,7 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
               {keywords.slice(0, 4).map((keyword, idx) => (
                 <span
                   key={idx}
-                  className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded"
+                  className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded-full"
                 >
                   {keyword}
                 </span>
@@ -314,7 +314,7 @@ const Dashboard = () => {
               {/* Charts Row */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 {/* Language Distribution */}
-                <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
+                <div className="bg-white/90 p-6 rounded-xl border border-border-light shadow-sm backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-semibold text-text-main">
                       {t('dashboard.language_distribution')}
@@ -346,7 +346,7 @@ const Dashboard = () => {
                 {/* Right Column: Activity + Topics */}
                 <div className="flex flex-col gap-6">
                   {/* Activity Timeline */}
-                  <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
+                  <div className="bg-white/90 p-6 rounded-xl border border-border-light shadow-sm backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-text-muted" />
@@ -414,7 +414,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Popular Topics */}
-                <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
+                <div className="bg-white/90 p-6 rounded-xl border border-border-light shadow-sm backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <Tag className="w-4 h-4 text-text-muted" />
