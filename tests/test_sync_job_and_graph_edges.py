@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pytest
@@ -28,6 +28,13 @@ def test_estimate_eta_seconds_returns_none_for_invalid_progress():
 
 def test_estimate_eta_seconds_estimates_remaining_time():
     started_at = datetime.utcnow() - timedelta(seconds=120)
+    eta = _estimate_eta_seconds(started_at, 50.0)
+    assert eta is not None
+    assert 100 <= eta <= 140
+
+
+def test_estimate_eta_seconds_handles_timezone_aware_started_at():
+    started_at = datetime.now(timezone.utc) - timedelta(seconds=120)
     eta = _estimate_eta_seconds(started_at, 50.0)
     assert eta is not None
     assert 100 <= eta <= 140

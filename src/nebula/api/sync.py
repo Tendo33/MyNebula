@@ -67,8 +67,12 @@ def _estimate_eta_seconds(
     if started_at is None or progress_percent <= 0 or progress_percent >= 100:
         return None
 
-    now_ts = now or datetime.utcnow()
-    elapsed_seconds = (now_ts - started_at).total_seconds()
+    started_at_utc = _to_utc(started_at)
+    now_ts = _to_utc(now) if now is not None else datetime.now(timezone.utc)
+    if started_at_utc is None:
+        return None
+
+    elapsed_seconds = (now_ts - started_at_utc).total_seconds()
     if elapsed_seconds <= 0:
         return None
 
