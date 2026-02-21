@@ -56,6 +56,7 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
+      - LLM_OUTPUT_LANGUAGE=${LLM_OUTPUT_LANGUAGE:-zh}
 
       # ---------- 同步配置 ----------
       - SYNC_BATCH_SIZE=${SYNC_BATCH_SIZE:-100}
