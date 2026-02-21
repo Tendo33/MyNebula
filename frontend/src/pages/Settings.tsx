@@ -269,15 +269,43 @@ const Settings = () => {
     setSyncSteps(createFullRefreshSteps());
   };
 
+  const normalizeFullRefreshPhase = (phase: string): 'reset' | 'stars' | 'embeddings' | 'clustering' | null => {
+    switch (phase) {
+      case 'reset':
+        return 'reset';
+      case 'stars':
+      case 'star':
+        return 'stars';
+      case 'embedding':
+      case 'embeddings':
+      case 'summary':
+      case 'summaries':
+        return 'embeddings';
+      case 'cluster':
+      case 'clustering':
+      case 'complete':
+      case 'completed':
+        return 'clustering';
+      case 'full_refresh':
+      default:
+        return null;
+    }
+  };
+
   const updateFullRefreshProgress = (job: SyncJobStatusResponse) => {
     const phaseOrder = ['reset', 'stars', 'embeddings', 'clustering'] as const;
-    const normalizedPhase =
-      job.phase === 'cluster'
-        ? 'clustering'
-        : job.phase === 'complete'
-        ? 'clustering'
-        : job.phase;
-    const currentIndex = phaseOrder.findIndex((phase) => phase === normalizedPhase);
+    const normalizedPhase = normalizeFullRefreshPhase(job.phase);
+    const phaseIndex =
+      normalizedPhase !== null ? phaseOrder.findIndex((phase) => phase === normalizedPhase) : -1;
+    const inferredIndex = Math.min(
+      phaseOrder.length - 1,
+      Math.max(0, Math.floor(Math.max(0, Math.min(99.999, job.progress_percent)) / 25))
+    );
+    const currentIndex =
+      job.status === 'running' || job.status === 'pending'
+        ? Math.max(phaseIndex, inferredIndex)
+        : phaseIndex;
+
     if (currentIndex >= 0) {
       setSyncStep(t(`sync.step_${phaseOrder[currentIndex]}_label`, phaseOrder[currentIndex]));
     }
@@ -292,7 +320,11 @@ const Settings = () => {
           if (currentIndex >= 0 && index < currentIndex) {
             return { ...step, status: 'completed', progress: 100, error: undefined };
           }
-          if (step.id === normalizedPhase || (currentIndex < 0 && index === previous.length - 1)) {
+          if (
+            step.id === normalizedPhase ||
+            (normalizedPhase === null && currentIndex >= 0 && step.id === phaseOrder[currentIndex]) ||
+            (currentIndex < 0 && index === previous.length - 1)
+          ) {
             return {
               ...step,
               status: 'failed',
