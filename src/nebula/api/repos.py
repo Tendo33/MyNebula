@@ -5,7 +5,10 @@ Handles repository CRUD and semantic search operations.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +21,13 @@ from nebula.core.relevance import (
     cosine_similarity,
     merge_repo_tags,
 )
-from nebula.db import RepoRelatedFeedback, StarredRepo, User, get_db
+from nebula.db import (
+    RepoRelatedCache,
+    RepoRelatedFeedback,
+    StarredRepo,
+    User,
+    get_db,
+)
 from nebula.schemas.repo import (
     RelatedFeedbackRequest,
     RelatedFeedbackResponse,
@@ -33,6 +42,7 @@ from nebula.utils import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
+RELATED_CACHE_VERSION = "related-v1"
 
 
 async def get_default_user(db: AsyncSession) -> User:
@@ -121,6 +131,117 @@ def _rank_related_candidates(
         reverse=True,
     )
     return ranked[:limit]
+
+
+def _build_related_cache_key(min_score: float, min_semantic: float, limit: int) -> str:
+    return (
+        f"{RELATED_CACHE_VERSION}"
+        f"|ms={min_score:.4f}"
+        f"|sem={min_semantic:.4f}"
+        f"|limit={limit}"
+    )
+
+
+def _serialize_related_results(
+    ranked: list[RelatedRepoResponse],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "repo_id": item.repo.id,
+            "score": item.score,
+            "reasons": item.reasons,
+            "components": {
+                "semantic": item.components.semantic,
+                "tag_overlap": item.components.tag_overlap,
+                "same_star_list": item.components.same_star_list,
+                "same_language": item.components.same_language,
+            },
+        }
+        for item in ranked
+    ]
+
+
+def _deserialize_related_results(
+    items: Any,
+    repo_by_id: dict[int, StarredRepo],
+    limit: int,
+) -> list[RelatedRepoResponse]:
+    if not isinstance(items, list):
+        return []
+
+    restored: list[RelatedRepoResponse] = []
+    for raw_item in items:
+        if not isinstance(raw_item, dict):
+            continue
+
+        repo_id = raw_item.get("repo_id")
+        if not isinstance(repo_id, int):
+            continue
+
+        repo = repo_by_id.get(repo_id)
+        if repo is None:
+            continue
+
+        components = raw_item.get("components")
+        if not isinstance(components, dict):
+            continue
+
+        reasons = raw_item.get("reasons")
+        if not isinstance(reasons, list):
+            reasons = []
+
+        try:
+            restored.append(
+                RelatedRepoResponse(
+                    repo=RepoResponse.model_validate(repo),
+                    score=float(raw_item.get("score", 0.0)),
+                    reasons=[str(reason) for reason in reasons],
+                    components=RelatedScoreComponents(
+                        semantic=float(components.get("semantic", 0.0)),
+                        tag_overlap=float(components.get("tag_overlap", 0.0)),
+                        same_star_list=float(components.get("same_star_list", 0.0)),
+                        same_language=float(components.get("same_language", 0.0)),
+                    ),
+                )
+            )
+        except Exception:
+            continue
+
+        if len(restored) >= limit:
+            break
+
+    return restored
+
+
+def _build_related_cache_upsert_stmt(
+    *,
+    user_id: int,
+    anchor_repo_id: int,
+    cache_key: str,
+    items: list[dict[str, Any]],
+    anchor_updated_at: Any,
+    user_last_sync_at: Any,
+):
+    return pg_insert(RepoRelatedCache).values(
+        user_id=user_id,
+        anchor_repo_id=anchor_repo_id,
+        cache_key=cache_key,
+        items=items,
+        anchor_updated_at=anchor_updated_at,
+        user_last_sync_at=user_last_sync_at,
+    ).on_conflict_do_update(
+        index_elements=[
+            RepoRelatedCache.user_id,
+            RepoRelatedCache.anchor_repo_id,
+            RepoRelatedCache.cache_key,
+        ],
+        set_={
+            "items": items,
+            "anchor_updated_at": anchor_updated_at,
+            "user_last_sync_at": user_last_sync_at,
+            "updated_at": func.now(),
+        },
+    )
 
 
 @router.get("", response_model=RepoListResponse)
@@ -257,6 +378,55 @@ async def get_related_repositories(
     if anchor_repo.embedding is None:
         return []
 
+    cache_key = _build_related_cache_key(
+        min_score=min_score,
+        min_semantic=min_semantic,
+        limit=limit,
+    )
+    cache_result = await db.execute(
+        select(RepoRelatedCache).where(
+            RepoRelatedCache.user_id == user.id,
+            RepoRelatedCache.anchor_repo_id == anchor_repo.id,
+            RepoRelatedCache.cache_key == cache_key,
+        )
+    )
+    cache_entry = cache_result.scalar_one_or_none()
+
+    if (
+        cache_entry is not None
+        and cache_entry.user_last_sync_at == user.last_sync_at
+        and cache_entry.anchor_updated_at == anchor_repo.updated_at
+    ):
+        cached_items = (
+            cache_entry.items
+            if isinstance(cache_entry.items, list)
+            else []
+        )
+        if not cached_items:
+            return []
+        cached_repo_ids = [
+            item.get("repo_id")
+            for item in cached_items
+            if isinstance(item, dict) and isinstance(item.get("repo_id"), int)
+        ]
+        if cached_repo_ids:
+            cached_repo_result = await db.execute(
+                select(StarredRepo).where(
+                    StarredRepo.user_id == user.id,
+                    StarredRepo.id.in_(cached_repo_ids),
+                )
+            )
+            repo_by_id = {
+                repo.id: repo for repo in cached_repo_result.scalars().all()
+            }
+            restored = _deserialize_related_results(
+                items=cached_items,
+                repo_by_id=repo_by_id,
+                limit=limit,
+            )
+            if restored:
+                return restored
+
     candidate_result = await db.execute(
         select(StarredRepo).where(
             StarredRepo.user_id == user.id,
@@ -267,13 +437,26 @@ async def get_related_repositories(
     )
     candidates = candidate_result.scalars().all()
 
-    return _rank_related_candidates(
+    ranked = _rank_related_candidates(
         anchor_repo=anchor_repo,
         candidates=candidates,
         min_score=min_score,
         min_semantic=min_semantic,
         limit=limit,
     )
+    serialized_items = _serialize_related_results(ranked)
+    await db.execute(
+        _build_related_cache_upsert_stmt(
+            user_id=user.id,
+            anchor_repo_id=anchor_repo.id,
+            cache_key=cache_key,
+            items=serialized_items,
+            anchor_updated_at=anchor_repo.updated_at,
+            user_last_sync_at=user.last_sync_at,
+        )
+    )
+
+    return ranked
 
 
 @router.post(

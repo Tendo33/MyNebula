@@ -35,16 +35,20 @@ const GraphPage = () => {
   // Handle URL parameter for node selection
   useEffect(() => {
     const nodeId = searchParams.get('node');
-    if (nodeId && rawData?.nodes) {
-      const node = rawData.nodes.find(n => n.id === parseInt(nodeId, 10));
+    if (!nodeId || !rawData?.nodes) return;
+
+    const parsedNodeId = Number.parseInt(nodeId, 10);
+    if (Number.isFinite(parsedNodeId)) {
+      const node = rawData.nodes.find(n => n.id === parsedNodeId);
       if (node) {
         setSelectedNode(node);
-        // Clear the URL parameter after selecting
-        const nextParams = new URLSearchParams(searchParams);
-        nextParams.delete('node');
-        setSearchParams(nextParams, { replace: true });
       }
     }
+
+    // Clear URL parameter regardless of whether node exists to avoid stale links.
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('node');
+    setSearchParams(nextParams, { replace: true });
   }, [searchParams, rawData, setSelectedNode, setSearchParams]);
 
   // Handle URL parameter for cluster filter
@@ -83,6 +87,15 @@ const GraphPage = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Keep details panel in sync with visible graph nodes after filters change.
+  useEffect(() => {
+    if (!selectedNode || !filteredData) return;
+    const stillVisible = filteredData.nodes.some((n) => n.id === selectedNode.id);
+    if (!stillVisible) {
+      setSelectedNode(null);
+    }
+  }, [filteredData, selectedNode, setSelectedNode]);
 
   // Close details panel
   const handleCloseDetails = useCallback(() => {

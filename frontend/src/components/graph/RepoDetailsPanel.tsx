@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GraphNode } from '../../types';
 import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart, Link2, ChevronRight } from 'lucide-react';
@@ -20,6 +20,7 @@ interface RelatedRepoItemProps {
 
 type RelatedTab = 'similar' | 'sameTags' | 'sameLang';
 type RelatedGraphNode = GraphNode & { _score: number; _matchReason: string };
+type CachedRelatedItem = { repoId: number; score: number; matchReason: string };
 
 const normalizeTag = (tag: string): string => {
   return tag
@@ -102,11 +103,45 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   const [remoteSimilar, setRemoteSimilar] = useState<RelatedGraphNode[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
+  const similarCacheRef = useRef<Map<string, CachedRelatedItem[]>>(new Map());
+  const similarInFlightRef = useRef<Map<string, Promise<CachedRelatedItem[]>>>(new Map());
 
   useEffect(() => {
     let disposed = false;
     if (!rawData) {
       setRemoteSimilar([]);
+      setSimilarLoading(false);
+      setSimilarError(null);
+      return;
+    }
+
+    if (activeTab !== 'similar') {
+      setSimilarLoading(false);
+      setSimilarError(null);
+      return;
+    }
+
+    const cacheKey = `${node.id}:${settings.relatedMinSemantic.toFixed(3)}`;
+    const byId = new Map(rawData.nodes.map((n) => [n.id, n]));
+    const mapCachedItems = (items: CachedRelatedItem[]): RelatedGraphNode[] => {
+      const mapped: RelatedGraphNode[] = [];
+      for (const item of items) {
+        const inGraph = byId.get(item.repoId);
+        if (!inGraph) continue;
+        mapped.push({
+          ...inGraph,
+          _score: item.score,
+          _matchReason: item.matchReason,
+        });
+      }
+      return mapped;
+    };
+
+    const cached = similarCacheRef.current.get(cacheKey);
+    if (cached) {
+      setRemoteSimilar(mapCachedItems(cached));
+      setSimilarLoading(false);
+      setSimilarError(null);
       return;
     }
 
@@ -114,25 +149,31 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       try {
         setSimilarLoading(true);
         setSimilarError(null);
-        const items = await getRelatedRepos(node.id, {
-          limit: 20,
-          min_score: 0.4,
-          min_semantic: settings.relatedMinSemantic,
-        });
-        if (disposed) return;
+        setRemoteSimilar([]);
 
-        const byId = new Map(rawData.nodes.map((n) => [n.id, n]));
-        const mapped: RelatedGraphNode[] = [];
-        for (const item of items) {
-          const inGraph = byId.get(item.repo.id);
-          if (!inGraph) continue;
-          mapped.push({
-            ...inGraph,
-            _score: item.score,
-            _matchReason: item.reasons.join(' · '),
+        let request = similarInFlightRef.current.get(cacheKey);
+        if (!request) {
+          request = getRelatedRepos(node.id, {
+            limit: 20,
+            min_score: 0.4,
+            min_semantic: settings.relatedMinSemantic,
+          }).then((items) => {
+            const compact = items.map((item) => ({
+              repoId: item.repo.id,
+              score: item.score,
+              matchReason: item.reasons.join(' · '),
+            }));
+            similarCacheRef.current.set(cacheKey, compact);
+            return compact;
+          }).finally(() => {
+            similarInFlightRef.current.delete(cacheKey);
           });
+          similarInFlightRef.current.set(cacheKey, request);
         }
-        setRemoteSimilar(mapped);
+
+        const items = await request;
+        if (disposed) return;
+        setRemoteSimilar(mapCachedItems(items));
       } catch (err) {
         if (!disposed) {
           setSimilarError(err instanceof Error ? err.message : 'Failed to load related repos');
@@ -149,7 +190,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
     return () => {
       disposed = true;
     };
-  }, [node.id, rawData, settings.relatedMinSemantic]);
+  }, [activeTab, node.id, rawData, settings.relatedMinSemantic]);
 
 
   // Get related repos by different dimensions
@@ -466,7 +507,11 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               {activeTab === 'similar' && (
                 similarLoading
                   ? t('common.loading', 'Loading...')
-                  : (similarError ? t('repoDetails.noSimilar', 'No similar repos found') : t('repoDetails.noSimilar', 'No similar repos found'))
+                  : (
+                      similarError
+                        ? t('repoDetails.similarLoadFailed', 'Failed to load similar repos')
+                        : t('repoDetails.noSimilar', 'No similar repos found')
+                    )
               )}
               {activeTab === 'sameTags' && t('repoDetails.noSameTags', 'No repos with same tags')}
               {activeTab === 'sameLang' && t('repoDetails.noSameLang', 'No repos with same language')}

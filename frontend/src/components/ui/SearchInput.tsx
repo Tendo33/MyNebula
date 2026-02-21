@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +22,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 }) => {
   const { t } = useTranslation();
   const [localValue, setLocalValue] = useState(controlledValue || '');
+  const skipNextDebounceRef = useRef(false);
 
   // Sync with controlled value
   useEffect(() => {
@@ -33,6 +34,10 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   // Debounced search callback
   useEffect(() => {
     if (!onSearch) return;
+    if (skipNextDebounceRef.current) {
+      skipNextDebounceRef.current = false;
+      return;
+    }
 
     const timer = setTimeout(() => {
       onSearch(localValue);
@@ -48,6 +53,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   // Handle clear
   const handleClear = useCallback(() => {
+    skipNextDebounceRef.current = true;
     setLocalValue('');
     if (onSearch) {
       onSearch('');

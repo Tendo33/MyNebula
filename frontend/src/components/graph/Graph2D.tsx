@@ -611,6 +611,33 @@ const Graph2D: React.FC = () => {
     });
   }, [clusterGroups, processedData.nodes]);
 
+  const focusNodeById = useCallback((nodeId: number, duration = 900) => {
+    if (!graphRef.current) return;
+
+    const liveNode = processedData.nodes.find((node) => node.id === nodeId);
+    if (!liveNode || liveNode.x === undefined || liveNode.y === undefined) return;
+
+    graphRef.current.centerAt(liveNode.x, liveNode.y, duration);
+    graphRef.current.zoom(3, duration);
+  }, [processedData.nodes]);
+
+  useEffect(() => {
+    if (!selectedNode) return;
+
+    let frame1 = 0;
+    let frame2 = 0;
+    frame1 = window.requestAnimationFrame(() => {
+      frame2 = window.requestAnimationFrame(() => {
+        focusNodeById(selectedNode.id, 800);
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame1);
+      window.cancelAnimationFrame(frame2);
+    };
+  }, [selectedNode?.id, focusNodeById]);
+
   // Handle node click
   const handleNodeClick = useCallback((node: any) => {
     const processedNode = node as ProcessedNode;
@@ -621,19 +648,21 @@ const Graph2D: React.FC = () => {
       setSelectedNode(fullNode);
     }
 
-    // Zoom to node
-    if (graphRef.current && processedNode.x !== undefined && processedNode.y !== undefined) {
-      graphRef.current.centerAt(processedNode.x, processedNode.y, 1000);
-      graphRef.current.zoom(3, 1000);
-    }
-  }, [filteredData, setSelectedNode]);
+    focusNodeById(processedNode.id, 1000);
+  }, [filteredData, setSelectedNode, focusNodeById]);
 
   // Handle node hover
   const handleNodeHover = useCallback((node: any) => {
     setLocalHoverNode(node as ProcessedNode | null);
     setHoveredNode(node ? filteredData?.nodes.find(n => n.id === node.id) || null : null);
-    document.body.style.cursor = node ? 'pointer' : 'default';
+    document.body.style.cursor = node ? 'pointer' : '';
   }, [filteredData, setHoveredNode]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = '';
+    };
+  }, []);
 
   // Handle background click (deselect)
   const handleBackgroundClick = useCallback(() => {

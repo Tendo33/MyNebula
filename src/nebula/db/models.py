@@ -394,6 +394,53 @@ class RepoRelatedFeedback(Base):
         )
 
 
+class RepoRelatedCache(Base):
+    """Cached related-repository recommendations by anchor repository and params."""
+
+    __tablename__ = "repo_related_caches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    anchor_repo_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("starred_repos.id"), nullable=False, index=True
+    )
+    cache_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    items: Mapped[list[dict]] = mapped_column(JSONB, nullable=False, default=list)
+    anchor_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    user_last_sync_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_repo_related_cache_unique_key",
+            "user_id",
+            "anchor_repo_id",
+            "cache_key",
+            unique=True,
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            "<RepoRelatedCache("
+            f"user_id={self.user_id}, "
+            f"anchor_repo_id={self.anchor_repo_id}, "
+            f"cache_key={self.cache_key}"
+            ")>"
+        )
+
+
 class SyncTask(Base):
     """Synchronization task tracking model."""
 
