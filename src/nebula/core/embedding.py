@@ -10,9 +10,7 @@ OpenAI-compatible APIs, supporting providers like:
 - Any OpenAI-compatible endpoint
 """
 
-import numpy as np
 from openai import AsyncOpenAI
-from pydantic import BaseModel
 
 from nebula.core.config import EmbeddingSettings, get_embedding_settings
 from nebula.utils import get_logger
@@ -45,15 +43,6 @@ def _normalize_semantic_tags(tags: list[str] | None) -> list[str]:
             normalized_tags.append(candidate)
 
     return normalized_tags
-
-
-class EmbeddingResult(BaseModel):
-    """Result of an embedding operation."""
-
-    text: str
-    embedding: list[float]
-    model: str
-    dimensions: int
 
 
 class EmbeddingService:
@@ -210,33 +199,6 @@ class EmbeddingService:
             parts.append(readme_summary)
 
         return "\n".join(parts)
-
-    async def compute_similarity(
-        self,
-        embedding1: list[float],
-        embedding2: list[float],
-    ) -> float:
-        """Compute cosine similarity between two embeddings.
-
-        Args:
-            embedding1: First embedding vector
-            embedding2: Second embedding vector
-
-        Returns:
-            Cosine similarity score (0 to 1)
-        """
-        vec1 = np.array(embedding1)
-        vec2 = np.array(embedding2)
-
-        # Cosine similarity
-        dot_product = np.dot(vec1, vec2)
-        norm1 = np.linalg.norm(vec1)
-        norm2 = np.linalg.norm(vec2)
-
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
-
-        return float(dot_product / (norm1 * norm2))
 
     async def close(self) -> None:
         """Close the client connection."""

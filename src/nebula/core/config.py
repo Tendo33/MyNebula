@@ -175,7 +175,7 @@ class AppSettings(BaseSettings):
 
     # Basic settings
     app_name: str = Field(default="mynebula", description="Application name")
-    app_version: str = Field(default="0.2.6", description="Application version")
+    app_version: str = Field(default="0.2.7", description="Application version")
     debug: bool = Field(
         default=False, description="Debug mode (also controls environment)"
     )

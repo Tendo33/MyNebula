@@ -114,63 +114,6 @@ def resolve_collisions(
     return result
 
 
-def assign_noise_to_nearest_cluster(
-    coords: np.ndarray,
-    labels: np.ndarray,
-    embeddings: np.ndarray | None = None,
-) -> np.ndarray:
-    """Assign noise points (-1 labels) to the nearest cluster.
-
-    Uses K-Nearest Neighbors to find the closest clustered point for each
-    noise point and assigns it to that cluster.
-
-    Args:
-        coords: Nx3 array of 3D coordinates
-        labels: Array of cluster labels (-1 indicates noise)
-        embeddings: Optional original embeddings for distance calculation.
-                   If provided, uses embedding space; otherwise uses 3D coords.
-
-    Returns:
-        Updated labels with no noise points (-1)
-    """
-    labels = labels.copy()
-    noise_mask = labels == -1
-
-    if not noise_mask.any():
-        logger.debug("No noise points to assign")
-        return labels
-
-    noise_count = noise_mask.sum()
-    clustered_mask = ~noise_mask
-
-    if not clustered_mask.any():
-        # All points are noise - assign all to cluster 0
-        logger.warning("All points are noise, assigning all to cluster 0")
-        return np.zeros_like(labels)
-
-    # Use embeddings if available, otherwise use 3D coordinates
-    if embeddings is not None:
-        reference_data = embeddings[clustered_mask]
-        query_data = embeddings[noise_mask]
-        metric = "cosine"
-    else:
-        reference_data = coords[clustered_mask]
-        query_data = coords[noise_mask]
-        metric = "euclidean"
-
-    # Find nearest clustered neighbor for each noise point
-    nn = NearestNeighbors(n_neighbors=1, metric=metric)
-    nn.fit(reference_data)
-    _, indices = nn.kneighbors(query_data)
-
-    # Get the labels of the nearest clustered points
-    clustered_labels = labels[clustered_mask]
-    labels[noise_mask] = clustered_labels[indices.flatten()]
-
-    logger.info(f"Assigned {noise_count} noise points to nearest clusters")
-    return labels
-
-
 def estimate_cluster_count(n_samples: int, min_clusters: int = 3) -> int:
     """Estimate a reasonable number of clusters based on sample count.
 
@@ -922,26 +865,3 @@ def assign_new_repos_incrementally(
         new_coords=new_coords_resolved.tolist(),
         new_labels=new_labels.tolist(),
     )
-
-
-# Global service instance
-_clustering_service: ClusteringService | None = None
-
-
-def get_clustering_service() -> ClusteringService:
-    """Get global clustering service instance."""
-    global _clustering_service
-    if _clustering_service is None:
-        # Stable defaults for mixed user datasets.
-        # - Clustering runs in PCA-reduced embedding space
-        # - target_max_clusters is treated as a soft cap via post-merge
-        _clustering_service = ClusteringService(
-            n_neighbors=40,
-            min_cluster_size=20,
-            min_samples=8,
-            cluster_selection_method="eom",
-            min_clusters=3,
-            target_min_clusters=None,
-            target_max_clusters=8,
-        )
-    return _clustering_service

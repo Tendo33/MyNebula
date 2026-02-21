@@ -4,7 +4,6 @@ Handles GitHub star synchronization and processing tasks.
 """
 
 from datetime import datetime, timedelta, timezone
-from enum import Enum
 from typing import Literal
 from zoneinfo import ZoneInfo
 
@@ -121,13 +120,6 @@ def _is_schedule_due(
         and last_run_local.hour == now_local.hour
         and last_run_local.minute == now_local.minute
     )
-
-
-class SyncMode(str, Enum):
-    """Sync mode for star synchronization."""
-
-    FULL = "full"  # Full sync: fetch all starred repos
-    INCREMENTAL = "incremental"  # Incremental: only fetch new stars since last sync
 
 
 class SyncStatusResponse(BaseModel):

@@ -4,7 +4,8 @@ Provides data for force graph visualization and timeline analytics.
 """
 
 import math
-from typing import Literal, Sequence
+from collections.abc import Sequence
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -47,7 +48,9 @@ CLUSTER_COLORS = [
 
 def _cosine_similarity(vec_a: Sequence[float], vec_b: Sequence[float]) -> float:
     """Compute cosine similarity between two vectors."""
-    if len(vec_a) != len(vec_b) or not vec_a:
+    if vec_a is None or vec_b is None:
+        return 0.0
+    if len(vec_a) != len(vec_b) or len(vec_a) == 0:
         return 0.0
 
     dot = 0.0
@@ -85,7 +88,7 @@ def _build_similarity_edges_knn(
     for i in range(n):
         source_id = repo_ids[i]
         source_embedding = embeddings[i]
-        if not source_embedding:
+        if source_embedding is None or len(source_embedding) == 0:
             continue
 
         candidates: list[tuple[float, int]] = []
@@ -93,7 +96,7 @@ def _build_similarity_edges_knn(
             if i == j:
                 continue
             target_embedding = embeddings[j]
-            if not target_embedding:
+            if target_embedding is None or len(target_embedding) == 0:
                 continue
             similarity = _cosine_similarity(source_embedding, target_embedding)
             if similarity >= min_similarity:

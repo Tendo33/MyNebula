@@ -46,6 +46,47 @@ def test_generate_repo_summary_and_tags_uses_english_prompt_when_configured():
     asyncio.run(run_test())
 
 
+def test_generate_repo_summary_and_tags_includes_full_readme_and_specificity_rules():
+    async def run_test() -> None:
+        service = LLMService(
+            settings=LLMSettings(
+                api_key="test-key",
+                base_url="https://example.com/v1",
+                model="test-model",
+                output_language="en",
+            )
+        )
+        captured: dict[str, str] = {}
+
+        async def fake_complete(
+            prompt: str,
+            system_prompt: str | None = None,
+            max_tokens: int = 2048,
+            temperature: float = 0.3,
+        ) -> str:
+            _ = max_tokens, temperature
+            captured["prompt"] = prompt
+            captured["system_prompt"] = system_prompt or ""
+            return '{"summary": "English summary", "tags": ["agent", "workflow", "cli"]}'
+
+        service.complete = fake_complete  # type: ignore[method-assign]
+
+        readme_content = "A" * 5200 + "TAIL_MARKER"
+
+        await service.generate_repo_summary_and_tags(
+            full_name="owner/repo",
+            description="A CLI agent framework",
+            topics=["agent", "automation"],
+            language="Python",
+            readme_content=readme_content,
+        )
+
+        assert "TAIL_MARKER" in captured["prompt"]
+        assert "Must include at least 2 concrete project details from the input" in captured["prompt"]
+
+    asyncio.run(run_test())
+
+
 def test_generate_repo_summary_and_tags_uses_chinese_prompt_when_configured():
     async def run_test() -> None:
         service = LLMService(

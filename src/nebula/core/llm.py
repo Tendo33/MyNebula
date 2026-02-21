@@ -16,21 +16,12 @@ Used for:
 
 import json_repair
 from openai import AsyncOpenAI
-from pydantic import BaseModel
 
 from nebula.core.config import LLMSettings, get_llm_settings
 from nebula.utils import get_logger
 from nebula.utils.decorator_utils import async_retry_decorator
 
 logger = get_logger(__name__)
-
-
-class LLMResponse(BaseModel):
-    """Response from LLM completion."""
-
-    content: str
-    model: str
-    usage: dict | None = None
 
 
 class LLMService:
@@ -98,53 +89,6 @@ class LLMService:
         )
 
         return response.choices[0].message.content or ""
-
-    @async_retry_decorator(max_retries=3, delay=1.0, backoff=2.0)
-    async def complete_with_metadata(
-        self,
-        prompt: str,
-        system_prompt: str | None = None,
-        max_tokens: int = 2048,
-        temperature: float = 0.7,
-    ) -> LLMResponse:
-        """Generate completion with full response metadata.
-
-        Args:
-            prompt: User prompt
-            system_prompt: Optional system prompt
-            max_tokens: Maximum tokens in response
-            temperature: Sampling temperature (0-2)
-
-        Returns:
-            LLMResponse with content and metadata
-        """
-        messages = []
-
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-
-        messages.append({"role": "user", "content": prompt})
-
-        response = await self.client.chat.completions.create(
-            model=self.settings.model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-
-        usage = None
-        if response.usage:
-            usage = {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
-
-        return LLMResponse(
-            content=response.choices[0].message.content or "",
-            model=response.model,
-            usage=usage,
-        )
 
     async def generate_cluster_info(
         self,
@@ -323,111 +267,6 @@ Requirements:
 
             return generate_cluster_name(repo_names, descriptions, topics)
 
-    async def generate_repo_summary(
-        self,
-        full_name: str,
-        description: str | None,
-        topics: list[str] | None,
-        language: str | None,
-        readme_content: str | None,
-    ) -> str:
-        """Generate a summary for a repository.
-
-        Args:
-            full_name: Repository full name (owner/repo)
-            description: Repository description
-            topics: Repository topics/tags
-            language: Primary programming language
-            readme_content: README content (truncated)
-
-        Returns:
-            Summary text in configured output language
-        """
-        is_chinese = self.settings.output_language == "zh"
-
-        # Build context
-        context_parts = [f"仓库: {full_name}" if is_chinese else f"Repository: {full_name}"]
-
-        if language:
-            context_parts.append(f"语言: {language}" if is_chinese else f"Language: {language}")
-
-        if description:
-            context_parts.append(f"描述: {description}" if is_chinese else f"Description: {description}")
-
-        if topics:
-            context_parts.append(f"标签: {', '.join(topics[:10])}" if is_chinese else f"Topics: {', '.join(topics[:10])}")
-
-        if readme_content:
-            # Truncate README to avoid token limits
-            readme_truncated = readme_content[:4000]
-            context_parts.append(
-                f"README 摘要:\n{readme_truncated}"
-                if is_chinese
-                else f"README excerpt:\n{readme_truncated}"
-            )
-
-        context = "\n".join(context_parts)
-
-        if is_chinese:
-            prompt = f"""请为以下 GitHub 项目生成一段中文摘要（100-150 字）。
-
-{context}
-
-要求:
-1. 涵盖项目的核心功能、技术特点和适用场景
-2. 使用专业、流畅的中文
-3. 不要使用 "这是一个" 开头
-4. 字数控制在 100-150 字之间
-
-直接输出摘要内容，不要有其他文字。"""
-            system_prompt = "你是一个技术文档专家，擅长用清晰的语言描述开源项目。"
-        else:
-            prompt = f"""Write a concise English summary (70-120 words) for the GitHub project below.
-
-{context}
-
-Requirements:
-1. Cover core functionality, technical highlights, and use cases
-2. Use clear and professional language
-3. Avoid starting with "This is a..."
-
-Return only the summary text."""
-            system_prompt = (
-                "You are a technical writer who explains open-source projects clearly and accurately."
-            )
-
-        try:
-            response = await self.complete(
-                prompt=prompt,
-                system_prompt=system_prompt,
-                max_tokens=10000,
-                temperature=0.3,
-            )
-
-            # Clean up response
-            summary = response.strip()
-            # Remove common prefixes
-            for prefix in (
-                ["摘要:", "总结:", "简介:"]
-                if is_chinese
-                else ["Summary:", "Overview:", "Description:"]
-            ):
-                if summary.startswith(prefix):
-                    summary = summary[len(prefix) :].strip()
-
-            return summary
-
-        except Exception as e:
-            logger.warning(f"LLM summary generation failed for {full_name}: {e}")
-            # Fallback to description or default
-            if description:
-                return description
-            return (
-                f"{full_name.split('/')[-1]} - 开源项目"
-                if is_chinese
-                else f"{full_name.split('/')[-1]} - open source project"
-            )
-
     async def generate_repo_summary_and_tags(
         self,
         full_name: str,
@@ -446,7 +285,7 @@ Return only the summary text."""
             description: Repository description
             topics: Repository topics/tags from GitHub
             language: Primary programming language
-            readme_content: README content (truncated)
+            readme_content: README content
 
         Returns:
             Tuple of (summary, tags) - tags is guaranteed to be non-empty
@@ -484,12 +323,10 @@ Return only the summary text."""
             )
 
         if readme_content:
-            # Truncate README to avoid token limits
-            readme_truncated = readme_content[:5000]
             context_parts.append(
-                f"README 内容:\n{readme_truncated}"
+                f"README 全文:\n{readme_content}"
                 if is_chinese
-                else f"README excerpt:\n{readme_truncated}"
+                else f"README full content:\n{readme_content}"
             )
 
         context = "\n".join(context_parts)
@@ -499,7 +336,7 @@ Return only the summary text."""
 
 你的职责：
 1. 深入理解项目的技术架构和核心价值
-2. 用专业、简洁的中文描述项目
+2. 用专业、简洁且有区分度的中文描述项目
 3. 提取精准的分类标签
 
 输出要求：
@@ -518,6 +355,9 @@ Return only the summary text."""
 - 内容：核心功能、技术特点、适用场景
 - 风格：专业流畅，避免"这是一个"等冗余开头
 - 语言：中文
+- 必须包含至少 2 个来自输入信息的具体事实（例如命令、模块、协议、模型、文件名、接口或关键能力）
+- 必须说明项目解决的问题，并指出与同类项目的差异点
+- 禁止空泛套话，避免与其他仓库摘要雷同
 
 ### tags (标签)
 - 数量：3-7 个
@@ -532,7 +372,7 @@ Return only the summary text."""
 
 Your responsibilities:
 1. Understand project architecture and core value quickly
-2. Write concise, professional English summaries
+2. Write concise, professional, and distinctive English summaries
 3. Extract precise classification tags
 
 Output requirements:
@@ -551,6 +391,9 @@ Output requirements:
 - content: core functionality, technical highlights, and practical use cases
 - style: professional and concise; avoid boilerplate openings
 - language: English
+- Must include at least 2 concrete project details from the input (for example commands, modules, APIs, protocols, models, file paths, or key features)
+- Must state the problem the project solves and one differentiator versus similar tools
+- Avoid generic claims and reusable template phrases
 
 ### tags
 - count: 3-7
@@ -689,58 +532,6 @@ Output requirements:
         )
 
         return result_tags
-
-    async def generate_batch_summaries(
-        self,
-        repos: list[dict],
-        batch_size: int = 5,
-    ) -> list[str]:
-        """Generate summaries for multiple repositories.
-
-        Args:
-            repos: List of repo dicts with keys: full_name, description, topics, language, readme_content
-            batch_size: Number of repos to process in parallel
-
-        Returns:
-            List of summaries in same order as input
-        """
-        import asyncio
-
-        summaries = []
-
-        for i in range(0, len(repos), batch_size):
-            batch = repos[i : i + batch_size]
-            tasks = [
-                self.generate_repo_summary(
-                    full_name=r.get("full_name", ""),
-                    description=r.get("description"),
-                    topics=r.get("topics"),
-                    language=r.get("language"),
-                    readme_content=r.get("readme_content"),
-                )
-                for r in batch
-            ]
-
-            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for j, result in enumerate(batch_results):
-                if isinstance(result, Exception):
-                    logger.warning(f"Summary generation failed: {result}")
-                    repo = batch[j]
-                    summaries.append(
-                        repo.get("description", "")[:100]
-                        or (
-                            "开源项目"
-                            if self.settings.output_language == "zh"
-                            else "open source project"
-                        )
-                    )
-                else:
-                    summaries.append(result)
-
-            logger.debug(f"Generated summaries: {len(summaries)}/{len(repos)}")
-
-        return summaries
 
     async def close(self) -> None:
         """Close the client connection."""

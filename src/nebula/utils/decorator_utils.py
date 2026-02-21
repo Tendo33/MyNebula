@@ -254,7 +254,7 @@ class ContextTimer:
         logger.debug(f"⏱️  Starting timer for: {self.name}")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, _exc_val, _exc_tb):
         """停止计时并记录结果。"""
         self.end_time = time.perf_counter()
         if self.start_time is None:
@@ -508,7 +508,7 @@ class AsyncContextTimer:
         logger.debug(f"⏱️  Starting async timer for: {self.name}")
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, _exc_val, _exc_tb):
         """停止计时并记录结果。"""
         self.end_time = time.perf_counter()
         if self.start_time is None:

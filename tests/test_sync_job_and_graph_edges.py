@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 
+import numpy as np
 import pytest
+from fastapi import HTTPException
 
 from nebula.api.graph import _build_similarity_edges_knn
 from nebula.api.sync import (
@@ -51,7 +53,7 @@ def test_resolve_job_phase_for_completed_task():
 
 def test_validate_full_refresh_confirmation_requires_true():
     _validate_full_refresh_confirmation(True)
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException):
         _validate_full_refresh_confirmation(False)
 
 
@@ -81,3 +83,21 @@ def test_build_similarity_edges_knn_returns_unique_edges():
     edge = edges[0]
     assert {edge.source, edge.target} == {1, 2}
     assert edge.weight >= 0.8
+
+
+def test_build_similarity_edges_knn_handles_numpy_embeddings():
+    repo_ids = [1, 2]
+    embeddings = [
+        np.array([1.0, 0.0]),
+        np.array([0.99, 0.01]),
+    ]
+
+    edges = _build_similarity_edges_knn(
+        repo_ids=repo_ids,
+        embeddings=embeddings,
+        min_similarity=0.8,
+        k=1,
+    )
+
+    assert len(edges) == 1
+    assert {edges[0].source, edges[0].target} == {1, 2}

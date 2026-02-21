@@ -8,7 +8,6 @@
 - date_utils: 日期时间处理
 - common_utils: 通用工具函数
 - setting: Pydantic配置管理
-- context: 运行时上下文管理
 """
 
 # Logger utilities
@@ -27,18 +26,6 @@ from .common_utils import (
     safe_get,
     safe_set,
     unflatten_dict,
-)
-
-# Context management
-from .context import (
-    Context,
-    ContextManager,
-    clear_global,
-    context_scope,
-    get_context,
-    get_global,
-    get_global_context,
-    set_global,
 )
 
 # Date utilities
@@ -209,14 +196,6 @@ __all__ = [
     "remove_empty_values",
     "batch_process",
     "retry_on_exception",
-    "Context",
-    "ContextManager",
-    "clear_global",
-    "context_scope",
-    "get_context",
-    "get_global",
-    "get_global_context",
-    "set_global",
     "AsyncContextTimer",
     "async_catch_exceptions",
     "async_log_calls",
