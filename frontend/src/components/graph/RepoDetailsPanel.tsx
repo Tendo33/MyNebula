@@ -97,7 +97,7 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
 
 export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClose }) => {
   const { t } = useTranslation();
-  const { rawData, setSelectedNode } = useGraph();
+  const { rawData, settings, setSelectedNode } = useGraph();
   const [activeTab, setActiveTab] = useState<RelatedTab>('similar');
   const [remoteSimilar, setRemoteSimilar] = useState<RelatedGraphNode[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
@@ -116,7 +116,8 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
         setSimilarError(null);
         const items = await getRelatedRepos(node.id, {
           limit: 20,
-          min_score: 0.35,
+          min_score: 0.4,
+          min_semantic: settings.relatedMinSemantic,
         });
         if (disposed) return;
 
@@ -130,7 +131,6 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             _score: item.score,
             _matchReason: item.reasons.join(' · '),
           });
-          if (mapped.length >= 10) break;
         }
         setRemoteSimilar(mapped);
       } catch (err) {
@@ -149,7 +149,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
     return () => {
       disposed = true;
     };
-  }, [node.id, rawData]);
+  }, [node.id, rawData, settings.relatedMinSemantic]);
 
 
   // Get related repos by different dimensions
@@ -262,7 +262,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       </div>
 
       {/* Content */}
-      <div className="p-5 flex flex-col gap-4 flex-1 overflow-y-auto">
+      <div className="p-5 flex flex-col gap-4 flex-1 overflow-y-auto overscroll-contain">
 
         {/* Quick Actions */}
         <div className="flex items-center gap-2">
@@ -448,7 +448,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
 
           {/* Related Repos List */}
           {currentRelatedRepos.length > 0 ? (
-            <div className="flex-1 min-h-0 bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 overflow-y-auto p-1.5">
+            <div className="flex-1 min-h-0 bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 overflow-y-auto overscroll-contain p-1.5">
               {currentRelatedRepos.map((repo: any) => (
                 <RelatedRepoItem
                   key={repo.id}

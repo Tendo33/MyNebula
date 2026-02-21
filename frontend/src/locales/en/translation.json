@@ -110,6 +110,8 @@
     "hq_rendering_desc": "Enable high-quality visual effects",
     "show_trajectories": "Show Trajectories",
     "show_trajectories_desc": "Show connection paths between nodes",
+    "related_min_semantic": "Related Similarity Strictness",
+    "related_min_semantic_desc": "Raise this to keep only highly similar repositories in the Similar tab",
     "connection": "Connection",
     "api_endpoint": "API Endpoint",
     "github_token_status": "GitHub Token Status",

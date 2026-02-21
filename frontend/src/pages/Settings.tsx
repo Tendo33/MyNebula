@@ -7,6 +7,7 @@ import {
   Clock,
   Database,
   Eye,
+  Link2,
   Loader2,
   LogOut,
   RefreshCw,
@@ -730,6 +731,34 @@ const Settings = () => {
                       )}
                     />
                   </button>
+                </div>
+
+                <div className="p-3 border border-border-light rounded-md space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-text-muted" />
+                    <span className="text-sm font-medium text-text-main">
+                      {t('settings.related_min_semantic')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-muted">{t('settings.related_min_semantic_desc')}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-text-muted">{t('repoDetails.similar', 'Similar')}</span>
+                    <span className="text-xs font-mono tabular-nums text-text-dim">
+                      {settings.relatedMinSemantic.toFixed(2)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={0.9}
+                    step={0.01}
+                    value={settings.relatedMinSemantic}
+                    onChange={(e) => {
+                      const nextMinSemantic = Number(e.target.value);
+                      updateSettings({ relatedMinSemantic: nextMinSemantic });
+                    }}
+                    className="w-full"
+                  />
                 </div>
               </div>
             </section>

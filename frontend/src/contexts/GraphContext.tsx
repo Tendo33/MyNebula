@@ -79,6 +79,8 @@ export interface GraphSettings {
   maxClusters: number;
   /** Lower bound hint for desired cluster count */
   minClusters: number;
+  /** Hard floor for semantic similarity in related repositories */
+  relatedMinSemantic: number;
 }
 
 interface GraphState {
@@ -151,6 +153,7 @@ const defaultSettings: GraphSettings = {
   hqRendering: true,
   maxClusters: 8,
   minClusters: 3,
+  relatedMinSemantic: 0.65,
 };
 
 const GraphContext = createContext<GraphContextValue | null>(null);

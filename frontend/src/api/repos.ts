@@ -40,12 +40,14 @@ export const getRelatedRepos = async (
   params?: {
     limit?: number;
     min_score?: number;
+    min_semantic?: number;
   }
 ): Promise<RelatedRepoResponse[]> => {
   const response = await client.get<RelatedRepoResponse[]>(`/repos/${repoId}/related`, {
     params: {
       limit: params?.limit ?? 20,
-      min_score: params?.min_score ?? 0.35,
+      min_score: params?.min_score ?? 0.4,
+      min_semantic: params?.min_semantic ?? 0.65,
     },
   });
   return response.data;

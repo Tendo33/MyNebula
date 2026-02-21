@@ -987,7 +987,7 @@ wheels = [
 
 [[package]]
 name = "mynebula"
-version = "0.2.9"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },

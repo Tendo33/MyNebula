@@ -73,6 +73,7 @@ def test_rank_related_candidates_returns_score_sorted_items():
         anchor_repo=anchor,
         candidates=[c1, c2],
         min_score=0.0,
+        min_semantic=0.0,
         limit=5,
     )
 
@@ -89,6 +90,22 @@ def test_rank_related_candidates_filters_by_min_score():
         anchor_repo=anchor,
         candidates=[c1],
         min_score=0.9,
+        min_semantic=0.0,
+        limit=5,
+    )
+
+    assert ranked == []
+
+
+def test_rank_related_candidates_filters_low_semantic_even_with_other_signals():
+    anchor = _dummy_repo(1, [1.0, 0.0], ["agent"], 10)
+    candidate = _dummy_repo(2, [0.2, 0.98], ["agent"], 5)
+
+    ranked = _rank_related_candidates(
+        anchor_repo=anchor,
+        candidates=[candidate],
+        min_score=0.0,
+        min_semantic=0.65,
         limit=5,
     )
 

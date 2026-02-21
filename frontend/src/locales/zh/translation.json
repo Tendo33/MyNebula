@@ -111,6 +111,8 @@
     "hq_rendering_desc": "启用高质量视觉效果",
     "show_trajectories": "显示轨迹",
     "show_trajectories_desc": "显示节点之间的连接路径",
+    "related_min_semantic": "相似推荐严格度",
+    "related_min_semantic_desc": "提高该值可只保留 Similar 标签中语义更接近的仓库",
     "connection": "连接",
     "api_endpoint": "API 端点",
     "github_token_status": "GitHub 令牌状态",

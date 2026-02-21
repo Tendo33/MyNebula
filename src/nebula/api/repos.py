@@ -83,6 +83,7 @@ def _rank_related_candidates(
     anchor_repo: StarredRepo,
     candidates: list[StarredRepo],
     min_score: float,
+    min_semantic: float,
     limit: int,
 ) -> list[RelatedRepoResponse]:
     ranked: list[RelatedRepoResponse] = []
@@ -92,6 +93,8 @@ def _rank_related_candidates(
         if candidate.embedding is None:
             continue
         score, components, reasons = _build_related_result_item(anchor_repo, candidate)
+        if components.semantic < min_semantic:
+            continue
         if score < min_score:
             continue
 
@@ -228,7 +231,8 @@ async def get_repo(
 async def get_related_repositories(
     repo_id: int,
     limit: int = Query(default=20, ge=1, le=100),
-    min_score: float = Query(default=0.35, ge=0.0, le=1.0),
+    min_score: float = Query(default=0.4, ge=0.0, le=1.0),
+    min_semantic: float = Query(default=0.65, ge=0.0, le=1.0),
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get related repositories ranked by hybrid relevance score.
@@ -267,6 +271,7 @@ async def get_related_repositories(
         anchor_repo=anchor_repo,
         candidates=candidates,
         min_score=min_score,
+        min_semantic=min_semantic,
         limit=limit,
     )
 

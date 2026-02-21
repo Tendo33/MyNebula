@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-02-21
+
+### Added
+- Related recommendation strictness control in Settings (`relatedMinSemantic`) with persistent user preference
+- Explainable Similar recommendations with stronger filtering defaults
+
+### Changed
+- Promoted project to major release `1.0.0`
+- Unified version fields across backend, frontend, runtime config, and environment docs
+- Improved graph details panel scrolling behavior to prevent page-level scroll chaining
+
 ## [0.2.6] - 2026-02-19
 
 ### Changed
@@ -81,7 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Tendo33/mynebula/compare/v0.2.10...v1.0.0
 [0.2.6]: https://github.com/Tendo33/mynebula/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/Tendo33/mynebula/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/Tendo33/mynebula/compare/v0.2.3...v0.2.4
