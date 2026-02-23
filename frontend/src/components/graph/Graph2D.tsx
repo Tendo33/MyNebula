@@ -166,8 +166,18 @@ const Graph2D: React.FC = () => {
   const activeHoverNode = localHoverNode || (hoveredNode as ProcessedNode | null);
   const autoFitKeyRef = useRef<string | null>(null);
 
-  // Counter to trigger re-render when images load
+  // Debounced re-render trigger for avatar image loading.
+  // Instead of calling forceUpdate per image (which causes a render storm),
+  // we batch updates and flush once after a short idle period.
   const [, forceUpdate] = useState(0);
+  const avatarFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerAvatarRedraw = useCallback(() => {
+    if (avatarFlushTimerRef.current) clearTimeout(avatarFlushTimerRef.current);
+    avatarFlushTimerRef.current = setTimeout(() => {
+      forceUpdate(n => n + 1);
+      avatarFlushTimerRef.current = null;
+    }, 200);
+  }, []);
 
   // Get neighbors of hovered node for highlighting
   const hoverNeighbors = useNodeNeighbors(activeHoverNode?.id);
@@ -531,7 +541,7 @@ const Graph2D: React.FC = () => {
       ctx.textBaseline = 'middle';
       ctx.fillText(label, x, labelY - textHeight / 2 + padding);
     }
-  }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering]);
+  }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering, triggerAvatarRedraw]);
 
   // Node pointer area for click detection
   const paintNodeArea = useCallback((node: any, color: string, ctx: CanvasRenderingContext2D) => {
@@ -661,6 +671,8 @@ const Graph2D: React.FC = () => {
   useEffect(() => {
     return () => {
       document.body.style.cursor = '';
+      // Clean up debounce timer for avatar redraws
+      if (avatarFlushTimerRef.current) clearTimeout(avatarFlushTimerRef.current);
     };
   }, []);
 

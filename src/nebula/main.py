@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -80,9 +81,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Configure CORS - 确保所有请求都能正确返回 CORS 头
-    # 注意：allow_origins=["*"] 与 allow_credentials=True 不能同时使用
-    # 在开发模式下我们使用具体的来源地址
+    # GZip compression – significantly reduces JSON payload sizes
+    # (typically 70-80% smaller for /api/graph responses)
+    app.add_middleware(GZipMiddleware, minimum_size=500)
+
     # Configure CORS - 允许所有本地开发端口
     # 使用 regex 匹配 localhost 和 127.0.0.1 的任意端口
     app.add_middleware(
