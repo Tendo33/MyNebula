@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-02-25
+
+### Fixed
+- Fixed graph page vertical overflow causing double scrollbars
+- Preserved selected node when it becomes a ghost node after filtering
+
+### Changed
+- Optimized graph layout spacing: increased position scale, cluster distance, and repulsion for better readability
+- Improved node hover color detection order to handle null `activeHoverNode` safely
+- Refined ghost node opacity from 0.15 to 0.4 for better visibility
+- Improved repo details panel layout with flex-based proportional sizing and independent scroll areas
+- Bumped version to `1.0.5` across backend, frontend, runtime config, and docs
+
 ## [1.0.4] - 2026-02-25
 
 ### Fixed
@@ -100,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/Tendo33/mynebula/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/Tendo33/mynebula/compare/v1.0.3...v1.0.4
 [1.0.0]: https://github.com/Tendo33/mynebula/compare/v0.2.10...v1.0.0
 [0.2.6]: https://github.com/Tendo33/mynebula/compare/v0.2.5...v0.2.6

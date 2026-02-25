@@ -67,10 +67,10 @@ const NODE_BASE_SIZE = 5;
 const NODE_MAX_SIZE = 30;
 const ZOOM_TO_FIT_PADDING = 80;
 
-// Layout tuning: smaller = more compact initial view
-const POSITION_SCALE = 13;
-const MIN_CLUSTER_DISTANCE = 50;
-const CENTER_PULL_STRENGTH = 0.015;
+// Layout tuning: larger = more spaced out initial view
+const POSITION_SCALE = 22;
+const MIN_CLUSTER_DISTANCE = 85;
+const CENTER_PULL_STRENGTH = 0.01;
 
 // ============================================================================
 // Utility Functions
@@ -163,6 +163,7 @@ const Graph2D: React.FC = () => {
   const [activeHoverNode, setActiveHoverNode] = useState<ProcessedNode | null>(null);
   const autoFitKeyRef = useRef<string | null>(null);
   const userInteractedRef = useRef<boolean>(false);
+  const skipNextFocusRef = useRef<boolean>(false);
 
   // Debounced re-render trigger for avatar image loading.
   // Instead of calling forceUpdate per image (which causes a render storm),
@@ -248,8 +249,8 @@ const Graph2D: React.FC = () => {
       ?.distance((link: any) => {
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
         const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : null;
-        // Same cluster: short distance, Different cluster: moderate separation
-        return sourceCluster === targetCluster ? 22 : 55;
+        // Same cluster: moderate distance, Different cluster: larger separation
+        return sourceCluster === targetCluster ? 38 : 75;
       })
       .strength((link: any) => {
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
@@ -258,10 +259,10 @@ const Graph2D: React.FC = () => {
         return sourceCluster === targetCluster ? 0.7 : 0.05;
       });
 
-    // Configure charge force (repulsion) - balanced for separation
+    // Configure charge force (repulsion) - increased for more spacing
     fg.d3Force('charge')
-      ?.strength(-80)
-      .distanceMax(180);
+      ?.strength(-150)
+      .distanceMax(250);
 
     // Gentle pull toward the origin to avoid disconnected groups drifting far apart
     fg.d3Force('x', (d3 as any).forceX(0).strength(CENTER_PULL_STRENGTH));
@@ -377,19 +378,21 @@ const Graph2D: React.FC = () => {
       return COLORS.NODE_SELECTED;
     }
 
+    // Hovered node
+    if (activeHoverNode && node.id === activeHoverNode.id) {
+      return COLORS.NODE_HOVER;
+    }
+
     // Ghost mode for filtered out nodes
     if (!visibleNodeIds.has(node.id)) {
-      return 'rgba(200, 200, 200, 0.15)'; // Dim gray
+      // Dim gray if it doesn't have an avatar. If it has an avatar,
+      // the transparency will be handled by globalAlpha in paintNode.
+      return 'rgba(200, 200, 200, 0.4)';
     }
 
     // No hover - use cluster color
     if (!activeHoverNode) {
       return node.color || COLORS.NODE_DEFAULT;
-    }
-
-    // Hovered node
-    if (node.id === activeHoverNode.id) {
-      return COLORS.NODE_HOVER;
     }
 
     // Neighbor of hovered node
@@ -466,13 +469,11 @@ const Graph2D: React.FC = () => {
     const radius = calculateNodeRadius(stargazers_count);
     const color = getNodeColor(node);
 
-    // If ghosted, draw simple dim circle and return early
-    if (!isVisible && !isSelected) {
-      ctx.beginPath();
-      ctx.arc(x, y, radius * 0.8, 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
-      return; // Skip labels and avatars for ghost nodes
+    ctx.save();
+
+    // Apply transparency for filtered out ghost nodes
+    if (!isVisible && !isSelected && !isHovered) {
+      ctx.globalAlpha = 0.25;
     }
 
     // Try to draw avatar image
@@ -488,7 +489,7 @@ const Graph2D: React.FC = () => {
         img.onload = () => {
           imageCache.current.set(owner_avatar_url, img);
           // Trigger re-render by updating state
-          forceUpdate(n => n + 1);
+          triggerAvatarRedraw();
         };
         img.onerror = () => {
           imageCache.current.set(owner_avatar_url, 'error');
@@ -517,10 +518,12 @@ const Graph2D: React.FC = () => {
     // Fallback: Draw solid color circle if no avatar
     if (!avatarDrawn) {
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      // Make it slightly smaller if it's not visible to mimic the older ghost style if wanted,
+      // but standard radius is fine when transparent.
+      ctx.arc(x, y, (!isVisible && !isSelected && !isHovered) ? radius * 0.8 : radius, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
-    } else if (color === COLORS.NODE_DIM) {
+    } else if (color === COLORS.NODE_DIM && (isVisible || isSelected)) {
       // Keep avatar nodes visually dimmed when not in focus.
       ctx.save();
       ctx.beginPath();
@@ -550,7 +553,8 @@ const Graph2D: React.FC = () => {
 
     // Draw label
     const fontSize = Math.max(10 / globalScale, 8);
-    const showLabel = isHovered || isSelected || globalScale > 2 || radius > 15;
+    // Hide label for ghost nodes unless hovered
+    const showLabel = isHovered || isSelected || (isVisible && (globalScale > 2 || radius > 15));
 
     if (showLabel) {
       const label = name;
@@ -576,22 +580,21 @@ const Graph2D: React.FC = () => {
       ctx.textBaseline = 'middle';
       ctx.fillText(label, x, labelY - textHeight / 2 + padding);
     }
+
+    ctx.restore();
   }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering, triggerAvatarRedraw, visibleNodeIds]);
 
   // Node pointer area for click detection
   const paintNodeArea = useCallback((node: any, color: string, ctx: CanvasRenderingContext2D) => {
-    const { x, y, stargazers_count, id } = node as ProcessedNode;
+    const { x, y, stargazers_count } = node as ProcessedNode;
     if (x === undefined || y === undefined) return;
-
-    // Don't register clicks/hovers for ghost nodes unless selected
-    if (!visibleNodeIds.has(id) && selectedNode?.id !== id) return;
 
     const radius = calculateNodeRadius(stargazers_count);
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, radius + 5, 0, 2 * Math.PI); // Slightly larger for easier clicking
     ctx.fill();
-  }, [visibleNodeIds, selectedNode]);
+  }, []);
 
   // Draw cluster hulls in the background
   const drawClusterHulls = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -676,27 +679,29 @@ const Graph2D: React.FC = () => {
     return (graphData.nodes as ProcessedNode[]).find((n) => n.id === nodeId) ?? null;
   }, []);
 
-  const focusNodeById = useCallback((nodeId: number, duration = 900) => {
-    if (!graphRef.current) return;
+  const focusNodeById = useCallback((nodeId: number, duration = 1200) => {
+    if (!graphRef.current || !width || !height) return;
 
-    // Read live positions from the force graph instance
-    const liveNode = getLiveNodeById(nodeId);
-    if (!liveNode || liveNode.x === undefined || liveNode.y === undefined) return;
+    // Fixed zoom target to ensure an obvious, but reasonable magnification on select
+    const targetZoom = 1.05;
 
-    const currentZoom = graphRef.current.zoom();
-    const targetZoom = Math.max(currentZoom, 3);
+    // zoomToFit's scale calculation for a single point is:
+    // scale = Math.min(width, height) / (padding * 2)
+    // Thus padding = Math.min(width, height) / (2 * targetZoom)
+    const padding = Math.min(width, height) / (2 * targetZoom);
 
-    // Offset for right panel (assuming 400px wide right panel = 200px shift in screen space)
-    // To shift the node to the left visually, we tell the camera to center on a point to its right.
-    const screenShift = window.innerWidth >= 1024 ? 200 : 0;
-    const graphShift = screenShift / targetZoom;
-
-    graphRef.current.centerAt(liveNode.x + graphShift, liveNode.y, duration);
-    graphRef.current.zoom(targetZoom, duration);
-  }, [getLiveNodeById]);
+    // Use built-in zoomToFit to perfectly animate pan and zoom simultaneously
+    // without D3 transitions cancelling each other out.
+    graphRef.current.zoomToFit(duration, padding, (n) => n.id === nodeId);
+  }, [width, height]);
 
   useEffect(() => {
     if (!selectedNode) return;
+
+    if (skipNextFocusRef.current) {
+      skipNextFocusRef.current = false;
+      return;
+    }
 
     // Wait two frames so the force graph has ingested the (possibly new) graphData
     // and has valid x/y on the node before we try to center on it.
@@ -730,32 +735,26 @@ const Graph2D: React.FC = () => {
   const handleNodeClick = useCallback((node: any) => {
     const processedNode = node as ProcessedNode;
 
-    // Don't register clicks for ghost nodes unless selected
-    if (!visibleNodeIds.has(processedNode.id) && selectedNode?.id !== processedNode.id) return;
-
     // Find the full node data from raw data
     const fullNode = rawData?.nodes.find(n => n.id === processedNode.id);
     if (fullNode) {
-      setSelectedNode(fullNode);
+      if (selectedNode?.id !== fullNode.id) {
+        skipNextFocusRef.current = true;
+        setSelectedNode(fullNode);
+      }
     }
 
+    // Always focus the node when explicitly clicked on the graph canvas
     focusNodeById(processedNode.id, 1000);
-  }, [visibleNodeIds, rawData, selectedNode, setSelectedNode, focusNodeById]);
+  }, [rawData, selectedNode, setSelectedNode, focusNodeById]);
 
   // Handle node hover
   const handleNodeHover = useCallback((node: any) => {
     const processedNode = node as ProcessedNode | null;
 
-    // Don't register hovers for ghost nodes unless selected
-    if (processedNode && !visibleNodeIds.has(processedNode.id) && selectedNode?.id !== processedNode.id) {
-      setActiveHoverNode(null);
-      document.body.style.cursor = '';
-      return;
-    }
-
     setActiveHoverNode(processedNode);
     document.body.style.cursor = processedNode ? 'pointer' : '';
-  }, [visibleNodeIds, selectedNode]);
+  }, []);
 
   useEffect(() => {
     return () => {

@@ -88,14 +88,8 @@ const GraphPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Keep details panel in sync with visible graph nodes after filters change.
-  useEffect(() => {
-    if (!selectedNode || !filteredData) return;
-    const stillVisible = filteredData.nodes.some((n) => n.id === selectedNode.id);
-    if (!stillVisible) {
-      setSelectedNode(null);
-    }
-  }, [filteredData, selectedNode, setSelectedNode]);
+  // Keep details panel open even if the node is filtered out (ghost mode)
+  // We no longer force setSelectedNode(null) here because ghost nodes can still be selected.
 
   // Close details panel
   const handleCloseDetails = useCallback(() => {
@@ -116,7 +110,7 @@ const GraphPage = () => {
                           filters.languages.size > 0;
 
   return (
-    <div className="flex min-h-screen bg-bg-main text-text-main">
+    <div className="flex h-screen overflow-hidden bg-bg-main text-text-main">
       <Sidebar />
 
       <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
@@ -169,7 +163,7 @@ const GraphPage = () => {
         </header>
 
         {/* Content Area */}
-        <section className="flex-1 relative flex">
+        <section className="flex-1 relative flex overflow-hidden">
           {isMobile && showFilters && (
             <button
               className="absolute inset-0 z-20 bg-black/25"
