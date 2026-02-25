@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-02-25
+
+### Fixed
+- Fixed first-load deadlock in frontend graph data loader that could keep all pages stuck in loading state and block `/api/graph` requests
+
+### Changed
+- Bumped and synchronized project version metadata to `1.0.4` across backend, frontend, runtime config, environment docs, and frontend lockfile
+
 ## [1.0.0] - 2026-02-21
 
 ### Added
@@ -92,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/Tendo33/mynebula/compare/v1.0.3...v1.0.4
 [1.0.0]: https://github.com/Tendo33/mynebula/compare/v0.2.10...v1.0.0
 [0.2.6]: https://github.com/Tendo33/mynebula/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/Tendo33/mynebula/compare/v0.2.4...v0.2.5

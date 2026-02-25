@@ -20,7 +20,7 @@
 | 变量名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `APP_NAME` | string | `mynebula` | 应用名称 |
-| `APP_VERSION` | string | `1.0.3` | 应用版本 |
+| `APP_VERSION` | string | `1.0.4` | 应用版本 |
 | `DEBUG` | boolean | `false` | 调试模式（启用 Swagger UI，同时控制开发/生产环境） |
 | `SECRET_KEY` | string | - | JWT 签名密钥（生产环境必须修改） |
 
@@ -28,7 +28,7 @@
 
 ```bash
 APP_NAME=mynebula
-APP_VERSION=1.0.3
+APP_VERSION=1.0.4
 DEBUG=true
 SECRET_KEY=your-32-character-secret-key-here
 ```
@@ -224,7 +224,7 @@ LLM_OUTPUT_LANGUAGE=zh
 ```bash
 # ==================== 应用配置 ====================
 APP_NAME=mynebula
-APP_VERSION=1.0.3
+APP_VERSION=1.0.4
 DEBUG=true
 SECRET_KEY=dev-secret-key-not-for-production
 
@@ -260,7 +260,7 @@ LLM_OUTPUT_LANGUAGE=zh
 ```bash
 # ==================== 应用配置 ====================
 APP_NAME=mynebula
-APP_VERSION=1.0.3
+APP_VERSION=1.0.4
 DEBUG=false
 SECRET_KEY=your-very-long-and-secure-secret-key-32chars
 
