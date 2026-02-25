@@ -621,32 +621,62 @@ const Graph2D: React.FC = () => {
     });
   }, [clusterGroups, processedData.nodes]);
 
+  const getLiveNodeById = useCallback((nodeId: number): ProcessedNode | null => {
+    if (!graphRef.current) return null;
+
+    // `graphData()` exists at runtime, but some react-force-graph type versions
+    // don't expose it on ForceGraphMethods.
+    const maybeWithGraphData = graphRef.current as ForceGraphMethods & {
+      graphData?: () => { nodes: NodeObject[] };
+    };
+    const graphData = maybeWithGraphData.graphData?.();
+    if (!graphData) return null;
+
+    return (graphData.nodes as ProcessedNode[]).find((n) => n.id === nodeId) ?? null;
+  }, []);
+
   const focusNodeById = useCallback((nodeId: number, duration = 900) => {
     if (!graphRef.current) return;
 
-    const liveNode = processedData.nodes.find((node) => node.id === nodeId);
+    // Read live positions from the force graph instance — processedData.nodes
+    // only holds initial coordinates, not the ones mutated by the simulation.
+    const liveNode = getLiveNodeById(nodeId);
     if (!liveNode || liveNode.x === undefined || liveNode.y === undefined) return;
 
     graphRef.current.centerAt(liveNode.x, liveNode.y, duration);
     graphRef.current.zoom(3, duration);
-  }, [processedData.nodes]);
+  }, [getLiveNodeById]);
 
   useEffect(() => {
     if (!selectedNode) return;
 
+    // Wait two frames so the force graph has ingested the (possibly new) graphData
+    // and has valid x/y on the node before we try to center on it.
     let frame1 = 0;
     let frame2 = 0;
-    frame1 = window.requestAnimationFrame(() => {
-      frame2 = window.requestAnimationFrame(() => {
+    let retryTimer = 0;
+
+    const tryFocus = () => {
+      if (!graphRef.current) return;
+      const node = getLiveNodeById(selectedNode.id);
+      if (node?.x !== undefined && node?.y !== undefined) {
         focusNodeById(selectedNode.id, 800);
-      });
+      } else {
+        // Node positions not ready yet — retry after the simulation warms up
+        retryTimer = window.setTimeout(() => focusNodeById(selectedNode.id, 800), 600);
+      }
+    };
+
+    frame1 = window.requestAnimationFrame(() => {
+      frame2 = window.requestAnimationFrame(tryFocus);
     });
 
     return () => {
       window.cancelAnimationFrame(frame1);
       window.cancelAnimationFrame(frame2);
+      window.clearTimeout(retryTimer);
     };
-  }, [selectedNode?.id, focusNodeById]);
+  }, [selectedNode?.id, focusNodeById, getLiveNodeById]);
 
   // Handle node click
   const handleNodeClick = useCallback((node: any) => {

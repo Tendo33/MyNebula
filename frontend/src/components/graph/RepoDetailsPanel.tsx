@@ -303,7 +303,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       </div>
 
       {/* Content */}
-      <div className="p-5 flex flex-col gap-4 flex-1 min-h-0 overflow-y-auto sm:overflow-hidden">
+      <div className="p-5 flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
 
         <div className="flex flex-col gap-4 shrink-0">
           {/* Quick Actions */}
@@ -432,7 +432,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
         </div>
 
         {/* Related Repositories with Tabs */}
-        <div className="space-y-2 flex flex-col sm:flex-1 sm:min-h-0">
+        <div className="flex flex-col flex-1 min-h-0 gap-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-teal-600 uppercase tracking-wider">
               <Link2 className="w-3.5 h-3.5" />
@@ -489,9 +489,9 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             </button>
           </div>
 
-          {/* Related Repos List */}
+          {/* Related Repos List — independently scrollable, sized to remaining space */}
           {currentRelatedRepos.length > 0 ? (
-            <div className="bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 p-1.5 overflow-visible sm:flex-1 sm:min-h-0 sm:overflow-y-auto sm:overscroll-contain">
+            <div className="bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 p-1.5 flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ minHeight: '180px' }}>
               {currentRelatedRepos.map((repo: any) => (
                 <RelatedRepoItem
                   key={repo.id}
@@ -503,7 +503,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               ))}
             </div>
           ) : (
-            <div className="px-4 py-6 text-center text-sm text-text-muted bg-bg-sidebar/60 rounded-xl border border-border-light/60 flex items-center justify-center sm:flex-1 sm:min-h-0">
+            <div className="px-4 py-6 text-center text-sm text-text-muted bg-bg-sidebar/60 rounded-xl border border-border-light/60 flex items-center justify-center flex-1 min-h-0" style={{ minHeight: '180px' }}>
               {activeTab === 'similar' && (
                 similarLoading
                   ? t('common.loading', 'Loading...')

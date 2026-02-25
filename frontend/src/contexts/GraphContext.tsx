@@ -163,9 +163,13 @@ const GraphContext = createContext<GraphContextValue | null>(null);
 // ============================================================================
 
 export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // State
-  const [rawData, setRawData] = useState<GraphData | null>(null);
-  const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
+  // State - initialize synchronously from cache to avoid loading flash
+  const [rawData, setRawData] = useState<GraphData | null>(() =>
+    getCachedData<GraphData>(CACHE_KEY_GRAPH)
+  );
+  const [timelineData, setTimelineData] = useState<TimelineData | null>(() =>
+    getCachedData<TimelineData>(CACHE_KEY_TIMELINE)
+  );
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [filters, setFilters] = useState<GraphFilters>(defaultFilters);
@@ -180,7 +184,13 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return defaultSettings;
   });
-  const [loading, setLoading] = useState(false);
+  // Start in loading state only if no cached data is available
+  const [loading, setLoading] = useState(() => {
+    const hasCache =
+      Boolean(getCachedData<GraphData>(CACHE_KEY_GRAPH)) &&
+      Boolean(getCachedData<TimelineData>(CACHE_KEY_TIMELINE));
+    return !hasCache;
+  });
   const [syncing, setSyncing] = useState(false);
   const [syncStep, setSyncStep] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -189,58 +199,49 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadData = useCallback(async () => {
     if (loading) return;
 
+    setError(null);
+
+    // Try to load from cache first for instant display
+    const cachedGraph = getCachedData<GraphData>(CACHE_KEY_GRAPH);
+    const cachedTimeline = getCachedData<TimelineData>(CACHE_KEY_TIMELINE);
+
+    if (cachedGraph && cachedTimeline) {
+      // Cached data is already set via lazy state init; no loading state needed.
+      // Kick off a background refresh to keep data fresh.
+      Promise.all([
+        getGraphData(),
+        getTimelineData(),
+      ]).then(([graphData, timeline]) => {
+        setRawData(graphData);
+        setTimelineData(timeline);
+        setCachedData(CACHE_KEY_GRAPH, graphData);
+        setCachedData(CACHE_KEY_TIMELINE, timeline);
+
+        getGraphEdges({
+          k: 8,
+          max_nodes: 1000,
+          adaptive: true,
+        }).then((edges) => {
+          setRawData((prev) => {
+            if (!prev) return prev;
+            const merged = { ...prev, edges, total_edges: edges.length };
+            setCachedData(CACHE_KEY_GRAPH, merged);
+            return merged;
+          });
+        }).catch((edgeErr) => {
+          console.warn('Background edge refresh failed:', edgeErr);
+        });
+      }).catch(err => {
+        console.warn('Background refresh failed:', err);
+      });
+
+      return;
+    }
+
+    // No cache — show loading skeleton and fetch
     try {
       setLoading(true);
-      setError(null);
 
-      // Try to load from cache first for instant display
-      const cachedGraph = getCachedData<GraphData>(CACHE_KEY_GRAPH);
-      const cachedTimeline = getCachedData<TimelineData>(CACHE_KEY_TIMELINE);
-
-      if (cachedGraph && cachedTimeline) {
-        // Use cached data immediately
-        setRawData(cachedGraph);
-        setTimelineData(cachedTimeline);
-        setLoading(false);
-
-        // Fetch fresh data in background
-        Promise.all([
-          getGraphData(),
-          getTimelineData(),
-        ]).then(([graphData, timeline]) => {
-          setRawData(graphData);
-          setTimelineData(timeline);
-          setCachedData(CACHE_KEY_GRAPH, graphData);
-          setCachedData(CACHE_KEY_TIMELINE, timeline);
-
-          getGraphEdges({
-            k: 8,
-            max_nodes: 1000,
-            adaptive: true,
-          }).then((edges) => {
-            setRawData((prev) => {
-              if (!prev) {
-                return prev;
-              }
-              const merged = {
-                ...prev,
-                edges,
-                total_edges: edges.length,
-              };
-              setCachedData(CACHE_KEY_GRAPH, merged);
-              return merged;
-            });
-          }).catch((edgeErr) => {
-            console.warn('Background edge refresh failed:', edgeErr);
-          });
-        }).catch(err => {
-          console.warn('Background refresh failed:', err);
-        });
-
-        return;
-      }
-
-      // Fetch fresh data
       const [graphData, timeline] = await Promise.all([
         getGraphData(),
         getTimelineData(),
@@ -249,9 +250,11 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setRawData(graphData);
       setTimelineData(timeline);
 
-      // Cache the data
-      setCachedData(CACHE_KEY_GRAPH, graphData);
-      setCachedData(CACHE_KEY_TIMELINE, timeline);
+      // Cache the data (deferred to avoid blocking the main thread)
+      setTimeout(() => {
+        setCachedData(CACHE_KEY_GRAPH, graphData);
+        setCachedData(CACHE_KEY_TIMELINE, timeline);
+      }, 0);
 
       getGraphEdges({
         k: 8,
@@ -259,15 +262,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         adaptive: true,
       }).then((edges) => {
         setRawData((prev) => {
-          if (!prev) {
-            return prev;
-          }
-          const merged = {
-            ...prev,
-            edges,
-            total_edges: edges.length,
-          };
-          setCachedData(CACHE_KEY_GRAPH, merged);
+          if (!prev) return prev;
+          const merged = { ...prev, edges, total_edges: edges.length };
+          setTimeout(() => setCachedData(CACHE_KEY_GRAPH, merged), 0);
           return merged;
         });
       }).catch((edgeErr) => {
