@@ -90,8 +90,6 @@ interface GraphState {
   timelineData: TimelineData | null;
   /** Currently selected node for details panel */
   selectedNode: GraphNode | null;
-  /** Hovered node (for cross-component highlighting) */
-  hoveredNode: GraphNode | null;
   /** Current filters */
   filters: GraphFilters;
   /** Visual settings */
@@ -112,7 +110,6 @@ interface GraphContextValue extends GraphState {
   loadData: () => Promise<void>;
   refreshData: () => Promise<void>;
   setSelectedNode: (node: GraphNode | null) => void;
-  setHoveredNode: (node: GraphNode | null) => void;
 
   // Filter actions
   setSearchQuery: (query: string) => void;
@@ -171,7 +168,6 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     getCachedData<TimelineData>(CACHE_KEY_TIMELINE)
   );
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [filters, setFilters] = useState<GraphFilters>(defaultFilters);
   const [settings, setSettings] = useState<GraphSettings>(() => {
     try {
@@ -510,7 +506,6 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     rawData,
     timelineData,
     selectedNode,
-    hoveredNode,
     filters,
     settings,
     loading,
@@ -525,7 +520,6 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loadData,
     refreshData,
     setSelectedNode,
-    setHoveredNode,
 
     // Filter actions
     setSearchQuery,

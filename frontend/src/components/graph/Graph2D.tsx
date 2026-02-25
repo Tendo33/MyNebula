@@ -154,17 +154,15 @@ const Graph2D: React.FC = () => {
     filteredData,
     rawData,
     selectedNode,
-    hoveredNode,
     setSelectedNode,
-    setHoveredNode,
     settings,
     loading,
   } = useGraph();
 
   // Local state for graph-specific interactions
-  const [localHoverNode, setLocalHoverNode] = useState<ProcessedNode | null>(null);
-  const activeHoverNode = localHoverNode || (hoveredNode as ProcessedNode | null);
+  const [activeHoverNode, setActiveHoverNode] = useState<ProcessedNode | null>(null);
   const autoFitKeyRef = useRef<string | null>(null);
+  const userInteractedRef = useRef<boolean>(false);
 
   // Debounced re-render trigger for avatar image loading.
   // Instead of calling forceUpdate per image (which causes a render storm),
@@ -182,14 +180,20 @@ const Graph2D: React.FC = () => {
   // Get neighbors of hovered node for highlighting
   const hoverNeighbors = useNodeNeighbors(activeHoverNode?.id);
 
-  // Process data for force-graph
+  // Visibility set
+  const visibleNodeIds = useMemo(() => {
+    if (!filteredData) return new Set<number>();
+    return new Set(filteredData.nodes.map(n => n.id));
+  }, [filteredData]);
+
+  // Process data for force-graph (from rawData to keep layout stable!)
   const processedData = useMemo((): ProcessedData => {
-    if (!filteredData || filteredData.nodes.length === 0) {
+    if (!rawData || rawData.nodes.length === 0) {
       return { nodes: [], links: [] };
     }
 
     return {
-      nodes: filteredData.nodes.map(n => ({
+      nodes: rawData.nodes.map(n => ({
         id: n.id,
         name: n.name,
         full_name: n.full_name,
@@ -209,13 +213,13 @@ const Graph2D: React.FC = () => {
         x: n.x * POSITION_SCALE,
         y: n.y * POSITION_SCALE,
       })),
-      links: filteredData.edges.map(e => ({
+      links: rawData.edges.map(e => ({
         source: typeof e.source === 'object' ? e.source.id : e.source,
         target: typeof e.target === 'object' ? e.target.id : e.target,
         weight: e.weight,
       })),
     };
-  }, [filteredData]);
+  }, [rawData]);
 
   const layoutKey = useMemo(
     () => `${processedData.nodes.length}:${processedData.links.length}`,
@@ -345,6 +349,7 @@ const Graph2D: React.FC = () => {
   const tryAutoFit = useCallback(() => {
     if (!graphRef.current || processedData.nodes.length === 0) return;
     if (autoFitKeyRef.current === layoutKey) return;
+    if (userInteractedRef.current) return;
 
     graphRef.current.zoomToFit(400, ZOOM_TO_FIT_PADDING);
     autoFitKeyRef.current = layoutKey;
@@ -367,9 +372,14 @@ const Graph2D: React.FC = () => {
 
   // Get node color based on state
   const getNodeColor = useCallback((node: ProcessedNode): string => {
-    // Selected node
+    // Selected node ALWAYS visible
     if (selectedNode && selectedNode.id === node.id) {
       return COLORS.NODE_SELECTED;
+    }
+
+    // Ghost mode for filtered out nodes
+    if (!visibleNodeIds.has(node.id)) {
+      return 'rgba(200, 200, 200, 0.15)'; // Dim gray
     }
 
     // No hover - use cluster color
@@ -395,50 +405,75 @@ const Graph2D: React.FC = () => {
 
     // Dim other nodes
     return COLORS.NODE_DIM;
-  }, [selectedNode, activeHoverNode, hoverNeighbors]);
+  }, [selectedNode, activeHoverNode, hoverNeighbors, visibleNodeIds]);
 
   // Get link color based on state
   const getLinkColor = useCallback((link: ProcessedLink): string => {
     if (!settings.showTrajectories) return 'rgba(0,0,0,0)';
 
-    if (!activeHoverNode) return COLORS.LINK_DEFAULT;
-
     const sourceId = getNodeId(link.source);
     const targetId = getNodeId(link.target);
 
+    const sourceVisible = visibleNodeIds.has(sourceId) || selectedNode?.id === sourceId;
+    const targetVisible = visibleNodeIds.has(targetId) || selectedNode?.id === targetId;
+
+    if (!sourceVisible || !targetVisible) {
+      return 'rgba(200, 200, 200, 0.05)';
+    }
+
+    if (!activeHoverNode) return COLORS.LINK_DEFAULT;
+
     // Highlight links connected to hovered node
-    if (sourceId === activeHoverNode.id || targetId === activeHoverNode.id) {
+    if (sourceId === activeHoverNode?.id || targetId === activeHoverNode?.id) {
       return COLORS.LINK_ACTIVE;
     }
 
     return COLORS.LINK_DIM;
-  }, [activeHoverNode]);
+  }, [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]);
 
   // Get link width based on state
   const getLinkWidth = useCallback((link: ProcessedLink): number => {
     if (!settings.showTrajectories) return 0;
 
-    if (!activeHoverNode) return 1;
-
     const sourceId = getNodeId(link.source);
     const targetId = getNodeId(link.target);
+
+    const sourceVisible = visibleNodeIds.has(sourceId) || selectedNode?.id === sourceId;
+    const targetVisible = visibleNodeIds.has(targetId) || selectedNode?.id === targetId;
+
+    if (!sourceVisible || !targetVisible) {
+      return 0.2;
+    }
+
+    if (!activeHoverNode) return 1;
 
     if (sourceId === activeHoverNode.id || targetId === activeHoverNode.id) {
       return 2;
     }
 
     return 0.5;
-  }, [activeHoverNode]);
+  }, [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]);
 
   // Custom node painting
   const paintNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
     const { x, y, name, stargazers_count, owner_avatar_url } = node as ProcessedNode;
     if (x === undefined || y === undefined) return;
 
+    const isVisible = visibleNodeIds.has(node.id);
+    const isSelected = selectedNode?.id === node.id;
+    const isHovered = activeHoverNode?.id === node.id;
+
     const radius = calculateNodeRadius(stargazers_count);
     const color = getNodeColor(node);
-    const isHovered = activeHoverNode?.id === node.id;
-    const isSelected = selectedNode?.id === node.id;
+
+    // If ghosted, draw simple dim circle and return early
+    if (!isVisible && !isSelected) {
+      ctx.beginPath();
+      ctx.arc(x, y, radius * 0.8, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+      return; // Skip labels and avatars for ghost nodes
+    }
 
     // Try to draw avatar image
     let avatarDrawn = false;
@@ -541,19 +576,22 @@ const Graph2D: React.FC = () => {
       ctx.textBaseline = 'middle';
       ctx.fillText(label, x, labelY - textHeight / 2 + padding);
     }
-  }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering, triggerAvatarRedraw]);
+  }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering, triggerAvatarRedraw, visibleNodeIds]);
 
   // Node pointer area for click detection
   const paintNodeArea = useCallback((node: any, color: string, ctx: CanvasRenderingContext2D) => {
-    const { x, y, stargazers_count } = node as ProcessedNode;
+    const { x, y, stargazers_count, id } = node as ProcessedNode;
     if (x === undefined || y === undefined) return;
+
+    // Don't register clicks/hovers for ghost nodes unless selected
+    if (!visibleNodeIds.has(id) && selectedNode?.id !== id) return;
 
     const radius = calculateNodeRadius(stargazers_count);
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, radius + 5, 0, 2 * Math.PI); // Slightly larger for easier clicking
     ctx.fill();
-  }, []);
+  }, [visibleNodeIds, selectedNode]);
 
   // Draw cluster hulls in the background
   const drawClusterHulls = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -565,6 +603,9 @@ const Graph2D: React.FC = () => {
     // Group nodes by cluster
     const nodesByCluster = new Map<number, ProcessedNode[]>();
     nodes.forEach(node => {
+      // Only draw hull for visible nodes
+      if (!visibleNodeIds.has(node.id)) return;
+
       if (node.cluster_id != null && node.x !== undefined && node.y !== undefined) {
         const group = nodesByCluster.get(node.cluster_id) || [];
         group.push(node);
@@ -619,7 +660,7 @@ const Graph2D: React.FC = () => {
         ctx.fillText(cluster.name, centerX, centerY);
       }
     });
-  }, [clusterGroups, processedData.nodes]);
+  }, [clusterGroups, processedData.nodes, visibleNodeIds]);
 
   const getLiveNodeById = useCallback((nodeId: number): ProcessedNode | null => {
     if (!graphRef.current) return null;
@@ -638,13 +679,20 @@ const Graph2D: React.FC = () => {
   const focusNodeById = useCallback((nodeId: number, duration = 900) => {
     if (!graphRef.current) return;
 
-    // Read live positions from the force graph instance — processedData.nodes
-    // only holds initial coordinates, not the ones mutated by the simulation.
+    // Read live positions from the force graph instance
     const liveNode = getLiveNodeById(nodeId);
     if (!liveNode || liveNode.x === undefined || liveNode.y === undefined) return;
 
-    graphRef.current.centerAt(liveNode.x, liveNode.y, duration);
-    graphRef.current.zoom(3, duration);
+    const currentZoom = graphRef.current.zoom();
+    const targetZoom = Math.max(currentZoom, 3);
+
+    // Offset for right panel (assuming 400px wide right panel = 200px shift in screen space)
+    // To shift the node to the left visually, we tell the camera to center on a point to its right.
+    const screenShift = window.innerWidth >= 1024 ? 200 : 0;
+    const graphShift = screenShift / targetZoom;
+
+    graphRef.current.centerAt(liveNode.x + graphShift, liveNode.y, duration);
+    graphRef.current.zoom(targetZoom, duration);
   }, [getLiveNodeById]);
 
   useEffect(() => {
@@ -682,21 +730,32 @@ const Graph2D: React.FC = () => {
   const handleNodeClick = useCallback((node: any) => {
     const processedNode = node as ProcessedNode;
 
-    // Find the full node data from filtered data
-    const fullNode = filteredData?.nodes.find(n => n.id === processedNode.id);
+    // Don't register clicks for ghost nodes unless selected
+    if (!visibleNodeIds.has(processedNode.id) && selectedNode?.id !== processedNode.id) return;
+
+    // Find the full node data from raw data
+    const fullNode = rawData?.nodes.find(n => n.id === processedNode.id);
     if (fullNode) {
       setSelectedNode(fullNode);
     }
 
     focusNodeById(processedNode.id, 1000);
-  }, [filteredData, setSelectedNode, focusNodeById]);
+  }, [visibleNodeIds, rawData, selectedNode, setSelectedNode, focusNodeById]);
 
   // Handle node hover
   const handleNodeHover = useCallback((node: any) => {
-    setLocalHoverNode(node as ProcessedNode | null);
-    setHoveredNode(node ? filteredData?.nodes.find(n => n.id === node.id) || null : null);
-    document.body.style.cursor = node ? 'pointer' : '';
-  }, [filteredData, setHoveredNode]);
+    const processedNode = node as ProcessedNode | null;
+
+    // Don't register hovers for ghost nodes unless selected
+    if (processedNode && !visibleNodeIds.has(processedNode.id) && selectedNode?.id !== processedNode.id) {
+      setActiveHoverNode(null);
+      document.body.style.cursor = '';
+      return;
+    }
+
+    setActiveHoverNode(processedNode);
+    document.body.style.cursor = processedNode ? 'pointer' : '';
+  }, [visibleNodeIds, selectedNode]);
 
   useEffect(() => {
     return () => {
@@ -752,6 +811,8 @@ const Graph2D: React.FC = () => {
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
+        onZoom={() => { userInteractedRef.current = true; }}
+        onNodeDragEnd={() => { userInteractedRef.current = true; }}
 
         // Node rendering
         nodeCanvasObject={paintNode}
