@@ -91,6 +91,9 @@ class GraphData(BaseModel):
     total_edges: int = Field(..., description="Total number of edges")
     total_clusters: int = Field(..., description="Total number of clusters")
     total_star_lists: int = Field(default=0, description="Total number of star lists")
+    version: str | None = Field(None, description="Snapshot version identifier")
+    generated_at: str | None = Field(None, description="Payload generation timestamp")
+    request_id: str | None = Field(None, description="Request correlation ID")
 
 
 class TimelinePoint(BaseModel):
@@ -109,3 +112,6 @@ class TimelineData(BaseModel):
     points: list[TimelinePoint] = Field(..., description="Timeline data points")
     total_stars: int = Field(..., description="Total starred repos")
     date_range: tuple[str, str] = Field(..., description="Date range (start, end)")
+    version: str | None = Field(None, description="Snapshot version identifier")
+    generated_at: str | None = Field(None, description="Payload generation timestamp")
+    request_id: str | None = Field(None, description="Request correlation ID")

@@ -1,4 +1,9 @@
 import client from './client';
+import {
+  getPipelineStatusV2,
+  startSyncPipelineV2,
+  type PipelineStatusResponse,
+} from './v2/sync';
 
 export interface SyncStartResponse {
   task_id: number;
@@ -32,72 +37,120 @@ export interface SyncJobStatusResponse {
   completed_at: string | null;
 }
 
+const toLegacySyncStartResponse = (
+  run: Awaited<ReturnType<typeof startSyncPipelineV2>>
+): SyncStartResponse => ({
+  task_id: run.pipeline_run_id,
+  message: run.message,
+  status: run.status,
+});
+
+const toLegacySyncStatusResponse = (
+  pipeline: PipelineStatusResponse,
+  taskType: string
+): SyncStatusResponse => {
+  const statusToProgress: Record<string, number> = {
+    pending: 0,
+    running: 50,
+    partial_failed: 95,
+    completed: 100,
+    failed: 100,
+  };
+  return {
+    task_id: pipeline.pipeline_run_id,
+    status: pipeline.status,
+    task_type: taskType,
+    total_items: 100,
+    processed_items: statusToProgress[pipeline.status] ?? 0,
+    failed_items: pipeline.status === 'failed' || pipeline.status === 'partial_failed' ? 1 : 0,
+    progress_percent: statusToProgress[pipeline.status] ?? 0,
+    error_message: pipeline.last_error ?? null,
+    started_at: pipeline.started_at ?? null,
+    completed_at: pipeline.completed_at ?? null,
+  };
+};
+
+const toLegacySyncJobStatusResponse = (pipeline: PipelineStatusResponse): SyncJobStatusResponse => ({
+  task_id: pipeline.pipeline_run_id,
+  task_type: 'pipeline',
+  status: pipeline.status,
+  phase: pipeline.phase,
+  progress_percent:
+    pipeline.status === 'completed'
+      ? 100
+      : pipeline.status === 'failed'
+        ? 100
+        : pipeline.status === 'running'
+          ? 50
+          : 0,
+  eta_seconds: null,
+  last_error: pipeline.last_error ?? null,
+  retryable: pipeline.status === 'failed' || pipeline.status === 'partial_failed',
+  started_at: pipeline.started_at ?? null,
+  completed_at: pipeline.completed_at ?? null,
+});
+
 /**
- * 开始同步星标仓库
- * @param mode 同步模式: 'incremental' (增量) 或 'full' (全量)
+ * @deprecated Use `frontend/src/api/v2/sync.ts` instead.
  */
-export const startStarSync = async (mode: "incremental" | "full" = "incremental") => {
-	const response = await client.post<SyncStartResponse>("/sync/stars", null, {
-		params: { mode },
-	});
-	return response.data;
+export const startStarSync = async (mode: 'incremental' | 'full' = 'incremental') => {
+  const response = await startSyncPipelineV2({ mode });
+  return toLegacySyncStartResponse(response);
 };
 
 /**
- * 获取同步任务状态
- * @param taskId 任务 ID
+ * @deprecated Use `frontend/src/api/v2/sync.ts` instead.
  */
 export const getSyncStatus = async (taskId: number) => {
-	const response = await client.get<SyncStatusResponse>(`/sync/status/${taskId}`);
-	return response.data;
+  const response = await getPipelineStatusV2(taskId);
+  return toLegacySyncStatusResponse(response, 'pipeline');
 };
 
 /**
- * 获取所有同步任务状态
+ * @deprecated Keep legacy fallback for call-sites that still need list status.
  */
 export const getAllSyncStatus = async () => {
-	const response = await client.get<SyncStatusResponse[]>("/sync/status");
-	return response.data;
-};
-
-/**
- * 获取聚合任务状态（包含阶段和 ETA）
- */
-export const getSyncJobStatus = async (taskId: number) => {
-  const response = await client.get<SyncJobStatusResponse>(`/sync/jobs/${taskId}`);
+  const response = await client.get<SyncStatusResponse[]>('/sync/status');
   return response.data;
 };
 
 /**
- * 开始计算向量嵌入（增量：只处理未嵌入的仓库）
+ * @deprecated Use `frontend/src/api/v2/sync.ts` instead.
+ */
+export const getSyncJobStatus = async (taskId: number) => {
+  const response = await getPipelineStatusV2(taskId);
+  return toLegacySyncJobStatusResponse(response);
+};
+
+/**
+ * @deprecated Use `frontend/src/api/v2/sync.ts` instead.
  */
 export const startEmbedding = async () => {
-	const response = await client.post<SyncStartResponse>("/sync/embeddings");
-	return response.data;
+  const response = await startSyncPipelineV2({ mode: 'incremental' });
+  return toLegacySyncStartResponse(response);
 };
 
 /**
- * 开始生成 AI 摘要和标签
+ * @deprecated Use `frontend/src/api/v2/sync.ts` instead.
  */
 export const startSummaries = async () => {
-	const response = await client.post<SyncStartResponse>("/sync/summaries");
-	return response.data;
+  const response = await startSyncPipelineV2({ mode: 'incremental' });
+  return toLegacySyncStartResponse(response);
 };
 
 /**
- * 开始运行聚类（生成3D坐标和分类）
+ * @deprecated Use `frontend/src/api/v2/sync.ts` instead.
  */
 export const startClustering = async (
   useLlm: boolean = true,
   maxClusters: number = 8,
   minClusters: number = 2
 ) => {
-	const response = await client.post<SyncStartResponse>("/sync/clustering", null, {
-		params: {
-			use_llm: useLlm,
-			max_clusters: maxClusters,
-			min_clusters: minClusters,
-		},
-	});
-	return response.data;
+  const response = await startSyncPipelineV2({
+    mode: 'incremental',
+    use_llm: useLlm,
+    max_clusters: maxClusters,
+    min_clusters: minClusters,
+  });
+  return toLegacySyncStartResponse(response);
 };

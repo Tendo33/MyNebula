@@ -190,6 +190,24 @@ class AppSettings(BaseSettings):
             "Whether API runs in single-user mode (reads use the first user by default)"
         ),
     )
+    snapshot_read_fallback_on_error: bool = Field(
+        default=True,
+        description=(
+            "Fallback to live payload build when snapshot read fails unexpectedly"
+        ),
+    )
+    slow_query_log_ms: int = Field(
+        default=200,
+        ge=10,
+        le=5000,
+        description="Slow query logging threshold in milliseconds",
+    )
+    api_query_timeout_seconds: int = Field(
+        default=15,
+        ge=1,
+        le=120,
+        description="Timeout for expensive read API queries in seconds",
+    )
 
     # GitHub Personal Access Token
     github_token: str = Field(

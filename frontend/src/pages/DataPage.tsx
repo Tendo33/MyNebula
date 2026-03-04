@@ -4,13 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { Sidebar } from '../components/layout/Sidebar';
 import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { SearchInput } from '../components/ui/SearchInput';
-import { useGraph } from '../contexts/GraphContext';
 import { ClusterInfo } from '../types';
 import {
   Loader2, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, X, Layers, Calendar, Tag
 } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { useDataReposQuery } from '../features/data/hooks/useDataReposQuery';
 
 // ============================================================================
 // Types
@@ -122,7 +122,6 @@ const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) => {
 const DataPage = () => {
   const { t } = useTranslation();
 
-  const { rawData, filters, toggleCluster, clearClusterFilter, loading } = useGraph();
   const [searchParams, setSearchParams] = useSearchParams();
   const monthFilter = searchParams.get('month');
   const topicFilter = searchParams.get('topic');
@@ -135,21 +134,26 @@ const DataPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [localSearch, setLocalSearch] = useState('');
+  const [selectedClusters, setSelectedClusters] = useState<Set<number>>(new Set());
+  const selectedClusterId = selectedClusters.size === 1
+    ? Array.from(selectedClusters)[0]
+    : undefined;
+
+  const { repos, clusters, totalNodes, loading } = useDataReposQuery({
+    searchQuery: localSearch,
+    clusterId: selectedClusterId,
+  });
 
   // Cluster map for quick lookup
   const clusterMap = useMemo(() => {
-    if (!rawData) return new Map<number, ClusterInfo>();
-
     const map = new Map<number, ClusterInfo>();
-    rawData.clusters.forEach(c => map.set(c.id, c));
+    clusters.forEach(c => map.set(c.id, c));
     return map;
-  }, [rawData]);
+  }, [clusters]);
 
   // Filter and sort data
   const processedData = useMemo(() => {
-    if (!rawData) return [];
-
-    let filtered = [...rawData.nodes];
+    let filtered = [...repos];
 
     // Apply search filter
     if (localSearch.trim()) {
@@ -164,9 +168,9 @@ const DataPage = () => {
     }
 
     // Apply cluster filter
-    if (filters.selectedClusters.size > 0) {
+    if (selectedClusters.size > 0) {
       filtered = filtered.filter(
-        node => node.cluster_id != null && filters.selectedClusters.has(node.cluster_id)
+        node => node.cluster_id != null && selectedClusters.has(node.cluster_id)
       );
     }
 
@@ -219,7 +223,7 @@ const DataPage = () => {
     });
 
     return filtered;
-  }, [rawData, localSearch, filters.selectedClusters, monthFilter, topicFilter, sortConfig, clusterMap]);
+  }, [repos, localSearch, selectedClusters, monthFilter, topicFilter, sortConfig, clusterMap]);
 
   // Pagination
   const totalPages = Math.ceil(processedData.length / pageSize);
@@ -245,14 +249,22 @@ const DataPage = () => {
 
   // Handle cluster filter
   const handleClusterFilter = useCallback((clusterId: number) => {
-    toggleCluster(clusterId);
+    setSelectedClusters((current) => {
+      const next = new Set(current);
+      if (next.has(clusterId)) {
+        next.delete(clusterId);
+      } else {
+        next.add(clusterId);
+      }
+      return next;
+    });
     setCurrentPage(1);
-  }, [toggleCluster]);
+  }, []);
 
 
 
   // Format date
-  const formatDate = (dateStr: string | undefined): string => {
+  const formatDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   };
@@ -270,7 +282,7 @@ const DataPage = () => {
             </h2>
             <div className="h-4 w-[1px] bg-border-light mx-1" />
             <span className="text-sm text-text-muted">
-              {processedData.length} / {rawData?.total_nodes || 0} {t('common.repositories')}
+              {processedData.length} / {totalNodes} {t('common.repositories')}
             </span>
           </div>
 
@@ -287,10 +299,10 @@ const DataPage = () => {
             </div>
 
             {/* Clear filters */}
-            {(filters.selectedClusters.size > 0 || localSearch.trim() || monthFilter || topicFilter) && (
+            {(selectedClusters.size > 0 || localSearch.trim() || monthFilter || topicFilter) && (
               <button
                 onClick={() => {
-                  clearClusterFilter();
+                  setSelectedClusters(new Set());
                   setLocalSearch('');
                   setSearchParams({});
                   setCurrentPage(1);
@@ -313,7 +325,7 @@ const DataPage = () => {
           ) : (
             <div className="space-y-4">
               {/* Filter chips */}
-              {(rawData && rawData.clusters.length > 0) || monthFilter || topicFilter ? (
+              {(clusters.length > 0) || monthFilter || topicFilter ? (
                 <div className="flex items-center gap-4 flex-wrap">
                   {/* Month Filter Chip */}
                   {monthFilter && (
@@ -361,18 +373,18 @@ const DataPage = () => {
                     </div>
                   )}
 
-                  {rawData && rawData.clusters.length > 0 && (
+                  {clusters.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="flex items-center gap-1 text-xs text-text-muted">
                         <Layers className="w-4 h-4" />
                         <span>{t('data.filter_by_cluster')}:</span>
                       </div>
-                  {rawData.clusters.map(cluster => (
+                  {clusters.map(cluster => (
                     <button
                       key={cluster.id}
                       onClick={() => handleClusterFilter(cluster.id)}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                        filters.selectedClusters.has(cluster.id)
+                        selectedClusters.has(cluster.id)
                           ? 'ring-2 ring-offset-1'
                           : 'hover:opacity-80'
                       }`}
@@ -518,7 +530,7 @@ const DataPage = () => {
                       {paginatedData.length === 0 && (
                         <tr>
                           <td colSpan={8} className="px-4 py-12 text-center text-text-muted">
-                            {localSearch || filters.selectedClusters.size > 0 || monthFilter || topicFilter
+                            {localSearch || selectedClusters.size > 0 || monthFilter || topicFilter
                               ? t('data.no_results')
                               : t('data.no_data')
                             }

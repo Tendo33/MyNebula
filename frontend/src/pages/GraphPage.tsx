@@ -24,12 +24,15 @@ const GraphPage = () => {
   const {
     filteredData,
     rawData,
+    edgesLoading,
+    error,
     selectedNode,
     setSelectedNode,
     filters,
     setSelectedClusters,
     setSearchQuery,
     clearFilters,
+    retryEdgeLoading,
   } = useGraph();
 
   // Handle URL parameter for node selection
@@ -130,6 +133,21 @@ const GraphPage = () => {
               <span className="hidden sm:inline text-xs text-text-dim">
                 / {rawData.total_nodes} {t('common.total')}
               </span>
+            )}
+            {edgesLoading && (
+              <span className="hidden sm:inline text-xs text-text-dim">
+                · {t('sync.loading', 'Loading')} edges...
+              </span>
+            )}
+            {error && (
+              <button
+                onClick={() => {
+                  void retryEdgeLoading();
+                }}
+                className="hidden sm:inline text-xs text-red-600 hover:underline"
+              >
+                {t('common.retry')}
+              </button>
             )}
           </div>
 

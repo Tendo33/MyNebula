@@ -16,7 +16,8 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nebula.db import SyncSchedule, SyncTask, User
+from nebula.application.services.pipeline_service import SyncPipelineService
+from nebula.db import SyncSchedule
 from nebula.utils import get_logger
 
 logger = get_logger(__name__)
@@ -202,23 +203,6 @@ class SchedulerService:
             )
             self._active_user_tasks[user_id] = task
 
-    async def _create_task_record(
-        self,
-        db: AsyncSession,
-        user_id: int,
-        task_type: str,
-    ) -> int:
-        """Create and persist a sync task record."""
-        task = SyncTask(
-            user_id=user_id,
-            task_type=task_type,
-            status="pending",
-        )
-        db.add(task)
-        await db.commit()
-        await db.refresh(task)
-        return task.id
-
     async def _run_user_sync_pipeline(
         self,
         user_id: int,
@@ -227,92 +211,33 @@ class SchedulerService:
 
         The scheduler check loop never awaits this method directly.
         """
-        from nebula.api.sync import (
-            _should_force_full_recluster,
-            compute_embeddings_task,
-            run_clustering_task,
-            sync_stars_task,
-        )
         from nebula.db.database import get_db_context
 
         try:
-            async with get_db_context() as db:
-                user = await db.get(User, user_id)
-                if not user:
-                    raise ValueError(f"User {user_id} not found")
-
-                active_task_result = await db.execute(
-                    select(SyncTask.id).where(
-                        SyncTask.user_id == user_id,
-                        SyncTask.status.in_(["pending", "running"]),
-                        SyncTask.task_type.in_(
-                            ["stars", "embedding", "cluster", "full_refresh"]
-                        ),
-                    )
-                )
-                active_task_id = active_task_result.scalar_one_or_none()
-                if active_task_id is not None:
-                    logger.info(
-                        f"Skipping scheduled sync for user {user_id}: existing task {active_task_id} is active"
-                    )
-                    schedule = await db.scalar(
-                        select(SyncSchedule).where(SyncSchedule.user_id == user_id)
-                    )
-                    if schedule:
-                        schedule.last_run_status = "success"
-                        schedule.last_run_error = (
-                            "Skipped because another sync task is already running"
-                        )
-                        await db.commit()
-                    return
-
-                stars_task_id = await self._create_task_record(db, user_id, "stars")
-
-            # Run sync (incremental mode)
-            await sync_stars_task(user_id, stars_task_id, "incremental")
-
-            async with get_db_context() as db:
-                embed_task_id = await self._create_task_record(db, user_id, "embedding")
-            await compute_embeddings_task(user_id, embed_task_id)
-
-            force_full_recluster = False
-            async with get_db_context() as db:
-                stars_task = await db.get(SyncTask, stars_task_id)
-                user_latest = await db.get(User, user_id)
-                error_details = stars_task.error_details if stars_task else {}
-                new_repos = (
-                    int(error_details.get("new_repos", 0))
-                    if isinstance(error_details, dict)
-                    else 0
-                )
-                total_repos = int(user_latest.total_stars or 0) if user_latest else 0
-                force_full_recluster = _should_force_full_recluster(
-                    total_repos=total_repos,
-                    new_repos=new_repos,
-                    centroid_drift=None,
-                )
-
-            async with get_db_context() as db:
-                cluster_task_id = await self._create_task_record(db, user_id, "cluster")
-
-            # Prefer incremental mode, but switch to full recluster when drift guard trips.
-            await run_clustering_task(
-                user_id,
-                cluster_task_id,
+            pipeline_service = SyncPipelineService()
+            run_id = await pipeline_service.create_pipeline_run(user_id)
+            await pipeline_service.run_pipeline(
+                run_id,
+                mode="incremental",
                 use_llm=True,
-                incremental=not force_full_recluster,
             )
+            run = await pipeline_service.get_pipeline(run_id)
+            run_failed = run is not None and run.status in {"failed", "partial_failed"}
 
             async with get_db_context() as db:
                 schedule = await db.scalar(
                     select(SyncSchedule).where(SyncSchedule.user_id == user_id)
                 )
                 if schedule:
-                    schedule.last_run_status = "success"
-                    schedule.last_run_error = None
+                    schedule.last_run_status = "failed" if run_failed else "success"
+                    schedule.last_run_error = run.last_error if run_failed and run else None
                     await db.commit()
 
-            logger.info(f"Scheduled sync completed for user {user_id}")
+            logger.info(
+                "Scheduled pipeline sync completed for user %s (run_id=%s)",
+                user_id,
+                run_id,
+            )
 
         except Exception as e:
             logger.exception(f"Scheduled sync failed for user {user_id}: {e}")

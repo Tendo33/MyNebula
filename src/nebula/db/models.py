@@ -75,6 +75,9 @@ class User(Base):
     last_sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    active_graph_snapshot_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("graph_snapshots.id"), nullable=True, index=True
+    )
 
     # Relationships
     starred_repos: Mapped[list["StarredRepo"]] = relationship(
@@ -83,11 +86,25 @@ class User(Base):
     sync_tasks: Mapped[list["SyncTask"]] = relationship(
         "SyncTask", back_populates="user", cascade="all, delete-orphan"
     )
+    pipeline_runs: Mapped[list["PipelineRun"]] = relationship(
+        "PipelineRun", back_populates="user", cascade="all, delete-orphan"
+    )
     sync_schedule: Mapped[Optional["SyncSchedule"]] = relationship(
         "SyncSchedule",
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
+    )
+    graph_snapshots: Mapped[list["GraphSnapshot"]] = relationship(
+        "GraphSnapshot",
+        back_populates="user",
+        foreign_keys="GraphSnapshot.user_id",
+        cascade="all, delete-orphan",
+    )
+    active_graph_snapshot: Mapped[Optional["GraphSnapshot"]] = relationship(
+        "GraphSnapshot",
+        foreign_keys=[active_graph_snapshot_id],
+        post_update=True,
     )
 
     def __repr__(self) -> str:
@@ -441,6 +458,152 @@ class RepoRelatedCache(Base):
         )
 
 
+class GraphSnapshot(Base):
+    """Versioned immutable graph snapshot."""
+
+    __tablename__ = "graph_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    version: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="ready")
+    meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="graph_snapshots",
+        foreign_keys=[user_id],
+    )
+    nodes: Mapped[list["GraphSnapshotNode"]] = relationship(
+        "GraphSnapshotNode",
+        back_populates="snapshot",
+        cascade="all, delete-orphan",
+    )
+    edges: Mapped[list["GraphSnapshotEdge"]] = relationship(
+        "GraphSnapshotEdge",
+        back_populates="snapshot",
+        cascade="all, delete-orphan",
+    )
+    timeline: Mapped[Optional["GraphSnapshotTimeline"]] = relationship(
+        "GraphSnapshotTimeline",
+        back_populates="snapshot",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_graph_snapshots_user_version",
+            "user_id",
+            "version",
+            unique=True,
+        ),
+    )
+
+
+class GraphSnapshotNode(Base):
+    """Node payload stored for one snapshot."""
+
+    __tablename__ = "graph_snapshot_nodes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("graph_snapshots.id"), nullable=False, index=True
+    )
+    repo_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    snapshot: Mapped["GraphSnapshot"] = relationship(
+        "GraphSnapshot", back_populates="nodes"
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_graph_snapshot_nodes_snapshot_repo",
+            "snapshot_id",
+            "repo_id",
+            unique=True,
+        ),
+    )
+
+
+class GraphSnapshotEdge(Base):
+    """Edge payload stored for one snapshot."""
+
+    __tablename__ = "graph_snapshot_edges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("graph_snapshots.id"), nullable=False, index=True
+    )
+    edge_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[int] = mapped_column(Integer, nullable=False)
+    target: Mapped[int] = mapped_column(Integer, nullable=False)
+    weight: Mapped[float] = mapped_column(nullable=False)
+
+    snapshot: Mapped["GraphSnapshot"] = relationship(
+        "GraphSnapshot", back_populates="edges"
+    )
+
+    __table_args__ = (
+        Index("ix_graph_snapshot_edges_snapshot_index", "snapshot_id", "edge_index"),
+    )
+
+
+class GraphSnapshotTimeline(Base):
+    """Timeline payload stored for one snapshot."""
+
+    __tablename__ = "graph_snapshot_timeline"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("graph_snapshots.id"), nullable=False, unique=True, index=True
+    )
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    snapshot: Mapped["GraphSnapshot"] = relationship(
+        "GraphSnapshot", back_populates="timeline"
+    )
+
+
+class PipelineRun(Base):
+    """Pipeline run record for sync -> embedding -> clustering -> snapshot."""
+
+    __tablename__ = "pipeline_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
+    phase: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="pipeline_runs")
+    tasks: Mapped[list["SyncTask"]] = relationship(
+        "SyncTask",
+        back_populates="pipeline_run",
+    )
+
+
 class SyncTask(Base):
     """Synchronization task tracking model."""
 
@@ -450,6 +613,9 @@ class SyncTask(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False, index=True
     )
+    pipeline_run_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("pipeline_runs.id"), nullable=True, index=True
+    )
 
     # Task info
     task_type: Mapped[str] = mapped_column(
@@ -458,6 +624,7 @@ class SyncTask(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending", index=True
     )  # pending, running, completed, failed
+    phase: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
 
     # Progress
     total_items: Mapped[int] = mapped_column(Integer, default=0)
@@ -481,6 +648,9 @@ class SyncTask(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="sync_tasks")
+    pipeline_run: Mapped[Optional["PipelineRun"]] = relationship(
+        "PipelineRun", back_populates="tasks"
+    )
 
     def __repr__(self) -> str:
         return f"<SyncTask(id={self.id}, type={self.task_type}, status={self.status})>"

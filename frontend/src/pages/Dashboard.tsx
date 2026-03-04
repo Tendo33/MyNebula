@@ -1,11 +1,10 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { LanguageSwitch } from '../components/layout/LanguageSwitch';
-import { useGraph } from '../contexts/GraphContext';
 import { DashboardSkeleton } from '../components/ui/Skeleton';
 import { Book, Code, Layers, TrendingUp, ArrowRight, Calendar, Hash, Tag } from 'lucide-react';
+import { useDashboardQuery } from '../features/dashboard/hooks/useDashboardQuery';
 
 // ============================================================================
 // Types
@@ -34,37 +33,6 @@ interface ClusterCardProps {
   keywords: string[];
   onClick?: () => void;
 }
-
-// ============================================================================
-// Language Colors (GitHub style)
-// ============================================================================
-
-const LANGUAGE_COLORS: Record<string, string> = {
-  JavaScript: '#f1e05a',
-  TypeScript: '#3178c6',
-  Python: '#3572A5',
-  Java: '#b07219',
-  Go: '#00ADD8',
-  Rust: '#dea584',
-  Ruby: '#701516',
-  PHP: '#4F5D95',
-  'C++': '#f34b7d',
-  C: '#555555',
-  'C#': '#178600',
-  Swift: '#F05138',
-  Kotlin: '#A97BFF',
-  Scala: '#c22d40',
-  Shell: '#89e051',
-  Vue: '#41b883',
-  HTML: '#e34c26',
-  CSS: '#563d7c',
-  Dart: '#00B4AB',
-  Lua: '#000080',
-};
-
-const getLanguageColor = (language: string): string => {
-  return LANGUAGE_COLORS[language] || '#6B7280';
-};
 
 // ============================================================================
 // Sub Components
@@ -161,92 +129,7 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
 const Dashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { rawData, timelineData, loading } = useGraph();
-
-  // Calculate statistics
-  const stats = useMemo(() => {
-    if (!rawData) return null;
-
-    const totalRepos = rawData.total_nodes;
-
-    // Calculate unique topics and topic counts
-    const topicCounts: Record<string, number> = {};
-    rawData.nodes.forEach(node => {
-      if (node.topics && Array.isArray(node.topics)) {
-        node.topics.forEach(topic => {
-          const normalizedTopic = topic.toLowerCase();
-          topicCounts[normalizedTopic] = (topicCounts[normalizedTopic] || 0) + 1;
-        });
-      }
-    });
-    const totalTopics = Object.keys(topicCounts).length;
-
-    // Top topics sorted by count
-    const topTopics = Object.entries(topicCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 12)
-      .map(([topic, count]) => ({ topic, count }));
-
-    const totalClusters = rawData.total_clusters;
-    const totalEdges = rawData.total_edges;
-
-    // Language distribution
-    const languageCounts: Record<string, number> = {};
-    rawData.nodes.forEach(node => {
-      if (node.language) {
-        languageCounts[node.language] = (languageCounts[node.language] || 0) + 1;
-      }
-    });
-
-    const topLanguages = Object.entries(languageCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([language, count]) => ({
-        language,
-        count,
-        percentage: (count / totalRepos) * 100,
-        color: getLanguageColor(language),
-      }));
-
-    const topLanguage = topLanguages[0];
-
-    // Top clusters
-    const topClusters = [...rawData.clusters]
-      .sort((a, b) => b.repo_count - a.repo_count)
-      .slice(0, 6);
-
-    // Recent activity (from timeline)
-    const recentMonths = timelineData?.points.slice(-3) || [];
-    const recentActivity = recentMonths.reduce((sum, p) => sum + p.count, 0);
-
-    return {
-      totalRepos,
-      totalTopics,
-      totalClusters,
-      totalEdges,
-      topLanguages,
-      topLanguage: topLanguage ? `${topLanguage.language} (${topLanguage.count})` : t('common.n_a'),
-      topClusters,
-      topTopics,
-      recentActivity,
-    };
-  }, [rawData, timelineData]);
-
-  // Activity chart data
-  const activityData = useMemo(() => {
-    if (!timelineData || timelineData.points.length === 0) return [];
-
-    // Take last 12 months
-    return timelineData.points.slice(-12).map(point => ({
-      date: point.date,
-      count: point.count,
-      languages: point.top_languages,
-    }));
-  }, [timelineData]);
-
-  const maxActivity = useMemo(() => {
-    return Math.max(...activityData.map(d => d.count), 1);
-  }, [activityData]);
+  const { stats, activityData, maxActivity, loading } = useDashboardQuery();
 
   // Navigate to graph with cluster filter
   const handleClusterClick = (clusterId: number) => {
@@ -293,13 +176,13 @@ const Dashboard = () => {
                 />
                 <StatCard
                   title={t('dashboard.total_topics')}
-                  value={stats?.totalTopics.toLocaleString() || '0'}
+                  value={stats ? stats.totalTopics.toLocaleString() : '0'}
                   icon={Hash}
                   subValue={t('dashboard.unique_topics')}
                 />
                 <StatCard
                   title={t('dashboard.top_language')}
-                  value={stats?.topLanguage || '-'}
+                  value={stats?.topLanguage || t('common.n_a')}
                   icon={Code}
                 />
                 <StatCard
@@ -320,12 +203,12 @@ const Dashboard = () => {
                       {t('dashboard.language_distribution')}
                     </h3>
                     <span className="text-xs text-text-muted">
-                      {stats?.topLanguages.length || 0} {t('common.languages')}
+                      {stats?.topLanguages?.length || 0} {t('common.languages')}
                     </span>
                   </div>
 
                   <div className="space-y-4">
-                    {stats?.topLanguages.map((lang, idx) => (
+                    {stats?.topLanguages?.map((lang, idx) => (
                       <LanguageBar
                         key={idx}
                         language={lang.language}
@@ -429,9 +312,10 @@ const Dashboard = () => {
 
                   {/* Topics cloud */}
                   <div className="flex flex-wrap gap-2">
-                    {stats?.topTopics.map((item, idx) => {
+                    {stats?.topTopics?.map((item, idx) => {
                       // Color intensity based on count ranking
-                      const intensity = 1 - (idx / (stats.topTopics.length - 1)) * 0.6;
+                      const totalTopics = stats?.topTopics?.length || 1;
+                      const intensity = 1 - (idx / (totalTopics - 1 || 1)) * 0.6;
                       return (
                         <button
                           key={item.topic}
@@ -482,7 +366,7 @@ const Dashboard = () => {
                     <ClusterCard
                       key={cluster.id}
                       name={cluster.name || `Cluster ${cluster.id}`}
-                      color={cluster.color}
+                      color={cluster.color || '#6B7280'}
                       repoCount={cluster.repo_count}
                       keywords={cluster.keywords || []}
                       onClick={() => handleClusterClick(cluster.id)}
