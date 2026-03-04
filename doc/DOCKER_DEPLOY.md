@@ -133,7 +133,7 @@ docker compose up -d
 | `DATABASE_PASSWORD` | `mynebula_secret` | 数据库密码（**生产环境请修改**） |
 | `DATABASE_NAME` | `mynebula` | 数据库名 |
 
-> 注意：`DATABASE_HOST` 和 `DATABASE_PORT` 由 docker-compose.yml 内部管理（api 容器通过 Docker 网络连接 db 容器），**不需要在 .env 中设置**。
+> 注意：`DATABASE_HOST` 和 `DATABASE_PORT` 在 Docker Compose 下由容器网络内部固定（api 连接 `db:5432`），模板中可保留默认值，通常无需修改。
 
 #### Docker 镜像
 
@@ -165,13 +165,13 @@ docker compose up -d
 | `LLM_MODEL` | `Qwen/Qwen2.5-7B-Instruct` | 模型名称 |
 | `LLM_OUTPUT_LANGUAGE` | `zh` | LLM 输出语言（`zh` 或 `en`） |
 
-### 不需要配置的变量（已从 .env.example 移除）
+### Docker Compose 下一般无需修改的变量（模板中可保留默认）
 
 | 变量 | 原因 |
 |------|------|
-| `DATABASE_HOST` | docker-compose.yml 内部固定为 `db`（容器服务名） |
-| `DATABASE_PORT` | docker-compose.yml 内部固定为 `5432` |
-| `DATABASE_URL` | docker-compose.yml 中显式设为空，防止覆盖 |
+| `DATABASE_HOST` | API 容器内部固定连接 `db`（容器服务名） |
+| `DATABASE_PORT` | API 容器内部固定连接 `5432` |
+| `DATABASE_URL` | docker-compose.yml 中显式设为空，防止覆盖分离式配置 |
 | `VITE_API_BASE_URL` | 前端已内置自动检测逻辑（使用 `window.location.origin`） |
 | `FRONTEND_URL` | 代码中未实际使用 |
 | `APP_VERSION` | 版本号由 Docker 镜像决定 |
