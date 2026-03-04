@@ -1,5 +1,10 @@
-import client from './client';
 import { GraphData, GraphEdge, TimelineData } from '../types';
+import {
+  getGraphDataV2,
+  getGraphEdgesPageV2,
+  getTimelineDataV2,
+  rebuildGraphV2,
+} from './v2/graph';
 
 export interface GetGraphEdgesParams {
   min_similarity?: number;
@@ -13,8 +18,7 @@ export interface GetGraphEdgesParams {
  * @returns Complete graph data with nodes, edges, and clusters
  */
 export const getGraphData = async (): Promise<GraphData> => {
-  const response = await client.get<GraphData>('/graph');
-  return response.data;
+  return getGraphDataV2({ version: 'active', include_edges: false });
 };
 
 /**
@@ -22,8 +26,7 @@ export const getGraphData = async (): Promise<GraphData> => {
  * @returns Timeline data grouped by month
  */
 export const getTimelineData = async (): Promise<TimelineData> => {
-  const response = await client.get<TimelineData>('/graph/timeline');
-  return response.data;
+  return getTimelineDataV2('active');
 };
 
 /**
@@ -32,13 +35,23 @@ export const getTimelineData = async (): Promise<TimelineData> => {
 export const getGraphEdges = async (
   params?: GetGraphEdgesParams
 ): Promise<GraphEdge[]> => {
-  const response = await client.get<GraphEdge[]>('/graph/edges', {
-    params: {
-      min_similarity: params?.min_similarity,
-      k: params?.k ?? 8,
-      max_nodes: params?.max_nodes ?? 1000,
-      adaptive: params?.adaptive ?? true,
-    },
-  });
-  return response.data;
+  const limit = Math.max(100, Math.min(5000, params?.max_nodes ?? 1000));
+  const edges: GraphEdge[] = [];
+  let cursor: number | null = 0;
+
+  while (cursor != null) {
+    const page = await getGraphEdgesPageV2({
+      version: 'active',
+      cursor,
+      limit,
+    });
+    edges.push(...page.edges);
+    cursor = page.next_cursor;
+  }
+
+  return edges;
+};
+
+export const rebuildGraph = async (): Promise<GraphData> => {
+  return rebuildGraphV2();
 };

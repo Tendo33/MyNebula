@@ -109,4 +109,3 @@ def merge_repo_tags(
 ) -> list[str]:
     """Normalize and merge repo tag sources."""
     return merge_and_normalize_tag_sources(ai_tags, topics)
-

@@ -7,7 +7,7 @@ and GitHub configurations needed for the MyNebula application.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AliasChoices, Field, computed_field, field_validator
+from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -150,7 +150,6 @@ class SyncSettings(BaseSettings):
         description="Maximum README content length to store",
         ge=1000,
         le=100000,
-        validation_alias=AliasChoices("SYNC_README_MAX_LENGTH", "README_MAX_LENGTH"),
     )
     default_sync_mode: Literal["incremental", "full"] = Field(
         default="incremental",
@@ -176,19 +175,33 @@ class AppSettings(BaseSettings):
 
     # Basic settings
     app_name: str = Field(default="mynebula", description="Application name")
-    app_version: str = Field(default="1.0.5", description="Application version")
+    app_version: str = Field(default="1.0.6", description="Application version")
     debug: bool = Field(
         default=False, description="Debug mode (also controls environment)"
-    )
-    frontend_url: str = Field(
-        default="http://localhost:5173",
-        description="Frontend URL for redirects",
     )
     single_user_mode: bool = Field(
         default=True,
         description=(
             "Whether API runs in single-user mode (reads use the first user by default)"
         ),
+    )
+    snapshot_read_fallback_on_error: bool = Field(
+        default=True,
+        description=(
+            "Fallback to live payload build when snapshot read fails unexpectedly"
+        ),
+    )
+    slow_query_log_ms: int = Field(
+        default=200,
+        ge=10,
+        le=5000,
+        description="Slow query logging threshold in milliseconds",
+    )
+    api_query_timeout_seconds: int = Field(
+        default=15,
+        ge=1,
+        le=120,
+        description="Timeout for expensive read API queries in seconds",
     )
 
     # GitHub Personal Access Token

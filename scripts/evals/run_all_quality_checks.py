@@ -25,7 +25,9 @@ def _load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
-def _evaluate_related(goldset_rows: list[dict], predictions: dict[int, list[int]]) -> dict:
+def _evaluate_related(
+    goldset_rows: list[dict], predictions: dict[int, list[int]]
+) -> dict:
     if not goldset_rows:
         return {"p_at_5": 0.0, "ndcg_at_10": 0.0, "coverage": 0.0}
 
@@ -83,8 +85,12 @@ def run_checks() -> dict:
     related_rows = _load_jsonl(Path("data/eval/related_goldset.jsonl"))
     related_predictions_path = Path("data/eval/related_predictions.json")
     if related_predictions_path.exists():
-        predictions_raw = json.loads(related_predictions_path.read_text(encoding="utf-8"))
-        predictions = {int(k): [int(v) for v in values] for k, values in predictions_raw.items()}
+        predictions_raw = json.loads(
+            related_predictions_path.read_text(encoding="utf-8")
+        )
+        predictions = {
+            int(k): [int(v) for v in values] for k, values in predictions_raw.items()
+        }
     else:
         predictions = {}
 
@@ -114,7 +120,9 @@ def main() -> None:
 
     report_path = Path("data/eval/quality_report.json")
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+    report_path.write_text(
+        json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     if failed:
         print(f"Quality gate failed: {', '.join(failed)}", file=sys.stderr)

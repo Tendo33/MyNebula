@@ -25,7 +25,9 @@ def test_generate_repo_summary_and_tags_uses_english_prompt_when_configured():
             _ = max_tokens, temperature
             captured["prompt"] = prompt
             captured["system_prompt"] = system_prompt or ""
-            return '{"summary": "English summary", "tags": ["agent", "workflow", "cli"]}'
+            return (
+                '{"summary": "English summary", "tags": ["agent", "workflow", "cli"]}'
+            )
 
         service.complete = fake_complete  # type: ignore[method-assign]
 
@@ -67,7 +69,9 @@ def test_generate_repo_summary_and_tags_includes_full_readme_and_specificity_rul
             _ = max_tokens, temperature
             captured["prompt"] = prompt
             captured["system_prompt"] = system_prompt or ""
-            return '{"summary": "English summary", "tags": ["agent", "workflow", "cli"]}'
+            return (
+                '{"summary": "English summary", "tags": ["agent", "workflow", "cli"]}'
+            )
 
         service.complete = fake_complete  # type: ignore[method-assign]
 
@@ -82,7 +86,10 @@ def test_generate_repo_summary_and_tags_includes_full_readme_and_specificity_rul
         )
 
         assert "TAIL_MARKER" in captured["prompt"]
-        assert "Must include at least 2 concrete project details from the input" in captured["prompt"]
+        assert (
+            "Must include at least 2 concrete project details from the input"
+            in captured["prompt"]
+        )
 
     asyncio.run(run_test())
 
@@ -165,9 +172,10 @@ def test_generate_cluster_info_uses_english_prompt_when_configured():
         assert description == "Tooling for autonomous agent workflows"
         assert keywords == ["agent", "automation", "tooling"]
         assert "Analyze the following GitHub repositories" in captured["prompt"]
-        assert "technical analyst specializing in GitHub project taxonomy" in captured[
-            "system_prompt"
-        ]
+        assert (
+            "technical analyst specializing in GitHub project taxonomy"
+            in captured["system_prompt"]
+        )
 
     asyncio.run(run_test())
 

@@ -202,7 +202,8 @@ LLM_OUTPUT_LANGUAGE=zh
 | 变量名 | 类型 | 默认值 | 范围 | 说明 |
 |--------|------|--------|------|------|
 | `SYNC_BATCH_SIZE` | integer | `100` | 10-500 | 每批处理的仓库数量 |
-| `README_MAX_LENGTH` | integer | `10000` | 1000-100000 | README 内容最大长度（字符） |
+| `SYNC_README_MAX_LENGTH` | integer | `10000` | 1000-100000 | README 内容最大长度（字符） |
+| `README_MAX_LENGTH` | integer | `10000` | 1000-100000 | 兼容旧变量名（不建议新配置使用） |
 
 ---
 

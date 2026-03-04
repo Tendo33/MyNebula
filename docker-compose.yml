@@ -60,7 +60,7 @@ services:
 
       # ---------- 同步配置 ----------
       - SYNC_BATCH_SIZE=${SYNC_BATCH_SIZE:-100}
-      - README_MAX_LENGTH=${README_MAX_LENGTH:-10000}
+      - SYNC_README_MAX_LENGTH=${SYNC_README_MAX_LENGTH:-10000}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:

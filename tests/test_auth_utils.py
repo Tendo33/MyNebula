@@ -18,7 +18,7 @@ def test_verify_admin_credentials_plaintext_password():
 
 
 def test_admin_auth_disabled_when_password_not_set():
-    settings = AppSettings(admin_username="owner")
+    settings = AppSettings(admin_username="owner", admin_password="")
 
     assert is_admin_auth_enabled(settings) is False
     assert verify_admin_credentials("owner", "anything", settings) is False

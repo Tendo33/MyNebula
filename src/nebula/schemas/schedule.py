@@ -90,7 +90,9 @@ class JobStatusResponse(BaseModel):
     task_type: str = Field(..., description="Task type")
     status: str = Field(..., description="Task status")
     phase: str = Field(..., description="Current task phase")
-    progress_percent: float = Field(..., description="Progress percentage", ge=0, le=100)
+    progress_percent: float = Field(
+        ..., description="Progress percentage", ge=0, le=100
+    )
     eta_seconds: int | None = Field(
         None, description="Estimated remaining seconds when running"
     )

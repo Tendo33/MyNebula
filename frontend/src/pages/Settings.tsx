@@ -25,33 +25,22 @@ import { useGraph } from '../contexts/GraphContext';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { API_BASE_URL } from '../api/client';
 import {
-  startClustering,
-  startEmbedding,
-  startStarSync,
-  startSummaries,
-  getSyncJobStatus,
-  getSyncStatus,
-  type SyncJobStatusResponse,
-} from '../api/sync';
+  getPipelineStatusV2,
+  startSyncPipelineV2,
+  type PipelineStatusResponse,
+} from '../api/v2/sync';
 import {
-  formatLastRunTime,
-  formatNextRunTime,
-  getSchedule,
-  getStatusDisplay,
-  getSyncInfo,
-  triggerFullRefresh,
-  updateSchedule,
+  getFullRefreshJobStatusV2,
+  getSettingsV2,
+  triggerFullRefreshV2,
+  updateScheduleV2,
+  type FullRefreshJobStatus,
   type ScheduleConfig,
   type ScheduleResponse,
   type SyncInfoResponse,
-} from '../api/schedule';
+} from '../api/v2/settings';
+import { formatLastRunTime, formatNextRunTime, getStatusDisplay } from '../utils/scheduleFormat';
 import { getAdminAuthConfig } from '../api/auth';
-
-interface TaskProgressUpdate {
-  state: string;
-  progress: number;
-  error: string | null;
-}
 
 interface TaskCompletionResult {
   success: boolean;
@@ -60,9 +49,9 @@ interface TaskCompletionResult {
 
 const createPipelineSyncSteps = (): { id: string; status: SyncStepStatus; progress?: number; error?: string }[] => ([
   { id: 'stars', status: 'pending', progress: 0 },
-  { id: 'summaries', status: 'pending', progress: 0 },
   { id: 'embeddings', status: 'pending', progress: 0 },
   { id: 'clustering', status: 'pending', progress: 0 },
+  { id: 'snapshot', status: 'pending', progress: 0 },
 ]);
 
 const createFullRefreshSteps = (): { id: string; status: SyncStepStatus; progress?: number; error?: string }[] => ([
@@ -143,14 +132,22 @@ const Settings = () => {
   const loadScheduleData = useCallback(async () => {
     try {
       setError(null);
-      const [scheduleData, infoData] = await Promise.all([getSchedule(), getSyncInfo()]);
-      setSchedule(scheduleData);
-      setSyncInfo(infoData);
+      const settingsPayload = await getSettingsV2();
+      setSchedule(settingsPayload.schedule);
+      setSyncInfo(settingsPayload.sync_info);
+
+      updateSettings({
+        maxClusters: settingsPayload.graph_defaults.max_clusters,
+        minClusters: settingsPayload.graph_defaults.min_clusters,
+        relatedMinSemantic: settingsPayload.graph_defaults.related_min_semantic,
+        hqRendering: settingsPayload.graph_defaults.hq_rendering,
+        showTrajectories: settingsPayload.graph_defaults.show_trajectories,
+      });
     } catch (err) {
       setError(t('settings.load_schedule_error'));
       console.error('Failed to load schedule data:', err);
     }
-  }, [t]);
+  }, [t, updateSettings]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -173,36 +170,26 @@ const Settings = () => {
       .catch(() => setAdminAuthConfigured(null));
   }, [isAuthenticated]);
 
-  const waitForTaskComplete = async (
-    taskId: number,
-    onProgress?: (update: TaskProgressUpdate) => void
+  const waitForPipelineComplete = async (
+    runId: number,
+    onProgress?: (pipeline: PipelineStatusResponse) => void
   ): Promise<TaskCompletionResult> => {
     while (true) {
       try {
-        const status = await getSyncStatus(taskId);
-        const progress = Number.isFinite(status.progress_percent)
-          ? Math.max(0, Math.min(100, status.progress_percent))
-          : 0;
+        const pipeline = await getPipelineStatusV2(runId);
+        onProgress?.(pipeline);
 
-        onProgress?.({
-          state: status.status,
-          progress,
-          error: status.error_message,
-        });
-
-        if (status.status === 'completed') {
+        if (pipeline.status === 'completed') {
           return { success: true, error: null };
         }
 
-        if (status.status === 'failed') {
-          console.error('Task failed:', status.error_message);
-          return { success: false, error: status.error_message };
+        if (pipeline.status === 'failed' || pipeline.status === 'partial_failed') {
+          return { success: false, error: pipeline.last_error || null };
         }
       } catch (err) {
-        console.error('Poll status error:', err);
         return {
           success: false,
-          error: err instanceof Error ? err.message : 'poll_status_failed',
+          error: err instanceof Error ? err.message : 'poll_pipeline_status_failed',
         };
       }
 
@@ -210,21 +197,21 @@ const Settings = () => {
     }
   };
 
-  const waitForJobComplete = async (
+  const waitForFullRefreshJobComplete = async (
     taskId: number,
-    onProgress?: (job: SyncJobStatusResponse) => void
+    onProgress?: (job: FullRefreshJobStatus) => void
   ): Promise<TaskCompletionResult> => {
     while (true) {
       try {
-        const job = await getSyncJobStatus(taskId);
-        onProgress?.(job);
+        const jobResponse = await getFullRefreshJobStatusV2(taskId);
+        onProgress?.(jobResponse.job);
 
-        if (job.status === 'completed') {
+        if (jobResponse.job.status === 'completed') {
           return { success: true, error: null };
         }
 
-        if (job.status === 'failed') {
-          return { success: false, error: job.last_error };
+        if (jobResponse.job.status === 'failed') {
+          return { success: false, error: jobResponse.job.last_error };
         }
       } catch (err) {
         return {
@@ -237,37 +224,81 @@ const Settings = () => {
     }
   };
 
-  const updateStepStatus = (
-    stepId: string,
-    status: SyncStepStatus,
-    stepError?: string,
-    progress?: number
-  ) => {
-    setSyncSteps((prev) =>
-      prev.map((step) =>
-        step.id === stepId
-          ? {
-              ...step,
-              status,
-              error: stepError,
-              progress:
-                progress !== undefined
-                  ? Math.max(0, Math.min(100, Math.round(progress)))
-                  : status === 'running'
-                  ? step.progress
-                  : undefined,
-            }
-          : step
-      )
-    );
-  };
-
   const resetSteps = () => {
     setSyncSteps(createPipelineSyncSteps());
   };
 
   const resetFullRefreshStepState = () => {
     setSyncSteps(createFullRefreshSteps());
+  };
+
+  const normalizePipelinePhase = (
+    phase: string
+  ): 'stars' | 'embeddings' | 'clustering' | 'snapshot' | null => {
+    switch (phase) {
+      case 'stars':
+      case 'star':
+        return 'stars';
+      case 'embedding':
+      case 'embeddings':
+        return 'embeddings';
+      case 'cluster':
+      case 'clustering':
+        return 'clustering';
+      case 'snapshot':
+        return 'snapshot';
+      default:
+        return null;
+    }
+  };
+
+  const updatePipelineProgress = (pipeline: PipelineStatusResponse) => {
+    const phaseOrder = ['stars', 'embeddings', 'clustering', 'snapshot'] as const;
+    const normalizedPhase = normalizePipelinePhase(pipeline.phase);
+    const phaseIndex =
+      normalizedPhase !== null ? phaseOrder.findIndex((phase) => phase === normalizedPhase) : -1;
+
+    if (phaseIndex >= 0) {
+      setSyncStep(t(`sync.step_${phaseOrder[phaseIndex]}_label`, phaseOrder[phaseIndex]));
+    }
+
+    setSyncSteps((previous) =>
+      previous.map((step, index) => {
+        if (pipeline.status === 'completed') {
+          return { ...step, status: 'completed', progress: 100, error: undefined };
+        }
+
+        if (pipeline.status === 'failed' || pipeline.status === 'partial_failed') {
+          if (phaseIndex >= 0 && index < phaseIndex) {
+            return { ...step, status: 'completed', progress: 100, error: undefined };
+          }
+          if (
+            step.id === normalizedPhase ||
+            (normalizedPhase === null && index === previous.length - 1)
+          ) {
+            return {
+              ...step,
+              status: 'failed',
+              error: pipeline.last_error || undefined,
+            };
+          }
+          return { ...step, status: 'pending', progress: 0, error: undefined };
+        }
+
+        if (phaseIndex >= 0 && index < phaseIndex) {
+          return { ...step, status: 'completed', progress: 100, error: undefined };
+        }
+        if (phaseIndex >= 0 && index === phaseIndex) {
+          return {
+            ...step,
+            status: 'running',
+            progress: 40,
+            error: undefined,
+          };
+        }
+        return { ...step, status: 'pending', progress: 0, error: undefined };
+      })
+    );
   };
 
   const normalizeFullRefreshPhase = (phase: string): 'reset' | 'stars' | 'embeddings' | 'clustering' | null => {
@@ -293,7 +324,7 @@ const Settings = () => {
     }
   };
 
-  const updateFullRefreshProgress = (job: SyncJobStatusResponse) => {
+  const updateFullRefreshProgress = (job: FullRefreshJobStatus) => {
     const phaseOrder = ['reset', 'stars', 'embeddings', 'clustering'] as const;
     const normalizedPhase = normalizeFullRefreshPhase(job.phase);
     const phaseIndex =
@@ -397,8 +428,8 @@ const Settings = () => {
         schedule_minute: schedule.schedule_minute,
         timezone: schedule.timezone,
       };
-      const updated = await updateSchedule(newConfig);
-      setSchedule(updated);
+      const updated = await updateScheduleV2(newConfig);
+      setSchedule(updated.schedule);
     } catch (err) {
       setError(t('settings.update_schedule_error'));
       console.error('Failed to update schedule:', err);
@@ -418,8 +449,8 @@ const Settings = () => {
         schedule_minute: minute,
         timezone: schedule.timezone,
       };
-      const updated = await updateSchedule(newConfig);
-      setSchedule(updated);
+      const updated = await updateScheduleV2(newConfig);
+      setSchedule(updated.schedule);
     } catch (err) {
       setError(t('settings.update_time_error'));
       console.error('Failed to update schedule time:', err);
@@ -436,66 +467,23 @@ const Settings = () => {
       setProgressTitle(t('sync.title', 'Syncing Data'));
       resetSteps();
 
-      updateStepStatus('stars', 'running', undefined, 0);
-      setSyncStep(t('sync.step_stars_label'));
-      const starsResult = await startStarSync('incremental');
-      const starsResultStatus = await waitForTaskComplete(starsResult.task_id, ({ progress }) => {
-        updateStepStatus('stars', 'running', undefined, progress);
+      const started = await startSyncPipelineV2({
+        mode: 'incremental',
+        use_llm: true,
+        max_clusters: settings.maxClusters,
+        min_clusters: settings.minClusters,
       });
-      if (!starsResultStatus.success) {
-        const starsError = starsResultStatus.error || t('errors.sync_stars_failed');
-        updateStepStatus('stars', 'failed', starsError);
-        throw new Error(starsError);
-      }
-      updateStepStatus('stars', 'completed', undefined, 100);
-
-      updateStepStatus('summaries', 'running', undefined, 0);
-      setSyncStep(t('sync.step_summaries_label'));
-      try {
-        const summariesResult = await startSummaries();
-        const summariesStatus = await waitForTaskComplete(
-          summariesResult.task_id,
-          ({ progress }) => {
-            updateStepStatus('summaries', 'running', undefined, progress);
-          }
-        );
-        if (!summariesStatus.success) {
-          console.warn('Summaries generation skipped:', summariesStatus.error);
-        }
-      } catch (err) {
-        console.warn('Summaries generation skipped:', err);
-      }
-      updateStepStatus('summaries', 'completed', undefined, 100);
-
-      updateStepStatus('embeddings', 'running', undefined, 0);
-      setSyncStep(t('sync.step_embeddings_label'));
-      const embeddingResult = await startEmbedding();
-      const embeddingStatus = await waitForTaskComplete(embeddingResult.task_id, ({ progress }) => {
-        updateStepStatus('embeddings', 'running', undefined, progress);
-      });
-      if (!embeddingStatus.success) {
-        const embeddingError = embeddingStatus.error || t('errors.embedding_failed');
-        updateStepStatus('embeddings', 'failed', embeddingError);
-        throw new Error(embeddingError);
-      }
-      updateStepStatus('embeddings', 'completed', undefined, 100);
-
-      updateStepStatus('clustering', 'running', undefined, 0);
-      setSyncStep(t('sync.step_clustering_label'));
-      const clusterResult = await startClustering(
-        true,
-        settings.maxClusters,
-        settings.minClusters
+      const pipelineResult = await waitForPipelineComplete(
+        started.pipeline_run_id,
+        updatePipelineProgress
       );
-      const clusterStatus = await waitForTaskComplete(clusterResult.task_id, ({ progress }) => {
-        updateStepStatus('clustering', 'running', undefined, progress);
-      });
-      if (!clusterStatus.success) {
-        const clusterError = clusterStatus.error || t('errors.clustering_failed');
-        updateStepStatus('clustering', 'failed', clusterError);
-        throw new Error(clusterError);
+      if (!pipelineResult.success) {
+        throw new Error(pipelineResult.error || t('errors.sync_failed'));
       }
-      updateStepStatus('clustering', 'completed', undefined, 100);
+
+      setSyncSteps((prev) =>
+        prev.map((step) => ({ ...step, status: 'completed', progress: 100, error: undefined }))
+      );
 
       await refreshData();
       await loadScheduleData();
@@ -513,10 +501,15 @@ const Settings = () => {
     setError(null);
 
     try {
-      const started = await startClustering(true, settings.maxClusters, settings.minClusters);
-      const clusterStatus = await waitForTaskComplete(started.task_id);
-      if (!clusterStatus.success) {
-        throw new Error(clusterStatus.error || t('errors.clustering_failed'));
+      const started = await startSyncPipelineV2({
+        mode: 'incremental',
+        use_llm: true,
+        max_clusters: settings.maxClusters,
+        min_clusters: settings.minClusters,
+      });
+      const pipelineResult = await waitForPipelineComplete(started.pipeline_run_id);
+      if (!pipelineResult.success) {
+        throw new Error(pipelineResult.error || t('errors.clustering_failed'));
       }
 
       await refreshData();
@@ -539,8 +532,11 @@ const Settings = () => {
     resetFullRefreshStepState();
 
     try {
-      const started = await triggerFullRefresh();
-      const fullRefreshStatus = await waitForJobComplete(started.task_id, updateFullRefreshProgress);
+      const started = await triggerFullRefreshV2();
+      const fullRefreshStatus = await waitForFullRefreshJobComplete(
+        started.task.task_id,
+        updateFullRefreshProgress
+      );
       if (!fullRefreshStatus.success) {
         throw new Error(fullRefreshStatus.error || t('settings.full_refresh_error'));
       }

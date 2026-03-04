@@ -108,8 +108,7 @@ def main() -> None:
         predictions_raw = json.loads(args.predictions.read_text(encoding="utf-8"))
 
     predictions: dict[int, list[int]] = {
-        int(k): [int(v) for v in values]
-        for k, values in predictions_raw.items()
+        int(k): [int(v) for v in values] for k, values in predictions_raw.items()
     }
 
     result = evaluate_related(goldset_rows, predictions)

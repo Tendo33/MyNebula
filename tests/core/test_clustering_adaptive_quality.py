@@ -21,7 +21,9 @@ def test_clustering_service_produces_multiple_clusters_on_separable_data():
         + [[0.0, 0.0, 1.0] for _ in range(12)]
     )
 
-    service = ClusteringService(min_clusters=3, target_min_clusters=3, target_max_clusters=8)
+    service = ClusteringService(
+        min_clusters=3, target_min_clusters=3, target_max_clusters=8
+    )
     result = service.fit_transform(embeddings=embeddings, resolve_overlap=False)
 
     assert result.n_clusters >= 3
