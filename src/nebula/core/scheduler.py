@@ -149,9 +149,9 @@ class SchedulerService:
                 else None
             )
 
-            from nebula.api.sync import _is_schedule_due
+            from nebula.application.services.sync_ops_service import is_schedule_due
 
-            if not _is_schedule_due(
+            if not is_schedule_due(
                 now_local=user_time,
                 schedule_hour=schedule.schedule_hour,
                 schedule_minute=schedule.schedule_minute,

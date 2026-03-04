@@ -1,4 +1,6 @@
-from nebula.api.graph import _estimate_adaptive_similarity_threshold
+from nebula.application.services.graph_edge_service import (
+    _estimate_adaptive_similarity_threshold,
+)
 
 
 def test_adaptive_threshold_stays_in_bounds_sparse_and_dense():

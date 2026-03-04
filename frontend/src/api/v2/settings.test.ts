@@ -16,6 +16,7 @@ import {
   getFullRefreshJobStatusV2,
   getSettingsV2,
   triggerFullRefreshV2,
+  updateGraphDefaultsV2,
   updateScheduleV2,
 } from './settings';
 
@@ -56,5 +57,14 @@ describe('api/v2/settings client', () => {
 
     expect(postMock).toHaveBeenCalledWith('/v2/settings/full-refresh', { confirm: true });
     expect(getMock).toHaveBeenCalledWith('/v2/settings/full-refresh/jobs/1');
+  });
+
+  it('updates graph defaults through v2 endpoint', async () => {
+    postMock.mockResolvedValueOnce({ data: { graph_defaults: { max_clusters: 10, min_clusters: 4 } } });
+    await updateGraphDefaultsV2({ max_clusters: 10, min_clusters: 4 });
+    expect(postMock).toHaveBeenCalledWith('/v2/settings/graph-defaults', {
+      max_clusters: 10,
+      min_clusters: 4,
+    });
   });
 });

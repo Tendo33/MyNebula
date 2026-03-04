@@ -33,6 +33,18 @@ export interface GraphDefaults {
   show_trajectories: boolean;
 }
 
+export interface GraphDefaultsUpdateRequest {
+  max_clusters: number;
+  min_clusters: number;
+}
+
+export interface GraphDefaultsUpdateResponse {
+  graph_defaults: GraphDefaults;
+  version?: string;
+  generated_at?: string;
+  request_id?: string;
+}
+
 export interface SettingsResponse {
   schedule: ScheduleResponse;
   sync_info: SyncInfoResponse;
@@ -91,6 +103,16 @@ export const updateScheduleV2 = async (
   config: ScheduleConfig
 ): Promise<ScheduleUpdateResponse> => {
   const response = await client.post<ScheduleUpdateResponse>('/v2/settings/schedule', config);
+  return response.data;
+};
+
+export const updateGraphDefaultsV2 = async (
+  config: GraphDefaultsUpdateRequest
+): Promise<GraphDefaultsUpdateResponse> => {
+  const response = await client.post<GraphDefaultsUpdateResponse>(
+    '/v2/settings/graph-defaults',
+    config
+  );
   return response.data;
 };
 

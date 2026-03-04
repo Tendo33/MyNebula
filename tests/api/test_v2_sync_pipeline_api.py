@@ -9,6 +9,9 @@ async def test_v2_sync_router_has_admin_dependency():
     from nebula.api.v2 import sync as sync_api
 
     assert sync_api.router.dependencies
+    paths = {route.path for route in sync_api.router.routes}
+    assert "/start" in paths
+    assert "/recluster" in paths
 
 
 @pytest.mark.asyncio
@@ -16,7 +19,7 @@ async def test_start_pipeline_sync_returns_metadata(monkeypatch):
     from nebula.api.v2 import sync as sync_api
 
     async def fake_get_default_user(_db):
-        return SimpleNamespace(id=1)
+        return SimpleNamespace(id=1, graph_max_clusters=8, graph_min_clusters=3)
 
     async def fake_create_pipeline_run(_user_id):
         return 99
@@ -46,11 +49,51 @@ async def test_start_pipeline_sync_returns_metadata(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_start_recluster_sync_returns_metadata(monkeypatch):
+    from nebula.api.v2 import sync as sync_api
+
+    user = SimpleNamespace(id=1, graph_max_clusters=8, graph_min_clusters=3)
+
+    async def fake_get_default_user(_db):
+        return user
+
+    async def fake_create_pipeline_run(_user_id):
+        return 100
+
+    monkeypatch.setattr(sync_api, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(
+        sync_api,
+        "pipeline_service",
+        SimpleNamespace(
+            create_pipeline_run=fake_create_pipeline_run,
+            run_recluster_pipeline=lambda *_args, **_kwargs: None,
+        ),
+    )
+    db = SimpleNamespace(commit=lambda: None)
+    async def _commit():
+        return None
+    db.commit = _commit
+
+    response = await sync_api.start_recluster_sync(
+        background_tasks=BackgroundTasks(),
+        max_clusters=12,
+        min_clusters=5,
+        db=db,
+    )
+
+    assert response.pipeline_run_id == 100
+    assert response.request_id is not None
+    assert response.version == "pipeline-100"
+    assert user.graph_max_clusters == 12
+    assert user.graph_min_clusters == 5
+
+
+@pytest.mark.asyncio
 async def test_get_pipeline_status_returns_404_for_other_user(monkeypatch):
     from nebula.api.v2 import sync as sync_api
 
     async def fake_get_default_user(_db):
-        return SimpleNamespace(id=2)
+        return SimpleNamespace(id=2, graph_max_clusters=8, graph_min_clusters=3)
 
     async def fake_get_pipeline(_run_id):
         return SimpleNamespace(

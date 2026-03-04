@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
@@ -26,6 +26,7 @@ import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { API_BASE_URL } from '../api/client';
 import {
   getPipelineStatusV2,
+  startReclusterV2,
   startSyncPipelineV2,
   type PipelineStatusResponse,
 } from '../api/v2/sync';
@@ -33,6 +34,7 @@ import {
   getFullRefreshJobStatusV2,
   getSettingsV2,
   triggerFullRefreshV2,
+  updateGraphDefaultsV2,
   updateScheduleV2,
   type FullRefreshJobStatus,
   type ScheduleConfig,
@@ -59,6 +61,7 @@ const createFullRefreshSteps = (): { id: string; status: SyncStepStatus; progres
   { id: 'stars', status: 'pending', progress: 0 },
   { id: 'embeddings', status: 'pending', progress: 0 },
   { id: 'clustering', status: 'pending', progress: 0 },
+  { id: 'snapshot', status: 'pending', progress: 0 },
 ]);
 
 const Settings = () => {
@@ -92,6 +95,7 @@ const Settings = () => {
   const [syncSteps, setSyncSteps] = useState<
     { id: string; status: SyncStepStatus; progress?: number; error?: string }[]
   >(createPipelineSyncSteps);
+  const graphDefaultsRef = useRef<{ max: number; min: number } | null>(null);
 
   const translatedSteps = useMemo(
     () =>
@@ -143,6 +147,10 @@ const Settings = () => {
         hqRendering: settingsPayload.graph_defaults.hq_rendering,
         showTrajectories: settingsPayload.graph_defaults.show_trajectories,
       });
+      graphDefaultsRef.current = {
+        max: settingsPayload.graph_defaults.max_clusters,
+        min: settingsPayload.graph_defaults.min_clusters,
+      };
     } catch (err) {
       setError(t('settings.load_schedule_error'));
       console.error('Failed to load schedule data:', err);
@@ -158,6 +166,30 @@ const Settings = () => {
 
     loadScheduleData();
   }, [isAuthenticated, loadScheduleData]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const current = { max: settings.maxClusters, min: settings.minClusters };
+    const previous = graphDefaultsRef.current;
+    if (previous && previous.max === current.max && previous.min === current.min) {
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        await updateGraphDefaultsV2({
+          max_clusters: current.max,
+          min_clusters: current.min,
+        });
+        graphDefaultsRef.current = current;
+      } catch (err) {
+        setError(t('settings.update_graph_defaults_error', 'Failed to save graph defaults'));
+        console.error('Failed to update graph defaults:', err);
+      }
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated, settings.maxClusters, settings.minClusters, t]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -301,7 +333,9 @@ const Settings = () => {
     );
   };
 
-  const normalizeFullRefreshPhase = (phase: string): 'reset' | 'stars' | 'embeddings' | 'clustering' | null => {
+  const normalizeFullRefreshPhase = (
+    phase: string
+  ): 'reset' | 'stars' | 'embeddings' | 'clustering' | 'snapshot' | null => {
     switch (phase) {
       case 'reset':
         return 'reset';
@@ -315,9 +349,11 @@ const Settings = () => {
         return 'embeddings';
       case 'cluster':
       case 'clustering':
+        return 'clustering';
+      case 'snapshot':
       case 'complete':
       case 'completed':
-        return 'clustering';
+        return 'snapshot';
       case 'full_refresh':
       default:
         return null;
@@ -325,13 +361,17 @@ const Settings = () => {
   };
 
   const updateFullRefreshProgress = (job: FullRefreshJobStatus) => {
-    const phaseOrder = ['reset', 'stars', 'embeddings', 'clustering'] as const;
+    const phaseOrder = ['reset', 'stars', 'embeddings', 'clustering', 'snapshot'] as const;
     const normalizedPhase = normalizeFullRefreshPhase(job.phase);
+    const stepProgressSpan = 100 / phaseOrder.length;
     const phaseIndex =
       normalizedPhase !== null ? phaseOrder.findIndex((phase) => phase === normalizedPhase) : -1;
     const inferredIndex = Math.min(
       phaseOrder.length - 1,
-      Math.max(0, Math.floor(Math.max(0, Math.min(99.999, job.progress_percent)) / 25))
+      Math.max(
+        0,
+        Math.floor(Math.max(0, Math.min(99.999, job.progress_percent)) / stepProgressSpan)
+      )
     );
     const currentIndex =
       job.status === 'running' || job.status === 'pending'
@@ -372,7 +412,10 @@ const Settings = () => {
         if (currentIndex >= 0 && index === currentIndex) {
           const perStepProgress = Math.max(
             0,
-            Math.min(100, ((job.progress_percent - currentIndex * 25) / 25) * 100)
+            Math.min(
+              100,
+              ((job.progress_percent - currentIndex * stepProgressSpan) / stepProgressSpan) * 100
+            )
           );
           return {
             ...step,
@@ -501,9 +544,7 @@ const Settings = () => {
     setError(null);
 
     try {
-      const started = await startSyncPipelineV2({
-        mode: 'incremental',
-        use_llm: true,
+      const started = await startReclusterV2({
         max_clusters: settings.maxClusters,
         min_clusters: settings.minClusters,
       });

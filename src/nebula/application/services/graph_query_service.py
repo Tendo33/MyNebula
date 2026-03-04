@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 
 async def _get_default_user(db: AsyncSession):
-    from nebula.api.sync import get_default_user
+    from nebula.application.services.user_service import get_default_user
 
     return await get_default_user(db)
 

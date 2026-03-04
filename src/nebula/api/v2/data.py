@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nebula.api.sync import get_default_user
 from nebula.application.services.graph_query_service import GraphQueryService
+from nebula.application.services.user_service import get_default_user
 from nebula.db import StarredRepo, get_db
 from nebula.schemas.v2 import DataRepoItem, DataReposResponse
 
