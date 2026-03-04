@@ -238,9 +238,7 @@ class SchedulerService:
                     await db.commit()
 
             logger.info(
-                "Scheduled pipeline sync completed for user %s (run_id=%s)",
-                user_id,
-                run_id,
+                f"Scheduled pipeline sync completed for user {user_id} (run_id={run_id})"
             )
 
         except Exception as e:

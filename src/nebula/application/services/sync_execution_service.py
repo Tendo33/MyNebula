@@ -25,7 +25,7 @@ async def sync_star_lists(
             star_lists = await client.get_star_lists()
 
         if not star_lists:
-            logger.info("No star lists found for user %s", user_id)
+            logger.info(f"No star lists found for user {user_id}")
             return
 
         repo_to_list_map: dict[int, int] = {}
@@ -78,14 +78,12 @@ async def sync_star_lists(
             await db.commit()
 
         logger.info(
-            "Synced %s star lists for user %s, %s repos assigned to lists",
-            len(star_lists),
-            user_id,
-            len(repo_to_list_map),
+            f"Synced {len(star_lists)} star lists for user {user_id}, "
+            f"{len(repo_to_list_map)} repos assigned to lists"
         )
 
     except Exception as exc:
-        logger.warning("Failed to sync star lists: %s", exc)
+        logger.warning(f"Failed to sync star lists: {exc}")
         raise
 
 
@@ -96,10 +94,8 @@ async def sync_stars_task(
 ):
     """Background task to sync GitHub stars."""
     logger.info(
-        "[TASK START] sync_stars_task called: user=%s, task=%s, mode=%s",
-        user_id,
-        task_id,
-        sync_mode,
+        f"[TASK START] sync_stars_task called: user={user_id}, "
+        f"task={task_id}, mode={sync_mode}"
     )
     from nebula.db.database import get_db_context
 
@@ -109,7 +105,7 @@ async def sync_stars_task(
             task = await db.get(SyncTask, task_id)
 
             if not user or not task:
-                logger.error("User or task not found: user=%s, task=%s", user_id, task_id)
+                logger.error(f"User or task not found: user={user_id}, task={task_id}")
                 return
 
             task.status = "running"
@@ -122,15 +118,14 @@ async def sync_stars_task(
             if sync_mode == "incremental" and user.last_sync_at:
                 stop_before = user.last_sync_at
                 logger.info(
-                    "Incremental sync for %s: fetching stars newer than %s",
-                    user.username,
-                    stop_before,
+                    f"Incremental sync for {user.username}: "
+                    f"fetching stars newer than {stop_before}"
                 )
             elif sync_mode == "incremental" and not user.last_sync_at:
                 effective_mode = "full"
-                logger.info("First sync for %s: switching to full mode", user.username)
+                logger.info(f"First sync for {user.username}: switching to full mode")
             else:
-                logger.info("Full sync for %s", user.username)
+                logger.info(f"Full sync for {user.username}")
 
             task.error_details = {"sync_mode": effective_mode}
             await db.commit()
@@ -140,7 +135,7 @@ async def sync_stars_task(
                 error_msg = (
                     "GitHub token not configured. Please set GITHUB_TOKEN in .env file"
                 )
-                logger.error("[TASK ERROR] %s", error_msg)
+                logger.error(f"[TASK ERROR] {error_msg}")
                 task.status = "failed"
                 task.error_message = error_msg
                 await db.commit()
@@ -153,18 +148,18 @@ async def sync_stars_task(
                         stop_before=stop_before
                     )
             except Exception as api_error:
-                logger.exception("[TASK ERROR] GitHub API call failed: %s", api_error)
+                logger.exception(f"[TASK ERROR] GitHub API call failed: {api_error}")
                 task.status = "failed"
                 task.error_message = f"GitHub API error: {api_error}"
                 await db.commit()
                 return
 
-            logger.info("[TASK PROGRESS] Fetched %s repos from GitHub", len(repos))
+            logger.info(f"[TASK PROGRESS] Fetched {len(repos)} repos from GitHub")
 
             if was_truncated:
                 logger.info(
-                    "Incremental sync: fetched %s new repos (stopped at last_sync_at)",
-                    len(repos),
+                    f"Incremental sync: fetched {len(repos)} new repos "
+                    "(stopped at last_sync_at)"
                 )
 
             task.total_items = len(repos)
@@ -210,8 +205,8 @@ async def sync_stars_task(
                                     existing.readme_content = latest_readme
                                     existing.is_readme_fetched = True
                                 logger.info(
-                                    "Repo %s content changed, marked for reprocessing",
-                                    repo.full_name,
+                                    f"Repo {repo.full_name} content changed, "
+                                    "marked for reprocessing"
                                 )
 
                             existing.description = repo.description
@@ -264,14 +259,12 @@ async def sync_stars_task(
                         if processed % sync_settings.batch_size == 0:
                             await db.commit()
                             logger.info(
-                                "Synced %s/%s repos for user %s",
-                                processed,
-                                len(repos),
-                                user.username,
+                                f"Synced {processed}/{len(repos)} repos "
+                                f"for user {user.username}"
                             )
 
                     except Exception as exc:
-                        logger.warning("Failed to sync repo %s: %s", repo.full_name, exc)
+                        logger.warning(f"Failed to sync repo {repo.full_name}: {exc}")
                         failed += 1
                         task.failed_items = failed
 
@@ -290,14 +283,13 @@ async def sync_stars_task(
                         all_repos, _ = await client.get_starred_repos()
                     github_repo_ids_from_api = {repo.id for repo in all_repos}
                     logger.info(
-                        "Fetched %s starred repo IDs for deletion check",
-                        len(github_repo_ids_from_api),
+                        f"Fetched {len(github_repo_ids_from_api)} starred repo IDs "
+                        "for deletion check"
                     )
                 except Exception as exc:
                     logger.warning(
-                        "Failed to fetch complete starred list for deletion: %s. "
-                        "Skipping deletion detection.",
-                        exc,
+                        f"Failed to fetch complete starred list for deletion: {exc}. "
+                        "Skipping deletion detection."
                     )
                     github_repo_ids_from_api = None
             else:
@@ -319,18 +311,15 @@ async def sync_stars_task(
                 if unstarred_repos:
                     for repo in unstarred_repos:
                         logger.info(
-                            "Removing unstarred repo: %s (github_id=%s)",
-                            repo.full_name,
-                            repo.github_repo_id,
+                            f"Removing unstarred repo: {repo.full_name} "
+                            f"(github_id={repo.github_repo_id})"
                         )
                         await db.delete(repo)
                         removed_count += 1
 
                     await db.commit()
                     logger.info(
-                        "Removed %s unstarred repos for user %s",
-                        removed_count,
-                        user.username,
+                        f"Removed {removed_count} unstarred repos for user {user.username}"
                     )
 
             if effective_mode == "incremental":
@@ -358,22 +347,18 @@ async def sync_stars_task(
             await db.commit()
 
             logger.info(
-                "Completed star sync for %s (%s): %s new, %s updated, %s removed, %s failed",
-                user.username,
-                effective_mode,
-                new_count,
-                updated_count,
-                removed_count,
-                failed,
+                f"Completed star sync for {user.username} ({effective_mode}): "
+                f"{new_count} new, {updated_count} updated, "
+                f"{removed_count} removed, {failed} failed"
             )
 
             try:
                 await sync_star_lists(user_id, settings.github_token, db)
             except Exception as exc:
-                logger.warning("Star lists sync failed (non-critical): %s", exc)
+                logger.warning(f"Star lists sync failed (non-critical): {exc}")
 
         except Exception as exc:
-            logger.exception("Star sync failed for user %s: %s", user_id, exc)
+            logger.exception(f"Star sync failed for user {user_id}: {exc}")
 
             async with get_db_context() as db:
                 task = await db.get(SyncTask, task_id)
@@ -421,8 +406,8 @@ async def compute_embeddings_task(user_id: int, task_id: int):
             if repos_needing_llm:
                 total_llm_repos = len(repos_needing_llm)
                 logger.info(
-                    "Generating summaries/tags for %s repos before embedding",
-                    total_llm_repos,
+                    f"Generating summaries/tags for {total_llm_repos} repos "
+                    "before embedding"
                 )
 
                 for index, repo in enumerate(repos_needing_llm, 1):
@@ -438,20 +423,20 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                         repo.ai_tags = tags
                         repo.is_summarized = True
                     except Exception as exc:
-                        logger.warning("LLM generation failed for %s: %s", repo.full_name, exc)
+                        logger.warning(
+                            f"LLM generation failed for {repo.full_name}: {exc}"
+                        )
                         if not repo.ai_tags:
                             repo.ai_tags = repo.topics[:5] if repo.topics else ["开源项目"]
 
                     if index % 5 == 0:
                         logger.info(
-                            "Generating summaries progress: %s/%s",
-                            index,
-                            total_llm_repos,
+                            f"Generating summaries progress: {index}/{total_llm_repos}"
                         )
                         await db.commit()
 
                 await db.commit()
-                logger.info("LLM enhancement complete for %s repos", total_llm_repos)
+                logger.info(f"LLM enhancement complete for {total_llm_repos} repos")
 
             embedding_service = get_embedding_service()
             processed = 0
@@ -480,7 +465,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 task.processed_items = processed
                 await db.commit()
             except Exception as exc:
-                logger.error("Batch embedding failed: %s", exc)
+                logger.error(f"Batch embedding failed: {exc}")
                 task.failed_items = len(repos)
                 task.error_message = str(exc)
 
@@ -488,9 +473,9 @@ async def compute_embeddings_task(user_id: int, task_id: int):
             task.completed_at = datetime.utcnow()
             await db.commit()
 
-            logger.info("Completed embedding for user %s: %s embedded", user_id, processed)
+            logger.info(f"Completed embedding for user {user_id}: {processed} embedded")
         except Exception as exc:
-            logger.exception("Embedding task failed: %s", exc)
+            logger.exception(f"Embedding task failed: {exc}")
 
             async with get_db_context() as db:
                 task = await db.get(SyncTask, task_id)
@@ -592,7 +577,7 @@ async def run_clustering_task(
             task.total_items = len(repos)
             await db.commit()
 
-            logger.info("Running clustering on %s repos for user %s", len(repos), user_id)
+            logger.info(f"Running clustering on {len(repos)} repos for user {user_id}")
 
             repos_with_embeddings: list[StarredRepo] = []
             embeddings = []
@@ -608,8 +593,9 @@ async def run_clustering_task(
 
             if len(repos_with_embeddings) != len(repos):
                 logger.warning(
-                    "Skipping %s repos with missing embeddings during clustering",
-                    len(repos) - len(repos_with_embeddings),
+                    "Skipping "
+                    f"{len(repos) - len(repos_with_embeddings)} repos with missing "
+                    "embeddings during clustering"
                 )
                 for repo in repos:
                     if repo.embedding is None:
@@ -669,9 +655,8 @@ async def run_clustering_task(
                     incremental = False
                 else:
                     logger.info(
-                        "Incremental mode: %s existing repos, %s new repos to assign",
-                        len(existing_repos),
-                        len(new_repos),
+                        f"Incremental mode: {len(existing_repos)} existing repos, "
+                        f"{len(new_repos)} new repos to assign"
                     )
 
                     existing_embs_arr = normalize_embeddings(
@@ -720,9 +705,8 @@ async def run_clustering_task(
                     await db.commit()
 
                     logger.info(
-                        "Incremental clustering completed for user %s: %s new repos assigned",
-                        user_id,
-                        len(new_repos),
+                        f"Incremental clustering completed for user {user_id}: "
+                        f"{len(new_repos)} new repos assigned"
                     )
                     return
 
@@ -732,16 +716,13 @@ async def run_clustering_task(
                 min_clusters=min_clusters,
             )
             logger.info(
-                "Clustering params: max_clusters=%s, min_clusters=%s, "
-                "derived_min_clusters=%s, derived_target_max_clusters=%s, "
-                "min_cluster_size=%s, min_samples=%s, n_neighbors=%s",
-                max_clusters,
-                min_clusters,
-                derived["min_clusters"],
-                derived["target_max_clusters"],
-                derived["min_cluster_size"],
-                derived["min_samples"],
-                derived["n_neighbors"],
+                f"Clustering params: max_clusters={max_clusters}, "
+                f"min_clusters={min_clusters}, "
+                f"derived_min_clusters={derived['min_clusters']}, "
+                f"derived_target_max_clusters={derived['target_max_clusters']}, "
+                f"min_cluster_size={derived['min_cluster_size']}, "
+                f"min_samples={derived['min_samples']}, "
+                f"n_neighbors={derived['n_neighbors']}"
             )
             clustering_service = ClusteringService(
                 n_neighbors=derived["n_neighbors"],
@@ -805,7 +786,7 @@ async def run_clustering_task(
                             repo_names, descriptions, topics
                         )
                 except Exception as exc:
-                    logger.warning("Cluster naming failed: %s, using heuristic", exc)
+                    logger.warning(f"Cluster naming failed: {exc}, using heuristic")
                     name, description, keywords = generate_cluster_name(
                         repo_names, descriptions, topics
                     )
@@ -866,15 +847,12 @@ async def run_clustering_task(
             await db.commit()
 
             logger.info(
-                "Clustering completed for user %s: %s clusters, %s assigned, %s unassigned",
-                user_id,
-                cluster_result.n_clusters,
-                assigned_count,
-                unassigned_count,
+                f"Clustering completed for user {user_id}: {cluster_result.n_clusters} "
+                f"clusters, {assigned_count} assigned, {unassigned_count} unassigned"
             )
 
         except Exception as exc:
-            logger.exception("Clustering task failed: %s", exc)
+            logger.exception(f"Clustering task failed: {exc}")
 
             async with get_db_context() as db:
                 task = await db.get(SyncTask, task_id)

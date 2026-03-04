@@ -134,7 +134,7 @@ def calculate_next_run_time(schedule: SyncSchedule) -> datetime | None:
 
         return scheduled_today.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
     except Exception as exc:
-        logger.warning("Error calculating next run time: %s", exc)
+        logger.warning(f"Error calculating next run time: {exc}")
         return None
 
 
@@ -240,12 +240,10 @@ async def update_schedule(
 
     next_run = calculate_next_run_time(schedule)
     logger.info(
-        "Schedule updated for user %s: enabled=%s, time=%s:%02d %s",
-        user.id,
-        config.is_enabled,
-        config.schedule_hour,
-        config.schedule_minute,
-        config.timezone,
+        f"Schedule updated for user {user.id}: "
+        f"enabled={config.is_enabled}, "
+        f"time={config.schedule_hour}:{config.schedule_minute:02d} "
+        f"{config.timezone}"
     )
 
     return ScheduleResponse(
@@ -294,7 +292,7 @@ async def full_refresh_task(user_id: int, task_id: int):
         if not task_exists:
             return
 
-        logger.info("Full refresh: Resetting all repos for user %s", user_id)
+        logger.info(f"Full refresh: Resetting all repos for user {user_id}")
         async with get_db_context() as db:
             result = await db.execute(
                 update(StarredRepo)
@@ -311,14 +309,14 @@ async def full_refresh_task(user_id: int, task_id: int):
             )
             reset_count = result.rowcount
             await db.commit()
-        logger.info("Full refresh: Reset %s repos", reset_count)
+        logger.info(f"Full refresh: Reset {reset_count} repos")
 
         await _update_main_task(
             error_details={"phase": "reset", "reset_count": reset_count},
             processed_items=1,
         )
 
-        logger.info("Full refresh: Starting full star sync for user %s", user_id)
+        logger.info(f"Full refresh: Starting full star sync for user {user_id}")
         stars_task_id = await _create_sub_task("stars")
         await sync_stars_task(user_id, stars_task_id, "full")
         await _update_main_task(
@@ -326,7 +324,7 @@ async def full_refresh_task(user_id: int, task_id: int):
             processed_items=2,
         )
 
-        logger.info("Full refresh: Computing embeddings for user %s", user_id)
+        logger.info(f"Full refresh: Computing embeddings for user {user_id}")
         embed_task_id = await _create_sub_task("embedding")
         await compute_embeddings_task(user_id, embed_task_id)
         await _update_main_task(
@@ -334,7 +332,7 @@ async def full_refresh_task(user_id: int, task_id: int):
             processed_items=3,
         )
 
-        logger.info("Full refresh: Running clustering for user %s", user_id)
+        logger.info(f"Full refresh: Running clustering for user {user_id}")
         await _update_main_task(
             error_details={"phase": "clustering", "reset_count": reset_count},
             processed_items=3,
@@ -366,9 +364,9 @@ async def full_refresh_task(user_id: int, task_id: int):
                 ],
             },
         )
-        logger.info("Full refresh completed for user %s", user_id)
+        logger.info(f"Full refresh completed for user {user_id}")
     except Exception as exc:
-        logger.exception("Full refresh failed for user %s: %s", user_id, exc)
+        logger.exception(f"Full refresh failed for user {user_id}: {exc}")
         await _update_main_task(
             status="failed",
             error_message=str(exc),
@@ -417,9 +415,7 @@ async def trigger_full_refresh(
     background_tasks.add_task(full_refresh_task, user.id, task.id)
 
     logger.info(
-        "Full refresh started for user %s, %s repos will be reset",
-        user.id,
-        repo_count,
+        f"Full refresh started for user {user.id}, {repo_count} repos will be reset"
     )
     return FullRefreshResponse(
         task_id=task.id,

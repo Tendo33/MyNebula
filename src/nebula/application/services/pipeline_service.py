@@ -119,7 +119,7 @@ class SyncPipelineService:
             await self._update_run(run_id, final_status, PipelinePhase.completed)
             return run_id
         except Exception as exc:
-            logger.exception("Pipeline %s failed: %s", run_id, exc)
+            logger.exception(f"Pipeline {run_id} failed: {exc}")
             await self._update_run(
                 run_id,
                 PipelineStatus.failed,
@@ -195,7 +195,7 @@ class SyncPipelineService:
             await self._update_run(run_id, final_status, PipelinePhase.completed)
             return run_id
         except Exception as exc:
-            logger.exception("Recluster pipeline %s failed: %s", run_id, exc)
+            logger.exception(f"Recluster pipeline {run_id} failed: {exc}")
             await self._update_run(
                 run_id,
                 PipelineStatus.failed,
@@ -303,18 +303,17 @@ class SyncPipelineService:
                     "status": task.status,
                     "last_error": task.error_message,
                 }
-                logger.error("Pipeline phase failed: %s", details)
+                logger.error(f"Pipeline phase failed: {details}")
                 raise ValueError(
                     f"Pipeline phase failed phase={phase.value} task_id={task_id}: {task.error_message}"
                 )
 
             has_partial_failure = bool(task.failed_items and task.failed_items > 0)
             logger.info(
-                "Pipeline phase completed run_id=%s task_id=%s phase=%s status=%s failed_items=%s",
-                run_id,
-                task_id,
-                phase.value,
-                task.status,
-                task.failed_items,
+                f"Pipeline phase completed run_id={run_id} "
+                f"task_id={task_id} "
+                f"phase={phase.value} "
+                f"status={task.status} "
+                f"failed_items={task.failed_items}"
             )
             return has_partial_failure
