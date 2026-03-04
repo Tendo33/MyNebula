@@ -3,62 +3,40 @@
     <img src="doc/images/logo2.png" width="120" alt="MyNebula Logo" />
   </a>
   <h1>MyNebula</h1>
-
+  <p><strong>Transform your GitHub Stars into a semantic knowledge nebula.</strong></p>
   <p>
-    <strong>Transform your GitHub Stars into a semantic knowledge nebula.</strong>
+    <a href="README.zh.md">中文</a> · English
   </p>
-
   <p>
-    Turn a long list of starred repositories into an explorable personal knowledge graph.
-  </p>
-
-  <p>
-    English | <a href="README.zh.md">中文</a>
-  </p>
-
-  <p>
-    <a href="#-quick-start">Quick Start</a> ·
-    <a href="#-local-development">Local Development</a> ·
-    <a href="#-docs-index">Docs Index</a> ·
-    <a href="#-faq">FAQ</a>
-  </p>
-
-  <p>
-    <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12%2B-blue.svg?style=flat-square" alt="Python 3.12+" /></a>
-    <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115%2B-green.svg?style=flat-square" alt="FastAPI" /></a>
-    <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-16%2B-blue.svg?style=flat-square" alt="PostgreSQL" /></a>
-    <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json&style=flat-square" alt="uv" /></a>
-    <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=flat-square" alt="ruff" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/github/license/Tendo33/MyNebula?style=flat-square" alt="License" /></a>
+    <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square" alt="Python 3.10+" />
+    <img src="https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=flat-square" alt="FastAPI" />
+    <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square" alt="React" />
+    <img src="https://img.shields.io/badge/PostgreSQL-16%2B-336791?style=flat-square" alt="PostgreSQL" />
+    <img src="https://img.shields.io/badge/pgvector-enabled-4B8BBE?style=flat-square" alt="pgvector" />
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" /></a>
   </p>
 </div>
 
 <div align="center">
-  <img src="doc/images/banner.png" width="85%" alt="MyNebula Banner" />
+  <img src="doc/images/banner.png" width="88%" alt="MyNebula Banner" />
 </div>
 
 ---
 
-## Why MyNebula
+## What is MyNebula
 
-When your GitHub Stars keep growing, it becomes hard to:
+MyNebula turns your growing GitHub Stars list into a searchable, explorable, and continuously updated knowledge graph.
 
-- quickly find what you saved,
-- discover related projects,
-- understand how your interests evolved over time.
+Instead of scrolling through hundreds of starred repositories, you get:
 
-MyNebula turns a star list into a knowledge space. Instead of only searching by keyword, you can explore semantic relationships, clusters, and timeline trends.
+- semantic clusters with AI-assisted naming,
+- graph exploration with timeline replay,
+- related-repo recommendations with explainable signals,
+- a production-oriented sync pipeline (incremental/full + schedule + snapshots).
 
-## ✨ Highlights
+---
 
-- **Semantic Graph**: Builds repository relationships from embedding similarity and visualizes them as clusters.
-- **Multi-dimensional Filtering**: Filter by clusters, star lists, time range, and text search.
-- **AI Enrichment**: Generates summaries and tags to make unfamiliar projects easier to scan.
-- **Timeline Playback**: Revisit your starred activity by month.
-- **Sync + Schedule**: Supports incremental sync, full refresh, and scheduled tasks.
-- **Operations-ready Settings**: Manage clustering parameters, sync status, and runtime settings in one place.
-
-## 📸 Screenshots
+## Screenshots
 
 <div align="center">
   <img src="doc/images/image1.png" width="100%" alt="Knowledge Graph View" />
@@ -68,201 +46,269 @@ MyNebula turns a star list into a knowledge space. Instead of only searching by 
 
 ---
 
-## 🏗 Architecture
+## Core Capabilities
 
-```mermaid
-graph TD
-    User["Browser"] -->|HTTP| FastAPI["FastAPI App"]
-    FastAPI -->|Serve SPA| React["React + Vite Frontend"]
-    FastAPI -->|REST API| React
-    FastAPI -->|Read/Write| PG[("PostgreSQL + pgvector")]
-    FastAPI -->|Sync Stars| GitHub["GitHub API"]
-    FastAPI -->|Embedding/LLM| AI["OpenAI-Compatible Providers"]
-```
-
-- Backend: FastAPI + SQLAlchemy + asyncpg + APScheduler
-- Frontend: React + TypeScript + Vite + Tailwind
-- Data: PostgreSQL 16 + pgvector
-- AI providers: SiliconFlow / OpenAI / Jina / Ollama (OpenAI-compatible APIs)
+- **Semantic graph modeling**: Embeddings + clustering transform stars into topic groups.
+- **Versioned graph snapshots**: Read APIs serve immutable snapshot payloads for stable UX.
+- **Paged edge loading**: Large graph edges are loaded incrementally (`/api/v2/graph/edges`).
+- **Incremental sync pipeline**: `stars -> embeddings -> clustering -> snapshot` with run tracking.
+- **Smart reprocessing**: Description/topic hash change detection avoids unnecessary recompute.
+- **Adaptive clustering strategy**: Automatic full-recluster fallback when incremental drift is high.
+- **Schedule automation**: Timezone-aware periodic sync powered by APScheduler.
+- **Bilingual UI**: Built-in i18n (`en`/`zh`) in frontend and configurable LLM output language.
 
 ---
 
-## 🚀 Quick Start
+## Architecture
 
-### Option A: Docker Compose (Recommended)
+```mermaid
+graph TD
+    Browser["Browser (React + Vite)"] -->|HTTP /api| FastAPI["FastAPI Service"]
+    FastAPI -->|ORM| Postgres[("PostgreSQL + pgvector")]
+    FastAPI -->|Stars + Lists| GitHub["GitHub API / GraphQL"]
+    FastAPI -->|Embeddings + LLM| AI["OpenAI-compatible Providers"]
+    FastAPI -->|Schedule jobs| APS["APScheduler"]
+```
 
-Use this for the fastest setup.
+```mermaid
+flowchart LR
+    A["Sync Stars"] --> B["Fetch README + Metadata"]
+    B --> C["LLM Summary/Tags (optional)"]
+    C --> D["Embedding"]
+    D --> E["Clustering + 3D/2D Coordinates"]
+    E --> F["Build Graph Snapshot"]
+    F --> G["Activate Snapshot for /api/v2"]
+```
+
+---
+
+## Tech Stack
+
+- **Backend**: FastAPI, SQLAlchemy (async), asyncpg, Alembic, APScheduler
+- **Data/ML**: pgvector, NumPy, scikit-learn, custom relevance scoring
+- **Frontend**: React 18, TypeScript, Vite, React Query, react-force-graph-2d, TailwindCSS
+- **Infra/Tooling**: Docker Compose, uv, Ruff, Pytest, Vitest, Playwright
+
+---
+
+## Quick Start (Docker, Recommended)
+
+### Prerequisites
+
+- Docker + Docker Compose v2
+- GitHub Personal Access Token
+- Embedding provider API key (OpenAI-compatible)
+
+### 1) Clone and configure
 
 ```bash
 git clone https://github.com/Tendo33/MyNebula.git
 cd MyNebula
-
 cp .env.example .env
-# Edit .env and set at least: GITHUB_TOKEN, EMBEDDING_API_KEY
+```
 
+At minimum, update in `.env`:
+
+- `GITHUB_TOKEN`
+- `EMBEDDING_API_KEY`
+- `ADMIN_PASSWORD` (strongly recommended, enables admin login)
+
+### 2) Start services
+
+```bash
 docker compose up -d
 ```
 
-Default endpoints:
+### 3) Open app
 
 - Web: <http://localhost:8000>
-- Health check: <http://localhost:8000/health>
+- Health: <http://localhost:8000/health>
+- OpenAPI docs: <http://localhost:8000/docs> (`DEBUG=true` only)
 
-> `/docs` and `/redoc` are available only when `DEBUG=true`.
+### 4) First sync flow
+
+1. Open `/settings`
+2. Login with `ADMIN_USERNAME` / `ADMIN_PASSWORD`
+3. Trigger **Sync Pipeline** (incremental or full)
+4. Wait until snapshot phase is completed, then open `/graph`
 
 ---
 
-## 💻 Local Development
+## Local Development
 
-### Requirements
-
-- Python 3.12+
-- Node.js 20+
-- Docker (for local PostgreSQL)
-
-### 1) Prepare environment
+### Backend
 
 ```bash
 cp .env.example .env
-```
-
-### 2) Start database
-
-```bash
+uv sync --all-extras
 docker compose up -d db
-```
-
-### 3) Start backend
-
-```bash
-uv sync
 uv run alembic upgrade head
 uv run uvicorn nebula.main:app --reload --port 8000
 ```
 
-### 4) Start frontend (optional)
-
-If you want frontend hot-reload on port 5173:
+### Frontend (hot reload)
 
 ```bash
 npm --prefix frontend install
 VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
 ```
 
-If you prefer backend-served static frontend:
+Then open <http://localhost:5173>.
+
+> In dev mode, frontend uses `/api` proxy. If `VITE_API_BASE_URL` is not set, Vite defaults to `http://localhost:8071`.
+
+### Backend-served frontend (single endpoint)
 
 ```bash
 npm --prefix frontend run build
-# then open http://localhost:8000
+uv run uvicorn nebula.main:app --reload --port 8000
 ```
 
----
-
-## ⚙️ Key Configuration
-
-For full details, see `.env.example` and `doc/ENV_VARS.md`.
-
-| Category | Variable | Description |
-|---|---|---|
-| GitHub | `GITHUB_TOKEN` | Required for star sync and list sync |
-| Embedding | `EMBEDDING_API_KEY` | Required for vector embeddings |
-| LLM | `LLM_API_KEY` | Optional, recommended for summaries/cluster naming |
-| LLM | `LLM_OUTPUT_LANGUAGE` | LLM output language for summaries/cluster names (`zh` or `en`) |
-| Admin | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Admin access for settings and mutating operations |
-| Server | `API_PORT` | Public service port (default: 8000) |
-| App | `DEBUG` | Enables `/docs` and debug behavior |
+If `frontend/dist` exists, FastAPI serves the SPA and static assets directly.
 
 ---
 
-## 🧭 Common Operations
+## Configuration Overview
 
-- **Initial import**: open `/settings`, sign in as admin, and run star sync.
-- **Re-cluster**: adjust `max_clusters/min_clusters` in settings, then run re-clustering.
-- **Full refresh**: reprocesses all repositories (time-consuming, uses API quota).
-- **Health check**: use `/health` to verify app and DB status.
+| Category | Key Variables | Required | Notes |
+|---|---|---:|---|
+| GitHub | `GITHUB_TOKEN` | ✅ | For stars/lists sync |
+| Embedding | `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` | ✅ | OpenAI-compatible embedding endpoint |
+| LLM | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_OUTPUT_LANGUAGE` | Optional | For summary/tag and cluster naming |
+| Admin auth | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_TTL_HOURS` | ⚠️ Recommended | If password is empty, admin-protected APIs are disabled |
+| Database | `DATABASE_*` / `DATABASE_URL` | ✅ | `DATABASE_URL` overrides split fields |
+| Sync | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | Optional | Tune cost/performance behavior |
+| Runtime | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | Optional | Observability + API behavior |
+
+Full reference: `doc/ENV_VARS.md`
 
 ---
 
-## 🗂 Project Structure
+## API Quick Reference
+
+Base prefix: `/api`
+
+### Read endpoints (public in single-user mode)
+
+- `GET /health`
+- `GET /api/v2/dashboard`
+- `GET /api/v2/graph?version=active&include_edges=false`
+- `GET /api/v2/graph/edges?version=active&cursor=0&limit=1000`
+- `GET /api/v2/graph/timeline?version=active`
+- `GET /api/v2/data/repos`
+- `GET /api/repos/{repo_id}/related`
+- `POST /api/repos/search`
+
+### Admin-protected endpoints
+
+- `POST /api/auth/login`
+- `POST /api/v2/sync/start?mode=incremental|full`
+- `GET /api/v2/sync/jobs/{run_id}`
+- `POST /api/v2/settings/schedule`
+- `POST /api/v2/settings/full-refresh`
+- `POST /api/v2/graph/rebuild`
+
+Legacy compatibility routes under `/api/sync` are still available.
+
+---
+
+## Quality & Testing
+
+### Backend
+
+```bash
+uv run ruff format
+uv run ruff check --fix
+uv run pytest
+```
+
+### Frontend
+
+```bash
+npm --prefix frontend run lint
+npm --prefix frontend run test
+npm --prefix frontend run build
+```
+
+### E2E
+
+```bash
+RUN_E2E=1 npm --prefix frontend run test:e2e
+```
+
+### Offline quality gates
+
+```bash
+uv run python scripts/evals/run_all_quality_checks.py
+```
+
+Thresholds are enforced in `doc/QUALITY_GATES.md`.
+
+---
+
+## Project Structure
 
 ```text
 MyNebula/
-├── src/nebula/              # FastAPI app and backend logic
-│   ├── api/                 # API routes
-│   ├── core/                # config, AI, clustering, scheduler
-│   ├── db/                  # ORM models and DB setup
-│   └── schemas/             # Pydantic schemas
-├── frontend/                # React frontend
-├── alembic/                 # database migrations
-├── tests/                   # Python tests
-├── doc/                     # detailed docs and images
+├── src/nebula/
+│   ├── api/                   # v1 + v2 route layer
+│   ├── application/services/  # pipeline + snapshot query services
+│   ├── core/                  # config, auth, embedding, llm, clustering, scheduler
+│   ├── db/                    # SQLAlchemy models + session lifecycle
+│   ├── domain/                # pipeline/snapshot lifecycle enums
+│   └── infrastructure/        # snapshot persistence repository
+├── frontend/                  # React + TypeScript SPA
+├── alembic/                   # migrations
+├── tests/                     # backend tests (api/core/evals)
+├── scripts/                   # automation, perf, eval scripts
+├── doc/                       # deployment/config/ops docs
 ├── docker-compose.yml
 └── .env.example
 ```
 
 ---
 
-## 🧪 Development Quality
+## Docs Index
 
-```bash
-# Python format and lint
-uv run ruff format
-uv run ruff check --fix
-
-# Backend tests
-uv run pytest
-
-# Frontend build verification
-npm --prefix frontend run build
-```
-
----
-
-## 🛣 Roadmap (Suggested)
-
-- Better combined filters (tags + time + star ranges)
-- Explainable graph relations (why two repos are connected)
-- Stronger export capabilities (lists/reports/graph snapshots)
-
----
-
-## ❓ FAQ
-
-### 1) The app opens but no data appears.
-
-Check the following:
-
-- `.env` contains a valid `GITHUB_TOKEN`.
-- You have run sync from `/settings`.
-- `/health` returns `database: connected`.
-
-### 2) Why is `/docs` unavailable?
-
-`/docs` is enabled only when `DEBUG=true`.
-
-### 3) Frontend dev mode cannot reach backend API.
-
-Start frontend with explicit API base URL:
-
-```bash
-VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
-```
-
----
-
-## 📚 Docs Index
-
-- Docker deployment: `doc/DOCKER_DEPLOY.md`
 - Environment variables: `doc/ENV_VARS.md`
-- Model guide: `doc/MODELS_GUIDE.md`
+- Docker deployment: `doc/DOCKER_DEPLOY.md`
+- Quality gates: `doc/QUALITY_GATES.md`
+- Reset database: `doc/RESET_GUIDE.md`
+- Data models guide: `doc/MODELS_GUIDE.md`
 - SDK usage: `doc/SDK_USAGE.md`
-- Data reset guide: `doc/RESET_GUIDE.md`
+- Release history: `CHANGELOG.md`
 
 ---
 
-## 🤝 Contributing & License
+## Troubleshooting
 
-- Issues and PRs are welcome (see `CONTRIBUTING.md`).
-- License: [MIT](LICENSE)
+- **No data in graph/data pages**
+  - Ensure `GITHUB_TOKEN` and `EMBEDDING_API_KEY` are valid.
+  - Run sync from `/settings` and wait for snapshot completion.
+- **Cannot login in settings**
+  - Set `ADMIN_PASSWORD` in `.env` and restart service.
+- **`/docs` is missing**
+  - Set `DEBUG=true`.
+- **Frontend dev cannot reach backend**
+  - Start frontend with `VITE_API_BASE_URL=http://localhost:8000`.
+- **Slow large-graph response**
+  - Use paged edges (`/api/v2/graph/edges`) and tune `API_QUERY_TIMEOUT_SECONDS`.
 
-If this project helps you, a star is appreciated. ⭐
+---
+
+## Roadmap
+
+- Richer explainability for recommendation and graph edges
+- More export options (reports/snapshot export/share)
+- Better multi-user/auth model beyond current single-user default
+- More automated evaluation datasets and benchmark tooling
+
+---
+
+## Contributing & License
+
+Issues and PRs are welcome.
+
+- Contribution guide: `CONTRIBUTING.md`
+- License: `LICENSE` (MIT)
+
