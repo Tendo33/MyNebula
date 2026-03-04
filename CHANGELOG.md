@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-03-04
+
+### Fixed
+- Fixed Docker/CI frontend build failure caused by ignored frontend source folders (`frontend/src/lib` and `frontend/src/features/data`)
+
+### Changed
+- Bumped version to `1.0.7` across backend, frontend, runtime config, and environment docs
+
 ## [1.0.5] - 2026-02-25
 
 ### Fixed
@@ -113,7 +121,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/Tendo33/mynebula/compare/v1.0.5...v1.0.7
 [1.0.5]: https://github.com/Tendo33/mynebula/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/Tendo33/mynebula/compare/v1.0.3...v1.0.4
 [1.0.0]: https://github.com/Tendo33/mynebula/compare/v0.2.10...v1.0.0
