@@ -7,7 +7,7 @@ and GitHub configurations needed for the MyNebula application.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AliasChoices, Field, computed_field, field_validator
+from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -150,7 +150,6 @@ class SyncSettings(BaseSettings):
         description="Maximum README content length to store",
         ge=1000,
         le=100000,
-        validation_alias=AliasChoices("SYNC_README_MAX_LENGTH", "README_MAX_LENGTH"),
     )
     default_sync_mode: Literal["incremental", "full"] = Field(
         default="incremental",

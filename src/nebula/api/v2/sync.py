@@ -10,6 +10,7 @@ from nebula.api.sync import get_default_user
 from nebula.application.services.pipeline_service import SyncPipelineService
 from nebula.db import get_db
 from nebula.schemas.v2 import PipelineStartResponse, PipelineStatusResponse
+
 from .metadata import build_v2_metadata
 
 router = APIRouter(dependencies=[Depends(require_admin)])
