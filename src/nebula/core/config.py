@@ -175,13 +175,9 @@ class AppSettings(BaseSettings):
 
     # Basic settings
     app_name: str = Field(default="mynebula", description="Application name")
-    app_version: str = Field(default="1.0.5", description="Application version")
+    app_version: str = Field(default="1.0.6", description="Application version")
     debug: bool = Field(
         default=False, description="Debug mode (also controls environment)"
-    )
-    frontend_url: str = Field(
-        default="http://localhost:5173",
-        description="Frontend URL for redirects",
     )
     single_user_mode: bool = Field(
         default=True,
