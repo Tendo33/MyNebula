@@ -62,12 +62,12 @@ class VersionUpdater:
             ),
             (
                 project_root / "doc" / "ENV_VARS.md",
-                r'(APP_VERSION=)(\d+\.\d+\.\d+)',
+                r"(APP_VERSION=)(\d+\.\d+\.\d+)",
                 r"\g<1>{version}",
             ),
             (
                 project_root / "doc" / "ENV_VARS.md",
-                r'(\|\s*`APP_VERSION`\s*\|\s*string\s*\|\s*`)(\d+\.\d+\.\d+)(`\s*\|)',
+                r"(\|\s*`APP_VERSION`\s*\|\s*string\s*\|\s*`)(\d+\.\d+\.\d+)(`\s*\|)",
                 r"\g<1>{version}\g<3>",
             ),
         ]

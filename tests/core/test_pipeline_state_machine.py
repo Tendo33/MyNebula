@@ -61,7 +61,10 @@ async def test_pipeline_marks_partial_failed_when_phase_has_failed_items(monkeyp
 
     await service.run_pipeline(1)
 
-    assert status_updates[-1] == (PipelineStatus.partial_failed, PipelinePhase.completed)
+    assert status_updates[-1] == (
+        PipelineStatus.partial_failed,
+        PipelinePhase.completed,
+    )
 
 
 @pytest.mark.asyncio

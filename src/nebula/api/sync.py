@@ -384,7 +384,9 @@ async def sync_stars_task(
             new_count = 0
             updated_count = 0
 
-            async with GitHubClient(access_token=settings.github_token) as readme_client:
+            async with GitHubClient(
+                access_token=settings.github_token
+            ) as readme_client:
                 for repo in repos:
                     try:
                         # Check if repo exists
@@ -959,7 +961,9 @@ async def get_job_status(
             detail="Task not found",
         )
 
-    progress_percent = _calculate_progress_percent(task.total_items, task.processed_items)
+    progress_percent = _calculate_progress_percent(
+        task.total_items, task.processed_items
+    )
     phase = _resolve_job_phase(task.task_type, task.status, task.error_details)
     eta_seconds = (
         _estimate_eta_seconds(task.started_at, progress_percent)

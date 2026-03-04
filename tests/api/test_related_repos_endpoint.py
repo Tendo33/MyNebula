@@ -41,7 +41,9 @@ class DummyRepo:
     embedding: list[float] | None
 
 
-def _dummy_repo(repo_id: int, embedding: list[float], tags: list[str], stars: int) -> DummyRepo:
+def _dummy_repo(
+    repo_id: int, embedding: list[float], tags: list[str], stars: int
+) -> DummyRepo:
     return DummyRepo(
         id=repo_id,
         github_repo_id=1000 + repo_id,
@@ -122,7 +124,9 @@ def test_rank_related_candidates_filters_low_semantic_even_with_other_signals():
 
 def test_related_cache_key_is_stable_under_rounding():
     key_a = _build_related_cache_key(min_score=0.4, min_semantic=0.65, limit=20)
-    key_b = _build_related_cache_key(min_score=0.40000001, min_semantic=0.6500001, limit=20)
+    key_b = _build_related_cache_key(
+        min_score=0.40000001, min_semantic=0.6500001, limit=20
+    )
 
     assert key_a == key_b
 

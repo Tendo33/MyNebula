@@ -21,6 +21,7 @@ from nebula.schemas.v2 import (
     ScheduleUpdateResponse,
     SettingsResponse,
 )
+
 from .metadata import build_v2_metadata
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -73,7 +74,9 @@ async def trigger_settings_full_refresh(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> FullRefreshStartResponse:
     """Trigger full refresh via v2 settings route."""
-    task = await trigger_full_refresh(payload=payload, background_tasks=background_tasks, db=db)
+    task = await trigger_full_refresh(
+        payload=payload, background_tasks=background_tasks, db=db
+    )
     return FullRefreshStartResponse(
         task=task,
         **build_v2_metadata(version=f"full-refresh-{task.task_id}"),

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
-from nebula.application.services.graph_snapshot_service import GraphSnapshotBuilderService
+from nebula.application.services.graph_snapshot_service import (
+    GraphSnapshotBuilderService,
+)
 from nebula.domain import PipelinePhase, PipelineStatus, SnapshotStatus
 from nebula.schemas.graph import GraphData
 

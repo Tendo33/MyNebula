@@ -24,11 +24,15 @@ def run_mock_mode(runs: int) -> tuple[int, int]:
             passed += 1
         if data_corrupted:
             corrupted += 1
-        print(f"[mock] run={index} status={'ok' if run_ok else 'failed'} corrupted={data_corrupted}")
+        print(
+            f"[mock] run={index} status={'ok' if run_ok else 'failed'} corrupted={data_corrupted}"
+        )
     return passed, corrupted
 
 
-def wait_pipeline_complete(client: httpx.Client, run_id: int, timeout_seconds: int) -> dict:
+def wait_pipeline_complete(
+    client: httpx.Client, run_id: int, timeout_seconds: int
+) -> dict:
     started = time.perf_counter()
     while True:
         response = client.get(f"/api/v2/sync/jobs/{run_id}")
@@ -102,7 +106,9 @@ def main() -> None:
         settings = get_app_settings()
         admin_username = args.admin_username or settings.admin_username
         admin_password = (
-            args.admin_password if args.admin_password is not None else settings.admin_password
+            args.admin_password
+            if args.admin_password is not None
+            else settings.admin_password
         )
         passed, corrupted = run_api_mode(
             args.runs,

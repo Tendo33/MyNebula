@@ -20,7 +20,9 @@ from nebula.schemas.graph import GraphData, TimelineData
 class SnapshotStoreRepository:
     """Repository for creating and querying snapshot payloads."""
 
-    async def get_active_snapshot(self, db: AsyncSession, user_id: int) -> GraphSnapshot | None:
+    async def get_active_snapshot(
+        self, db: AsyncSession, user_id: int
+    ) -> GraphSnapshot | None:
         user = await db.get(User, user_id)
         if not user or not user.active_graph_snapshot_id:
             return None
@@ -49,10 +51,14 @@ class SnapshotStoreRepository:
         snapshot = await self.get_snapshot_by_version(db, user_id, version)
         if snapshot:
             await db.execute(
-                delete(GraphSnapshotNode).where(GraphSnapshotNode.snapshot_id == snapshot.id)
+                delete(GraphSnapshotNode).where(
+                    GraphSnapshotNode.snapshot_id == snapshot.id
+                )
             )
             await db.execute(
-                delete(GraphSnapshotEdge).where(GraphSnapshotEdge.snapshot_id == snapshot.id)
+                delete(GraphSnapshotEdge).where(
+                    GraphSnapshotEdge.snapshot_id == snapshot.id
+                )
             )
             await db.execute(
                 delete(GraphSnapshotTimeline).where(
@@ -66,7 +72,9 @@ class SnapshotStoreRepository:
                 "total_clusters": graph_data.total_clusters,
                 "total_star_lists": graph_data.total_star_lists,
                 "clusters": [cluster.model_dump() for cluster in graph_data.clusters],
-                "star_lists": [star_list.model_dump() for star_list in graph_data.star_lists],
+                "star_lists": [
+                    star_list.model_dump() for star_list in graph_data.star_lists
+                ],
             }
         else:
             snapshot = GraphSnapshot(
@@ -78,8 +86,12 @@ class SnapshotStoreRepository:
                     "total_edges": graph_data.total_edges,
                     "total_clusters": graph_data.total_clusters,
                     "total_star_lists": graph_data.total_star_lists,
-                    "clusters": [cluster.model_dump() for cluster in graph_data.clusters],
-                    "star_lists": [star_list.model_dump() for star_list in graph_data.star_lists],
+                    "clusters": [
+                        cluster.model_dump() for cluster in graph_data.clusters
+                    ],
+                    "star_lists": [
+                        star_list.model_dump() for star_list in graph_data.star_lists
+                    ],
                 },
             )
             db.add(snapshot)
@@ -259,14 +271,18 @@ class SnapshotStoreRepository:
             total_clusters=int(meta.get("total_clusters", 0)),
             total_star_lists=int(meta.get("total_star_lists", 0)),
             version=snapshot.version,
-            generated_at=snapshot.created_at.isoformat() if snapshot.created_at else None,
+            generated_at=snapshot.created_at.isoformat()
+            if snapshot.created_at
+            else None,
         )
 
     async def hydrate_timeline_data(
         self, db: AsyncSession, snapshot_id: int
     ) -> TimelineData | None:
         row = await db.scalar(
-            select(GraphSnapshotTimeline).where(GraphSnapshotTimeline.snapshot_id == snapshot_id)
+            select(GraphSnapshotTimeline).where(
+                GraphSnapshotTimeline.snapshot_id == snapshot_id
+            )
         )
         if row is None:
             return None

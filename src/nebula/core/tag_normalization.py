@@ -127,4 +127,3 @@ def merge_and_normalize_tag_sources(*tag_sources: list[str] | None) -> list[str]
         if source:
             merged.extend(source)
     return normalize_tag_list(merged)
-

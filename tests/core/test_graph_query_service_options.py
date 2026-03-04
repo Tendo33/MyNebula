@@ -76,6 +76,7 @@ async def test_get_graph_data_with_options_omits_edges(monkeypatch):
 @pytest.mark.asyncio
 async def test_rollback_active_snapshot_activates_previous(monkeypatch):
     repo = _SnapshotRepoStub()
+
     async def _fake_user(_db):
         return SimpleNamespace(id=1)
 

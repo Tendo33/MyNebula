@@ -162,9 +162,7 @@ class LLMService:
         if existing_cluster_names:
             names_list = ", ".join(f'"{n}"' for n in existing_cluster_names)
             if is_chinese:
-                exclusion_block = (
-                    f"\n\n已有的集群名称（你必须避免使用相同或相似的名称）:\n{names_list}"
-                )
+                exclusion_block = f"\n\n已有的集群名称（你必须避免使用相同或相似的名称）:\n{names_list}"
             else:
                 exclusion_block = (
                     "\n\nExisting cluster names (you must avoid reusing or paraphrasing them):\n"
@@ -246,7 +244,9 @@ Requirements:
             else:
                 # Fallback parsing
                 name = sanitize_cluster_name(
-                    response_line if response_line else ("技术项目集" if is_chinese else "Tech Cluster")
+                    response_line
+                    if response_line
+                    else ("技术项目集" if is_chinese else "Tech Cluster")
                 )
                 description = (
                     f"包含 {len(repo_names)} 个相关仓库"
@@ -256,7 +256,9 @@ Requirements:
                 keywords = (
                     unique_topics[:5]
                     if unique_topics
-                    else (["github", "开源"] if is_chinese else ["github", "open-source"])
+                    else (
+                        ["github", "开源"] if is_chinese else ["github", "open-source"]
+                    )
                 )
                 return name, description, keywords
 
@@ -296,9 +298,7 @@ Requirements:
 
         # Build structured context
         context_parts = (
-            [f"仓库名称: {full_name}"]
-            if is_chinese
-            else [f"Repository: {full_name}"]
+            [f"仓库名称: {full_name}"] if is_chinese else [f"Repository: {full_name}"]
         )
 
         if language:

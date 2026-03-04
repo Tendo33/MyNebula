@@ -565,7 +565,11 @@ class GraphSnapshotTimeline(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     snapshot_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("graph_snapshots.id"), nullable=False, unique=True, index=True
+        Integer,
+        ForeignKey("graph_snapshots.id"),
+        nullable=False,
+        unique=True,
+        index=True,
     )
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
 

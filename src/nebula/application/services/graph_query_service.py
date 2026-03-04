@@ -60,7 +60,9 @@ class GraphQueryService:
         logger.info("Built and activated initial graph snapshot: %s", version)
         return snapshot
 
-    async def get_graph_data(self, db: AsyncSession, version: str = "active") -> GraphData:
+    async def get_graph_data(
+        self, db: AsyncSession, version: str = "active"
+    ) -> GraphData:
         return await self.get_graph_data_with_options(
             db,
             version=version,
@@ -138,7 +140,9 @@ class GraphQueryService:
         except Exception:
             if not self.settings.snapshot_read_fallback_on_error:
                 raise
-            logger.exception("Snapshot timeline read failed, fallback to live timeline payload")
+            logger.exception(
+                "Snapshot timeline read failed, fallback to live timeline payload"
+            )
             _, _, timeline = await self.builder.build_payload(db)
 
         timeline.request_id = str(uuid.uuid4())
@@ -176,7 +180,9 @@ class GraphQueryService:
                 edges=[GraphEdge(**edge) for edge in edge_payload],
                 next_cursor=next_cursor,
                 version=snapshot.version,
-                generated_at=snapshot.created_at.isoformat() if snapshot.created_at else None,
+                generated_at=snapshot.created_at.isoformat()
+                if snapshot.created_at
+                else None,
             )
         except Exception:
             if not self.settings.snapshot_read_fallback_on_error:
@@ -184,7 +190,9 @@ class GraphQueryService:
             logger.exception("Snapshot edge read failed, fallback to live edge payload")
             _, graph_data, _ = await self.builder.build_payload(db)
             sliced_edges = graph_data.edges[cursor : cursor + limit]
-            next_cursor = cursor + limit if cursor + limit < len(graph_data.edges) else None
+            next_cursor = (
+                cursor + limit if cursor + limit < len(graph_data.edges) else None
+            )
             page = GraphEdgesPage(
                 edges=sliced_edges,
                 next_cursor=next_cursor,
@@ -276,12 +284,16 @@ class GraphQueryService:
     ) -> GraphSnapshot:
         if version == "active":
             return await self.ensure_active_snapshot(db)
-        snapshot = await self.snapshot_repo.get_snapshot_by_version(db, user_id, version)
+        snapshot = await self.snapshot_repo.get_snapshot_by_version(
+            db, user_id, version
+        )
         if snapshot is None:
             return await self.ensure_active_snapshot(db)
         return snapshot
 
-    def _log_if_slow(self, operation: str, started: float, **context: int | str) -> None:
+    def _log_if_slow(
+        self, operation: str, started: float, **context: int | str
+    ) -> None:
         elapsed_ms = int((perf_counter() - started) * 1000)
         if elapsed_ms <= self.settings.slow_query_log_ms:
             return

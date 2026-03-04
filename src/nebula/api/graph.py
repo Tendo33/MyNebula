@@ -3,7 +3,6 @@
 Provides data for force graph visualization and timeline analytics.
 """
 
-import math
 from collections.abc import Sequence
 from functools import lru_cache
 
@@ -13,15 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.core.relevance import cosine_similarity
-from nebula.db import Cluster, StarList, StarredRepo, User, get_db
+from nebula.db import User, get_db
 from nebula.schemas.graph import (
-    ClusterInfo,
     GraphData,
     GraphEdge,
-    GraphNode,
-    StarListInfo,
     TimelineData,
-    TimelinePoint,
 )
 from nebula.utils import get_logger
 
@@ -34,6 +29,7 @@ def _get_graph_query_service():
     from nebula.application.services import GraphQueryService
 
     return GraphQueryService()
+
 
 UNCATEGORIZED_STAR_LIST_ID = -1
 UNCATEGORIZED_STAR_LIST_NAME = "Uncategorized"

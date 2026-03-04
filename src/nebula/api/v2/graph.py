@@ -73,7 +73,9 @@ async def get_graph_edges(
             timeout=settings.api_query_timeout_seconds,
         )
     except TimeoutError as exc:
-        raise HTTPException(status_code=504, detail="Graph edges query timed out") from exc
+        raise HTTPException(
+            status_code=504, detail="Graph edges query timed out"
+        ) from exc
     response.headers["ETag"] = etag
     return page
 
@@ -96,7 +98,9 @@ async def get_graph_timeline(
             timeout=settings.api_query_timeout_seconds,
         )
     except TimeoutError as exc:
-        raise HTTPException(status_code=504, detail="Graph timeline query timed out") from exc
+        raise HTTPException(
+            status_code=504, detail="Graph timeline query timed out"
+        ) from exc
     response.headers["ETag"] = etag
     return payload
 

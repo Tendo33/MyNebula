@@ -144,7 +144,9 @@ class SchedulerService:
             user_tz = ZoneInfo(schedule.timezone)
             user_time = now_utc.astimezone(user_tz)
             last_run_local = (
-                schedule.last_run_at.astimezone(user_tz) if schedule.last_run_at else None
+                schedule.last_run_at.astimezone(user_tz)
+                if schedule.last_run_at
+                else None
             )
 
             from nebula.api.sync import _is_schedule_due
@@ -230,7 +232,9 @@ class SchedulerService:
                 )
                 if schedule:
                     schedule.last_run_status = "failed" if run_failed else "success"
-                    schedule.last_run_error = run.last_error if run_failed and run else None
+                    schedule.last_run_error = (
+                        run.last_error if run_failed and run else None
+                    )
                     await db.commit()
 
             logger.info(

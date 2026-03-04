@@ -5,7 +5,10 @@ import pytest
 async def test_legacy_sync_adapter_routes_are_preserved():
     from nebula.api import sync as legacy_sync_api
 
-    route_map = {route.path: getattr(route, "response_model", None) for route in legacy_sync_api.router.routes}
+    route_map = {
+        route.path: getattr(route, "response_model", None)
+        for route in legacy_sync_api.router.routes
+    }
 
     assert "/schedule" in route_map
     assert "/info" in route_map

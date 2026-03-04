@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import datetime, timezone
 
 import numpy as np
@@ -176,9 +176,13 @@ class GraphSnapshotBuilderService:
         )
         repos = repos_result.scalars().all()
 
-        clusters_result = await db.execute(select(Cluster).where(Cluster.user_id == user.id))
+        clusters_result = await db.execute(
+            select(Cluster).where(Cluster.user_id == user.id)
+        )
         clusters = clusters_result.scalars().all()
-        star_lists_result = await db.execute(select(StarList).where(StarList.user_id == user.id))
+        star_lists_result = await db.execute(
+            select(StarList).where(StarList.user_id == user.id)
+        )
         star_lists = star_lists_result.scalars().all()
 
         cluster_colors = {

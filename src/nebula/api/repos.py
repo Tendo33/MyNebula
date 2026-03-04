@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.core.embedding import get_embedding_service
@@ -222,25 +222,29 @@ def _build_related_cache_upsert_stmt(
     anchor_updated_at: Any,
     user_last_sync_at: Any,
 ):
-    return pg_insert(RepoRelatedCache).values(
-        user_id=user_id,
-        anchor_repo_id=anchor_repo_id,
-        cache_key=cache_key,
-        items=items,
-        anchor_updated_at=anchor_updated_at,
-        user_last_sync_at=user_last_sync_at,
-    ).on_conflict_do_update(
-        index_elements=[
-            RepoRelatedCache.user_id,
-            RepoRelatedCache.anchor_repo_id,
-            RepoRelatedCache.cache_key,
-        ],
-        set_={
-            "items": items,
-            "anchor_updated_at": anchor_updated_at,
-            "user_last_sync_at": user_last_sync_at,
-            "updated_at": func.now(),
-        },
+    return (
+        pg_insert(RepoRelatedCache)
+        .values(
+            user_id=user_id,
+            anchor_repo_id=anchor_repo_id,
+            cache_key=cache_key,
+            items=items,
+            anchor_updated_at=anchor_updated_at,
+            user_last_sync_at=user_last_sync_at,
+        )
+        .on_conflict_do_update(
+            index_elements=[
+                RepoRelatedCache.user_id,
+                RepoRelatedCache.anchor_repo_id,
+                RepoRelatedCache.cache_key,
+            ],
+            set_={
+                "items": items,
+                "anchor_updated_at": anchor_updated_at,
+                "user_last_sync_at": user_last_sync_at,
+                "updated_at": func.now(),
+            },
+        )
     )
 
 
@@ -397,11 +401,7 @@ async def get_related_repositories(
         and cache_entry.user_last_sync_at == user.last_sync_at
         and cache_entry.anchor_updated_at == anchor_repo.updated_at
     ):
-        cached_items = (
-            cache_entry.items
-            if isinstance(cache_entry.items, list)
-            else []
-        )
+        cached_items = cache_entry.items if isinstance(cache_entry.items, list) else []
         if not cached_items:
             return []
         cached_repo_ids = [
@@ -416,9 +416,7 @@ async def get_related_repositories(
                     StarredRepo.id.in_(cached_repo_ids),
                 )
             )
-            repo_by_id = {
-                repo.id: repo for repo in cached_repo_result.scalars().all()
-            }
+            repo_by_id = {repo.id: repo for repo in cached_repo_result.scalars().all()}
             restored = _deserialize_related_results(
                 items=cached_items,
                 repo_by_id=repo_by_id,

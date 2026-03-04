@@ -248,7 +248,9 @@ def mark_cluster_outliers(
     updated = labels.copy()
     candidate_scores: list[tuple[float, int]] = []
 
-    unique_labels = sorted({int(label) for label in labels.tolist() if int(label) != -1})
+    unique_labels = sorted(
+        {int(label) for label in labels.tolist() if int(label) != -1}
+    )
     for cluster_id in unique_labels:
         mask = labels == cluster_id
         indices = np.where(mask)[0]

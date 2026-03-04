@@ -8,6 +8,7 @@ from nebula.api.sync import get_default_user
 from nebula.application.services.graph_query_service import GraphQueryService
 from nebula.db import Cluster, StarredRepo, get_db
 from nebula.schemas.v2 import DashboardCluster, DashboardResponse, DashboardSummary
+
 from .metadata import build_v2_metadata
 
 router = APIRouter()
@@ -37,7 +38,9 @@ async def get_dashboard_data(
     counts = repo_count_result.one()
 
     clusters_result = await db.execute(
-        select(Cluster).where(Cluster.user_id == user.id).order_by(Cluster.repo_count.desc())
+        select(Cluster)
+        .where(Cluster.user_id == user.id)
+        .order_by(Cluster.repo_count.desc())
     )
     top_clusters = clusters_result.scalars().all()[:8]
     metadata = build_v2_metadata(

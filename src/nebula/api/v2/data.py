@@ -10,6 +10,7 @@ from nebula.api.sync import get_default_user
 from nebula.application.services.graph_query_service import GraphQueryService
 from nebula.db import StarredRepo, get_db
 from nebula.schemas.v2 import DataRepoItem, DataReposResponse
+
 from .metadata import build_v2_metadata
 
 router = APIRouter()
@@ -54,8 +55,12 @@ async def get_data_repos(
             next_month_year = month_dt.year + (1 if month_dt.month == 12 else 0)
             next_month = 1 if month_dt.month == 12 else month_dt.month + 1
             next_month_dt = month_dt.replace(year=next_month_year, month=next_month)
-            conditions.append(StarredRepo.starred_at >= month_dt.replace(tzinfo=timezone.utc))
-            conditions.append(StarredRepo.starred_at < next_month_dt.replace(tzinfo=timezone.utc))
+            conditions.append(
+                StarredRepo.starred_at >= month_dt.replace(tzinfo=timezone.utc)
+            )
+            conditions.append(
+                StarredRepo.starred_at < next_month_dt.replace(tzinfo=timezone.utc)
+            )
         except ValueError:
             pass
     if topic:

@@ -61,7 +61,9 @@ class SyncPipelineService:
             )
 
             await self._update_run(run_id, PipelineStatus.running, PipelinePhase.stars)
-            stars_task_id = await self._create_task(user_id, run_id, "stars", PipelinePhase.stars)
+            stars_task_id = await self._create_task(
+                user_id, run_id, "stars", PipelinePhase.stars
+            )
             await sync_stars_task(user_id, stars_task_id, mode)
             partial_failed = partial_failed or await self._inspect_task_outcome(
                 stars_task_id,
@@ -69,7 +71,9 @@ class SyncPipelineService:
                 phase=PipelinePhase.stars,
             )
 
-            await self._update_run(run_id, PipelineStatus.running, PipelinePhase.embedding)
+            await self._update_run(
+                run_id, PipelineStatus.running, PipelinePhase.embedding
+            )
             embedding_task_id = await self._create_task(
                 user_id, run_id, "embedding", PipelinePhase.embedding
             )
@@ -80,8 +84,12 @@ class SyncPipelineService:
                 phase=PipelinePhase.embedding,
             )
 
-            force_full_recluster = await self._should_force_full_recluster(user_id, stars_task_id)
-            await self._update_run(run_id, PipelineStatus.running, PipelinePhase.clustering)
+            force_full_recluster = await self._should_force_full_recluster(
+                user_id, stars_task_id
+            )
+            await self._update_run(
+                run_id, PipelineStatus.running, PipelinePhase.clustering
+            )
             clustering_task_id = await self._create_task(
                 user_id, run_id, "cluster", PipelinePhase.clustering
             )
@@ -99,12 +107,16 @@ class SyncPipelineService:
                 phase=PipelinePhase.clustering,
             )
 
-            await self._update_run(run_id, PipelineStatus.running, PipelinePhase.snapshot)
+            await self._update_run(
+                run_id, PipelineStatus.running, PipelinePhase.snapshot
+            )
             async with get_db_context() as db:
                 await self.graph_service.rebuild_active_snapshot(db)
 
             final_status = (
-                PipelineStatus.partial_failed if partial_failed else PipelineStatus.completed
+                PipelineStatus.partial_failed
+                if partial_failed
+                else PipelineStatus.completed
             )
             await self._update_run(run_id, final_status, PipelinePhase.completed)
             return run_id
@@ -181,7 +193,9 @@ class SyncPipelineService:
                 run.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
-    async def _should_force_full_recluster(self, user_id: int, stars_task_id: int) -> bool:
+    async def _should_force_full_recluster(
+        self, user_id: int, stars_task_id: int
+    ) -> bool:
         async with get_db_context() as db:
             stars_task = await db.get(SyncTask, stars_task_id)
             user = await db.get(User, user_id)

@@ -23,13 +23,20 @@ class _BuilderStub:
                 total_star_lists=0,
                 generated_at=now.isoformat(),
             ),
-            TimelineData(points=[], total_stars=0, date_range=("", ""), generated_at=now.isoformat()),
+            TimelineData(
+                points=[],
+                total_stars=0,
+                date_range=("", ""),
+                generated_at=now.isoformat(),
+            ),
         )
 
 
 class _InvalidSnapshotRepo:
     async def save_snapshot_payload(self, *_args, **_kwargs):
-        return SimpleNamespace(id=2, version="snapshot-v1", created_at=datetime.now(timezone.utc), meta={})
+        return SimpleNamespace(
+            id=2, version="snapshot-v1", created_at=datetime.now(timezone.utc), meta={}
+        )
 
     async def validate_snapshot_consistency(self, *_args, **_kwargs):
         return False, "node count mismatch"

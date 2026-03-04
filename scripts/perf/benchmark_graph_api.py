@@ -62,7 +62,9 @@ def main() -> None:
         return
 
     with httpx.Client(base_url=args.base_url, timeout=30.0) as client:
-        graph = _measure(client, "/api/v2/graph?version=active&include_edges=false", args.runs)
+        graph = _measure(
+            client, "/api/v2/graph?version=active&include_edges=false", args.runs
+        )
         edges = _measure(
             client,
             "/api/v2/graph/edges?version=active&cursor=0&limit=1200",
