@@ -147,7 +147,7 @@ const DataPage = () => {
   // Cluster map for quick lookup
   const clusterMap = useMemo(() => {
     const map = new Map<number, ClusterInfo>();
-    clusters.forEach(c => map.set(c.id, c));
+    clusters.forEach((c: ClusterInfo) => map.set(c.id, c));
     return map;
   }, [clusters]);
 
@@ -185,7 +185,7 @@ const DataPage = () => {
     if (topicFilter) {
       const normalizedTopic = topicFilter.toLowerCase();
       filtered = filtered.filter(
-        node => (node.topics || []).some(topic => topic.toLowerCase() === normalizedTopic)
+        node => (node.topics || []).some((topic: string) => topic.toLowerCase() === normalizedTopic)
       );
     }
 
@@ -379,7 +379,7 @@ const DataPage = () => {
                         <Layers className="w-4 h-4" />
                         <span>{t('data.filter_by_cluster')}:</span>
                       </div>
-                  {clusters.map(cluster => (
+                  {clusters.map((cluster: ClusterInfo) => (
                     <button
                       key={cluster.id}
                       onClick={() => handleClusterFilter(cluster.id)}

@@ -81,9 +81,10 @@ export const useDashboardQuery = () => {
     const topClusters = dashboard.top_clusters.map((cluster) => {
       const fullCluster = graph.clusters.find((item) => item.id === cluster.id);
       return {
-        ...cluster,
-        keywords: fullCluster?.keywords ?? [],
-      };
+				...cluster,
+				color: fullCluster?.color || cluster.color,
+				keywords: fullCluster?.keywords ?? [],
+			};
     });
 
     const recentMonths = timeline?.points.slice(-3) ?? [];

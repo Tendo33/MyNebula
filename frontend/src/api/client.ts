@@ -1,8 +1,12 @@
 import axios from 'axios';
 import type { AxiosError } from 'axios';
 
-// 优先使用环境变量，否则根据当前页面地址推断后端地址
 const getApiBaseUrl = (): string => {
+	// 开发环境下始终使用相对路径，以便 Vite proxy 能够接管从而避免跨域和 Cookie 丢失问题
+	if (import.meta.env.DEV) {
+		return "/api";
+	}
+
 	// 首先检查环境变量
 	const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
 	if (envUrl) {
@@ -13,7 +17,7 @@ const getApiBaseUrl = (): string => {
 		return `${window.location.origin}/api`;
 	}
 	return "http://localhost:8071/api";
-};;
+};
 
 export const API_BASE_URL = getApiBaseUrl();
 
