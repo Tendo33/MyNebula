@@ -112,6 +112,7 @@
     "show_trajectories_desc": "Show connection paths between nodes",
     "related_min_semantic": "Related Similarity Strictness",
     "related_min_semantic_desc": "Raise this to keep only highly similar repositories in the Similar tab",
+    "update_graph_defaults_error": "Failed to save graph defaults",
     "connection": "Connection",
     "api_endpoint": "API Endpoint",
     "github_token_status": "GitHub Token Status",
@@ -201,7 +202,9 @@
     "step_embeddings_label": "Computing Embeddings",
     "step_embeddings_desc": "Building semantic representations",
     "step_clustering_label": "Clustering Repositories",
-    "step_clustering_desc": "Organizing into knowledge groups"
+    "step_clustering_desc": "Organizing into knowledge groups",
+    "step_snapshot_label": "Rebuilding Graph Snapshot",
+    "step_snapshot_desc": "Publishing the latest graph payload"
   },
   "time": {
     "never_run": "Never Run",

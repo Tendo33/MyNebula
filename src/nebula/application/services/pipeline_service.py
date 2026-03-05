@@ -12,6 +12,7 @@ from nebula.domain import PipelinePhase, PipelineStatus
 from nebula.utils import get_logger
 
 from .graph_query_service import GraphQueryService
+from . import sync_execution_service
 
 logger = get_logger(__name__)
 
@@ -54,17 +55,12 @@ class SyncPipelineService:
 
         try:
             partial_failed = False
-            from nebula.api.sync import (
-                compute_embeddings_task,
-                run_clustering_task,
-                sync_stars_task,
-            )
 
             await self._update_run(run_id, PipelineStatus.running, PipelinePhase.stars)
             stars_task_id = await self._create_task(
                 user_id, run_id, "stars", PipelinePhase.stars
             )
-            await sync_stars_task(user_id, stars_task_id, mode)
+            await sync_execution_service.sync_stars_task(user_id, stars_task_id, mode)
             partial_failed = partial_failed or await self._inspect_task_outcome(
                 stars_task_id,
                 run_id=run_id,
@@ -77,7 +73,9 @@ class SyncPipelineService:
             embedding_task_id = await self._create_task(
                 user_id, run_id, "embedding", PipelinePhase.embedding
             )
-            await compute_embeddings_task(user_id, embedding_task_id)
+            await sync_execution_service.compute_embeddings_task(
+                user_id, embedding_task_id
+            )
             partial_failed = partial_failed or await self._inspect_task_outcome(
                 embedding_task_id,
                 run_id=run_id,
@@ -93,7 +91,7 @@ class SyncPipelineService:
             clustering_task_id = await self._create_task(
                 user_id, run_id, "cluster", PipelinePhase.clustering
             )
-            await run_clustering_task(
+            await sync_execution_service.run_clustering_task(
                 user_id=user_id,
                 task_id=clustering_task_id,
                 use_llm=use_llm,
@@ -121,7 +119,7 @@ class SyncPipelineService:
             await self._update_run(run_id, final_status, PipelinePhase.completed)
             return run_id
         except Exception as exc:
-            logger.exception("Pipeline %s failed: %s", run_id, exc)
+            logger.exception(f"Pipeline {run_id} failed: {exc}")
             await self._update_run(
                 run_id,
                 PipelineStatus.failed,
@@ -147,6 +145,64 @@ class SyncPipelineService:
             max_clusters=max_clusters,
             min_clusters=min_clusters,
         )
+
+    async def run_recluster_pipeline(
+        self,
+        run_id: int,
+        *,
+        max_clusters: int = 8,
+        min_clusters: int = 3,
+    ) -> int:
+        """Execute a pipeline run for full reclustering only."""
+        async with get_db_context() as db:
+            run = await db.get(PipelineRun, run_id)
+            if run is None:
+                raise ValueError(f"Pipeline run {run_id} not found")
+            user_id = run.user_id
+
+        try:
+            await self._update_run(
+                run_id, PipelineStatus.running, PipelinePhase.clustering
+            )
+            clustering_task_id = await self._create_task(
+                user_id, run_id, "cluster", PipelinePhase.clustering
+            )
+            await sync_execution_service.run_clustering_task(
+                user_id=user_id,
+                task_id=clustering_task_id,
+                use_llm=True,
+                max_clusters=max_clusters,
+                min_clusters=min_clusters,
+                incremental=False,
+            )
+            partial_failed = await self._inspect_task_outcome(
+                clustering_task_id,
+                run_id=run_id,
+                phase=PipelinePhase.clustering,
+            )
+
+            await self._update_run(
+                run_id, PipelineStatus.running, PipelinePhase.snapshot
+            )
+            async with get_db_context() as db:
+                await self.graph_service.rebuild_active_snapshot(db)
+
+            final_status = (
+                PipelineStatus.partial_failed
+                if partial_failed
+                else PipelineStatus.completed
+            )
+            await self._update_run(run_id, final_status, PipelinePhase.completed)
+            return run_id
+        except Exception as exc:
+            logger.exception(f"Recluster pipeline {run_id} failed: {exc}")
+            await self._update_run(
+                run_id,
+                PipelineStatus.failed,
+                PipelinePhase.completed,
+                error=str(exc),
+            )
+            return run_id
 
     async def _create_task(
         self,
@@ -206,9 +262,7 @@ class SyncPipelineService:
                 else 0
             )
             total_repos = int(user.total_stars or 0) if user else 0
-            from nebula.api.sync import _should_force_full_recluster
-
-            return _should_force_full_recluster(
+            return sync_execution_service.should_force_full_recluster(
                 total_repos=total_repos,
                 new_repos=new_repos,
                 centroid_drift=None,
@@ -249,18 +303,17 @@ class SyncPipelineService:
                     "status": task.status,
                     "last_error": task.error_message,
                 }
-                logger.error("Pipeline phase failed: %s", details)
+                logger.error(f"Pipeline phase failed: {details}")
                 raise ValueError(
                     f"Pipeline phase failed phase={phase.value} task_id={task_id}: {task.error_message}"
                 )
 
             has_partial_failure = bool(task.failed_items and task.failed_items > 0)
             logger.info(
-                "Pipeline phase completed run_id=%s task_id=%s phase=%s status=%s failed_items=%s",
-                run_id,
-                task_id,
-                phase.value,
-                task.status,
-                task.failed_items,
+                f"Pipeline phase completed run_id={run_id} "
+                f"task_id={task_id} "
+                f"phase={phase.value} "
+                f"status={task.status} "
+                f"failed_items={task.failed_items}"
             )
             return has_partial_failure

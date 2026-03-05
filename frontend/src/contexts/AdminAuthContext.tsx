@@ -43,7 +43,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     setUnauthorizedHandler((error) => {
       const requestUrl = error.config?.url ?? '';
-      if (requestUrl.includes('/auth/login')) {
+      if (requestUrl.includes('/v2/auth/login')) {
         return;
       }
       clearSession();

@@ -4,7 +4,6 @@ This module contains Pydantic models for:
 - repo: Repository-related schemas
 - graph: Graph visualization data schemas
 - user: User-related schemas
-- schedule: Sync schedule configuration schemas
 """
 
 from .graph import (
@@ -19,14 +18,6 @@ from .repo import (
     RepoResponse,
     RepoSearchRequest,
     RepoSearchResponse,
-)
-from .schedule import (
-    FullRefreshRequest,
-    FullRefreshResponse,
-    JobStatusResponse,
-    ScheduleConfig,
-    ScheduleResponse,
-    SyncInfoResponse,
 )
 from .user import (
     UserBase,
@@ -50,11 +41,4 @@ __all__ = [
     "UserBase",
     "UserResponse",
     "UserStats",
-    # Schedule
-    "ScheduleConfig",
-    "ScheduleResponse",
-    "SyncInfoResponse",
-    "FullRefreshRequest",
-    "FullRefreshResponse",
-    "JobStatusResponse",
 ]

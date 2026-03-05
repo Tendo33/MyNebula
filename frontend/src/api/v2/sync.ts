@@ -41,6 +41,19 @@ export const startSyncPipelineV2 = async (params?: {
   return response.data;
 };
 
+export const startReclusterV2 = async (params?: {
+  max_clusters?: number;
+  min_clusters?: number;
+}): Promise<PipelineStartResponse> => {
+  const response = await client.post<PipelineStartResponse>('/v2/sync/recluster', null, {
+    params: {
+      max_clusters: params?.max_clusters ?? 8,
+      min_clusters: params?.min_clusters ?? 3,
+    },
+  });
+  return response.data;
+};
+
 export const getPipelineStatusV2 = async (
   runId: number
 ): Promise<PipelineStatusResponse> => {

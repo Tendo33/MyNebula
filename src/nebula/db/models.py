@@ -64,6 +64,8 @@ class User(Base):
     # Statistics
     total_stars: Mapped[int] = mapped_column(Integer, default=0)
     synced_stars: Mapped[int] = mapped_column(Integer, default=0)
+    graph_max_clusters: Mapped[int] = mapped_column(Integer, default=8)
+    graph_min_clusters: Mapped[int] = mapped_column(Integer, default=3)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

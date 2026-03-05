@@ -82,7 +82,7 @@ def create_app() -> FastAPI:
     )
 
     # GZip compression – significantly reduces JSON payload sizes
-    # (typically 70-80% smaller for /api/graph responses)
+    # (typically 70-80% smaller for /api/v2/graph responses)
     app.add_middleware(GZipMiddleware, minimum_size=500)
 
     # Configure CORS - 允许所有本地开发端口

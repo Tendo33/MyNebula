@@ -43,7 +43,7 @@ export const getRelatedRepos = async (
     min_semantic?: number;
   }
 ): Promise<RelatedRepoResponse[]> => {
-  const response = await client.get<RelatedRepoResponse[]>(`/repos/${repoId}/related`, {
+  const response = await client.get<RelatedRepoResponse[]>(`/v2/repos/${repoId}/related`, {
     params: {
       limit: params?.limit ?? 20,
       min_score: params?.min_score ?? 0.4,
@@ -57,5 +57,5 @@ export const submitRelatedFeedback = async (
   repoId: number,
   payload: RelatedFeedbackPayload
 ): Promise<void> => {
-  await client.post(`/repos/${repoId}/related-feedback`, payload);
+  await client.post(`/v2/repos/${repoId}/related-feedback`, payload);
 };

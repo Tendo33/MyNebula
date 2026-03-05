@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 
 async def _get_default_user(db: AsyncSession):
-    from nebula.api.sync import get_default_user
+    from nebula.application.services.user_service import get_default_user
 
     return await get_default_user(db)
 
@@ -57,7 +57,7 @@ class GraphQueryService:
         )
         await self._validate_snapshot_or_raise(db, snapshot)
         await self.snapshot_repo.activate_snapshot(db, user.id, snapshot)
-        logger.info("Built and activated initial graph snapshot: %s", version)
+        logger.info(f"Built and activated initial graph snapshot: {version}")
         return snapshot
 
     async def get_graph_data(
@@ -298,10 +298,9 @@ class GraphQueryService:
         if elapsed_ms <= self.settings.slow_query_log_ms:
             return
         logger.warning(
-            "Slow graph query op=%s elapsed_ms=%s context=%s",
-            operation,
-            elapsed_ms,
-            context,
+            f"Slow graph query op={operation} "
+            f"elapsed_ms={elapsed_ms} "
+            f"context={context}"
         )
 
     async def _validate_snapshot_or_raise(

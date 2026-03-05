@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.dialects import postgresql
 
-from nebula.api.repos import (
+from nebula.api.v2.repos import (
     _build_related_cache_key,
     _build_related_cache_upsert_stmt,
     _deserialize_related_results,

@@ -15,21 +15,21 @@ interface LoginPayload {
 }
 
 export const loginAdmin = async (payload: LoginPayload): Promise<AdminSessionResponse> => {
-  const response = await client.post<AdminSessionResponse>('/auth/login', payload);
+  const response = await client.post<AdminSessionResponse>('/v2/auth/login', payload);
   return response.data;
 };
 
 export const logoutAdmin = async (): Promise<AdminSessionResponse> => {
-  const response = await client.post<AdminSessionResponse>('/auth/logout');
+  const response = await client.post<AdminSessionResponse>('/v2/auth/logout');
   return response.data;
 };
 
 export const getAdminSession = async (): Promise<AdminSessionResponse> => {
-  const response = await client.get<AdminSessionResponse>('/auth/me');
+  const response = await client.get<AdminSessionResponse>('/v2/auth/me');
   return response.data;
 };
 
 export const getAdminAuthConfig = async (): Promise<AdminAuthConfigResponse> => {
-  const response = await client.get<AdminAuthConfigResponse>('/auth/config');
+  const response = await client.get<AdminAuthConfigResponse>('/v2/auth/config');
   return response.data;
 };

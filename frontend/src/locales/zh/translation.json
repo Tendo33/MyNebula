@@ -113,6 +113,7 @@
     "show_trajectories_desc": "显示节点之间的连接路径",
     "related_min_semantic": "相似推荐严格度",
     "related_min_semantic_desc": "提高该值可只保留 Similar 标签中语义更接近的仓库",
+    "update_graph_defaults_error": "保存图谱聚类参数失败",
     "connection": "连接",
     "api_endpoint": "API 端点",
     "github_token_status": "GitHub 令牌状态",
@@ -202,7 +203,9 @@
     "step_embeddings_label": "计算数据向量",
     "step_embeddings_desc": "构建语义表示",
     "step_clustering_label": "执行聚类分析",
-    "step_clustering_desc": "按知识领域进行组织"
+    "step_clustering_desc": "按知识领域进行组织",
+    "step_snapshot_label": "重建图谱快照",
+    "step_snapshot_desc": "发布最新图谱数据"
   },
   "time": {
     "never_run": "从未运行",

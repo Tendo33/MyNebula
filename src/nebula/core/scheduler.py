@@ -149,9 +149,9 @@ class SchedulerService:
                 else None
             )
 
-            from nebula.api.sync import _is_schedule_due
+            from nebula.application.services.sync_ops_service import is_schedule_due
 
-            if not _is_schedule_due(
+            if not is_schedule_due(
                 now_local=user_time,
                 schedule_hour=schedule.schedule_hour,
                 schedule_minute=schedule.schedule_minute,
@@ -238,9 +238,7 @@ class SchedulerService:
                     await db.commit()
 
             logger.info(
-                "Scheduled pipeline sync completed for user %s (run_id=%s)",
-                user_id,
-                run_id,
+                f"Scheduled pipeline sync completed for user {user_id} (run_id={run_id})"
             )
 
         except Exception as e:
