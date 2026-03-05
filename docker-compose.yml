@@ -24,43 +24,14 @@ services:
   api:
     image: simonsun3/mynebula:latest
     container_name: mynebula-api
+    env_file:
+      - .env
     environment:
-      # ---------- 内部固定配置 (勿修改) ----------
+      # 内部固定配置，覆盖 .env 中同名变量
       - API_PORT=8000
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
       - DATABASE_URL=
-
-      # ---------- 数据库凭证 ----------
-      - DATABASE_USER=${DATABASE_USER:-mynebula}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-mynebula_secret}
-      - DATABASE_NAME=${DATABASE_NAME:-mynebula}
-
-      # ---------- 应用配置 ----------
-      - APP_NAME=${APP_NAME:-mynebula}
-      - DEBUG=${DEBUG:-false}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
-
-      # ---------- GitHub ----------
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-
-      # ---------- Embedding 服务 ----------
-      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
-      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-large-zh-v1.5}
-      - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-1024}
-
-      # ---------- LLM 服务 ----------
-      - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
-      - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
-      - LLM_OUTPUT_LANGUAGE=${LLM_OUTPUT_LANGUAGE:-zh}
-
-      # ---------- 同步配置 ----------
-      - SYNC_BATCH_SIZE=${SYNC_BATCH_SIZE:-100}
-      - SYNC_README_MAX_LENGTH=${SYNC_README_MAX_LENGTH:-10000}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
