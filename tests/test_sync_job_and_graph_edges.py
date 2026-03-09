@@ -4,7 +4,10 @@ import numpy as np
 import pytest
 from fastapi import HTTPException
 
-from nebula.application.services.graph_edge_service import _build_similarity_edges_knn
+from nebula.application.services.graph_edge_service import (
+    RepoEdgeInfo,
+    _build_similarity_edges_knn,
+)
 from nebula.application.services.sync_ops_service import (
     calculate_progress_percent,
     estimate_eta_seconds,
@@ -81,39 +84,27 @@ def test_is_schedule_due_handles_same_minute_deduplication():
 
 
 def test_build_similarity_edges_knn_returns_unique_edges():
-    repo_ids = [1, 2, 3]
-    embeddings = [
-        [1.0, 0.0],
-        [0.98, 0.02],
-        [0.0, 1.0],
+    repos = [
+        RepoEdgeInfo(repo_id=1, embedding=[1.0, 0.0], language="Python"),
+        RepoEdgeInfo(repo_id=2, embedding=[0.98, 0.02], language="Python"),
+        RepoEdgeInfo(repo_id=3, embedding=[0.0, 1.0], language="Rust"),
     ]
 
-    edges = _build_similarity_edges_knn(
-        repo_ids=repo_ids,
-        embeddings=embeddings,
-        min_similarity=0.8,
-        k=2,
-    )
+    edges = _build_similarity_edges_knn(repos, min_score=0.5, k=2)
 
     assert len(edges) == 1
     edge = edges[0]
     assert {edge.source, edge.target} == {1, 2}
-    assert edge.weight >= 0.8
+    assert edge.weight >= 0.5
 
 
 def test_build_similarity_edges_knn_handles_numpy_embeddings():
-    repo_ids = [1, 2]
-    embeddings = [
-        np.array([1.0, 0.0]),
-        np.array([0.99, 0.01]),
+    repos = [
+        RepoEdgeInfo(repo_id=1, embedding=np.array([1.0, 0.0]), language="Go"),
+        RepoEdgeInfo(repo_id=2, embedding=np.array([0.99, 0.01]), language="Go"),
     ]
 
-    edges = _build_similarity_edges_knn(
-        repo_ids=repo_ids,
-        embeddings=embeddings,
-        min_similarity=0.8,
-        k=1,
-    )
+    edges = _build_similarity_edges_knn(repos, min_score=0.5, k=1)
 
     assert len(edges) == 1
     assert {edges[0].source, edges[0].target} == {1, 2}

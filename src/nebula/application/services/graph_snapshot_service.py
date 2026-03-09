@@ -20,8 +20,9 @@ from nebula.schemas.graph import (
 )
 
 from .graph_edge_service import (
+    RepoEdgeInfo,
     _build_similarity_edges_knn,
-    _estimate_adaptive_similarity_threshold,
+    _estimate_adaptive_relevance_threshold,
 )
 from .user_service import get_default_user
 
@@ -197,28 +198,29 @@ class GraphSnapshotBuilderService:
             .limit(edge_max_nodes)
         )
         edge_repos = edge_repos_result.scalars().all()
-        repo_ids = [
-            repo.id
+        repo_edge_infos = [
+            RepoEdgeInfo(
+                repo_id=repo.id,
+                embedding=repo.embedding,
+                ai_tags=repo.ai_tags,
+                topics=repo.topics,
+                star_list_id=repo.star_list_id,
+                language=repo.language,
+            )
             for repo in edge_repos
             if repo.embedding is not None and len(repo.embedding) > 0
         ]
-        embeddings = [
-            repo.embedding
-            for repo in edge_repos
-            if repo.embedding is not None and len(repo.embedding) > 0
-        ]
-        effective_similarity = (
-            _estimate_adaptive_similarity_threshold(
-                embeddings=embeddings,
+        effective_threshold = (
+            _estimate_adaptive_relevance_threshold(
+                repo_edge_infos,
                 target_degree=edge_k,
             )
             if adaptive_edges
-            else 0.7
+            else 0.5
         )
         edges = _build_similarity_edges_knn(
-            repo_ids=repo_ids,
-            embeddings=embeddings,
-            min_similarity=effective_similarity,
+            repo_edge_infos,
+            min_score=effective_threshold,
             k=edge_k,
         )
 
