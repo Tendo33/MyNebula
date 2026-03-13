@@ -91,6 +91,18 @@ flowchart LR
 
 ---
 
+## 文档索引
+
+- 环境变量：`doc/ENV_VARS.md`
+- Docker 部署：`doc/DOCKER_DEPLOY.md`
+- 质量门禁：`doc/QUALITY_GATES.md`
+- 数据重置：`doc/RESET_GUIDE.md`
+- 模型说明：`doc/MODELS_GUIDE.md`
+- SDK 使用：`doc/SDK_USAGE.md`
+- 版本变更：`CHANGELOG.md`
+
+---
+
 ## 快速开始（推荐 Docker）
 
 ### 前置条件
@@ -98,6 +110,7 @@ flowchart LR
 - Docker + Docker Compose v2
 - GitHub Personal Access Token
 - 任意 OpenAI 兼容的 Embedding 服务 API Key
+- OpenAI 兼容的 LLM API Key（可选）
 
 ### 1）克隆并配置
 
@@ -112,6 +125,7 @@ cp .env.example .env
 - `GITHUB_TOKEN`
 - `EMBEDDING_API_KEY`
 - `ADMIN_PASSWORD`（强烈建议，用于启用后台登录）
+- `ADMIN_USERNAME`（`.env.example` 默认 `admin`）
 
 ### 2）启动服务
 
@@ -268,18 +282,6 @@ MyNebula/
 
 ---
 
-## 文档索引
-
-- 环境变量：`doc/ENV_VARS.md`
-- Docker 部署：`doc/DOCKER_DEPLOY.md`
-- 质量门禁：`doc/QUALITY_GATES.md`
-- 数据重置：`doc/RESET_GUIDE.md`
-- 模型说明：`doc/MODELS_GUIDE.md`
-- SDK 使用：`doc/SDK_USAGE.md`
-- 版本变更：`CHANGELOG.md`
-
----
-
 ## 常见问题
 
 - **图谱/数据页没有内容**
@@ -311,4 +313,3 @@ MyNebula/
 
 - 贡献指南：`CONTRIBUTING.md`
 - 开源许可：`LICENSE`（MIT）
-

@@ -138,7 +138,9 @@ async def test_recluster_pipeline_runs_clustering_then_snapshot(monkeypatch):
         return None
 
     service = pipeline_module.SyncPipelineService(
-        graph_service=SimpleNamespace(rebuild_active_snapshot=fake_rebuild_active_snapshot)
+        graph_service=SimpleNamespace(
+            rebuild_active_snapshot=fake_rebuild_active_snapshot
+        )
     )
 
     status_updates: list[tuple[PipelineStatus, PipelinePhase]] = []

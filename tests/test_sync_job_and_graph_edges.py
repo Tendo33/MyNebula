@@ -24,13 +24,13 @@ def test_calculate_progress_percent_handles_bounds():
 
 
 def test_estimate_eta_seconds_returns_none_for_invalid_progress():
-    started_at = datetime.utcnow() - timedelta(minutes=2)
+    started_at = datetime.now(timezone.utc) - timedelta(minutes=2)
     assert estimate_eta_seconds(started_at, 0.0) is None
     assert estimate_eta_seconds(started_at, 100.0) is None
 
 
 def test_estimate_eta_seconds_estimates_remaining_time():
-    started_at = datetime.utcnow() - timedelta(seconds=120)
+    started_at = datetime.now(timezone.utc) - timedelta(seconds=120)
     eta = estimate_eta_seconds(started_at, 50.0)
     assert eta is not None
     assert 100 <= eta <= 140
@@ -108,3 +108,12 @@ def test_build_similarity_edges_knn_handles_numpy_embeddings():
 
     assert len(edges) == 1
     assert {edges[0].source, edges[0].target} == {1, 2}
+
+
+def test_schema_responses_use_from_attributes():
+    from nebula.schemas import RepoResponse, UserResponse
+
+    assert RepoResponse.model_config.get("from_attributes") is True
+    assert UserResponse.model_config.get("from_attributes") is True
+    assert not hasattr(RepoResponse, "Config")
+    assert not hasattr(UserResponse, "Config")

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserBase(BaseModel):
@@ -23,8 +23,7 @@ class UserResponse(UserBase):
     last_sync_at: datetime | None = Field(None, description="Last sync timestamp")
     created_at: datetime = Field(..., description="Account creation time")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserStats(BaseModel):

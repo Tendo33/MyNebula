@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-03-13
+
+### Changed
+- Refreshed README (EN/中文) and `doc/` documentation to match current behavior and config.
+- Synchronized version metadata to `1.0.10` across backend/config/env docs.
+- Cleaned up outdated refactor notes under `doc/refactor/`.
+- Updated frontend logo asset.
+- Normalized import ordering flagged by Ruff.
+
 ## [1.0.7] - 2026-03-04
 
 ### Fixed
@@ -121,7 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.10...HEAD
+[1.0.10]: https://github.com/Tendo33/mynebula/compare/v1.0.9...v1.0.10
 [1.0.7]: https://github.com/Tendo33/mynebula/compare/v1.0.5...v1.0.7
 [1.0.5]: https://github.com/Tendo33/mynebula/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/Tendo33/mynebula/compare/v1.0.3...v1.0.4

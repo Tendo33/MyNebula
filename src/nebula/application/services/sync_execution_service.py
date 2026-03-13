@@ -171,7 +171,9 @@ async def sync_stars_task(
             new_count = 0
             updated_count = 0
 
-            async with GitHubClient(access_token=settings.github_token) as readme_client:
+            async with GitHubClient(
+                access_token=settings.github_token
+            ) as readme_client:
                 for repo in repos:
                     try:
                         result = await db.execute(
@@ -279,7 +281,9 @@ async def sync_stars_task(
                     "Incremental deletion detection enabled: fetching full starred list..."
                 )
                 try:
-                    async with GitHubClient(access_token=settings.github_token) as client:
+                    async with GitHubClient(
+                        access_token=settings.github_token
+                    ) as client:
                         all_repos, _ = await client.get_starred_repos()
                     github_repo_ids_from_api = {repo.id for repo in all_repos}
                     logger.info(
@@ -401,7 +405,9 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 return
 
             llm_service = get_llm_service()
-            repos_needing_llm = [repo for repo in repos if not repo.ai_summary or not repo.ai_tags]
+            repos_needing_llm = [
+                repo for repo in repos if not repo.ai_summary or not repo.ai_tags
+            ]
 
             if repos_needing_llm:
                 total_llm_repos = len(repos_needing_llm)
@@ -412,7 +418,10 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 
                 for index, repo in enumerate(repos_needing_llm, 1):
                     try:
-                        summary, tags = await llm_service.generate_repo_summary_and_tags(
+                        (
+                            summary,
+                            tags,
+                        ) = await llm_service.generate_repo_summary_and_tags(
                             full_name=repo.full_name,
                             description=repo.description,
                             topics=repo.topics,
@@ -427,7 +436,9 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                             f"LLM generation failed for {repo.full_name}: {exc}"
                         )
                         if not repo.ai_tags:
-                            repo.ai_tags = repo.topics[:5] if repo.topics else ["开源项目"]
+                            repo.ai_tags = (
+                                repo.topics[:5] if repo.topics else ["开源项目"]
+                            )
 
                     if index % 5 == 0:
                         logger.info(
@@ -764,12 +775,14 @@ async def run_clustering_task(
                     for idx, label in enumerate(cluster_result.labels)
                     if label == cluster_id
                 ]
-                cluster_repos = [repos_with_embeddings[idx] for idx in cluster_repo_indices]
+                cluster_repos = [
+                    repos_with_embeddings[idx] for idx in cluster_repo_indices
+                ]
                 if not cluster_repos:
                     continue
 
-                repo_names, descriptions, topics, languages = build_cluster_naming_inputs(
-                    cluster_repos
+                repo_names, descriptions, topics, languages = (
+                    build_cluster_naming_inputs(cluster_repos)
                 )
 
                 try:

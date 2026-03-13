@@ -18,7 +18,9 @@ async def test_get_settings_returns_typed_payload(monkeypatch):
     from nebula.api.v2 import settings as settings_api
 
     async def fake_get_default_user(*_args, **_kwargs):
-        return type("User", (), {"id": 1, "graph_max_clusters": 12, "graph_min_clusters": 4})()
+        return type(
+            "User", (), {"id": 1, "graph_max_clusters": 12, "graph_min_clusters": 4}
+        )()
 
     async def fake_get_schedule(*_args, **_kwargs):
         return ScheduleResponse(
@@ -62,7 +64,9 @@ async def test_update_graph_defaults_persists_user_values(monkeypatch):
     from nebula.api.v2 import settings as settings_api
     from nebula.schemas.v2.settings import GraphDefaultsUpdateRequest
 
-    user = type("User", (), {"id": 1, "graph_max_clusters": 8, "graph_min_clusters": 3})()
+    user = type(
+        "User", (), {"id": 1, "graph_max_clusters": 8, "graph_min_clusters": 3}
+    )()
 
     async def fake_get_default_user(*_args, **_kwargs):
         return user

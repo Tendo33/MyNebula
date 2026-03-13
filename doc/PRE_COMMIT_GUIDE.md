@@ -80,7 +80,6 @@ uv run pre-commit uninstall
 | `check-yaml` | 验证 YAML 语法 |
 | `check-toml` | 验证 TOML 语法 |
 | `check-json` | 验证 JSON 语法 |
-| `check-added-large-files` | 阻止提交大文件 |
 | `check-merge-conflict` | 检测合并冲突标记 |
 | `debug-statements` | 检测遗留的 print/debugger 语句 |
 | `ruff` | Python 代码 lint 检查 |

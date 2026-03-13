@@ -298,9 +298,7 @@ class GraphQueryService:
         if elapsed_ms <= self.settings.slow_query_log_ms:
             return
         logger.warning(
-            f"Slow graph query op={operation} "
-            f"elapsed_ms={elapsed_ms} "
-            f"context={context}"
+            f"Slow graph query op={operation} elapsed_ms={elapsed_ms} context={context}"
         )
 
     async def _validate_snapshot_or_raise(

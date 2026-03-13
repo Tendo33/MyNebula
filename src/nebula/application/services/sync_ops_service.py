@@ -158,7 +158,9 @@ async def get_job_status(
             detail="Task not found",
         )
 
-    progress_percent = calculate_progress_percent(task.total_items, task.processed_items)
+    progress_percent = calculate_progress_percent(
+        task.total_items, task.processed_items
+    )
     phase = resolve_job_phase(task.task_type, task.status, task.error_details)
     eta_seconds = (
         estimate_eta_seconds(task.started_at, progress_percent)

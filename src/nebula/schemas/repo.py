@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RepoBase(BaseModel):
@@ -66,8 +66,7 @@ class RepoResponse(RepoBase):
     is_embedded: bool = False
     is_summarized: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RepoSearchRequest(BaseModel):

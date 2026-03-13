@@ -44,8 +44,8 @@ docker compose version
 mkdir mynebula && cd mynebula
 
 # 下载配置文件
-curl -O https://raw.githubusercontent.com/yourusername/mynebula/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/yourusername/mynebula/main/.env.example
+curl -O https://raw.githubusercontent.com/Tendo33/MyNebula/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/Tendo33/MyNebula/main/.env.example
 
 # 创建 .env
 cp .env.example .env
@@ -54,14 +54,14 @@ cp .env.example .env
 或者克隆仓库：
 
 ```bash
-git clone https://github.com/yourusername/mynebula.git
+git clone https://github.com/Tendo33/MyNebula.git
 cd mynebula
 cp .env.example .env
 ```
 
 ### 第 2 步：编辑 .env（填写必填项）
 
-用编辑器打开 `.env` 文件，**至少**修改以下三项：
+用编辑器打开 `.env` 文件，**至少**修改以下两项（并建议设置管理员密码）：
 
 ```bash
 # [必填] GitHub Personal Access Token
@@ -72,7 +72,10 @@ GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 # [必填] Embedding API Key (向量计算)
 EMBEDDING_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
 
-# [推荐] LLM API Key (AI 摘要)
+# [推荐] 管理员密码（用于 /settings 登录）
+ADMIN_PASSWORD=change_me
+
+# [可选] LLM API Key (AI 摘要/聚类命名)
 LLM_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
 
 # [可选] LLM 输出语言（zh=中文，en=英文）
@@ -123,7 +126,8 @@ docker compose up -d
 |------|------|------|
 | `GITHUB_TOKEN` | GitHub Personal Access Token | `ghp_xxxx` |
 | `EMBEDDING_API_KEY` | Embedding 服务的 API Key | `sk-xxxx` |
-| `LLM_API_KEY` | LLM 服务的 API Key（强烈推荐） | `sk-xxxx` |
+| `ADMIN_PASSWORD` | 管理员密码（推荐，启用后台登录） | `change_me` |
+| `LLM_API_KEY` | LLM 服务的 API Key（可选） | `sk-xxxx` |
 
 #### 数据库
 
@@ -137,9 +141,7 @@ docker compose up -d
 
 #### Docker 镜像
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `DOCKER_IMAGE` | `sjfeng1999/mynebula:latest` | Docker Hub 镜像地址 |
+Docker 镜像由 `docker-compose.yml` 中的 `api.image` 决定，当前默认：`simonsun3/mynebula:latest`。如需自定义镜像，请直接修改 compose 文件。
 
 #### 应用
 
@@ -173,8 +175,7 @@ docker compose up -d
 | `DATABASE_PORT` | API 容器内部固定连接 `5432` |
 | `DATABASE_URL` | docker-compose.yml 中显式设为空，防止覆盖分离式配置 |
 | `VITE_API_BASE_URL` | 前端已内置自动检测逻辑（使用 `window.location.origin`） |
-| `FRONTEND_URL` | 代码中未实际使用 |
-| `APP_VERSION` | 版本号由 Docker 镜像决定 |
+| `APP_VERSION` | 通常无需修改（Docker 镜像内已带默认版本） |
 | `LOG_FILE` | 容器内日志建议通过 `docker logs` 查看 |
 
 ---
@@ -288,6 +289,10 @@ cat backup_20260206.sql | docker compose exec -T db psql -U mynebula mynebula
 ```bash
 # 停止并删除容器
 docker compose down
+
+# 删除数据卷（会清除所有数据！）
+# 查看实际卷名（一般为 <项目名>_postgres_data）
+docker volume ls | findstr postgres_data
 
 # 删除数据卷（会清除所有数据！）
 docker volume rm mynebula_postgres_data

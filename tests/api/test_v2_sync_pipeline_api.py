@@ -70,8 +70,10 @@ async def test_start_recluster_sync_returns_metadata(monkeypatch):
         ),
     )
     db = SimpleNamespace(commit=lambda: None)
+
     async def _commit():
         return None
+
     db.commit = _commit
 
     response = await sync_api.start_recluster_sync(

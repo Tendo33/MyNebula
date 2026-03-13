@@ -91,6 +91,18 @@ flowchart LR
 
 ---
 
+## Docs Index
+
+- Environment variables: `doc/ENV_VARS.md`
+- Docker deployment: `doc/DOCKER_DEPLOY.md`
+- Quality gates: `doc/QUALITY_GATES.md`
+- Reset database: `doc/RESET_GUIDE.md`
+- Data models guide: `doc/MODELS_GUIDE.md`
+- SDK usage: `doc/SDK_USAGE.md`
+- Release history: `CHANGELOG.md`
+
+---
+
 ## Quick Start (Docker, Recommended)
 
 ### Prerequisites
@@ -98,6 +110,7 @@ flowchart LR
 - Docker + Docker Compose v2
 - GitHub Personal Access Token
 - Embedding provider API key (OpenAI-compatible)
+- LLM provider API key (OpenAI-compatible, optional)
 
 ### 1) Clone and configure
 
@@ -112,6 +125,7 @@ At minimum, update in `.env`:
 - `GITHUB_TOKEN`
 - `EMBEDDING_API_KEY`
 - `ADMIN_PASSWORD` (strongly recommended, enables admin login)
+- `ADMIN_USERNAME` (defaults to `admin` in `.env.example`)
 
 ### 2) Start services
 
@@ -268,18 +282,6 @@ MyNebula/
 
 ---
 
-## Docs Index
-
-- Environment variables: `doc/ENV_VARS.md`
-- Docker deployment: `doc/DOCKER_DEPLOY.md`
-- Quality gates: `doc/QUALITY_GATES.md`
-- Reset database: `doc/RESET_GUIDE.md`
-- Data models guide: `doc/MODELS_GUIDE.md`
-- SDK usage: `doc/SDK_USAGE.md`
-- Release history: `CHANGELOG.md`
-
----
-
 ## Troubleshooting
 
 - **No data in graph/data pages**
@@ -311,4 +313,3 @@ Issues and PRs are welcome.
 
 - Contribution guide: `CONTRIBUTING.md`
 - License: `LICENSE` (MIT)
-

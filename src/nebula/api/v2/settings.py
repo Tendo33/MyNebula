@@ -13,8 +13,8 @@ from nebula.application.services.sync_ops_service import (
 from nebula.application.services.user_service import get_default_user
 from nebula.db import get_db
 from nebula.schemas.v2 import (
-    FullRefreshRequest,
     FullRefreshJobResponse,
+    FullRefreshRequest,
     FullRefreshStartResponse,
     GraphDefaults,
     GraphDefaultsUpdateRequest,
@@ -24,8 +24,8 @@ from nebula.schemas.v2 import (
     SettingsResponse,
 )
 
-from .metadata import build_v2_metadata
 from .auth import require_admin
+from .metadata import build_v2_metadata
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 

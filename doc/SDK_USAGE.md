@@ -19,12 +19,14 @@ uv pip install -e .
 如果已经发布到 PyPI，则直接安装包名：
 
 ```bash
-pip install nebula
+pip install mynebula
 ```
 
 ### 导入和使用
 
 安装完成后，你可以直接在任何 Python 脚本中导入 `nebula`，**不需要** 关心它在项目中的具体路径（如 `src`）。
+
+> 包名为 `mynebula`，导入名为 `nebula`。
 
 ```python
 from nebula.utils import read_json

@@ -11,8 +11,8 @@ from nebula.db.database import get_db_context
 from nebula.domain import PipelinePhase, PipelineStatus
 from nebula.utils import get_logger
 
-from .graph_query_service import GraphQueryService
 from . import sync_execution_service
+from .graph_query_service import GraphQueryService
 
 logger = get_logger(__name__)
 
