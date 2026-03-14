@@ -202,6 +202,19 @@ const Settings = () => {
       .catch(() => setAdminAuthConfigured(null));
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!showConfirmDialog) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowConfirmDialog(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showConfirmDialog]);
+
   const waitForPipelineComplete = async (
     runId: number,
     onProgress?: (pipeline: PipelineStatusResponse) => void
@@ -606,10 +619,10 @@ const Settings = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-bg-main text-text-main">
+    <div className="flex min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main">
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
-        <header className="flex items-center justify-between h-14 px-8 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-h-[3.5rem] px-4 sm:px-8 py-3 sm:py-0 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 dark:bg-dark-bg-main/95 dark:border-dark-border">
           <h1 className="text-base font-semibold text-text-main select-none tracking-tight">
             {t('settings.title')}
           </h1>
@@ -618,7 +631,7 @@ const Settings = () => {
             {isAuthenticated && (
               <button
                 onClick={handleAdminLogout}
-                className="h-8 px-3 rounded-md text-xs font-medium border border-border-light bg-white hover:bg-bg-hover text-text-main transition-colors inline-flex items-center gap-1.5"
+                className="h-8 px-3 rounded-md text-xs font-medium border border-border-light bg-bg-main hover:bg-bg-hover text-text-main transition-colors inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:bg-dark-bg-main dark:border-dark-border dark:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 {t('app.logout')}
@@ -633,7 +646,7 @@ const Settings = () => {
           </div>
         ) : !isAuthenticated ? (
           <section className="flex-1 flex items-center justify-center px-8">
-            <div className="w-full max-w-md bg-white border border-border-light rounded-xl shadow-sm p-6">
+            <div className="w-full max-w-md bg-bg-main border border-border-light rounded-xl shadow-sm p-6 dark:bg-dark-bg-main dark:border-dark-border">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-full bg-bg-sidebar flex items-center justify-center">
                   <Shield className="w-5 h-5 text-text-main" />
@@ -652,14 +665,17 @@ const Settings = () => {
                 )}
 
                 <div>
-                  <label className="block text-xs text-text-muted mb-1">{t('settings.username')}</label>
+                  <label htmlFor="admin-username" className="block text-xs text-text-muted mb-1">
+                    {t('settings.username')}
+                  </label>
                   <div className="relative">
                     <User className="w-4 h-4 text-text-dim absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
+                      id="admin-username"
                       type="text"
                       value={loginUsername}
                       onChange={(e) => setLoginUsername(e.target.value)}
-                      className="w-full h-10 pl-9 pr-3 rounded-md border border-border-light text-sm bg-white focus:outline-none focus:ring-1 focus:ring-black"
+                      className="w-full h-10 pl-9 pr-3 rounded-md border border-border-light text-sm bg-bg-main focus:outline-none focus:ring-1 focus:ring-text-main/30 dark:bg-dark-bg-main dark:border-dark-border dark:text-dark-text-main"
                       autoComplete="username"
                       required
                     />
@@ -667,12 +683,15 @@ const Settings = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-text-muted mb-1">{t('settings.password')}</label>
+                  <label htmlFor="admin-password" className="block text-xs text-text-muted mb-1">
+                    {t('settings.password')}
+                  </label>
                   <input
+                    id="admin-password"
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-border-light text-sm bg-white focus:outline-none focus:ring-1 focus:ring-black"
+                    className="w-full h-10 px-3 rounded-md border border-border-light text-sm bg-bg-main focus:outline-none focus:ring-1 focus:ring-text-main/30 dark:bg-dark-bg-main dark:border-dark-border dark:text-dark-text-main"
                     autoComplete="current-password"
                     required
                   />
@@ -690,8 +709,8 @@ const Settings = () => {
                   className={clsx(
                     'w-full h-10 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2',
                     loginLoading || adminAuthConfigured === false
-                      ? 'bg-gray-100 text-gray-400 border border-border-light cursor-not-allowed'
-                      : 'bg-black text-white hover:bg-gray-800'
+                      ? 'bg-bg-hover text-text-dim border border-border-light cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60 dark:border-dark-border'
+                      : 'bg-text-main text-bg-main hover:bg-text-main/90'
                   )}
                 >
                   {loginLoading && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -701,7 +720,7 @@ const Settings = () => {
             </div>
           </section>
         ) : (
-          <div className="max-w-3xl px-8 py-10 space-y-12">
+          <div className="max-w-3xl px-4 sm:px-8 py-6 sm:py-10 space-y-12">
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
@@ -714,12 +733,9 @@ const Settings = () => {
                 {t('settings.appearance')}
               </h2>
               <div className="space-y-2">
-                <div
-                  className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group cursor-pointer"
-                  onClick={() => updateSettings({ hqRendering: !settings.hqRendering })}
-                >
+                <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-white transition-colors">
+                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
                       <Zap className="w-5 h-5 text-text-muted group-hover:text-text-main" />
                     </div>
                     <div className="flex flex-col">
@@ -729,25 +745,27 @@ const Settings = () => {
                   </div>
                   <button
                     className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none',
-                      settings.hqRendering ? 'bg-black' : 'bg-gray-300'
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                      settings.hqRendering ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border'
                     )}
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.hqRendering}
+                    aria-label={t('settings.hq_rendering')}
+                    onClick={() => updateSettings({ hqRendering: !settings.hqRendering })}
                   >
                     <span
                       className={clsx(
-                        'inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out shadow-sm',
+                        'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
                         settings.hqRendering ? 'translate-x-5' : 'translate-x-0.5'
                       )}
                     />
                   </button>
                 </div>
 
-                <div
-                  className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group cursor-pointer"
-                  onClick={() => updateSettings({ showTrajectories: !settings.showTrajectories })}
-                >
+                <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-white transition-colors">
+                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
                       <Eye className="w-5 h-5 text-text-muted group-hover:text-text-main" />
                     </div>
                     <div className="flex flex-col">
@@ -757,13 +775,18 @@ const Settings = () => {
                   </div>
                   <button
                     className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none',
-                      settings.showTrajectories ? 'bg-black' : 'bg-gray-300'
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                      settings.showTrajectories ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border'
                     )}
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.showTrajectories}
+                    aria-label={t('settings.show_trajectories')}
+                    onClick={() => updateSettings({ showTrajectories: !settings.showTrajectories })}
                   >
                     <span
                       className={clsx(
-                        'inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out shadow-sm',
+                        'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
                         settings.showTrajectories ? 'translate-x-5' : 'translate-x-0.5'
                       )}
                     />
@@ -813,16 +836,16 @@ const Settings = () => {
                       <Sparkles className="w-4 h-4 text-text-muted" />
                       <span className="text-sm font-medium text-text-main">{t('dashboard.sync_button')}</span>
                     </div>
-                    <button
-                      onClick={handleSyncStars}
-                      disabled={syncing || refreshLoading || reclusterLoading}
-                      className={clsx(
-                        'h-9 px-4 rounded-md text-sm font-medium transition-all flex items-center gap-2',
-                        syncing || refreshLoading || reclusterLoading
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-black text-white hover:bg-gray-800 shadow-sm'
-                      )}
-                    >
+                  <button
+                    onClick={handleSyncStars}
+                    disabled={syncing || refreshLoading || reclusterLoading}
+                    className={clsx(
+                      'h-9 px-4 rounded-md text-sm font-medium transition-all flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                      syncing || refreshLoading || reclusterLoading
+                        ? 'bg-bg-hover text-text-dim cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60'
+                        : 'bg-text-main text-bg-main hover:bg-text-main/90 shadow-sm'
+                    )}
+                  >
                       {syncing && <Loader2 className="w-4 h-4 animate-spin" />}
                       {syncing ? t('dashboard.syncing') : t('dashboard.sync_button')}
                     </button>
@@ -885,10 +908,10 @@ const Settings = () => {
                     onClick={handleRecluster}
                     disabled={reclusterLoading || syncing || refreshLoading}
                     className={clsx(
-                      'h-9 px-4 rounded-md text-sm font-medium border transition-colors inline-flex items-center gap-2',
+                      'h-9 px-4 rounded-md text-sm font-medium border transition-colors inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
                       reclusterLoading || syncing || refreshLoading
-                        ? 'bg-gray-100 text-gray-400 border-border-light cursor-not-allowed'
-                        : 'bg-white text-text-main border-border-light hover:bg-bg-hover'
+                        ? 'bg-bg-hover text-text-dim border-border-light cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60 dark:border-dark-border'
+                        : 'bg-bg-main text-text-main border-border-light hover:bg-bg-hover dark:bg-dark-bg-main dark:text-dark-text-main dark:border-dark-border dark:hover:bg-dark-bg-sidebar/70'
                     )}
                     title={t('graph.recluster_hint')}
                   >
@@ -929,8 +952,8 @@ const Settings = () => {
                       'flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full border',
                       githubTokenStatus.state === 'connected' && 'text-green-700 bg-green-50 border-green-200',
                       githubTokenStatus.state === 'not_configured' && 'text-amber-700 bg-amber-50 border-amber-200',
-                      githubTokenStatus.state === 'unknown' && 'text-gray-700 bg-gray-100 border-gray-200',
-                      githubTokenStatus.state === 'loading' && 'text-gray-600 bg-gray-50 border-gray-200'
+                      githubTokenStatus.state === 'unknown' && 'text-text-muted bg-bg-hover border-border-light dark:text-dark-text-main/70 dark:bg-dark-bg-sidebar/70 dark:border-dark-border',
+                      githubTokenStatus.state === 'loading' && 'text-text-dim bg-bg-hover border-border-light dark:text-dark-text-main/60 dark:bg-dark-bg-sidebar/60 dark:border-dark-border'
                     )}
                   >
                     <div
@@ -938,8 +961,8 @@ const Settings = () => {
                         'w-2 h-2 rounded-full',
                         githubTokenStatus.state === 'connected' && 'bg-green-500 animate-pulse',
                         githubTokenStatus.state === 'not_configured' && 'bg-amber-500',
-                        githubTokenStatus.state === 'unknown' && 'bg-gray-500',
-                        githubTokenStatus.state === 'loading' && 'bg-gray-400 animate-pulse'
+                        githubTokenStatus.state === 'unknown' && 'bg-text-dim',
+                        githubTokenStatus.state === 'loading' && 'bg-text-dim/70 animate-pulse'
                       )}
                     />
                     {githubTokenStatus.label}
@@ -956,12 +979,9 @@ const Settings = () => {
               </h2>
 
               <div className="space-y-2">
-                <div
-                  className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group cursor-pointer"
-                  onClick={!scheduleLoading ? handleScheduleToggle : undefined}
-                >
+                <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-white transition-colors">
+                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
                       <Clock className="w-5 h-5 text-text-muted group-hover:text-text-main" />
                     </div>
                     <div className="flex flex-col">
@@ -972,17 +992,22 @@ const Settings = () => {
                   <button
                     disabled={scheduleLoading}
                     className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none',
-                      schedule?.is_enabled ? 'bg-black' : 'bg-gray-300',
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                      schedule?.is_enabled ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border',
                       scheduleLoading && 'opacity-50 cursor-not-allowed'
                     )}
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(schedule?.is_enabled)}
+                    aria-label={t('settings.enable_scheduled_sync')}
+                    onClick={!scheduleLoading ? handleScheduleToggle : undefined}
                   >
                     {scheduleLoading ? (
                       <Loader2 className="w-4 h-4 text-white mx-auto animate-spin" />
                     ) : (
                       <span
                         className={clsx(
-                          'inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out shadow-sm',
+                          'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
                           schedule?.is_enabled ? 'translate-x-5' : 'translate-x-0.5'
                         )}
                       />
@@ -1102,7 +1127,7 @@ const Settings = () => {
                     onClick={() => setShowConfirmDialog(true)}
                     disabled={refreshLoading || syncing || reclusterLoading}
                     className={clsx(
-                      'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                      'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
                       'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100',
                       (refreshLoading || syncing || reclusterLoading) && 'opacity-50 cursor-not-allowed'
                     )}
@@ -1127,17 +1152,25 @@ const Settings = () => {
 
         {showConfirmDialog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <div
+              className="bg-bg-main rounded-lg shadow-xl max-w-md w-full mx-4 p-6 dark:bg-dark-bg-main"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="full-refresh-title"
+              aria-describedby="full-refresh-desc"
+            >
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-red-100 rounded-full">
                   <AlertTriangle className="w-6 h-6 text-red-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">{t('settings.confirm_full_refresh_title')}</h3>
+                <h3 id="full-refresh-title" className="text-lg font-semibold text-text-main dark:text-dark-text-main">
+                  {t('settings.confirm_full_refresh_title')}
+                </h3>
               </div>
-              <p className="text-sm text-gray-600 mb-6">
+              <p id="full-refresh-desc" className="text-sm text-text-muted mb-6 dark:text-dark-text-main/70">
                 {t('settings.confirm_full_refresh_desc', { count: syncInfo?.total_repos ?? 0 })}
               </p>
-              <ul className="text-sm text-gray-600 mb-6 space-y-1 list-disc list-inside">
+              <ul className="text-sm text-text-muted mb-6 space-y-1 list-disc list-inside dark:text-dark-text-main/70">
                 <li>{t('settings.confirm_step_fetch')}</li>
                 <li>{t('settings.confirm_step_summarize')}</li>
                 <li>{t('settings.confirm_step_embed')}</li>
@@ -1147,13 +1180,13 @@ const Settings = () => {
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowConfirmDialog(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-text-main bg-bg-hover hover:bg-border-light rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-border"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleFullRefresh}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                 >
                   {t('settings.execute_full_refresh')}
                 </button>

@@ -38,18 +38,22 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-start gap-3 p-3 rounded-xl border border-transparent hover:bg-white hover:border-border-light/70 hover:shadow-sm transition-all text-left group"
+      className="w-full flex items-start gap-3 p-3 rounded-xl border border-transparent hover:bg-bg-hover hover:border-border-light/70 hover:shadow-sm transition-all text-left group dark:hover:bg-dark-bg-sidebar/70"
     >
       {/* Avatar */}
-      {repo.owner_avatar_url ? (
+            {repo.owner_avatar_url ? (
         <img
           src={repo.owner_avatar_url}
           alt={repo.owner}
           className="w-9 h-9 rounded-lg border border-border-light flex-shrink-0"
+          loading="lazy"
+          decoding="async"
+          width={36}
+          height={36}
         />
       ) : (
-        <div className="w-9 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-          <span className="text-gray-500 text-xs font-medium">
+        <div className="w-9 h-9 rounded-lg bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
+          <span className="text-text-dim text-xs font-medium dark:text-dark-text-main/60">
             {repo.owner?.charAt(0).toUpperCase()}
           </span>
         </div>
@@ -60,7 +64,7 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm font-semibold text-text-main truncate">{repo.name}</span>
           {repo.language && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded-full text-gray-600 flex-shrink-0">
+            <span className="text-[10px] px-1.5 py-0.5 bg-bg-hover rounded-full text-text-muted flex-shrink-0 dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
               {repo.language}
             </span>
           )}
@@ -71,7 +75,7 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
         {(matchReason || score != null) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {matchReason && (
-              <span className="max-w-full text-[10px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 line-clamp-1">
+              <span className="max-w-full text-[10px] px-1.5 py-0.5 rounded-full bg-action-primary/10 text-action-primary line-clamp-1">
                 {matchReason}
               </span>
             )}
@@ -86,8 +90,8 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
 
       {/* Stars + Arrow */}
       <div className="flex flex-col items-end justify-between h-full gap-2 flex-shrink-0 pl-1">
-        <div className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
-          <Star className="w-3 h-3 text-orange-400" fill="currentColor" />
+        <div className="flex items-center gap-1 text-xs text-action-primary bg-action-primary/10 px-1.5 py-0.5 rounded-full">
+          <Star className="w-3 h-3 text-action-primary" fill="currentColor" />
           <span>{repo.stargazers_count >= 1000 ? `${(repo.stargazers_count / 1000).toFixed(1)}k` : repo.stargazers_count}</span>
         </div>
         <ChevronRight className="w-4 h-4 text-text-dim opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -261,9 +265,9 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   };
 
   return (
-    <div className="absolute inset-y-0 right-0 w-full max-w-full sm:static sm:w-[25rem] h-full bg-white/95 backdrop-blur-sm border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20">
+    <div className="absolute inset-y-0 right-0 w-full max-w-full sm:static sm:w-[25rem] h-full bg-bg-main/95 backdrop-blur-sm border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20 dark:bg-dark-bg-main/95 dark:border-dark-border">
       {/* Header with Avatar */}
-      <div className="relative p-5 border-b border-border-light bg-gradient-to-b from-bg-sidebar to-white">
+      <div className="relative p-5 border-b border-border-light bg-gradient-to-b from-bg-sidebar to-bg-main dark:from-dark-bg-sidebar dark:to-dark-bg-main dark:border-dark-border">
         <div className="flex items-start gap-3 pr-8">
             {/* Owner Avatar */}
             {node.owner_avatar_url ? (
@@ -271,10 +275,14 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                 src={node.owner_avatar_url}
                 alt={node.owner}
                 className="w-10 h-10 rounded-lg border border-border-light flex-shrink-0"
+                loading="lazy"
+                decoding="async"
+                width={40}
+                height={40}
               />
             ) : (
-              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                <span className="text-gray-500 text-sm font-medium">
+              <div className="w-10 h-10 rounded-lg bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
+                <span className="text-text-dim text-sm font-medium dark:text-dark-text-main/60">
                   {node.owner?.charAt(0).toUpperCase()}
                 </span>
               </div>
@@ -283,13 +291,13 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                     <a href={node.html_url} target="_blank" rel="noopener noreferrer" className="hover:underline decoration-text-muted underline-offset-4">
-                        <h2 className="text-base font-semibold text-text-main line-clamp-1 leading-snug" title={node.full_name}>
+                        <h2 className="text-base font-semibold text-text-main line-clamp-1 leading-snug dark:text-dark-text-main" title={node.full_name}>
                         {node.name}
                         </h2>
                     </a>
                 </div>
-                <p className="text-xs text-text-dim">{node.owner}</p>
-                <p className="text-sm text-text-muted leading-relaxed mt-1">
+                <p className="text-xs text-text-dim dark:text-dark-text-main/60">{node.owner}</p>
+                <p className="text-sm text-text-muted leading-relaxed mt-1 dark:text-dark-text-main/70">
                 {node.description || t('repoDetails.no_description')}
                 </p>
             </div>
@@ -312,7 +320,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               href={node.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-text-main hover:bg-black text-white text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-text-main hover:bg-text-main/90 text-bg-main text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
             >
               <ExternalLink className="w-4 h-4" />
               <span>GitHub</span>
@@ -323,10 +331,18 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               href={`https://deepwiki.com/${node.full_name}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-bg-hover hover:bg-bg-sidebar text-text-main text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md border border-border-light dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-bg-sidebar dark:text-dark-text-main dark:border-dark-border"
               title="View on DeepWiki"
             >
-              <img src="https://deepwiki.com/favicon.ico" alt="DeepWiki" className="w-4 h-4 rounded-sm bg-white" />
+              <img
+                src="https://deepwiki.com/favicon.ico"
+                alt="DeepWiki"
+                className="w-4 h-4 rounded-sm bg-bg-main"
+                loading="lazy"
+                decoding="async"
+                width={16}
+                height={16}
+              />
               <span>DeepWiki</span>
             </a>
 
@@ -335,10 +351,18 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               href={`https://zread.ai/${node.full_name}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-bg-hover hover:bg-bg-sidebar text-text-main text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md border border-border-light dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-bg-sidebar dark:text-dark-text-main dark:border-dark-border"
               title="View on zRead"
             >
-              <img src="https://zread.ai/favicon.ico" alt="zRead" className="w-4 h-4 rounded-sm bg-white" />
+              <img
+                src="https://zread.ai/favicon.ico"
+                alt="zRead"
+                className="w-4 h-4 rounded-sm bg-bg-main"
+                loading="lazy"
+                decoding="async"
+                width={16}
+                height={16}
+              />
               <span>zRead</span>
             </a>
           </div>
@@ -346,8 +370,8 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           {/* User's Star List Badge */}
           {node.star_list_name && (
             <div className="flex items-center gap-2">
-              <FolderHeart className="w-4 h-4 text-pink-500" />
-              <span className="text-xs font-medium text-pink-600 bg-pink-50 px-2 py-1 rounded-full">
+              <FolderHeart className="w-4 h-4 text-action-primary" />
+              <span className="text-xs font-medium text-action-primary bg-action-primary/10 px-2 py-1 rounded-full">
                 {node.star_list_name}
               </span>
             </div>
@@ -355,22 +379,22 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-white border border-border-light shadow-sm">
-                  <div className="p-1.5 bg-orange-50 rounded text-orange-500">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-main border border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
+                  <div className="p-1.5 bg-action-primary/10 rounded text-action-primary">
                       <Star className="w-4 h-4" fill="currentColor" />
                   </div>
                   <div>
-                      <span className="block text-lg font-semibold text-text-main leading-none">{node.stargazers_count?.toLocaleString() ?? 0}</span>
-                      <span className="text-xs text-text-muted capitalize">{t('repoDetails.stars')}</span>
+                      <span className="block text-lg font-semibold text-text-main leading-none dark:text-dark-text-main">{node.stargazers_count?.toLocaleString() ?? 0}</span>
+                      <span className="text-xs text-text-muted capitalize dark:text-dark-text-main/70">{t('repoDetails.stars')}</span>
                   </div>
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-white border border-border-light shadow-sm">
-                   <div className="p-1.5 bg-blue-50 rounded text-blue-500">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-main border border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
+                   <div className="p-1.5 bg-action-primary/10 rounded text-action-primary">
                       <Code className="w-4 h-4" />
                   </div>
                   <div>
-                      <span className="block text-lg font-semibold text-text-main leading-none truncate max-w-[100px]" title={node.language || 'Unknown'}>{node.language || 'N/A'}</span>
-                      <span className="text-xs text-text-muted capitalize">{t('repoDetails.language')}</span>
+                      <span className="block text-lg font-semibold text-text-main leading-none truncate max-w-[100px] dark:text-dark-text-main" title={node.language || 'Unknown'}>{node.language || 'N/A'}</span>
+                      <span className="text-xs text-text-muted capitalize dark:text-dark-text-main/70">{t('repoDetails.language')}</span>
                   </div>
               </div>
           </div>
@@ -378,7 +402,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           {/* AI Tags */}
           {node.ai_tags && node.ai_tags.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-purple-600 uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-xs font-semibold text-action-primary uppercase tracking-wider">
                   <Tag className="w-3.5 h-3.5" />
                   <span>{t('repoDetails.aiTags', 'AI Tags')}</span>
               </div>
@@ -386,7 +410,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                 {node.ai_tags.map((tag, idx) => (
                   <span
                     key={idx}
-                    className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded-full"
+                    className="text-xs px-2 py-1 bg-action-primary/10 text-action-primary rounded-full"
                   >
                     {tag}
                   </span>
@@ -398,20 +422,20 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           {/* GitHub Topics */}
           {node.topics && node.topics.length > 0 && (
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider dark:text-dark-text-main/70">
                   {t('repoDetails.topics', 'Topics')}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {node.topics.slice(0, 8).map((topic, idx) => (
                   <span
                     key={idx}
-                    className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full"
+                    className="text-xs px-2 py-1 bg-bg-hover text-text-muted rounded-full dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
                   >
                     {topic}
                   </span>
                 ))}
                 {node.topics.length > 8 && (
-                  <span className="text-xs text-text-dim">+{node.topics.length - 8}</span>
+                  <span className="text-xs text-text-dim dark:text-dark-text-main/60">+{node.topics.length - 8}</span>
                 )}
               </div>
             </div>
@@ -423,8 +447,8 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>{t('repoDetails.aiInsight', 'AI Insight')}</span>
               </div>
-              <div className="bg-bg-sidebar p-3 rounded-lg border border-border-light/50">
-                   <p className="text-sm text-text-main leading-relaxed line-clamp-5 sm:line-clamp-6">
+              <div className="bg-bg-sidebar p-3 rounded-lg border border-border-light/50 dark:bg-dark-bg-sidebar dark:border-dark-border">
+                   <p className="text-sm text-text-main leading-relaxed line-clamp-5 sm:line-clamp-6 dark:text-dark-text-main">
                       {node.ai_summary || t('repoDetails.no_ai_summary')}
                   </p>
               </div>
@@ -432,29 +456,29 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
         </div>
 
         {/* Related Repositories with Tabs */}
-        <div className="flex flex-col flex-[2] min-h-[200px] gap-2 pt-3 border-t border-border-light/60">
+        <div className="flex flex-col flex-[2] min-h-[200px] gap-2 pt-3 border-t border-border-light/60 dark:border-dark-border">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold text-teal-600 uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs font-semibold text-action-primary uppercase tracking-wider">
               <Link2 className="w-3.5 h-3.5" />
               <span>{t('repoDetails.relatedRepos', 'Related Repositories')}</span>
             </div>
           </div>
 
           {/* Dimension Tabs */}
-          <div className="flex items-center gap-1 p-1.5 bg-bg-sidebar/80 rounded-xl border border-border-light/60">
+          <div className="flex items-center gap-1 p-1.5 bg-bg-sidebar/80 rounded-xl border border-border-light/60 dark:bg-dark-bg-sidebar/80 dark:border-dark-border">
             <button
               onClick={() => setActiveTab('similar')}
               className={clsx(
                 'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
                 activeTab === 'similar'
-                  ? 'bg-white shadow-sm text-text-main font-medium ring-1 ring-border-light/70'
-                  : 'text-text-muted hover:text-text-main'
+                  ? 'bg-bg-main shadow-sm text-text-main font-medium ring-1 ring-border-light/70 dark:bg-dark-bg-main dark:text-dark-text-main dark:ring-dark-border'
+                  : 'text-text-muted hover:text-text-main dark:text-dark-text-main/70 dark:hover:text-dark-text-main'
               )}
             >
               <Link2 className="w-3 h-3" />
               <span>{t('repoDetails.similar', 'Similar')}</span>
               {tabCounts.similar > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim">({tabCounts.similar})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim dark:bg-dark-bg-sidebar dark:text-dark-text-main/60">({tabCounts.similar})</span>
               )}
             </button>
             <button
@@ -462,8 +486,8 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               className={clsx(
                 'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
                 activeTab === 'sameTags'
-                  ? 'bg-white shadow-sm text-text-main font-medium ring-1 ring-border-light/70'
-                  : 'text-text-muted hover:text-text-main'
+                  ? 'bg-bg-main shadow-sm text-text-main font-medium ring-1 ring-border-light/70 dark:bg-dark-bg-main dark:text-dark-text-main dark:ring-dark-border'
+                  : 'text-text-muted hover:text-text-main dark:text-dark-text-main/70 dark:hover:text-dark-text-main'
               )}
             >
               <Tag className="w-3 h-3" />
@@ -477,21 +501,21 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               className={clsx(
                 'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
                 activeTab === 'sameLang'
-                  ? 'bg-white shadow-sm text-text-main font-medium ring-1 ring-border-light/70'
-                  : 'text-text-muted hover:text-text-main'
+                  ? 'bg-bg-main shadow-sm text-text-main font-medium ring-1 ring-border-light/70 dark:bg-dark-bg-main dark:text-dark-text-main dark:ring-dark-border'
+                  : 'text-text-muted hover:text-text-main dark:text-dark-text-main/70 dark:hover:text-dark-text-main'
               )}
             >
               <Code className="w-3 h-3" />
               <span>{t('repoDetails.sameLang', 'Lang')}</span>
               {tabCounts.sameLang > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim">({tabCounts.sameLang})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim dark:bg-dark-bg-sidebar dark:text-dark-text-main/60">({tabCounts.sameLang})</span>
               )}
             </button>
           </div>
 
           {/* Related Repos List — independently scrollable, sized to remaining space */}
           {currentRelatedRepos.length > 0 ? (
-            <div className="bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 p-1.5 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+            <div className="bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 p-1.5 flex-1 min-h-0 overflow-y-auto overscroll-contain dark:bg-dark-bg-sidebar/60 dark:border-dark-border dark:divide-dark-border/60">
               {currentRelatedRepos.map((repo: any) => (
                 <RelatedRepoItem
                   key={repo.id}
@@ -503,7 +527,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               ))}
             </div>
           ) : (
-            <div className="px-4 py-6 text-center text-sm text-text-muted bg-bg-sidebar/60 rounded-xl border border-border-light/60 flex items-center justify-center flex-1 min-h-0">
+            <div className="px-4 py-6 text-center text-sm text-text-muted bg-bg-sidebar/60 rounded-xl border border-border-light/60 flex items-center justify-center flex-1 min-h-0 dark:text-dark-text-main/70 dark:bg-dark-bg-sidebar/60 dark:border-dark-border">
               {activeTab === 'similar' && (
                 similarLoading
                   ? t('common.loading', 'Loading...')

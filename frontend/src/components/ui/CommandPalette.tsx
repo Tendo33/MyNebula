@@ -180,9 +180,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           title: node.name,
           subtitle: node.description || node.ai_summary,
           icon: node.owner_avatar_url ? (
-            <img src={node.owner_avatar_url} alt="" className="w-6 h-6 rounded" />
+            <img
+              src={node.owner_avatar_url}
+              alt=""
+              className="w-6 h-6 rounded"
+              loading="lazy"
+              decoding="async"
+              width={24}
+              height={24}
+            />
           ) : (
-            <div className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center text-xs">
+            <div className="w-6 h-6 rounded bg-border-light flex items-center justify-center text-xs dark:bg-dark-border">
               {node.owner?.charAt(0).toUpperCase()}
             </div>
           ),
@@ -234,7 +242,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           id: lang,
           title: lang,
           subtitle: `Filter by ${lang} repositories`,
-          icon: <Code className="w-5 h-5 text-blue-500" />,
+          icon: <Code className="w-5 h-5 text-action-primary" />,
           meta: `${count} repos`,
           data: { language: lang },
         }));
@@ -254,7 +262,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           id: tag,
           title: tag,
           subtitle: `Filter by tag`,
-          icon: <Tag className="w-5 h-5 text-purple-500" />,
+          icon: <Tag className="w-5 h-5 text-action-primary" />,
           meta: `${count} repos`,
           data: { tag },
         }));
@@ -362,7 +370,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       />
 
       {/* Palette */}
-      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-border-light overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
+      <div
+        className="relative w-full max-w-2xl bg-bg-main rounded-xl shadow-2xl border border-border-light overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200 dark:bg-dark-bg-main dark:border-dark-border"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="command-palette-title"
+      >
+        <h2 id="command-palette-title" className="sr-only">
+          {t('search.command_palette', 'Command Palette')}
+        </h2>
         {/* Search Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border-light">
           <Search className="w-5 h-5 text-text-muted flex-shrink-0" />
@@ -376,6 +392,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             }}
             placeholder={t('search.placeholder', 'Search repos, clusters, languages, tags...')}
             className="flex-1 text-base outline-none placeholder:text-text-dim"
+            aria-label={t('search.placeholder', 'Search repos, clusters, languages, tags...')}
           />
           <div className="flex items-center gap-2">
             <kbd className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-text-dim bg-bg-sidebar rounded border border-border-light">
@@ -383,7 +400,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             </kbd>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-bg-hover rounded transition-colors"
+              aria-label={t('common.close', 'Close')}
+              className="p-1 hover:bg-bg-hover rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
             >
               <X className="w-5 h-5 text-text-muted" />
             </button>
@@ -403,10 +421,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               key={filter.key}
               onClick={() => setActiveFilter(filter.key as FilterType)}
               className={clsx(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
                 activeFilter === filter.key
-                  ? 'bg-white text-text-main shadow-sm'
-                  : 'text-text-muted hover:text-text-main hover:bg-bg-hover'
+                  ? 'bg-bg-main text-text-main shadow-sm dark:bg-dark-bg-main dark:text-dark-text-main'
+                  : 'text-text-muted hover:text-text-main hover:bg-bg-hover dark:text-dark-text-main/70 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70'
               )}
             >
               {filter.label}
@@ -415,7 +433,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         </div>
 
         {/* Results / Empty State */}
-        <div ref={listRef} className="max-h-[50vh] overflow-y-auto">
+        <div
+          ref={listRef}
+          className="max-h-[50vh] overflow-y-auto"
+          role={results.length > 0 ? 'listbox' : undefined}
+          aria-activedescendant={results.length > 0 ? `command-palette-option-${selectedIndex}` : undefined}
+        >
           {query.trim() === '' ? (
             // Empty state with quick filters
             <div className="p-4 space-y-4">
@@ -438,7 +461,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       <button
                         key={idx}
                         onClick={() => setQuery(search)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-bg-sidebar hover:bg-bg-hover rounded-full transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-bg-sidebar hover:bg-bg-hover rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                       >
                         <Clock className="w-3 h-3 text-text-dim" />
                         {search}
@@ -460,11 +483,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       <button
                         key={lang}
                         onClick={() => handleQuickFilter(lang)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-full transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-action-primary/10 text-action-primary hover:bg-action-primary/15 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                       >
                         <Code className="w-3 h-3" />
                         {lang}
-                        <span className="text-blue-500 text-xs">({count})</span>
+                        <span className="text-action-primary/80 text-xs">({count})</span>
                       </button>
                     ))}
                   </div>
@@ -475,11 +498,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       <button
                         key={tag}
                         onClick={() => handleQuickFilter(tag)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-full transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-action-primary/10 text-action-primary hover:bg-action-primary/15 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                       >
                         <Tag className="w-3 h-3" />
                         {tag}
-                        <span className="text-purple-500 text-xs">({count})</span>
+                        <span className="text-action-primary/80 text-xs">({count})</span>
                       </button>
                     ))}
                   </div>
@@ -495,7 +518,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                           setSearchQuery(starQuery);
                           onClose();
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-full transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-action-primary/10 text-action-primary hover:bg-action-primary/15 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                       >
                         <Star className="w-3 h-3" />
                         {range.label}
@@ -519,14 +542,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               {results.map((result, idx) => (
                 <button
                   key={`${result.type}-${result.id}`}
+                  id={`command-palette-option-${idx}`}
                   data-index={idx}
                   onClick={() => handleSelectResult(result)}
                   className={clsx(
-                    'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+                    'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
                     idx === selectedIndex
                       ? 'bg-action-primary/10'
                       : 'hover:bg-bg-hover'
                   )}
+                  role="option"
+                  aria-selected={idx === selectedIndex}
                 >
                   {/* Icon */}
                   <div className="flex-shrink-0">
@@ -541,10 +567,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       </span>
                       <span className={clsx(
                         'text-[10px] px-1.5 py-0.5 rounded uppercase',
-                        result.type === 'repo' && 'bg-gray-100 text-gray-600',
-                        result.type === 'cluster' && 'bg-teal-100 text-teal-700',
-                        result.type === 'language' && 'bg-blue-100 text-blue-700',
-                        result.type === 'tag' && 'bg-purple-100 text-purple-700',
+                        result.type === 'repo' && 'bg-bg-hover text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70',
+                        result.type === 'cluster' && 'bg-bg-hover text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70',
+                        result.type === 'language' && 'bg-action-primary/10 text-action-primary',
+                        result.type === 'tag' && 'bg-action-primary/10 text-action-primary',
                       )}>
                         {result.type}
                       </span>
@@ -589,15 +615,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         <div className="flex items-center justify-between px-4 py-2 border-t border-border-light bg-bg-sidebar/50 text-xs text-text-dim">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white rounded border border-border-light">↑↓</kbd>
+              <kbd className="px-1.5 py-0.5 bg-bg-main rounded border border-border-light dark:bg-dark-bg-main dark:border-dark-border">↑↓</kbd>
               {t('search.navigate', 'Navigate')}
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white rounded border border-border-light">↵</kbd>
+              <kbd className="px-1.5 py-0.5 bg-bg-main rounded border border-border-light dark:bg-dark-bg-main dark:border-dark-border">↵</kbd>
               {t('search.select', 'Select')}
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white rounded border border-border-light">esc</kbd>
+              <kbd className="px-1.5 py-0.5 bg-bg-main rounded border border-border-light dark:bg-dark-bg-main dark:border-dark-border">esc</kbd>
               {t('search.close', 'Close')}
             </span>
           </div>

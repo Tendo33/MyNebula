@@ -28,7 +28,7 @@ function AppContent() {
 
   return (
     <>
-      <div className="min-h-screen bg-bg-main text-text-main font-sans selection:bg-action-primary/20">
+      <div className="min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main font-sans selection:bg-action-primary/20">
         <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-text-muted">Loading...</div>}>
           <Routes>
             <Route path="/" element={<Dashboard />} />

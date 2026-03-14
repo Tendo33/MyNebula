@@ -40,8 +40,8 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
       onClick={onToggle}
       className={clsx(
         'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left border',
-        'hover:bg-white hover:border-border-light/70 group border-transparent',
-        isSelected && 'bg-white ring-1 ring-action-primary/20 border-border-light shadow-sm'
+        'hover:bg-bg-hover hover:border-border-light/70 group border-transparent dark:hover:bg-dark-bg-sidebar/70',
+        isSelected && 'bg-bg-main ring-1 ring-action-primary/20 border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border'
       )}
     >
       {/* Color indicator */}
@@ -55,11 +55,11 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
         <div className="flex items-center justify-between gap-2">
           <span className={clsx(
             'text-sm truncate',
-            isSelected ? 'font-medium text-text-main' : 'text-text-muted'
+            isSelected ? 'font-medium text-text-main dark:text-dark-text-main' : 'text-text-muted dark:text-dark-text-main/70'
           )}>
             {cluster.name || `Cluster ${cluster.id}`}
           </span>
-          <span className="text-xs text-text-dim font-mono tabular-nums">
+          <span className="text-xs text-text-dim font-mono tabular-nums dark:text-dark-text-main/60">
             {nodeCount}
           </span>
         </div>
@@ -70,13 +70,13 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
             {cluster.keywords.slice(0, 3).map((keyword, idx) => (
               <span
                 key={idx}
-                className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded-full"
+                className="text-[10px] px-1.5 py-0.5 bg-bg-hover text-text-muted rounded-full dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
               >
                 {keyword}
               </span>
             ))}
             {cluster.keywords.length > 3 && (
-              <span className="text-[10px] text-text-dim">
+              <span className="text-[10px] text-text-dim dark:text-dark-text-main/60">
                 +{cluster.keywords.length - 3}
               </span>
             )}
@@ -88,8 +88,8 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
       <div className={clsx(
         'w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors',
         isSelected
-          ? 'bg-text-main text-white'
-          : 'bg-gray-100 text-transparent group-hover:bg-gray-200'
+          ? 'bg-text-main text-bg-main'
+          : 'bg-bg-hover text-transparent group-hover:bg-border-light dark:bg-dark-bg-sidebar dark:group-hover:bg-dark-border'
       )}>
         <Check className="w-3 h-3" />
       </div>
@@ -148,54 +148,54 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
 
   return (
     <div className={clsx(
-      'bg-white/90 border border-border-light rounded-xl shadow-sm overflow-hidden backdrop-blur-sm',
+      'bg-bg-main/90 border border-border-light rounded-xl shadow-sm overflow-hidden backdrop-blur-sm',
       'transition-all duration-300',
+      'dark:bg-dark-bg-main/90 dark:border-dark-border',
       className
     )}>
       {/* Header */}
-      <div
-        className={clsx(
-          'flex items-center justify-between px-4 py-3 border-b border-border-light',
-          'cursor-pointer hover:bg-bg-hover/50 transition-colors'
-        )}
-        onClick={onToggleCollapsed}
-      >
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-text-muted" />
-          <span className="text-sm font-medium text-text-main">
-            {t('graph.clusters')}
-          </span>
-          <span className="text-xs text-text-dim">
-            ({hasSelectedClusters ? `${selectedCount}/${totalClusters}` : totalClusters})
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {hasSelectedClusters && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                clearClusterFilter();
-              }}
-              className="p-1 rounded hover:bg-bg-hover text-text-dim hover:text-text-main transition-colors"
-              title={t('common.clear_filter')}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-light dark:border-dark-border">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="flex items-center justify-between gap-2 flex-1 text-left hover:bg-bg-hover/50 rounded-md px-2 -ml-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:hover:bg-dark-bg-sidebar/70"
+          aria-expanded={!collapsed}
+          aria-controls="cluster-panel-list"
+        >
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-text-muted dark:text-dark-text-main/70" />
+            <span className="text-sm font-medium text-text-main dark:text-dark-text-main">
+              {t('graph.clusters')}
+            </span>
+            <span className="text-xs text-text-dim dark:text-dark-text-main/60">
+              ({hasSelectedClusters ? `${selectedCount}/${totalClusters}` : totalClusters})
+            </span>
+          </div>
           {onToggleCollapsed && (
             collapsed ? (
-              <ChevronDown className="w-4 h-4 text-text-dim" />
+              <ChevronDown className="w-4 h-4 text-text-dim dark:text-dark-text-main/60" />
             ) : (
-              <ChevronUp className="w-4 h-4 text-text-dim" />
+              <ChevronUp className="w-4 h-4 text-text-dim dark:text-dark-text-main/60" />
             )
           )}
-        </div>
+        </button>
+
+        {hasSelectedClusters && (
+          <button
+            onClick={clearClusterFilter}
+            className="p-1 rounded hover:bg-bg-hover text-text-dim hover:text-text-main transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main/60 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
+            title={t('common.clear_filter')}
+            aria-label={t('common.clear_filter')}
+            type="button"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Cluster list */}
       {!collapsed && (
-        <div className="max-h-80 overflow-y-auto p-2 space-y-1">
+        <div id="cluster-panel-list" className="max-h-80 overflow-y-auto p-2 space-y-1">
           {clustersWithCounts.map(({ cluster, nodeCount }) => (
             <ClusterItem
               key={cluster.id}
@@ -210,9 +210,9 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
 
       {/* Footer with filter info */}
       {!collapsed && hasSelectedClusters && (
-        <div className="px-4 py-2 border-t border-border-light bg-bg-sidebar/50">
+        <div className="px-4 py-2 border-t border-border-light bg-bg-sidebar/50 dark:border-dark-border dark:bg-dark-bg-sidebar/60">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-text-muted">
+            <span className="text-xs text-text-muted dark:text-dark-text-main/70">
               {t('graph.showing_repos', { count: filteredData?.total_nodes || 0 })}
             </span>
             <button

@@ -17,7 +17,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className, animate = true, s
   <div
     style={style}
     className={clsx(
-      'bg-gray-200 rounded',
+      'bg-bg-hover rounded dark:bg-dark-bg-sidebar/70',
       animate && 'animate-pulse',
       className
     )}
@@ -32,20 +32,20 @@ export const GraphSkeleton: React.FC = () => {
   const { t } = useTranslation();
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gray-50/50 relative overflow-hidden">
+    <div className="w-full h-full flex items-center justify-center bg-bg-hover/50 relative overflow-hidden dark:bg-dark-bg-sidebar/60">
       {/* Animated background circles */}
       <div className="absolute inset-0 flex items-center justify-center">
         {/* Cluster circles */}
-        <div className="absolute w-48 h-48 rounded-full bg-gray-100 animate-pulse opacity-50" style={{ top: '15%', left: '20%' }} />
-        <div className="absolute w-64 h-64 rounded-full bg-gray-100 animate-pulse opacity-40" style={{ top: '30%', right: '15%' }} />
-        <div className="absolute w-40 h-40 rounded-full bg-gray-100 animate-pulse opacity-60" style={{ bottom: '20%', left: '30%' }} />
-        <div className="absolute w-56 h-56 rounded-full bg-gray-100 animate-pulse opacity-35" style={{ bottom: '25%', right: '25%' }} />
+        <div className="absolute w-48 h-48 rounded-full bg-bg-hover/70 animate-pulse opacity-50 dark:bg-dark-bg-sidebar/70" style={{ top: '15%', left: '20%' }} />
+        <div className="absolute w-64 h-64 rounded-full bg-bg-hover/70 animate-pulse opacity-40 dark:bg-dark-bg-sidebar/70" style={{ top: '30%', right: '15%' }} />
+        <div className="absolute w-40 h-40 rounded-full bg-bg-hover/70 animate-pulse opacity-60 dark:bg-dark-bg-sidebar/70" style={{ bottom: '20%', left: '30%' }} />
+        <div className="absolute w-56 h-56 rounded-full bg-bg-hover/70 animate-pulse opacity-35 dark:bg-dark-bg-sidebar/70" style={{ bottom: '25%', right: '25%' }} />
 
         {/* Node dots */}
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-3 h-3 rounded-full bg-gray-300 animate-pulse"
+            className="absolute w-3 h-3 rounded-full bg-border-light animate-pulse dark:bg-dark-border"
             style={{
               top: `${15 + Math.random() * 70}%`,
               left: `${10 + Math.random() * 80}%`,
@@ -57,9 +57,9 @@ export const GraphSkeleton: React.FC = () => {
 
       {/* Center loading text */}
       <div className="relative z-10 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-border-light">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-bg-main/80 backdrop-blur-sm rounded-lg shadow-sm border border-border-light dark:bg-dark-bg-main/80 dark:border-dark-border">
           <Loader2 className="w-4 h-4 animate-spin text-action-primary" />
-          <span className="text-sm text-text-muted">{t('graph.loading_data')}</span>
+          <span className="text-sm text-text-muted dark:text-dark-text-main/70">{t('graph.loading_data')}</span>
         </div>
       </div>
     </div>
@@ -71,7 +71,7 @@ export const GraphSkeleton: React.FC = () => {
 // ============================================================================
 
 export const StatCardSkeleton: React.FC = () => (
-  <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
+  <div className="bg-bg-main p-6 rounded-lg border border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
     <Skeleton className="h-4 w-24 mb-3" />
     <Skeleton className="h-8 w-16 mb-2" />
     <Skeleton className="h-3 w-20" />
@@ -94,7 +94,7 @@ export const DashboardSkeleton: React.FC = () => (
     {/* Charts Row */}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Language Distribution */}
-      <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
+      <div className="bg-bg-main p-6 rounded-lg border border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
         <Skeleton className="h-5 w-40 mb-6" />
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
@@ -113,7 +113,7 @@ export const DashboardSkeleton: React.FC = () => (
       </div>
 
       {/* Activity Timeline */}
-      <div className="bg-white p-6 rounded-lg border border-border-light shadow-sm">
+      <div className="bg-bg-main p-6 rounded-lg border border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
         <Skeleton className="h-5 w-32 mb-6" />
         <div className="flex items-end gap-1 h-32">
           {[...Array(12)].map((_, i) => (
@@ -137,7 +137,7 @@ export const DashboardSkeleton: React.FC = () => (
       <Skeleton className="h-5 w-28 mb-4" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="p-4 rounded-lg border border-border-light bg-white">
+          <div key={i} className="p-4 rounded-lg border border-border-light bg-bg-main dark:bg-dark-bg-main dark:border-dark-border">
             <div className="flex items-start gap-3">
               <Skeleton className="w-4 h-4 rounded-full flex-shrink-0" />
               <div className="flex-1">
@@ -162,7 +162,7 @@ export const DashboardSkeleton: React.FC = () => (
 // ============================================================================
 
 export const RepoDetailsSkeleton: React.FC = () => (
-  <div className="absolute top-6 right-6 z-30 w-96 bg-white rounded-lg border border-border-light shadow-xl overflow-hidden">
+  <div className="absolute top-6 right-6 z-30 w-96 bg-bg-main rounded-lg border border-border-light shadow-xl overflow-hidden dark:bg-dark-bg-main dark:border-dark-border">
     {/* Header */}
     <div className="p-5 border-b border-border-light bg-bg-sidebar">
       <div className="flex items-start gap-3">
@@ -214,7 +214,7 @@ export const RepoDetailsSkeleton: React.FC = () => (
 // ============================================================================
 
 export const ClusterPanelSkeleton: React.FC = () => (
-  <div className="bg-white border border-border-light rounded-lg shadow-sm overflow-hidden">
+  <div className="bg-bg-main border border-border-light rounded-lg shadow-sm overflow-hidden dark:bg-dark-bg-main dark:border-dark-border">
     {/* Header */}
     <div className="flex items-center justify-between px-4 py-3 border-b border-border-light">
       <div className="flex items-center gap-2">

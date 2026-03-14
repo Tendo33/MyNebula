@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LayoutDashboard, Network, Settings, Database, Github, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,8 @@ export const Sidebar = () => {
     typeof window !== 'undefined' ? window.innerWidth < 1024 : false
   );
   const [mobileOpen, setMobileOpen] = useState(false);
+  const resizeRafRef = useRef<number | null>(null);
+  const pendingWidthRef = useRef<number | null>(null);
 
   const navItems = [
     { icon: LayoutDashboard, label: t('sidebar.dashboard'), path: '/' },
@@ -60,11 +62,23 @@ export const Sidebar = () => {
     if (!isResizing || isMobile) return;
 
     const handlePointerMove = (event: PointerEvent) => {
-      setSidebarWidth(clampSidebarWidth(event.clientX));
+      pendingWidthRef.current = event.clientX;
+      if (resizeRafRef.current === null) {
+        resizeRafRef.current = window.requestAnimationFrame(() => {
+          if (pendingWidthRef.current !== null) {
+            setSidebarWidth(clampSidebarWidth(pendingWidthRef.current));
+          }
+          resizeRafRef.current = null;
+        });
+      }
     };
 
     const handlePointerUp = () => {
       setIsResizing(false);
+      if (resizeRafRef.current !== null) {
+        window.cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
     };
 
     window.addEventListener('pointermove', handlePointerMove);
@@ -77,6 +91,10 @@ export const Sidebar = () => {
       window.removeEventListener('pointerup', handlePointerUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      if (resizeRafRef.current !== null) {
+        window.cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
     };
   }, [isResizing, isMobile]);
 
@@ -85,7 +103,7 @@ export const Sidebar = () => {
       {isMobile && (
         <button
           onClick={() => setMobileOpen((prev) => !prev)}
-          className="fixed left-3 top-3 z-[70] inline-flex h-9 w-9 items-center justify-center rounded-md border border-border-light bg-white/95 text-text-main shadow-sm backdrop-blur-sm"
+          className="fixed left-3 top-3 z-[70] inline-flex h-11 w-11 items-center justify-center rounded-md border border-border-light bg-bg-main/95 text-text-main shadow-sm backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:bg-dark-bg-main/95 dark:text-dark-text-main dark:border-dark-border"
           aria-label={mobileOpen ? t('common.close') : t('common.open_menu', 'Open menu')}
         >
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -102,7 +120,7 @@ export const Sidebar = () => {
 
       <aside
         className={clsx(
-          'fixed left-0 top-0 bottom-0 bg-bg-sidebar/95 backdrop-blur-sm border-r border-border-light flex flex-col z-[60] transition-transform duration-200',
+          'fixed left-0 top-0 bottom-0 bg-bg-sidebar/95 backdrop-blur-sm border-r border-border-light flex flex-col z-[60] transition-transform duration-200 dark:bg-dark-bg-sidebar/95 dark:border-dark-border',
           isMobile ? (mobileOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
         )}
         style={{ width: `${isMobile ? Math.min(sidebarWidth, 300) : sidebarWidth}px` }}
@@ -112,7 +130,7 @@ export const Sidebar = () => {
         href="https://github.com/Tendo33/MyNebula"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 px-4 h-12 mt-2 cursor-pointer select-none transition-colors hover:bg-white mx-2 rounded-lg mb-2 border border-transparent hover:border-border-light"
+        className="flex items-center gap-2 px-4 h-12 mt-2 cursor-pointer select-none transition-colors hover:bg-bg-hover mx-2 rounded-lg mb-2 border border-transparent hover:border-border-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:hover:bg-dark-bg-sidebar/80 dark:hover:border-dark-border"
       >
         <div className="w-5 h-5 flex items-center justify-center text-text-main">
            <Github className="w-4 h-4" />
@@ -136,9 +154,10 @@ export const Sidebar = () => {
             className={({ isActive }) =>
               clsx(
                 'relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 group select-none border',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
                 isActive
-                  ? 'bg-white text-text-main font-medium shadow-sm border-border-light'
-                  : 'text-text-muted border-transparent hover:bg-white/80 hover:text-text-main hover:border-border-light/70'
+                  ? 'bg-bg-main text-text-main font-medium shadow-sm border-border-light dark:bg-dark-bg-main dark:text-dark-text-main dark:border-dark-border'
+                  : 'text-text-muted border-transparent hover:bg-bg-hover hover:text-text-main hover:border-border-light/70 dark:text-dark-text-main/70 dark:hover:bg-dark-bg-sidebar/70 dark:hover:text-dark-text-main dark:hover:border-dark-border'
               )
             }
           >

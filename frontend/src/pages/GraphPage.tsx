@@ -113,12 +113,12 @@ const GraphPage = () => {
                           filters.languages.size > 0;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-main text-text-main">
+    <div className="flex h-screen overflow-hidden bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main">
       <Sidebar />
 
       <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
         {/* Header */}
-        <header className="flex items-center justify-between h-14 px-4 sm:px-6 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 transition-all">
+        <header className="flex items-center justify-between h-14 px-4 sm:px-6 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 transition-all dark:bg-dark-bg-main/95 dark:border-dark-border">
           <div className="flex items-center gap-3 select-none">
             <h2 className="text-base font-semibold text-text-main tracking-tight">
               {t('sidebar.graph')}
@@ -167,9 +167,9 @@ const GraphPage = () => {
               onClick={() => setShowFilters(!showFilters)}
               className={`h-9 px-3 rounded-md text-sm font-medium transition-all flex items-center gap-2 border ${
                 showFilters
-                  ? 'bg-bg-sidebar border-border-light text-text-main'
-                  : 'border-transparent text-text-muted hover:text-text-main hover:bg-bg-hover'
-              }`}
+                  ? 'bg-bg-sidebar border-border-light text-text-main dark:bg-dark-bg-sidebar dark:border-dark-border dark:text-dark-text-main'
+                  : 'border-transparent text-text-muted hover:text-text-main hover:bg-bg-hover dark:text-dark-text-main/70 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70'
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30`}
             >
               <Filter className="w-4 h-4" />
               {hasActiveFilters && (
@@ -197,13 +197,13 @@ const GraphPage = () => {
                 isMobile
                   ? 'absolute inset-y-0 left-0 w-[85vw] max-w-sm'
                   : 'w-72 flex-shrink-0'
-              } border-r border-border-light bg-bg-sidebar/90 backdrop-blur-sm p-4 space-y-4 overflow-y-auto z-30 relative`}
+              } border-r border-border-light bg-bg-sidebar/90 backdrop-blur-sm p-4 space-y-4 overflow-y-auto z-30 relative dark:bg-dark-bg-sidebar/90 dark:border-dark-border`}
             >
               {/* Clear all filters */}
               {hasActiveFilters && (
                 <button
                   onClick={clearFilters}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-text-main hover:bg-bg-hover rounded-md transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-text-main hover:bg-bg-hover rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                 >
                   <X className="w-4 h-4" />
                   {t('common.clear_all_filters')}
@@ -228,7 +228,7 @@ const GraphPage = () => {
           )}
 
           {/* Graph Container */}
-          <div className="flex-1 min-w-0 relative bg-white/80 flex flex-row overflow-hidden">
+          <div className="flex-1 min-w-0 relative bg-bg-main/80 flex flex-row overflow-hidden dark:bg-dark-bg-main/80">
             <div className="flex-1 relative min-w-0 h-full">
               <Graph2D />
             </div>

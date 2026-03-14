@@ -23,6 +23,9 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const { t } = useTranslation();
   const [localValue, setLocalValue] = useState(controlledValue || '');
   const skipNextDebounceRef = useRef(false);
+  const computedAriaLabel =
+    props['aria-label'] ??
+    (props['aria-labelledby'] ? undefined : (placeholder || t('dashboard.search_placeholder')));
 
   // Sync with controlled value
   useEffect(() => {
@@ -69,15 +72,17 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         type="text"
         value={localValue}
         onChange={handleChange}
-        className="block w-full pl-9 pr-8 py-2 h-9 border border-border-light rounded-lg leading-5 bg-white/85 text-text-main placeholder-text-dim focus:outline-none focus:bg-white focus:ring-2 focus:ring-action-primary/15 focus:border-action-primary text-sm shadow-sm hover:border-gray-300"
+        className="block w-full pl-9 pr-8 py-2 h-9 border border-border-light rounded-lg leading-5 bg-bg-main/85 text-text-main placeholder-text-dim focus:outline-none focus:bg-bg-main focus:ring-2 focus:ring-action-primary/15 focus:border-action-primary text-sm shadow-sm hover:border-border-light dark:bg-dark-bg-main/85 dark:text-dark-text-main dark:border-dark-border dark:focus:bg-dark-bg-main"
         placeholder={placeholder || t('dashboard.search_placeholder')}
+        aria-label={computedAriaLabel}
         {...props}
       />
       {localValue && (
         <button
           type="button"
           onClick={handleClear}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-dim hover:text-text-main"
+          aria-label={t('common.clear', 'Clear')}
+          className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-dim hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 rounded"
         >
           <X className="h-4 w-4" />
         </button>

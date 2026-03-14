@@ -174,7 +174,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
 
   return (
     <div className={clsx(
-      'bg-white/90 border border-border-light rounded-xl shadow-sm p-4 backdrop-blur-sm',
+      'bg-bg-main/90 border border-border-light rounded-xl shadow-sm p-4 backdrop-blur-sm dark:bg-dark-bg-main/90 dark:border-dark-border',
       className
     )}>
       {/* Header */}
@@ -231,7 +231,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
                   'w-full rounded-t-sm transition-all duration-150',
                   inRange
                     ? 'bg-action-primary hover:bg-action-hover'
-                    : 'bg-gray-200/90 hover:bg-gray-300',
+                    : 'bg-border-light/80 hover:bg-border-light dark:bg-dark-border/60 dark:hover:bg-dark-border',
                   (isRangeStart || isRangeEnd) && 'ring-2 ring-action-primary ring-offset-1'
                 )}
                 style={{ height: `${height}px` }}
@@ -239,11 +239,11 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
 
               {/* Tooltip */}
               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                <div className="bg-text-main text-white px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap shadow-lg">
+                <div className="bg-text-main text-bg-main px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap shadow-lg">
                   <div className="font-semibold">{point.count} repos</div>
-                  <div className="text-white/70">{formatDate(point.date)}</div>
+                  <div className="text-bg-main/70">{formatDate(point.date)}</div>
                   {point.top_languages.length > 0 && (
-                    <div className="mt-1 text-white/60 text-[10px]">
+                    <div className="mt-1 text-bg-main/60 text-[10px]">
                       {point.top_languages.slice(0, 3).join(', ')}
                     </div>
                   )}

@@ -486,6 +486,7 @@ const Graph2D: React.FC = () => {
         imageCache.current.set(owner_avatar_url, 'loading');
         const img = new Image();
         img.crossOrigin = 'anonymous';
+        img.decoding = 'async';
         img.onload = () => {
           imageCache.current.set(owner_avatar_url, img);
           // Trigger re-render by updating state
@@ -781,7 +782,7 @@ const Graph2D: React.FC = () => {
   // Empty state
   if (!filteredData || filteredData.nodes.length === 0) {
     return (
-      <div ref={containerRef} className="w-full h-full relative flex items-center justify-center bg-gray-50/50">
+      <div ref={containerRef} className="w-full h-full relative flex items-center justify-center bg-bg-hover/50 dark:bg-dark-bg-sidebar/60">
         <div className="text-center p-8 opacity-50">
           <div className="text-6xl mb-4 grayscale">🕸️</div>
           <h3 className="font-semibold text-lg text-text-main">
@@ -796,7 +797,7 @@ const Graph2D: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full relative bg-white">
+    <div ref={containerRef} className="w-full h-full relative bg-bg-main dark:bg-dark-bg-main">
       <ForceGraph2D
         ref={graphRef}
         width={width}
@@ -841,7 +842,7 @@ const Graph2D: React.FC = () => {
 
       {/* Hover info overlay - Enhanced with full info */}
       {activeHoverNode && (
-        <div className="absolute top-4 right-4 z-10 bg-white/98 backdrop-blur-sm px-4 py-3 rounded-lg border border-border-light shadow-lg max-w-sm pointer-events-none">
+        <div className="absolute top-4 right-4 z-10 bg-bg-main/98 backdrop-blur-sm px-4 py-3 rounded-lg border border-border-light shadow-lg max-w-sm pointer-events-none dark:bg-dark-bg-main/95 dark:border-dark-border">
           {/* Header with Avatar */}
           <div className="flex items-start gap-3">
             {/* Owner Avatar */}
@@ -850,10 +851,14 @@ const Graph2D: React.FC = () => {
                 src={activeHoverNode.owner_avatar_url}
                 alt={activeHoverNode.owner || activeHoverNode.name}
                 className="w-10 h-10 rounded-md border border-border-light flex-shrink-0"
+                loading="lazy"
+                decoding="async"
+                width={40}
+                height={40}
               />
             ) : (
-              <div className="w-10 h-10 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0">
-                <span className="text-gray-500 text-sm font-medium">
+              <div className="w-10 h-10 rounded-md bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
+                <span className="text-text-dim text-sm font-medium dark:text-dark-text-main/60">
                   {(activeHoverNode.owner || activeHoverNode.name)?.charAt(0).toUpperCase()}
                 </span>
               </div>
@@ -865,11 +870,11 @@ const Graph2D: React.FC = () => {
               </h3>
               <div className="flex items-center gap-2 mt-0.5">
                 {activeHoverNode.language && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 rounded text-blue-700">
+                  <span className="text-[10px] px-1.5 py-0.5 bg-action-primary/10 rounded text-action-primary">
                     {activeHoverNode.language}
                   </span>
                 )}
-                <span className="text-xs text-orange-500 font-medium">
+                <span className="text-xs text-action-primary font-medium">
                   ⭐ {activeHoverNode.stargazers_count.toLocaleString()}
                 </span>
               </div>
@@ -889,7 +894,7 @@ const Graph2D: React.FC = () => {
               {activeHoverNode.ai_tags.slice(0, 4).map((tag: string, idx: number) => (
                 <span
                   key={idx}
-                  className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded"
+                  className="text-[10px] px-1.5 py-0.5 bg-action-primary/10 text-action-primary rounded"
                 >
                   {tag}
                 </span>

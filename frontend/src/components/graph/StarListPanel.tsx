@@ -38,14 +38,14 @@ const StarListItem: React.FC<StarListItemProps> = ({
       onClick={onToggle}
       className={clsx(
         'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left border',
-        'hover:bg-white hover:border-border-light/70 group border-transparent',
-        isSelected && 'bg-pink-50 ring-1 ring-pink-200 border-pink-200/70 shadow-sm'
+        'hover:bg-bg-hover hover:border-border-light/70 group border-transparent dark:hover:bg-dark-bg-sidebar/70',
+        isSelected && 'bg-action-primary/10 ring-1 ring-action-primary/20 border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border'
       )}
     >
       {/* Icon */}
       <FolderHeart className={clsx(
         'w-4 h-4 flex-shrink-0',
-        isSelected ? 'text-pink-500' : 'text-text-dim group-hover:text-pink-400'
+        isSelected ? 'text-action-primary' : 'text-text-dim group-hover:text-action-primary'
       )} />
 
       {/* List info */}
@@ -53,18 +53,18 @@ const StarListItem: React.FC<StarListItemProps> = ({
         <div className="flex items-center justify-between gap-2">
           <span className={clsx(
             'text-sm truncate',
-            isSelected ? 'font-medium text-pink-700' : 'text-text-muted'
+            isSelected ? 'font-medium text-text-main dark:text-dark-text-main' : 'text-text-muted dark:text-dark-text-main/70'
           )}>
             {list.name}
           </span>
-          <span className="text-xs text-text-dim font-mono tabular-nums">
+          <span className="text-xs text-text-dim font-mono tabular-nums dark:text-dark-text-main/60">
             {list.repo_count}
           </span>
         </div>
 
         {/* Description */}
         {list.description && (
-          <p className="text-[11px] text-text-dim truncate mt-0.5">
+          <p className="text-[11px] text-text-dim truncate mt-0.5 dark:text-dark-text-main/60">
             {list.description}
           </p>
         )}
@@ -74,8 +74,8 @@ const StarListItem: React.FC<StarListItemProps> = ({
       <div className={clsx(
         'w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors',
         isSelected
-          ? 'bg-pink-500 text-white'
-          : 'bg-gray-100 text-transparent group-hover:bg-gray-200'
+          ? 'bg-text-main text-bg-main'
+          : 'bg-bg-hover text-transparent group-hover:bg-border-light dark:bg-dark-bg-sidebar dark:group-hover:bg-dark-border'
       )}>
         <Check className="w-3 h-3" />
       </div>
@@ -120,54 +120,54 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
 
   return (
     <div className={clsx(
-      'bg-white/90 border border-border-light rounded-xl shadow-sm overflow-hidden backdrop-blur-sm',
+      'bg-bg-main/90 border border-border-light rounded-xl shadow-sm overflow-hidden backdrop-blur-sm',
       'transition-all duration-300',
+      'dark:bg-dark-bg-main/90 dark:border-dark-border',
       className
     )}>
       {/* Header */}
-      <div
-        className={clsx(
-          'flex items-center justify-between px-4 py-3 border-b border-border-light',
-          'cursor-pointer hover:bg-bg-hover/50 transition-colors'
-        )}
-        onClick={onToggleCollapsed}
-      >
-        <div className="flex items-center gap-2">
-          <FolderHeart className="w-4 h-4 text-pink-500" />
-          <span className="text-sm font-medium text-text-main">
-            {t('graph.my_lists')}
-          </span>
-          <span className="text-xs text-text-dim">
-            ({hasSelectedLists ? `${selectedCount}/${totalLists}` : totalLists})
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {hasSelectedLists && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                clearStarListFilter?.();
-              }}
-              className="p-1 rounded hover:bg-bg-hover text-text-dim hover:text-text-main transition-colors"
-              title={t('common.clear_filter')}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-light dark:border-dark-border">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="flex items-center justify-between gap-2 flex-1 text-left hover:bg-bg-hover/50 rounded-md px-2 -ml-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:hover:bg-dark-bg-sidebar/70"
+          aria-expanded={!collapsed}
+          aria-controls="starlist-panel-list"
+        >
+          <div className="flex items-center gap-2">
+            <FolderHeart className="w-4 h-4 text-action-primary" />
+            <span className="text-sm font-medium text-text-main dark:text-dark-text-main">
+              {t('graph.my_lists')}
+            </span>
+            <span className="text-xs text-text-dim dark:text-dark-text-main/60">
+              ({hasSelectedLists ? `${selectedCount}/${totalLists}` : totalLists})
+            </span>
+          </div>
           {onToggleCollapsed && (
             collapsed ? (
-              <ChevronDown className="w-4 h-4 text-text-dim" />
+              <ChevronDown className="w-4 h-4 text-text-dim dark:text-dark-text-main/60" />
             ) : (
-              <ChevronUp className="w-4 h-4 text-text-dim" />
+              <ChevronUp className="w-4 h-4 text-text-dim dark:text-dark-text-main/60" />
             )
           )}
-        </div>
+        </button>
+
+        {hasSelectedLists && (
+          <button
+            onClick={() => clearStarListFilter?.()}
+            className="p-1 rounded hover:bg-bg-hover text-text-dim hover:text-text-main transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main/60 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
+            title={t('common.clear_filter')}
+            aria-label={t('common.clear_filter')}
+            type="button"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Star list items */}
       {!collapsed && (
-        <div className="max-h-60 overflow-y-auto p-2 space-y-1">
+        <div id="starlist-panel-list" className="max-h-60 overflow-y-auto p-2 space-y-1">
           {starLists.map((list) => (
             <StarListItem
               key={list.id}
@@ -181,14 +181,14 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
 
       {/* Footer with filter info */}
       {!collapsed && hasSelectedLists && (
-        <div className="px-4 py-2 border-t border-border-light bg-pink-50/50">
+        <div className="px-4 py-2 border-t border-border-light bg-bg-sidebar/50 dark:border-dark-border dark:bg-dark-bg-sidebar/60">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-pink-600">
+            <span className="text-xs text-text-muted dark:text-dark-text-main/70">
               {t('graph.showing_repos', { count: filteredData?.total_nodes || 0 })}
             </span>
             <button
               onClick={clearStarListFilter}
-              className="text-xs text-pink-600 hover:text-pink-700 transition-colors"
+              className="text-xs text-action-primary hover:text-action-hover transition-colors"
             >
               {t('common.show_all')}
             </button>

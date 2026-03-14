@@ -55,8 +55,8 @@ export const getStatusDisplay = (
     case 'failed':
       return { text: t('time.status.failed'), color: 'text-red-600' };
     case 'running':
-      return { text: t('time.status.running'), color: 'text-blue-600' };
+      return { text: t('time.status.running'), color: 'text-action-primary' };
     default:
-      return { text: t('time.status.unknown'), color: 'text-gray-500' };
+      return { text: t('time.status.unknown'), color: 'text-text-dim' };
   }
 };
