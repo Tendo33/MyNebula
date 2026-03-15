@@ -27,7 +27,7 @@
 | 变量名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `APP_NAME` | string | `mynebula` | 应用名称 |
-| `APP_VERSION` | string | `1.0.10` | 应用版本 |
+| `APP_VERSION` | string | `1.1.0` | 应用版本 |
 | `DEBUG` | boolean | `false` | 调试模式（控制 `/docs` 是否开放） |
 | `SINGLE_USER_MODE` | boolean | `true` | 单用户模式（读取接口默认使用首个用户） |
 | `SNAPSHOT_READ_FALLBACK_ON_ERROR` | boolean | `true` | 快照读取失败时回退到实时构建 |
@@ -134,7 +134,7 @@
 
 ```bash
 APP_NAME=mynebula
-APP_VERSION=1.0.10
+APP_VERSION=1.1.0
 DEBUG=true
 SINGLE_USER_MODE=true
 SNAPSHOT_READ_FALLBACK_ON_ERROR=true
