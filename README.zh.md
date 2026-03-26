@@ -174,6 +174,9 @@ cp .env.example .env
 
 - `GITHUB_TOKEN`
 - `EMBEDDING_API_KEY`
+- `EMBEDDING_BASE_URL`
+- `EMBEDDING_MODEL`
+- 如果你要启用摘要、标签或 AI 命名，还需要配置 `LLM_API_KEY`
 - `ADMIN_PASSWORD`
 - 如果你不想使用默认值 `admin`，还需要修改 `ADMIN_USERNAME`
 

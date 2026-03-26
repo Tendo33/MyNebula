@@ -174,6 +174,9 @@ At minimum, update these values in `.env`:
 
 - `GITHUB_TOKEN`
 - `EMBEDDING_API_KEY`
+- `EMBEDDING_BASE_URL`
+- `EMBEDDING_MODEL`
+- `LLM_API_KEY` if you want summaries, tags, or AI-assisted naming
 - `ADMIN_PASSWORD`
 - `ADMIN_USERNAME` if you do not want the default `admin`
 
