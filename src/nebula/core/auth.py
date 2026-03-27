@@ -14,7 +14,7 @@ from nebula.core.config import AppSettings
 
 def is_admin_auth_enabled(settings: AppSettings) -> bool:
     """Check whether admin auth is configured."""
-    return bool(settings.admin_password)
+    return bool(settings.admin_password and settings.admin_session_secret)
 
 
 def verify_admin_credentials(

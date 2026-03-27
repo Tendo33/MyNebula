@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.pipeline_service import SyncPipelineService
@@ -21,6 +21,7 @@ from nebula.db import SyncSchedule
 from nebula.utils import get_logger
 
 logger = get_logger(__name__)
+SCHEDULER_ADVISORY_LOCK_KEY = 91234567
 
 # Global scheduler instance
 _scheduler_service: "SchedulerService | None" = None
@@ -101,8 +102,13 @@ class SchedulerService:
         """
         from nebula.db.database import get_db_context
 
+        user_ids_to_launch: list[int] = []
         try:
             async with get_db_context() as db:
+                if not await self._try_acquire_scheduler_lock(db):
+                    logger.debug("Skipping scheduler tick: lock held by another instance")
+                    return
+
                 # Get all enabled schedules
                 result = await db.execute(
                     select(SyncSchedule).where(SyncSchedule.is_enabled == True)  # noqa: E712
@@ -116,72 +122,73 @@ class SchedulerService:
 
                 for schedule in schedules:
                     try:
-                        await self._check_single_schedule(schedule, now_utc, db)
+                        if await self._check_single_schedule(schedule, now_utc):
+                            user_ids_to_launch.append(schedule.user_id)
                     except Exception as e:
                         logger.error(
                             f"Error checking schedule for user {schedule.user_id}: {e}"
                         )
-                        # Continue with other schedules
+                        schedule.last_run_status = "failed"
+                        schedule.last_run_error = str(e)
 
         except Exception as e:
             logger.error(f"Error in scheduled sync check: {e}")
+            return
+
+        for user_id in user_ids_to_launch:
+            try:
+                await self._launch_user_pipeline(user_id)
+            except Exception as e:
+                logger.error(
+                    f"Failed to launch scheduled sync pipeline for user {user_id}: {e}"
+                )
+                await self._mark_schedule_failed(user_id, str(e))
 
     async def _check_single_schedule(
         self,
         schedule: SyncSchedule,
         now_utc: datetime,
-        db: AsyncSession,
-    ) -> None:
+    ) -> bool:
         """Check and potentially trigger a single user's schedule.
 
         Args:
             schedule: The sync schedule to check.
             now_utc: Current UTC time.
-            db: Database session.
+        Returns:
+            Whether this schedule should launch a pipeline.
         """
-        try:
-            # Convert current UTC time to user's timezone
-            user_tz = ZoneInfo(schedule.timezone)
-            user_time = now_utc.astimezone(user_tz)
-            last_run_local = (
-                schedule.last_run_at.astimezone(user_tz)
-                if schedule.last_run_at
-                else None
-            )
+        # Convert current UTC time to user's timezone
+        user_tz = ZoneInfo(schedule.timezone)
+        user_time = now_utc.astimezone(user_tz)
+        last_run_local = (
+            schedule.last_run_at.astimezone(user_tz) if schedule.last_run_at else None
+        )
 
-            from nebula.application.services.sync_ops_service import is_schedule_due
+        from nebula.application.services.sync_ops_service import is_schedule_due
 
-            if not is_schedule_due(
-                now_local=user_time,
-                schedule_hour=schedule.schedule_hour,
-                schedule_minute=schedule.schedule_minute,
-                last_run_local=last_run_local,
-            ):
-                return
+        if not is_schedule_due(
+            now_local=user_time,
+            schedule_hour=schedule.schedule_hour,
+            schedule_minute=schedule.schedule_minute,
+            last_run_local=last_run_local,
+        ):
+            return False
 
-            if await self._has_active_pipeline(schedule.user_id):
-                logger.info(
-                    f"Skipping scheduled sync for user {schedule.user_id}: pipeline already running"
-                )
-                return
-
+        if await self._has_active_pipeline(schedule.user_id):
             logger.info(
-                f"Triggering scheduled sync for user {schedule.user_id} "
-                f"at {user_time.strftime('%Y-%m-%d %H:%M')} {schedule.timezone}"
+                f"Skipping scheduled sync for user {schedule.user_id}: pipeline already running"
             )
+            return False
 
-            schedule.last_run_status = "running"
-            schedule.last_run_error = None
-            schedule.last_run_at = now_utc
-            await db.commit()
+        logger.info(
+            f"Triggering scheduled sync for user {schedule.user_id} "
+            f"at {user_time.strftime('%Y-%m-%d %H:%M')} {schedule.timezone}"
+        )
 
-            await self._launch_user_pipeline(schedule.user_id)
-
-        except Exception as e:
-            logger.error(f"Error processing schedule for user {schedule.user_id}: {e}")
-            schedule.last_run_status = "failed"
-            schedule.last_run_error = str(e)
-            await db.commit()
+        schedule.last_run_status = "running"
+        schedule.last_run_error = None
+        schedule.last_run_at = now_utc
+        return True
 
     async def _has_active_pipeline(self, user_id: int) -> bool:
         """Check whether a scheduler-triggered pipeline is running for the user."""
@@ -217,6 +224,13 @@ class SchedulerService:
 
         try:
             pipeline_service = SyncPipelineService()
+            active_run = await pipeline_service.get_active_pipeline(user_id)
+            if active_run is not None:
+                logger.info(
+                    "Skipping scheduled sync: pipeline already active "
+                    f"(user_id={user_id}, run_id={active_run.id})"
+                )
+                return
             run_id = await pipeline_service.create_pipeline_run(user_id)
             await pipeline_service.run_pipeline(
                 run_id,
@@ -259,6 +273,26 @@ class SchedulerService:
                 current = asyncio.current_task()
                 if existing is not None and existing is current:
                     self._active_user_tasks.pop(user_id, None)
+
+    async def _try_acquire_scheduler_lock(self, db: AsyncSession) -> bool:
+        """Acquire cross-process transaction-level advisory lock for scheduler tick."""
+        result = await db.execute(
+            text("SELECT pg_try_advisory_xact_lock(:lock_key)"),
+            {"lock_key": SCHEDULER_ADVISORY_LOCK_KEY},
+        )
+        return bool(result.scalar())
+
+    async def _mark_schedule_failed(self, user_id: int, error: str) -> None:
+        """Persist launch failure status for one user's schedule."""
+        from nebula.db.database import get_db_context
+
+        async with get_db_context() as db:
+            schedule = await db.scalar(
+                select(SyncSchedule).where(SyncSchedule.user_id == user_id)
+            )
+            if schedule:
+                schedule.last_run_status = "failed"
+                schedule.last_run_error = error
 
 
 def get_scheduler_service() -> SchedulerService:

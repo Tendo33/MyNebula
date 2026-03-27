@@ -148,6 +148,7 @@ const Graph2D: React.FC = () => {
 
   // Image cache for avatars
   const imageCache = useRef<Map<string, HTMLImageElement | 'loading' | 'error'>>(new Map());
+  const hullCacheRef = useRef<Map<number, { signature: string; hull: { x: number; y: number }[] }>>(new Map());
 
   // Global state
   const {
@@ -359,6 +360,7 @@ const Graph2D: React.FC = () => {
   // Reset auto-fit state when layout shape changes
   useEffect(() => {
     autoFitKeyRef.current = null;
+    hullCacheRef.current.clear();
   }, [layoutKey]);
 
   // Fallback auto-fit after initial render in case engine-stop callback is delayed
@@ -630,8 +632,16 @@ const Graph2D: React.FC = () => {
         y: n.y!,
       }));
 
-      // Compute convex hull
-      const hull = computeConvexHull([...points]);
+      const signature = points
+        .map((point) => `${Math.round(point.x)}:${Math.round(point.y)}`)
+        .join('|');
+      const cached = hullCacheRef.current.get(clusterId);
+      const hull = cached?.signature === signature
+        ? cached.hull
+        : computeConvexHull([...points]);
+      if (!cached || cached.signature !== signature) {
+        hullCacheRef.current.set(clusterId, { signature, hull });
+      }
       if (hull.length < 3) return;
 
       // Draw filled hull with cluster color
@@ -696,8 +706,10 @@ const Graph2D: React.FC = () => {
     graphRef.current.zoomToFit(duration, padding, (n) => n.id === nodeId);
   }, [width, height]);
 
+  const selectedNodeId = selectedNode?.id;
+
   useEffect(() => {
-    if (!selectedNode) return;
+    if (!selectedNodeId) return;
 
     if (skipNextFocusRef.current) {
       skipNextFocusRef.current = false;
@@ -712,12 +724,12 @@ const Graph2D: React.FC = () => {
 
     const tryFocus = () => {
       if (!graphRef.current) return;
-      const node = getLiveNodeById(selectedNode.id);
+      const node = getLiveNodeById(selectedNodeId);
       if (node?.x !== undefined && node?.y !== undefined) {
-        focusNodeById(selectedNode.id, 800);
+        focusNodeById(selectedNodeId, 800);
       } else {
         // Node positions not ready yet — retry after the simulation warms up
-        retryTimer = window.setTimeout(() => focusNodeById(selectedNode.id, 800), 600);
+        retryTimer = window.setTimeout(() => focusNodeById(selectedNodeId, 800), 600);
       }
     };
 
@@ -730,7 +742,7 @@ const Graph2D: React.FC = () => {
       window.cancelAnimationFrame(frame2);
       window.clearTimeout(retryTimer);
     };
-  }, [selectedNode?.id, focusNodeById, getLiveNodeById]);
+  }, [selectedNodeId, focusNodeById, getLiveNodeById]);
 
   // Handle node click
   const handleNodeClick = useCallback((node: any) => {

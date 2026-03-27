@@ -287,6 +287,29 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     };
   }, [rawData, languages, allTags]);
 
+  // Handle result selection
+  const handleSelectResult = useCallback((result: SearchResult) => {
+    addRecentSearch(query);
+
+    switch (result.type) {
+      case 'repo':
+        setSelectedNode(result.data);
+        onSelectNode?.(result.data);
+        break;
+      case 'cluster':
+        onSelectCluster?.(result.data);
+        break;
+      case 'language':
+        setSearchQuery(result.data.language);
+        break;
+      case 'tag':
+        setSearchQuery(result.data.tag);
+        break;
+    }
+
+    onClose();
+  }, [query, addRecentSearch, setSelectedNode, onSelectNode, onSelectCluster, setSearchQuery, onClose]);
+
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -321,7 +344,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, results, selectedIndex, query, addRecentSearch, setSearchQuery, onClose]);
+  }, [isOpen, results, selectedIndex, query, addRecentSearch, setSearchQuery, onClose, handleSelectResult]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -330,29 +353,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       selectedItem?.scrollIntoView({ block: 'nearest' });
     }
   }, [selectedIndex]);
-
-  // Handle result selection
-  const handleSelectResult = useCallback((result: SearchResult) => {
-    addRecentSearch(query);
-
-    switch (result.type) {
-      case 'repo':
-        setSelectedNode(result.data);
-        onSelectNode?.(result.data);
-        break;
-      case 'cluster':
-        onSelectCluster?.(result.data);
-        break;
-      case 'language':
-        setSearchQuery(result.data.language);
-        break;
-      case 'tag':
-        setSearchQuery(result.data.tag);
-        break;
-    }
-
-    onClose();
-  }, [query, addRecentSearch, setSelectedNode, onSelectNode, onSelectCluster, setSearchQuery, onClose]);
 
   // Handle quick filter click
   const handleQuickFilter = useCallback((filterQuery: string) => {

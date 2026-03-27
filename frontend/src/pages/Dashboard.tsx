@@ -161,7 +161,7 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
 const Dashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { stats, activityData, maxActivity, loading } = useDashboardQuery();
+  const { stats, activityData, maxActivity, loading, error, retry } = useDashboardQuery();
 
   // Navigate to graph with cluster filter
   const handleClusterClick = (clusterId: number) => {
@@ -195,6 +195,19 @@ const Dashboard = () => {
         <section className="flex-1 p-4 sm:p-8 overflow-auto">
           {loading ? (
             <DashboardSkeleton />
+          ) : error ? (
+            <div className="max-w-6xl mx-auto min-h-[320px] flex flex-col items-center justify-center gap-3">
+              <p className="text-sm text-red-600">{t('common.load_failed', 'Failed to load data')}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  void retry();
+                }}
+                className="px-3 py-1.5 rounded border border-border-light text-sm hover:bg-bg-hover dark:border-dark-border"
+              >
+                {t('common.retry')}
+              </button>
+            </div>
           ) : (
             <div className="max-w-6xl mx-auto space-y-8">
               {/* Stats Grid */}

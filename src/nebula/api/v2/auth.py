@@ -1,6 +1,6 @@
 """Admin authentication API routes."""
 
-import hashlib
+import hmac
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -17,6 +17,8 @@ from nebula.core.config import AppSettings, get_app_settings
 router = APIRouter()
 
 ADMIN_SESSION_COOKIE = "nebula_admin_session"
+ADMIN_CSRF_COOKIE = "nebula_admin_csrf"
+ADMIN_CSRF_HEADER = "x-csrf-token"
 
 
 class LoginRequest(BaseModel):
@@ -40,8 +42,11 @@ class AdminAuthConfigResponse(BaseModel):
 
 
 def _get_session_secret(settings: AppSettings) -> str:
-    raw = f"{settings.admin_username}:{settings.admin_password}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return settings.admin_session_secret
+
+
+def _get_csrf_secret(settings: AppSettings) -> str:
+    return f"{settings.admin_session_secret}:csrf"
 
 
 def _read_session_username(request: Request, settings: AppSettings) -> str | None:
@@ -57,6 +62,21 @@ def _read_session_username(request: Request, settings: AppSettings) -> str | Non
     if not isinstance(username, str):
         return None
     return username
+
+
+def _read_csrf_token(request: Request, settings: AppSettings) -> str | None:
+    csrf_token = request.cookies.get(ADMIN_CSRF_COOKIE)
+    if not csrf_token:
+        return None
+    payload = verify_signed_session_token(csrf_token, _get_csrf_secret(settings))
+    if not payload:
+        return None
+    username = payload.get("u")
+    if not isinstance(username, str):
+        return None
+    if username != settings.admin_username:
+        return None
+    return csrf_token
 
 
 def require_admin(
@@ -78,6 +98,30 @@ def require_admin(
         )
 
     return username
+
+
+def require_admin_csrf(
+    request: Request,
+    settings: AppSettings = Depends(get_app_settings),  # noqa: B008
+    _: str = Depends(require_admin),  # noqa: B008
+) -> None:
+    """Dependency that enforces CSRF checks on mutating admin endpoints."""
+    if request.method.upper() in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        return
+
+    cookie_token = _read_csrf_token(request, settings)
+    header_token = request.headers.get(ADMIN_CSRF_HEADER)
+
+    if not cookie_token or not header_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF token required",
+        )
+    if not hmac.compare_digest(cookie_token, header_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF token mismatch",
+        )
 
 
 @router.post("/login", response_model=AdminSessionResponse)
@@ -106,12 +150,26 @@ async def login_admin(
         secret=_get_session_secret(settings),
         expires_in_seconds=int(expires_delta.total_seconds()),
     )
+    csrf_token = create_signed_session_token(
+        username=settings.admin_username,
+        secret=_get_csrf_secret(settings),
+        expires_in_seconds=int(expires_delta.total_seconds()),
+    )
 
     response.set_cookie(
         key=ADMIN_SESSION_COOKIE,
         value=token,
         max_age=int(expires_delta.total_seconds()),
         httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/",
+    )
+    response.set_cookie(
+        key=ADMIN_CSRF_COOKIE,
+        value=csrf_token,
+        max_age=int(expires_delta.total_seconds()),
+        httponly=False,
         secure=request.url.scheme == "https",
         samesite="lax",
         path="/",
@@ -125,6 +183,11 @@ async def logout_admin(response: Response):
     """Logout admin and clear session cookie."""
     response.delete_cookie(
         key=ADMIN_SESSION_COOKIE,
+        path="/",
+        samesite="lax",
+    )
+    response.delete_cookie(
+        key=ADMIN_CSRF_COOKIE,
         path="/",
         samesite="lax",
     )

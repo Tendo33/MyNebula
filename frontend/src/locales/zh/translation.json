@@ -28,6 +28,8 @@
     "open_menu": "打开菜单",
     "cancel": "取消",
     "confirm": "确认",
+    "retry": "重试",
+    "load_failed": "加载失败",
     "n_a": "暂无"
   },
   "dashboard": {
@@ -102,7 +104,7 @@
     "username": "用户名",
     "password": "密码",
     "login_failed": "登录失败，请检查用户名或密码",
-    "admin_not_configured": "管理员认证尚未配置，请设置 ADMIN_PASSWORD 后重启服务。",
+    "admin_not_configured": "管理员认证尚未配置，请设置 ADMIN_PASSWORD 与 ADMIN_SESSION_SECRET 后重启服务。",
     "operations": "操作",
     "language": "语言",
     "language_desc": "更改界面显示语言",

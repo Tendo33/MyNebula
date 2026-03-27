@@ -95,7 +95,11 @@ class GraphQueryService:
 
         try:
             snapshot = await self._resolve_snapshot(db, user.id, version)
-            graph_data = await self.snapshot_repo.hydrate_graph_data(db, snapshot)
+            graph_data = await self.snapshot_repo.hydrate_graph_data(
+                db,
+                snapshot,
+                include_edges=include_edges,
+            )
         except Exception:
             if not self.settings.snapshot_read_fallback_on_error:
                 raise

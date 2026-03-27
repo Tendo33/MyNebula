@@ -121,6 +121,15 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [edgesQuery.edgesError]);
 
+  useEffect(() => {
+    const queryError = graphQuery.error ?? timelineQuery.error;
+    if (!queryError) {
+      setError((current) => (current === null ? current : null));
+      return;
+    }
+    setError(queryError instanceof Error ? queryError.message : 'Failed to load graph data');
+  }, [graphQuery.error, timelineQuery.error]);
+
   const loadData = async () => {
     try {
       setError(null);
@@ -299,15 +308,30 @@ export const useCluster = (clusterId: number | null): ClusterInfo | undefined =>
 
 export const useNodeNeighbors = (nodeId: number | undefined): Set<number> => {
   const { rawData } = useGraph();
-  return useMemo(() => {
-    const neighbors = new Set<number>();
-    if (!rawData || nodeId === undefined) return neighbors;
+  const adjacencyIndex = useMemo(() => {
+    const index = new Map<number, Set<number>>();
+    if (!rawData) {
+      return index;
+    }
     rawData.edges.forEach((edge) => {
       const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
       const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
-      if (sourceId === nodeId) neighbors.add(targetId);
-      if (targetId === nodeId) neighbors.add(sourceId);
+      if (!index.has(sourceId)) {
+        index.set(sourceId, new Set());
+      }
+      if (!index.has(targetId)) {
+        index.set(targetId, new Set());
+      }
+      index.get(sourceId)?.add(targetId);
+      index.get(targetId)?.add(sourceId);
     });
-    return neighbors;
-  }, [rawData, nodeId]);
+    return index;
+  }, [rawData]);
+
+  return useMemo(() => {
+    if (nodeId === undefined) {
+      return new Set<number>();
+    }
+    return new Set(adjacencyIndex.get(nodeId) ?? []);
+  }, [adjacencyIndex, nodeId]);
 };

@@ -219,6 +219,12 @@ class AppSettings(BaseSettings):
         default="",
         description="Admin password for settings access",
     )
+    admin_session_secret: str = Field(
+        default="",
+        description=(
+            "Admin session signing secret (must be independent from username/password)"
+        ),
+    )
     admin_session_ttl_hours: int = Field(
         default=24,
         ge=1,

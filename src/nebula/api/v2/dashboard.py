@@ -41,8 +41,9 @@ async def get_dashboard_data(
         select(Cluster)
         .where(Cluster.user_id == user.id)
         .order_by(Cluster.repo_count.desc())
+        .limit(8)
     )
-    top_clusters = clusters_result.scalars().all()[:8]
+    top_clusters = clusters_result.scalars().all()
     metadata = build_v2_metadata(
         version=graph_data.version,
         generated_at=graph_data.generated_at,

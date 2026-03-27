@@ -11,6 +11,8 @@ from nebula.db import get_db
 from nebula.schemas.graph import GraphData, TimelineData
 from nebula.schemas.v2 import GraphEdgesPage
 
+from .auth import require_admin, require_admin_csrf
+
 router = APIRouter()
 graph_service = GraphQueryService()
 settings = get_app_settings()
@@ -107,6 +109,8 @@ async def get_graph_timeline(
 
 @router.post("/rebuild", response_model=GraphData)
 async def rebuild_graph_snapshot(
+    _: str = Depends(require_admin),  # noqa: B008
+    __: None = Depends(require_admin_csrf),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> GraphData:
     """Rebuild and activate a new snapshot version."""

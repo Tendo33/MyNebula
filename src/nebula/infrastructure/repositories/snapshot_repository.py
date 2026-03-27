@@ -241,24 +241,30 @@ class SnapshotStoreRepository:
         return result.scalar_one_or_none()
 
     async def hydrate_graph_data(
-        self, db: AsyncSession, snapshot: GraphSnapshot
+        self,
+        db: AsyncSession,
+        snapshot: GraphSnapshot,
+        *,
+        include_edges: bool = True,
     ) -> GraphData:
         node_rows = await db.execute(
             select(GraphSnapshotNode)
             .where(GraphSnapshotNode.snapshot_id == snapshot.id)
             .order_by(GraphSnapshotNode.id.asc())
         )
-        edge_rows = await db.execute(
-            select(GraphSnapshotEdge)
-            .where(GraphSnapshotEdge.snapshot_id == snapshot.id)
-            .order_by(GraphSnapshotEdge.edge_index.asc())
-        )
 
         nodes = [row.payload for row in node_rows.scalars().all()]
-        edges = [
-            {"source": row.source, "target": row.target, "weight": row.weight}
-            for row in edge_rows.scalars().all()
-        ]
+        edges: list[dict] = []
+        if include_edges:
+            edge_rows = await db.execute(
+                select(GraphSnapshotEdge)
+                .where(GraphSnapshotEdge.snapshot_id == snapshot.id)
+                .order_by(GraphSnapshotEdge.edge_index.asc())
+            )
+            edges = [
+                {"source": row.source, "target": row.target, "weight": row.weight}
+                for row in edge_rows.scalars().all()
+            ]
 
         meta = snapshot.meta or {}
         return GraphData(

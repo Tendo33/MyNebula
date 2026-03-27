@@ -24,10 +24,10 @@ from nebula.schemas.v2 import (
     SettingsResponse,
 )
 
-from .auth import require_admin
+from .auth import require_admin, require_admin_csrf
 from .metadata import build_v2_metadata
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_admin), Depends(require_admin_csrf)])
 
 
 @router.get("", response_model=SettingsResponse)

@@ -44,7 +44,10 @@ async def get_default_user(db: AsyncSession) -> User:
             logger.error(f"Failed to create user from GitHub token: {exc}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to create user from GitHub token: {exc}",
+                detail=(
+                    "Failed to create default user from GitHub token. "
+                    "Please verify GITHUB_TOKEN and try again."
+                ),
             ) from exc
 
     return user

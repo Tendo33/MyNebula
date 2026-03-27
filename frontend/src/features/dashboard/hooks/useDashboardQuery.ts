@@ -137,5 +137,12 @@ export const useDashboardQuery = () => {
       graphQuery.error ??
       timelineQuery.error ??
       null,
+    retry: async () => {
+      await Promise.all([
+        dashboardQuery.refetch(),
+        graphQuery.refetch(),
+        timelineQuery.refetch(),
+      ]);
+    },
   };
 };

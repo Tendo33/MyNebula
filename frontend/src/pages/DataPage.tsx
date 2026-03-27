@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Sidebar } from '../components/layout/Sidebar';
@@ -142,13 +142,25 @@ const DataPage = () => {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [localSearch, setLocalSearch] = useState('');
   const [selectedClusters, setSelectedClusters] = useState<Set<number>>(new Set());
-  const selectedClusterId = selectedClusters.size === 1
-    ? Array.from(selectedClusters)[0]
-    : undefined;
+  const offset = (currentPage - 1) * pageSize;
 
-  const { repos, clusters, totalNodes, loading } = useDataReposQuery({
+  const {
+    repos,
+    clusters,
+    totalNodes,
+    count,
+    loading,
+    error,
+    retry,
+  } = useDataReposQuery({
     searchQuery: localSearch,
-    clusterId: selectedClusterId,
+    clusterIds: Array.from(selectedClusters),
+    month: monthFilter,
+    topic: topicFilter,
+    sortField: sortConfig.field,
+    sortDirection: sortConfig.direction,
+    limit: pageSize,
+    offset,
   });
 
   // Cluster map for quick lookup
@@ -158,86 +170,17 @@ const DataPage = () => {
     return map;
   }, [clusters]);
 
-  // Filter and sort data
-  const processedData = useMemo(() => {
-    let filtered = [...repos];
+  const totalPages = Math.max(1, Math.ceil(count / pageSize));
+  const paginatedData = repos;
+  const hasActiveFilters = Boolean(
+    selectedClusters.size > 0 || localSearch.trim() || monthFilter || topicFilter
+  );
 
-    // Apply search filter
-    if (localSearch.trim()) {
-      const query = localSearch.toLowerCase();
-      filtered = filtered.filter(
-        node =>
-          node.name.toLowerCase().includes(query) ||
-          node.full_name.toLowerCase().includes(query) ||
-          (node.description?.toLowerCase().includes(query) ?? false) ||
-          (node.language?.toLowerCase().includes(query) ?? false)
-      );
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
     }
-
-    // Apply cluster filter
-    if (selectedClusters.size > 0) {
-      filtered = filtered.filter(
-        node => node.cluster_id != null && selectedClusters.has(node.cluster_id)
-      );
-    }
-
-    // Apply month filter
-    if (monthFilter) {
-      filtered = filtered.filter(node =>
-        node.starred_at && node.starred_at.startsWith(monthFilter)
-      );
-    }
-
-    // Apply topic filter
-    if (topicFilter) {
-      const normalizedTopic = topicFilter.toLowerCase();
-      filtered = filtered.filter(
-        node => (node.topics || []).some((topic: string) => topic.toLowerCase() === normalizedTopic)
-      );
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortConfig.field) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'language':
-          comparison = (a.language || '').localeCompare(b.language || '');
-          break;
-        case 'stargazers_count':
-          comparison = a.stargazers_count - b.stargazers_count;
-          break;
-        case 'starred_at':
-          comparison = (a.starred_at || '').localeCompare(b.starred_at || '');
-          break;
-        case 'cluster':
-          const clusterA = a.cluster_id != null ? clusterMap.get(a.cluster_id)?.name || '' : '';
-          const clusterB = b.cluster_id != null ? clusterMap.get(b.cluster_id)?.name || '' : '';
-          comparison = clusterA.localeCompare(clusterB);
-          break;
-        case 'summary':
-          comparison = (a.ai_summary || '').localeCompare(b.ai_summary || '');
-          break;
-        case 'last_commit_time':
-          comparison = (a.last_commit_time || '').localeCompare(b.last_commit_time || '');
-          break;
-      }
-
-      return sortConfig.direction === 'asc' ? comparison : -comparison;
-    });
-
-    return filtered;
-  }, [repos, localSearch, selectedClusters, monthFilter, topicFilter, sortConfig, clusterMap]);
-
-  // Pagination
-  const totalPages = Math.ceil(processedData.length / pageSize);
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return processedData.slice(start, start + pageSize);
-  }, [processedData, currentPage, pageSize]);
+  }, [currentPage, totalPages]);
 
   // Reset to page 1 when filters change
   const handleSearch = useCallback((query: string) => {
@@ -289,7 +232,7 @@ const DataPage = () => {
             </h2>
             <div className="h-4 w-[1px] bg-border-light mx-1" />
             <span className="text-sm text-text-muted">
-              {processedData.length} / {totalNodes} {t('common.repositories')}
+              {count} / {totalNodes} {t('common.repositories')}
             </span>
           </div>
 
@@ -344,7 +287,7 @@ const DataPage = () => {
             </div>
 
             {/* Clear filters */}
-            {(selectedClusters.size > 0 || localSearch.trim() || monthFilter || topicFilter) && (
+            {hasActiveFilters && (
               <button
                 onClick={() => {
                   setSelectedClusters(new Set());
@@ -366,6 +309,19 @@ const DataPage = () => {
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="animate-spin h-8 w-8 text-text-muted" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center gap-3 h-64">
+              <p className="text-sm text-red-600">{t('common.load_failed', 'Failed to load data')}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  void retry();
+                }}
+                className="px-3 py-1.5 rounded border border-border-light text-sm hover:bg-bg-hover dark:border-dark-border"
+              >
+                {t('common.retry')}
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -428,7 +384,7 @@ const DataPage = () => {
                     <button
                       key={cluster.id}
                       onClick={() => handleClusterFilter(cluster.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all text-text-main dark:text-dark-text-main ${
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all text-text-main dark:text-dark-text-main ${
                         selectedClusters.has(cluster.id)
                           ? 'ring-2 ring-offset-1'
                           : 'hover:opacity-80'
@@ -582,7 +538,7 @@ const DataPage = () => {
                       {paginatedData.length === 0 && (
                         <tr>
                           <td colSpan={8} className="px-4 py-12 text-center text-text-muted">
-                            {localSearch || selectedClusters.size > 0 || monthFilter || topicFilter
+                            {hasActiveFilters
                               ? t('data.no_results')
                               : t('data.no_data')
                             }
@@ -648,7 +604,7 @@ const DataPage = () => {
 
                 {paginatedData.length === 0 && (
                   <div className="rounded-lg border border-border-light bg-bg-main p-6 text-center text-sm text-text-muted dark:bg-dark-bg-main dark:border-dark-border">
-                    {localSearch || selectedClusters.size > 0 || monthFilter || topicFilter
+                    {hasActiveFilters
                       ? t('data.no_results')
                       : t('data.no_data')
                     }
@@ -657,7 +613,7 @@ const DataPage = () => {
               </div>
 
               {/* Pagination */}
-              {processedData.length > 0 && (
+              {count > 0 && (
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 text-text-muted">
                     <span>{t('data.rows_per_page')}:</span>
@@ -678,9 +634,9 @@ const DataPage = () => {
                   <div className="flex items-center gap-2">
                     <span className="text-text-muted">
                       {t('data.showing', {
-                        start: (currentPage - 1) * pageSize + 1,
-                        end: Math.min(currentPage * pageSize, processedData.length),
-                        total: processedData.length,
+                        start: offset + 1,
+                        end: offset + paginatedData.length,
+                        total: count,
                       })}
                     </span>
 

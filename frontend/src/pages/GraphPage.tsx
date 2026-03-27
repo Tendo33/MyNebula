@@ -24,6 +24,7 @@ const GraphPage = () => {
   const {
     filteredData,
     rawData,
+    loadData,
     edgesLoading,
     error,
     selectedNode,
@@ -142,7 +143,7 @@ const GraphPage = () => {
             {error && (
               <button
                 onClick={() => {
-                  void retryEdgeLoading();
+                  void Promise.all([loadData(), retryEdgeLoading()]);
                 }}
                 className="hidden sm:inline text-xs text-red-600 hover:underline"
               >
@@ -229,6 +230,20 @@ const GraphPage = () => {
 
           {/* Graph Container */}
           <div className="flex-1 min-w-0 relative bg-bg-main/80 flex flex-row overflow-hidden dark:bg-dark-bg-main/80">
+            {error && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-md bg-red-50/95 px-3 py-2 text-xs text-red-700 shadow">
+                <span>{t('common.load_failed', 'Failed to load data')}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void Promise.all([loadData(), retryEdgeLoading()]);
+                  }}
+                  className="underline underline-offset-2"
+                >
+                  {t('common.retry')}
+                </button>
+              </div>
+            )}
             <div className="flex-1 relative min-w-0 h-full">
               <Graph2D />
             </div>

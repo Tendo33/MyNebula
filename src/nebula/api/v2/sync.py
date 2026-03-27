@@ -10,11 +10,21 @@ from nebula.application.services.user_service import get_default_user
 from nebula.db import get_db
 from nebula.schemas.v2 import PipelineStartResponse, PipelineStatusResponse
 
-from .auth import require_admin
+from .auth import require_admin, require_admin_csrf
 from .metadata import build_v2_metadata
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_admin), Depends(require_admin_csrf)])
 pipeline_service = SyncPipelineService()
+
+
+async def _ensure_no_active_pipeline(user_id: int) -> None:
+    active_run = await pipeline_service.get_active_pipeline(user_id)
+    if active_run is None:
+        return
+    raise HTTPException(
+        status_code=409,
+        detail=f"Pipeline already running (run_id={active_run.id})",
+    )
 
 
 @router.post("/start", response_model=PipelineStartResponse)
@@ -28,7 +38,11 @@ async def start_pipeline_sync(
 ) -> PipelineStartResponse:
     """Start sync pipeline in background."""
     user = await get_default_user(db)
-    run_id = await pipeline_service.create_pipeline_run(user.id)
+    await _ensure_no_active_pipeline(user.id)
+    try:
+        run_id = await pipeline_service.create_pipeline_run(user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     background_tasks.add_task(
         pipeline_service.run_pipeline,
         run_id,
@@ -61,11 +75,14 @@ async def start_recluster_sync(
         )
 
     user = await get_default_user(db)
+    await _ensure_no_active_pipeline(user.id)
+    try:
+        run_id = await pipeline_service.create_pipeline_run(user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     user.graph_max_clusters = max_clusters
     user.graph_min_clusters = min_clusters
     await db.commit()
-
-    run_id = await pipeline_service.create_pipeline_run(user.id)
     background_tasks.add_task(
         pipeline_service.run_recluster_pipeline,
         run_id,

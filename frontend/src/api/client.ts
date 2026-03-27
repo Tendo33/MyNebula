@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
 import type { AxiosError } from 'axios';
 
 const getApiBaseUrl = (): string => {
@@ -20,6 +20,8 @@ const getApiBaseUrl = (): string => {
 };
 
 export const API_BASE_URL = getApiBaseUrl();
+const ADMIN_CSRF_COOKIE = 'nebula_admin_csrf';
+const ADMIN_CSRF_HEADER = 'X-CSRF-Token';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -32,6 +34,26 @@ const apiClient = axios.create({
 type UnauthorizedHandler = (error: AxiosError) => void;
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+const getCookieValue = (cookieName: string): string | null => {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const target = `${cookieName}=`;
+  const match = document.cookie
+    .split(';')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(target));
+  return match ? decodeURIComponent(match.slice(target.length)) : null;
+};
+
+const isMutatingMethod = (method: string | undefined): boolean => {
+  if (!method) {
+    return false;
+  }
+  const normalized = method.toUpperCase();
+  return normalized !== 'GET' && normalized !== 'HEAD' && normalized !== 'OPTIONS';
+};
 
 const shouldNotifyUnauthorized = (error: AxiosError): boolean => {
   if (error.response?.status !== 401) {
@@ -55,6 +77,20 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+apiClient.interceptors.request.use((config) => {
+  if (!isMutatingMethod(config.method)) {
+    return config;
+  }
+  const csrfToken = getCookieValue(ADMIN_CSRF_COOKIE);
+  if (!csrfToken) {
+    return config;
+  }
+  const headers = AxiosHeaders.from(config.headers ?? {});
+  headers.set(ADMIN_CSRF_HEADER, csrfToken);
+  config.headers = headers;
+  return config;
+});
 
 export const setUnauthorizedHandler = (handler: UnauthorizedHandler | null): void => {
   unauthorizedHandler = handler;

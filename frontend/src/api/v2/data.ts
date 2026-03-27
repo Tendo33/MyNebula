@@ -30,9 +30,14 @@ export interface DataReposResponse {
 
 export const getDataReposV2 = async (params?: {
   cluster_id?: number;
+  cluster_ids?: string;
   language?: string;
   min_stars?: number;
   q?: string;
+  month?: string;
+  topic?: string;
+  sort_field?: 'name' | 'language' | 'stargazers_count' | 'starred_at' | 'cluster' | 'summary' | 'last_commit_time';
+  sort_direction?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }): Promise<DataReposResponse> => {

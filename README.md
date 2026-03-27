@@ -178,6 +178,7 @@ At minimum, update these values in `.env`:
 - `EMBEDDING_MODEL`
 - `LLM_API_KEY` if you want summaries, tags, or AI-assisted naming
 - `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
 - `ADMIN_USERNAME` if you do not want the default `admin`
 
 ### 2. Start the stack
@@ -239,7 +240,7 @@ If `frontend/dist` exists, FastAPI will serve the SPA and static assets directly
 | GitHub | `GITHUB_TOKEN` | Yes | Used for stars and lists sync |
 | Embedding | `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` | Yes | OpenAI-compatible embedding endpoint |
 | LLM | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_OUTPUT_LANGUAGE` | Optional | Used for summaries, tags, and cluster naming |
-| Admin auth | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_TTL_HOURS` | Recommended | If password is empty, admin-protected APIs are disabled |
+| Admin auth | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `ADMIN_SESSION_TTL_HOURS` | Recommended | If password or session secret is empty, admin-protected APIs are disabled |
 | Database | `DATABASE_*`, `DATABASE_URL` | Yes | `DATABASE_URL` overrides split database fields |
 | Sync | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | Optional | Controls throughput and cost |
 | Runtime | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | Optional | Debugging and observability settings |
@@ -329,7 +330,7 @@ Threshold details live in `doc/QUALITY_GATES.md`.
 - **The graph is empty**
   Check that `GITHUB_TOKEN` and `EMBEDDING_API_KEY` are valid, then run a sync from `/settings` and wait for snapshot completion.
 - **You cannot log in**
-  Set `ADMIN_PASSWORD` in `.env`, restart the service, and try again.
+  Set `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` in `.env`, restart the service, and try again.
 - **`/docs` is missing**
   Set `DEBUG=true`.
 - **Frontend dev server cannot reach the backend**

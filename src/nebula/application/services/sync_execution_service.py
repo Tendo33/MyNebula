@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from nebula.core.config import get_app_settings, get_sync_settings
 from nebula.core.embedding import get_embedding_service
@@ -328,9 +328,9 @@ async def sync_stars_task(
 
             if effective_mode == "incremental":
                 result = await db.execute(
-                    select(StarredRepo).where(StarredRepo.user_id == user_id)
+                    select(func.count(StarredRepo.id)).where(StarredRepo.user_id == user_id)
                 )
-                total_db_repos = len(result.scalars().all())
+                total_db_repos = int(result.scalar() or 0)
                 user.total_stars = total_db_repos
                 user.synced_stars = total_db_repos
             else:
@@ -703,12 +703,12 @@ async def run_clustering_task(
                         cluster_obj = await db.get(Cluster, cluster_id)
                         if cluster_obj:
                             count_result = await db.execute(
-                                select(StarredRepo).where(
+                                select(func.count(StarredRepo.id)).where(
                                     StarredRepo.user_id == user_id,
                                     StarredRepo.cluster_id == cluster_id,
                                 )
                             )
-                            cluster_obj.repo_count = len(count_result.scalars().all())
+                            cluster_obj.repo_count = int(count_result.scalar() or 0)
 
                     task.processed_items = len(new_repos)
                     task.status = "completed"

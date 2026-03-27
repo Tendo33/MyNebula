@@ -60,6 +60,6 @@ describe('Data page v2 smoke', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('octo/repo')).toBeInTheDocument();
+    expect(screen.getAllByText('octo/repo').length).toBeGreaterThan(0);
   });
 });

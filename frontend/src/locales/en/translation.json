@@ -28,6 +28,8 @@
     "open_menu": "Open menu",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "retry": "Retry",
+    "load_failed": "Failed to load data",
     "n_a": "N/A"
   },
   "dashboard": {
@@ -101,7 +103,7 @@
     "username": "Username",
     "password": "Password",
     "login_failed": "Login failed, please check username or password",
-    "admin_not_configured": "Admin auth is not configured. Set ADMIN_PASSWORD and restart the server.",
+    "admin_not_configured": "Admin auth is not configured. Set ADMIN_PASSWORD and ADMIN_SESSION_SECRET, then restart the server.",
     "operations": "Operations",
     "language": "Language",
     "language_desc": "Change the language of the interface",

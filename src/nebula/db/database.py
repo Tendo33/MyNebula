@@ -4,8 +4,10 @@ This module provides async PostgreSQL connection using SQLAlchemy 2.0
 with pgvector extension support.
 """
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import (
@@ -23,6 +25,92 @@ logger = get_logger(__name__)
 # Global engine instance
 _engine: AsyncEngine | None = None
 AsyncSessionLocal: async_sessionmaker[AsyncSession] | None = None
+
+
+def _get_project_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _build_alembic_config():
+    from alembic.config import Config
+
+    project_root = _get_project_root()
+    cfg = Config(str(project_root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(project_root / "alembic"))
+    return cfg
+
+
+def _resolve_alembic_heads() -> list[str]:
+    """Resolve Alembic migration heads from local migration scripts."""
+    from alembic.script import ScriptDirectory
+
+    project_root = _get_project_root()
+    alembic_ini = project_root / "alembic.ini"
+    if not alembic_ini.exists():
+        return []
+
+    cfg = _build_alembic_config()
+    script = ScriptDirectory.from_config(cfg)
+    return script.get_heads()
+
+
+async def _read_db_migration_head(engine: AsyncEngine) -> str | None:
+    """Read current DB migration head from alembic_version."""
+    async with engine.connect() as conn:
+        version_table = await conn.scalar(text("SELECT to_regclass('alembic_version')"))
+        if version_table is None:
+            return None
+        current_head = await conn.scalar(
+            text("SELECT version_num FROM alembic_version LIMIT 1")
+        )
+    return str(current_head) if current_head else None
+
+
+async def _run_alembic_upgrade_head() -> None:
+    """Run Alembic upgrade head in a worker thread."""
+    from alembic import command
+
+    cfg = _build_alembic_config()
+    await asyncio.to_thread(command.upgrade, cfg, "head")
+
+
+async def _assert_db_schema_at_migration_head(engine: AsyncEngine) -> None:
+    """Fail fast when DB schema is not managed by Alembic head."""
+    heads = _resolve_alembic_heads()
+    if not heads:
+        logger.warning("alembic.ini not found, skipping migration head validation")
+        return
+    if len(heads) > 1:
+        raise RuntimeError(
+            f"Multiple Alembic heads detected ({heads}). Merge heads before startup."
+        )
+    expected_head = heads[0]
+    current_head = await _read_db_migration_head(engine)
+    if current_head is None:
+        logger.warning(
+            "alembic_version table not found; attempting automatic migration to head"
+        )
+        try:
+            await _run_alembic_upgrade_head()
+        except Exception as exc:
+            raise RuntimeError(
+                "Database schema is not initialized via Alembic and automatic "
+                "migration failed. Run `uv run alembic upgrade head` and retry. "
+                f"Original error: {exc}"
+            ) from exc
+        current_head = await _read_db_migration_head(engine)
+        if current_head is None:
+            raise RuntimeError(
+                "Automatic Alembic migration did not initialize alembic_version. "
+                "Run `uv run alembic upgrade head` and retry."
+            )
+
+    if current_head != expected_head:
+        raise RuntimeError(
+            "Database migration version mismatch. "
+            f"expected={expected_head}, actual={current_head}. "
+            "Run `uv run alembic upgrade head`."
+        )
 
 
 async def init_db() -> None:
@@ -57,12 +145,7 @@ async def init_db() -> None:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         logger.info("pgvector extension ensured")
 
-    # Auto-create tables if they don't exist
-    from nebula.db.models import Base
-
-    async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables ensured")
+    await _assert_db_schema_at_migration_head(_engine)
 
 
 async def close_db() -> None:

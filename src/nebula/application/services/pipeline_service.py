@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.db import PipelineRun, SyncTask, User
 from nebula.db.database import get_db_context
@@ -26,6 +27,13 @@ class SyncPipelineService:
     async def create_pipeline_run(self, user_id: int) -> int:
         """Create a pipeline run record and return run id."""
         async with get_db_context() as db:
+            await self._acquire_pipeline_creation_lock(db, user_id)
+            active_run = await self._get_active_pipeline_from_db(db, user_id)
+            if active_run is not None:
+                raise ValueError(
+                    "Pipeline already running "
+                    f"(user_id={user_id}, run_id={active_run.id}, status={active_run.status})"
+                )
             run = PipelineRun(
                 user_id=user_id,
                 status=PipelineStatus.pending.value,
@@ -282,6 +290,10 @@ class SyncPipelineService:
             )
             return result.scalar_one_or_none()
 
+    async def get_active_pipeline(self, user_id: int) -> PipelineRun | None:
+        async with get_db_context() as db:
+            return await self._get_active_pipeline_from_db(db, user_id)
+
     async def _inspect_task_outcome(
         self,
         task_id: int,
@@ -317,3 +329,40 @@ class SyncPipelineService:
                 f"failed_items={task.failed_items}"
             )
             return has_partial_failure
+
+    async def _acquire_pipeline_creation_lock(
+        self,
+        db: AsyncSession,
+        user_id: int,
+    ) -> None:
+        """Acquire DB-level lock to serialize pipeline creation per user."""
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name if bind is not None else ""
+        if dialect_name != "postgresql":
+            return
+        await db.execute(
+            text("SELECT pg_advisory_xact_lock(:lock_key)"),
+            {"lock_key": self._pipeline_lock_key(user_id)},
+        )
+
+    def _pipeline_lock_key(self, user_id: int) -> int:
+        """Build a stable advisory lock key for one user's pipeline creation."""
+        return 870_000_000 + int(user_id)
+
+    async def _get_active_pipeline_from_db(
+        self,
+        db: AsyncSession,
+        user_id: int,
+    ) -> PipelineRun | None:
+        result = await db.execute(
+            select(PipelineRun)
+            .where(
+                PipelineRun.user_id == user_id,
+                PipelineRun.status.in_(
+                    [PipelineStatus.pending.value, PipelineStatus.running.value]
+                ),
+            )
+            .order_by(PipelineRun.id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()

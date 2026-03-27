@@ -20,6 +20,7 @@ graph_service = GraphQueryService()
 @router.get("/repos", response_model=DataReposResponse)
 async def get_data_repos(
     cluster_id: int | None = Query(default=None),
+    cluster_ids: str | None = Query(default=None, pattern=r"^\d+(,\d+)*$"),
     language: str | None = Query(default=None),
     min_stars: int = Query(default=0, ge=0),
     q: str | None = Query(default=None),
@@ -38,7 +39,11 @@ async def get_data_repos(
     user = await get_default_user(db)
     conditions = [StarredRepo.user_id == user.id]
 
-    if cluster_id is not None:
+    if cluster_ids:
+        parsed_cluster_ids = [int(value) for value in cluster_ids.split(",") if value]
+        if parsed_cluster_ids:
+            conditions.append(StarredRepo.cluster_id.in_(parsed_cluster_ids))
+    elif cluster_id is not None:
         conditions.append(StarredRepo.cluster_id == cluster_id)
     if language:
         conditions.append(StarredRepo.language == language)

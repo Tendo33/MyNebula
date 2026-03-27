@@ -11,6 +11,11 @@ async def test_v2_settings_router_has_admin_dependency():
     from nebula.api.v2 import settings as settings_api
 
     assert settings_api.router.dependencies
+    dependency_names = {
+        getattr(dep.dependency, "__name__", "") for dep in settings_api.router.dependencies
+    }
+    assert "require_admin" in dependency_names
+    assert "require_admin_csrf" in dependency_names
 
 
 @pytest.mark.asyncio
