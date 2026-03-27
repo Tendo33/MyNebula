@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-03-27
+
+### Fixed
+- Restored the missing taxonomy Alembic migration so fresh database bootstrap no longer fails on startup.
+- Repaired the related-repo cache migration chain so `repo_related_*` tables are created correctly and the Alembic history is continuous again.
+
+### Changed
+- Bumped version metadata to `1.1.2` across package, runtime config, and environment template.
+
 ## [1.0.10] - 2026-03-13
 
 ### Changed
