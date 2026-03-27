@@ -43,7 +43,11 @@ def test_admin_auth_disabled_when_password_not_set():
 
 
 def test_admin_auth_disabled_when_session_secret_not_set():
-    settings = AppSettings(admin_username="owner", admin_password="topsecret")
+    settings = AppSettings(
+        admin_username="owner",
+        admin_password="topsecret",
+        admin_session_secret="",
+    )
 
     assert is_admin_auth_enabled(settings) is False
     assert verify_admin_credentials("owner", "topsecret", settings) is False

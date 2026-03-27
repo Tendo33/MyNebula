@@ -18,10 +18,11 @@ class _SnapshotRepoStub:
             created_at=datetime(2026, 3, 3, 12, 0, tzinfo=timezone.utc),
         )
 
-    async def hydrate_graph_data(self, _db, snapshot):
+    async def hydrate_graph_data(self, _db, snapshot, *, include_edges=True):
+        edges = [GraphEdge(source=1, target=2, weight=0.9)] if include_edges else []
         return GraphData(
             nodes=[],
-            edges=[GraphEdge(source=1, target=2, weight=0.9)],
+            edges=edges,
             clusters=[],
             star_lists=[],
             total_nodes=0,

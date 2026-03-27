@@ -75,10 +75,12 @@ async def test_get_graph_returns_304_when_etag_matches(monkeypatch):
 async def test_graph_rebuild_route_requires_admin_auth_and_csrf():
     from nebula.api.v2 import graph as graph_api
 
-    rebuild_route = next((route for route in graph_api.router.routes if route.path == "/rebuild"), None)
+    rebuild_route = next(
+        (route for route in graph_api.router.routes if route.path == "/rebuild"), None
+    )
     assert rebuild_route is not None
     dependency_calls = {
-        getattr(dependency.dependency, "__name__", "")
+        getattr(getattr(dependency, "call", None), "__name__", "")
         for dependency in rebuild_route.dependant.dependencies
     }
     assert "require_admin" in dependency_calls
