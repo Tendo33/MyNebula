@@ -67,7 +67,9 @@ async def test_scheduler_skips_tick_when_lock_not_acquired(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_scheduler_marks_due_schedule_then_launches_after_context_exit(monkeypatch):
+async def test_scheduler_marks_due_schedule_then_launches_after_context_exit(
+    monkeypatch,
+):
     from nebula.application.services import sync_ops_service
     from nebula.core import scheduler as scheduler_module
     from nebula.db import database as db_module

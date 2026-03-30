@@ -12,7 +12,8 @@ async def test_v2_settings_router_has_admin_dependency():
 
     assert settings_api.router.dependencies
     dependency_names = {
-        getattr(dep.dependency, "__name__", "") for dep in settings_api.router.dependencies
+        getattr(dep.dependency, "__name__", "")
+        for dep in settings_api.router.dependencies
     }
     assert "require_admin" in dependency_names
     assert "require_admin_csrf" in dependency_names
