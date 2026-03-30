@@ -106,7 +106,9 @@ class SchedulerService:
         try:
             async with get_db_context() as db:
                 if not await self._try_acquire_scheduler_lock(db):
-                    logger.debug("Skipping scheduler tick: lock held by another instance")
+                    logger.debug(
+                        "Skipping scheduler tick: lock held by another instance"
+                    )
                     return
 
                 # Get all enabled schedules

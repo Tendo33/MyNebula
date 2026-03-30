@@ -18,7 +18,7 @@ export function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
         {t('common.error', 'Something went wrong')}
       </h2>
       <p className="max-w-md text-sm text-text-muted dark:text-dark-text-main/60">
-        {error?.message || t('common.load_failed', 'Failed to load data')}
+        {(error instanceof Error ? error.message : null) || t('common.load_failed', 'Failed to load data')}
       </p>
       <button
         onClick={resetErrorBoundary}

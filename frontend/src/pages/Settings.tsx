@@ -17,7 +17,7 @@ import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { SyncProgress, SyncStepStatus } from '../components/ui/SyncProgress';
 import { useGraph } from '../contexts/GraphContext';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
-import { SettingsLoginForm, SettingsAppearance, SettingsSchedule, SettingsDataSection } from './settings';
+import { SettingsLoginForm, SettingsAppearance, SettingsSchedule, SettingsDataSection } from './settings/index';
 import { API_BASE_URL } from '../api/client';
 import {
   getPipelineStatusV2,

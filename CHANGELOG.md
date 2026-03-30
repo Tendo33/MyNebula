@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-03-30
+
+### Added
+- CI/CD pipeline via GitHub Actions: backend lint (Ruff), frontend lint, typecheck, unit tests, and production build.
+- `react-error-boundary` for graceful frontend crash recovery with `ErrorFallback` component.
+- Playwright E2E testing infrastructure (`@playwright/test`).
+- Centralized React Query key management (`queryKeys.ts`).
+
+### Changed
+- Refactored Settings page into modular sub-components (`SettingsLoginForm`, `SettingsSchedule`, `SettingsDataSection`, `SettingsAppearance`).
+- Extracted related-repo logic from route handler into dedicated `RelatedRepoService`.
+- Tightened ESLint rules: `@typescript-eslint/no-explicit-any` and `no-unused-vars` upgraded from `off` to `warn`.
+- Removed hardcoded database credentials from `alembic.ini`.
+- Cleaned up frontend data hooks to use shared query key constants.
+- Bumped version to `1.2.0` across backend, frontend, runtime config, and environment template.
+
+### Removed
+- Deleted unused `useDataCache` hook (258 lines) in favor of React Query built-in caching.
+
 ## [1.1.2] - 2026-03-27
 
 ### Fixed
@@ -139,7 +158,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.0.10...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Tendo33/mynebula/compare/v1.1.2...v1.2.0
+[1.1.2]: https://github.com/Tendo33/mynebula/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/Tendo33/mynebula/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/Tendo33/mynebula/compare/v1.0.10...v1.1.0
 [1.0.10]: https://github.com/Tendo33/mynebula/compare/v1.0.9...v1.0.10
 [1.0.7]: https://github.com/Tendo33/mynebula/compare/v1.0.5...v1.0.7
 [1.0.5]: https://github.com/Tendo33/mynebula/compare/v1.0.4...v1.0.5
