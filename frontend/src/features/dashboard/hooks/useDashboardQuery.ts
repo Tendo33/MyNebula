@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getDashboardV2 } from '../../../api/v2/dashboard';
 import { getGraphDataV2, getTimelineDataV2 } from '../../../api/v2/graph';
+import { queryKeys } from '../../../lib/queryKeys';
 
 const getLanguageColor = (language: string): string => {
   const colors: Record<string, string> = {
@@ -37,12 +38,12 @@ export const useDashboardQuery = () => {
     staleTime: 20_000,
   });
   const graphQuery = useQuery({
-    queryKey: ['v2-dashboard-graph'],
+    queryKey: [...queryKeys.graphData(), 'dashboard'],
     queryFn: () => getGraphDataV2({ version: 'active', include_edges: false }),
     staleTime: 20_000,
   });
   const timelineQuery = useQuery({
-    queryKey: ['v2-dashboard-timeline'],
+    queryKey: [...queryKeys.timeline(), 'dashboard'],
     queryFn: () => getTimelineDataV2('active'),
     staleTime: 20_000,
   });

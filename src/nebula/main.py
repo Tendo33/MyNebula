@@ -85,16 +85,21 @@ def create_app() -> FastAPI:
     # (typically 70-80% smaller for /api/v2/graph responses)
     app.add_middleware(GZipMiddleware, minimum_size=500)
 
-    # Configure CORS - 允许所有本地开发端口
-    # 使用 regex 匹配 localhost 和 127.0.0.1 的任意端口
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
+    # Configure CORS from environment or default to localhost patterns
+    cors_origins = settings.cors_origins
+    cors_kwargs: dict = {
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+        "expose_headers": ["*"],
+    }
+    if cors_origins:
+        cors_kwargs["allow_origins"] = [o.strip() for o in cors_origins.split(",")]
+    else:
+        cors_kwargs["allow_origin_regex"] = (
+            r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+        )
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
 
     # Include API routes
     app.include_router(api_router, prefix="/api")
@@ -110,7 +115,6 @@ def create_app() -> FastAPI:
             "status": "healthy" if db_healthy else "degraded",
             "database": "connected" if db_healthy else "disconnected",
             "version": settings.app_version,
-            "single_user_mode": settings.single_user_mode,
         }
 
     # 静态文件服务配置
@@ -129,12 +133,14 @@ def create_app() -> FastAPI:
         @app.get("/{full_path:path}")
         async def serve_spa(request: Request, full_path: str):
             """Serve the SPA for all routes not matched by API or static files."""
-            # 如果请求的是具体文件（如 favicon.ico, manifest.json等）
-            requested_file = frontend_dist / full_path
-            if requested_file.is_file():
+            resolved_dist = frontend_dist.resolve()
+            requested_file = (frontend_dist / full_path).resolve()
+
+            if requested_file.is_file() and requested_file.is_relative_to(
+                resolved_dist
+            ):
                 return FileResponse(requested_file)
 
-            # 否则返回 index.html（SPA 路由）
             return FileResponse(frontend_dist / "index.html")
 
         logger.info(f"Serving frontend static files from: {frontend_dist}")

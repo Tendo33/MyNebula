@@ -4,18 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   AlertTriangle,
-  Clock,
-  Database,
-  Eye,
-  Link2,
   Loader2,
   LogOut,
   RefreshCw,
   Server,
   Shield,
   Sparkles,
-  User,
-  Zap,
 } from 'lucide-react';
 
 import { Sidebar } from '../components/layout/Sidebar';
@@ -23,6 +17,7 @@ import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { SyncProgress, SyncStepStatus } from '../components/ui/SyncProgress';
 import { useGraph } from '../contexts/GraphContext';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
+import { SettingsLoginForm, SettingsAppearance, SettingsSchedule, SettingsDataSection } from './settings';
 import { API_BASE_URL } from '../api/client';
 import {
   getPipelineStatusV2,
@@ -41,7 +36,6 @@ import {
   type ScheduleResponse,
   type SyncInfoResponse,
 } from '../api/v2/settings';
-import { formatLastRunTime, formatNextRunTime, getStatusDisplay } from '../utils/scheduleFormat';
 import { getAdminAuthConfig } from '../api/auth';
 
 interface TaskCompletionResult {
@@ -645,80 +639,16 @@ const Settings = () => {
             <Loader2 className="w-6 h-6 animate-spin text-text-muted" />
           </div>
         ) : !isAuthenticated ? (
-          <section className="flex-1 flex items-center justify-center px-8">
-            <div className="w-full max-w-md bg-bg-main border border-border-light rounded-xl shadow-sm p-6 dark:bg-dark-bg-main dark:border-dark-border">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-full bg-bg-sidebar flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-text-main" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-text-main">{t('settings.admin_access')}</h2>
-                  <p className="text-xs text-text-muted">{t('settings.login_required_desc')}</p>
-                </div>
-              </div>
-
-              <form className="space-y-4" onSubmit={handleAdminLogin}>
-                {adminAuthConfigured === false && (
-                  <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                    {t('settings.admin_not_configured')}
-                  </div>
-                )}
-
-                <div>
-                  <label htmlFor="admin-username" className="block text-xs text-text-muted mb-1">
-                    {t('settings.username')}
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-text-dim absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      id="admin-username"
-                      type="text"
-                      value={loginUsername}
-                      onChange={(e) => setLoginUsername(e.target.value)}
-                      className="w-full h-10 pl-9 pr-3 rounded-md border border-border-light text-sm bg-bg-main focus:outline-none focus:ring-1 focus:ring-text-main/30 dark:bg-dark-bg-main dark:border-dark-border dark:text-dark-text-main"
-                      autoComplete="username"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="admin-password" className="block text-xs text-text-muted mb-1">
-                    {t('settings.password')}
-                  </label>
-                  <input
-                    id="admin-password"
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-border-light text-sm bg-bg-main focus:outline-none focus:ring-1 focus:ring-text-main/30 dark:bg-dark-bg-main dark:border-dark-border dark:text-dark-text-main"
-                    autoComplete="current-password"
-                    required
-                  />
-                </div>
-
-                {loginError && (
-                  <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                    {loginError}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loginLoading || adminAuthConfigured === false}
-                  className={clsx(
-                    'w-full h-10 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2',
-                    loginLoading || adminAuthConfigured === false
-                      ? 'bg-bg-hover text-text-dim border border-border-light cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60 dark:border-dark-border'
-                      : 'bg-text-main text-bg-main hover:bg-text-main/90'
-                  )}
-                >
-                  {loginLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {t('app.login')}
-                </button>
-              </form>
-            </div>
-          </section>
+          <SettingsLoginForm
+            loginUsername={loginUsername}
+            loginPassword={loginPassword}
+            loginLoading={loginLoading}
+            loginError={loginError}
+            adminAuthConfigured={adminAuthConfigured}
+            onUsernameChange={setLoginUsername}
+            onPasswordChange={setLoginPassword}
+            onSubmit={handleAdminLogin}
+          />
         ) : (
           <div className="max-w-3xl px-4 sm:px-8 py-6 sm:py-10 space-y-12">
             {error && (
@@ -728,100 +658,7 @@ const Settings = () => {
               </div>
             )}
 
-            <section>
-              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">
-                {t('settings.appearance')}
-              </h2>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
-                      <Zap className="w-5 h-5 text-text-muted group-hover:text-text-main" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-text-main">{t('settings.hq_rendering')}</span>
-                      <span className="text-xs text-text-muted">{t('settings.hq_rendering_desc')}</span>
-                    </div>
-                  </div>
-                  <button
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-                      settings.hqRendering ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border'
-                    )}
-                    type="button"
-                    role="switch"
-                    aria-checked={settings.hqRendering}
-                    aria-label={t('settings.hq_rendering')}
-                    onClick={() => updateSettings({ hqRendering: !settings.hqRendering })}
-                  >
-                    <span
-                      className={clsx(
-                        'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
-                        settings.hqRendering ? 'translate-x-5' : 'translate-x-0.5'
-                      )}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
-                      <Eye className="w-5 h-5 text-text-muted group-hover:text-text-main" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-text-main">{t('settings.show_trajectories')}</span>
-                      <span className="text-xs text-text-muted">{t('settings.show_trajectories_desc')}</span>
-                    </div>
-                  </div>
-                  <button
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-                      settings.showTrajectories ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border'
-                    )}
-                    type="button"
-                    role="switch"
-                    aria-checked={settings.showTrajectories}
-                    aria-label={t('settings.show_trajectories')}
-                    onClick={() => updateSettings({ showTrajectories: !settings.showTrajectories })}
-                  >
-                    <span
-                      className={clsx(
-                        'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
-                        settings.showTrajectories ? 'translate-x-5' : 'translate-x-0.5'
-                      )}
-                    />
-                  </button>
-                </div>
-
-                <div className="p-3 border border-border-light rounded-md space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Link2 className="w-4 h-4 text-text-muted" />
-                    <span className="text-sm font-medium text-text-main">
-                      {t('settings.related_min_semantic')}
-                    </span>
-                  </div>
-                  <p className="text-xs text-text-muted">{t('settings.related_min_semantic_desc')}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-text-muted">{t('repoDetails.similar', 'Similar')}</span>
-                    <span className="text-xs font-mono tabular-nums text-text-dim">
-                      {settings.relatedMinSemantic.toFixed(2)}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0.5}
-                    max={0.9}
-                    step={0.01}
-                    value={settings.relatedMinSemantic}
-                    onChange={(e) => {
-                      const nextMinSemantic = Number(e.target.value);
-                      updateSettings({ relatedMinSemantic: nextMinSemantic });
-                    }}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </section>
+            <SettingsAppearance settings={settings} updateSettings={updateSettings} />
 
             <hr className="border-t border-border-light" />
 
@@ -973,225 +810,25 @@ const Settings = () => {
 
             <hr className="border-t border-border-light" />
 
-            <section>
-              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">
-                {t('settings.scheduled_sync')}
-              </h2>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
-                      <Clock className="w-5 h-5 text-text-muted group-hover:text-text-main" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-text-main">{t('settings.enable_scheduled_sync')}</span>
-                      <span className="text-xs text-text-muted">{t('settings.enable_scheduled_sync_desc')}</span>
-                    </div>
-                  </div>
-                  <button
-                    disabled={scheduleLoading}
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-                      schedule?.is_enabled ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border',
-                      scheduleLoading && 'opacity-50 cursor-not-allowed'
-                    )}
-                    type="button"
-                    role="switch"
-                    aria-checked={Boolean(schedule?.is_enabled)}
-                    aria-label={t('settings.enable_scheduled_sync')}
-                    onClick={!scheduleLoading ? handleScheduleToggle : undefined}
-                  >
-                    {scheduleLoading ? (
-                      <Loader2 className="w-4 h-4 text-white mx-auto animate-spin" />
-                    ) : (
-                      <span
-                        className={clsx(
-                          'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
-                          schedule?.is_enabled ? 'translate-x-5' : 'translate-x-0.5'
-                        )}
-                      />
-                    )}
-                  </button>
-                </div>
-
-                {schedule?.is_enabled && (
-                  <div className="p-3 pl-14">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-text-muted">{t('settings.execution_time')}:</label>
-                        <select
-                          value={schedule.schedule_hour}
-                          onChange={(e) => handleTimeChange(Number(e.target.value), schedule.schedule_minute)}
-                          disabled={scheduleLoading}
-                          className="bg-bg-sidebar border border-border-light rounded-md px-3 py-1.5 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-black"
-                        >
-                          {Array.from({ length: 24 }, (_, i) => (
-                            <option key={i} value={i}>
-                              {i.toString().padStart(2, '0')}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-text-muted">:</span>
-                        <select
-                          value={schedule.schedule_minute}
-                          onChange={(e) => handleTimeChange(schedule.schedule_hour, Number(e.target.value))}
-                          disabled={scheduleLoading}
-                          className="bg-bg-sidebar border border-border-light rounded-md px-3 py-1.5 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-black"
-                        >
-                          {[0, 15, 30, 45].map((m) => (
-                            <option key={m} value={m}>
-                              {m.toString().padStart(2, '0')}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <span className="text-xs text-text-muted">({schedule.timezone})</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="p-3 pl-14 space-y-1">
-                  <div className="flex items-center gap-2 text-xs text-text-muted">
-                    <span>{t('settings.last_run')}:</span>
-                    <span className="text-text-main">
-                      {schedule ? formatLastRunTime(schedule.last_run_at, t) : t('common.loading')}
-                    </span>
-                    {schedule?.last_run_status && (
-                      <span className={clsx('font-medium', getStatusDisplay(schedule.last_run_status, t).color)}>
-                        ({getStatusDisplay(schedule.last_run_status, t).text})
-                      </span>
-                    )}
-                  </div>
-                  {schedule?.is_enabled && schedule.next_run_at && (
-                    <div className="flex items-center gap-2 text-xs text-text-muted">
-                      <span>{t('settings.next_run')}:</span>
-                      <span className="text-text-main">
-                        {formatNextRunTime(schedule.next_run_at, schedule.timezone, t)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
+            <SettingsSchedule
+              schedule={schedule}
+              scheduleLoading={scheduleLoading}
+              onToggle={handleScheduleToggle}
+              onTimeChange={handleTimeChange}
+            />
 
             <hr className="border-t border-border-light" />
 
-            <section>
-              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">
-                {t('settings.data_management')}
-              </h2>
-              <div className="space-y-2">
-                <div className="p-3">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Database className="w-4 h-4 text-text-muted" />
-                    <label className="text-sm font-medium text-text-main">{t('settings.repo_stats')}</label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 bg-bg-sidebar/50 rounded-md p-4">
-                    <div>
-                      <div className="text-2xl font-semibold text-text-main">{syncInfo?.total_repos ?? '-'}</div>
-                      <div className="text-xs text-text-muted">{t('settings.total_repos')}</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-semibold text-text-main">{syncInfo?.synced_repos ?? '-'}</div>
-                      <div className="text-xs text-text-muted">{t('settings.synced')}</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-semibold text-text-main">{syncInfo?.embedded_repos ?? '-'}</div>
-                      <div className="text-xs text-text-muted">{t('settings.vectorized')}</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-semibold text-text-main">{syncInfo?.summarized_repos ?? '-'}</div>
-                      <div className="text-xs text-text-muted">{t('settings.summarized')}</div>
-                    </div>
-                  </div>
-                  {syncInfo?.last_sync_at && (
-                    <div className="mt-2 text-xs text-text-muted">
-                      {t('settings.last_run')}: {new Date(syncInfo.last_sync_at).toLocaleString()}
-                    </div>
-                  )}
-                  {syncInfo?.single_user_mode && (
-                    <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                      {t('settings.single_user_mode_notice')}
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-3">
-                  <div className="flex items-center gap-2 mb-3">
-                    <RefreshCw className="w-4 h-4 text-text-muted" />
-                    <label className="text-sm font-medium text-text-main">{t('settings.full_refresh')}</label>
-                  </div>
-                  <p className="text-xs text-text-muted mb-3">{t('settings.full_refresh_desc')}</p>
-                  <button
-                    onClick={() => setShowConfirmDialog(true)}
-                    disabled={refreshLoading || syncing || reclusterLoading}
-                    className={clsx(
-                      'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-                      'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100',
-                      (refreshLoading || syncing || reclusterLoading) && 'opacity-50 cursor-not-allowed'
-                    )}
-                  >
-                    {refreshLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {t('settings.refreshing')}
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4" />
-                        {t('settings.execute_full_refresh')}
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {showConfirmDialog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div
-              className="bg-bg-main rounded-lg shadow-xl max-w-md w-full mx-4 p-6 dark:bg-dark-bg-main"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="full-refresh-title"
-              aria-describedby="full-refresh-desc"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-red-100 rounded-full">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                </div>
-                <h3 id="full-refresh-title" className="text-lg font-semibold text-text-main dark:text-dark-text-main">
-                  {t('settings.confirm_full_refresh_title')}
-                </h3>
-              </div>
-              <p id="full-refresh-desc" className="text-sm text-text-muted mb-6 dark:text-dark-text-main/70">
-                {t('settings.confirm_full_refresh_desc', { count: syncInfo?.total_repos ?? 0 })}
-              </p>
-              <ul className="text-sm text-text-muted mb-6 space-y-1 list-disc list-inside dark:text-dark-text-main/70">
-                <li>{t('settings.confirm_step_fetch')}</li>
-                <li>{t('settings.confirm_step_summarize')}</li>
-                <li>{t('settings.confirm_step_embed')}</li>
-                <li>{t('settings.confirm_step_cluster')}</li>
-              </ul>
-              <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mb-6">{t('settings.confirm_warning')}</p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowConfirmDialog(false)}
-                  className="px-4 py-2 text-sm font-medium text-text-main bg-bg-hover hover:bg-border-light rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-border"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  onClick={handleFullRefresh}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
-                >
-                  {t('settings.execute_full_refresh')}
-                </button>
-              </div>
-            </div>
+            <SettingsDataSection
+              syncInfo={syncInfo}
+              refreshLoading={refreshLoading}
+              syncing={syncing}
+              reclusterLoading={reclusterLoading}
+              showConfirmDialog={showConfirmDialog}
+              onShowConfirm={() => setShowConfirmDialog(true)}
+              onHideConfirm={() => setShowConfirmDialog(false)}
+              onConfirmRefresh={handleFullRefresh}
+            />
           </div>
         )}
       </main>

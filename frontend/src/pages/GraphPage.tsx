@@ -166,6 +166,9 @@ const GraphPage = () => {
             {/* Filter toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
+              aria-expanded={showFilters}
+              aria-controls="graph-filters-panel"
+              aria-label={t('common.filter', 'Filters')}
               className={`h-9 px-3 rounded-md text-sm font-medium transition-all flex items-center gap-2 border ${
                 showFilters
                   ? 'bg-bg-sidebar border-border-light text-text-main dark:bg-dark-bg-sidebar dark:border-dark-border dark:text-dark-text-main'
@@ -194,6 +197,7 @@ const GraphPage = () => {
           {/* Filters sidebar */}
           {showFilters && (
             <aside
+              id="graph-filters-panel"
               className={`${
                 isMobile
                   ? 'absolute inset-y-0 left-0 w-[85vw] max-w-sm'
@@ -254,7 +258,12 @@ const GraphPage = () => {
             )}
 
             {/* Loading overlay */}
-
+            {!filteredData && !error && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg-main/80 backdrop-blur-sm dark:bg-dark-bg-main/80">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-action-primary border-t-transparent" />
+                <p className="text-sm text-text-muted">{t('common.loading', 'Loading...')}</p>
+              </div>
+            )}
           </div>
         </section>
       </main>

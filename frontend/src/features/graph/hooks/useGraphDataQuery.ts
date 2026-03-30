@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getGraphDataV2 } from '../../../api/v2/graph';
+import { queryKeys } from '../../../lib/queryKeys';
 
-export const GRAPH_DATA_QUERY_KEY = 'graph-data';
+export const GRAPH_DATA_QUERY_KEY = queryKeys.graphData()[0];
 
 export const useGraphDataQuery = (refreshNonce: number) =>
   useQuery({
-    queryKey: [GRAPH_DATA_QUERY_KEY, refreshNonce],
+    queryKey: [...queryKeys.graphData(), refreshNonce],
     queryFn: () => getGraphDataV2({ version: 'active', include_edges: false }),
     retry: 1,
     staleTime: 10_000,

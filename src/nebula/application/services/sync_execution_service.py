@@ -1,6 +1,6 @@
 """Execution primitives for sync, embedding, and clustering."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 
@@ -109,7 +109,7 @@ async def sync_stars_task(
                 return
 
             task.status = "running"
-            task.started_at = datetime.utcnow()
+            task.started_at = datetime.now(timezone.utc)
             await db.commit()
 
             effective_mode = sync_mode
@@ -171,18 +171,27 @@ async def sync_stars_task(
             new_count = 0
             updated_count = 0
 
+            # Batch-prefetch existing repos to avoid N+1 queries
+            github_ids = [repo.id for repo in repos]
+            existing_map: dict[int, StarredRepo] = {}
+            batch_size_lookup = 500
+            for i in range(0, len(github_ids), batch_size_lookup):
+                batch_ids = github_ids[i : i + batch_size_lookup]
+                batch_result = await db.execute(
+                    select(StarredRepo).where(
+                        StarredRepo.user_id == user_id,
+                        StarredRepo.github_repo_id.in_(batch_ids),
+                    )
+                )
+                for row in batch_result.scalars():
+                    existing_map[row.github_repo_id] = row
+
             async with GitHubClient(
                 access_token=settings.github_token
             ) as readme_client:
                 for repo in repos:
                     try:
-                        result = await db.execute(
-                            select(StarredRepo).where(
-                                StarredRepo.user_id == user_id,
-                                StarredRepo.github_repo_id == repo.id,
-                            )
-                        )
-                        existing = result.scalar_one_or_none()
+                        existing = existing_map.get(repo.id)
 
                         if existing:
                             new_desc_hash = compute_content_hash(repo.description)
@@ -328,7 +337,9 @@ async def sync_stars_task(
 
             if effective_mode == "incremental":
                 result = await db.execute(
-                    select(func.count(StarredRepo.id)).where(StarredRepo.user_id == user_id)
+                    select(func.count(StarredRepo.id)).where(
+                        StarredRepo.user_id == user_id
+                    )
                 )
                 total_db_repos = int(result.scalar() or 0)
                 user.total_stars = total_db_repos
@@ -337,10 +348,10 @@ async def sync_stars_task(
                 user.total_stars = len(repos)
                 user.synced_stars = processed
 
-            user.last_sync_at = datetime.utcnow()
+            user.last_sync_at = datetime.now(timezone.utc)
 
             task.status = "completed"
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             task.error_details = {
                 "sync_mode": effective_mode,
                 "new_repos": new_count,
@@ -369,7 +380,7 @@ async def sync_stars_task(
                 if task:
                     task.status = "failed"
                     task.error_message = str(exc)
-                    task.completed_at = datetime.utcnow()
+                    task.completed_at = datetime.now(timezone.utc)
                     await db.commit()
 
 
@@ -384,7 +395,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 return
 
             task.status = "running"
-            task.started_at = datetime.utcnow()
+            task.started_at = datetime.now(timezone.utc)
             await db.commit()
 
             result = await db.execute(
@@ -400,7 +411,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 
             if not repos:
                 task.status = "completed"
-                task.completed_at = datetime.utcnow()
+                task.completed_at = datetime.now(timezone.utc)
                 await db.commit()
                 return
 
@@ -468,20 +479,27 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 
             try:
                 embeddings = await embedding_service.embed_batch(texts, batch_size=32)
-                for repo, embedding in zip(repos, embeddings, strict=False):
+                if len(embeddings) != len(repos):
+                    raise ValueError(
+                        f"Embedding count mismatch: got {len(embeddings)} "
+                        f"for {len(repos)} repos"
+                    )
+                for repo, embedding in zip(repos, embeddings, strict=True):
                     repo.embedding = embedding
                     repo.is_embedded = True
                     processed += 1
 
                 task.processed_items = processed
+                task.status = "completed"
                 await db.commit()
             except Exception as exc:
                 logger.error(f"Batch embedding failed: {exc}")
                 task.failed_items = len(repos)
                 task.error_message = str(exc)
+                task.status = "failed"
+                await db.commit()
 
-            task.status = "completed"
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
             logger.info(f"Completed embedding for user {user_id}: {processed} embedded")
@@ -493,7 +511,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 if task:
                     task.status = "failed"
                     task.error_message = str(exc)
-                    task.completed_at = datetime.utcnow()
+                    task.completed_at = datetime.now(timezone.utc)
                     await db.commit()
 
 
@@ -567,7 +585,7 @@ async def run_clustering_task(
                 return
 
             task.status = "running"
-            task.started_at = datetime.utcnow()
+            task.started_at = datetime.now(timezone.utc)
             await db.commit()
 
             result = await db.execute(
@@ -580,7 +598,7 @@ async def run_clustering_task(
 
             if not repos:
                 task.status = "completed"
-                task.completed_at = datetime.utcnow()
+                task.completed_at = datetime.now(timezone.utc)
                 task.error_message = "No embedded repos found"
                 await db.commit()
                 return
@@ -617,7 +635,7 @@ async def run_clustering_task(
 
             if len(embeddings) < 5:
                 task.status = "completed"
-                task.completed_at = datetime.utcnow()
+                task.completed_at = datetime.now(timezone.utc)
                 task.error_message = "Not enough embedded repos for clustering (min 5)"
                 await db.commit()
                 return
@@ -653,7 +671,7 @@ async def run_clustering_task(
                 if not new_repos:
                     logger.info("Incremental mode: no new repos to assign")
                     task.status = "completed"
-                    task.completed_at = datetime.utcnow()
+                    task.completed_at = datetime.now(timezone.utc)
                     task.processed_items = 0
                     await db.commit()
                     return
@@ -712,7 +730,7 @@ async def run_clustering_task(
 
                     task.processed_items = len(new_repos)
                     task.status = "completed"
-                    task.completed_at = datetime.utcnow()
+                    task.completed_at = datetime.now(timezone.utc)
                     await db.commit()
 
                     logger.info(
@@ -752,7 +770,6 @@ async def run_clustering_task(
                 resolve_overlap=True,
             )
 
-            await db.execute(select(Cluster).where(Cluster.user_id == user_id))
             existing_clusters = (
                 (await db.execute(select(Cluster).where(Cluster.user_id == user_id)))
                 .scalars()
@@ -856,7 +873,7 @@ async def run_clustering_task(
 
             task.processed_items = len(repos_with_embeddings)
             task.status = "completed"
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
             logger.info(
@@ -872,5 +889,5 @@ async def run_clustering_task(
                 if task:
                     task.status = "failed"
                     task.error_message = str(exc)
-                    task.completed_at = datetime.utcnow()
+                    task.completed_at = datetime.now(timezone.utc)
                     await db.commit()

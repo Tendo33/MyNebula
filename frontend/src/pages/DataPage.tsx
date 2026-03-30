@@ -645,6 +645,7 @@ const DataPage = () => {
                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                         disabled={currentPage === 1}
                         className="p-1.5 rounded hover:bg-bg-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
+                        aria-label={t('data.previous_page', 'Previous page')}
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </button>
@@ -657,6 +658,7 @@ const DataPage = () => {
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages || totalPages === 0}
                         className="p-1.5 rounded hover:bg-bg-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
+                        aria-label={t('data.next_page', 'Next page')}
                       >
                         <ChevronRight className="w-4 h-4" />
                       </button>

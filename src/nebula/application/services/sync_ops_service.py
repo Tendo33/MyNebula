@@ -120,7 +120,7 @@ def calculate_next_run_time(schedule: SyncSchedule) -> datetime | None:
 
     try:
         tz = ZoneInfo(schedule.timezone)
-        now_utc = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC"))
+        now_utc = datetime.now(timezone.utc)
         now_local = now_utc.astimezone(tz)
         scheduled_today = now_local.replace(
             hour=schedule.schedule_hour,
@@ -285,7 +285,7 @@ async def full_refresh_task(user_id: int, task_id: int):
     try:
         task_exists = await _update_main_task(
             status="running",
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc),
             error_message=None,
             total_items=5,
             processed_items=0,
@@ -352,7 +352,7 @@ async def full_refresh_task(user_id: int, task_id: int):
 
         await _update_main_task(
             status="completed",
-            completed_at=datetime.utcnow(),
+            completed_at=datetime.now(timezone.utc),
             processed_items=5,
             error_details={
                 "phase": "complete",
@@ -372,7 +372,7 @@ async def full_refresh_task(user_id: int, task_id: int):
         await _update_main_task(
             status="failed",
             error_message=str(exc),
-            completed_at=datetime.utcnow(),
+            completed_at=datetime.now(timezone.utc),
         )
 
 

@@ -309,14 +309,16 @@ const Dashboard = () => {
                           </div>
 
                           {/* Bar */}
-                          <div
+                          <button
+                            type="button"
                             className={`w-full rounded-t transition-all duration-300 cursor-pointer hover:opacity-90 ${
                               isRecent
                                 ? 'bg-gradient-to-t from-action-primary to-action-hover shadow-sm'
                                 : 'bg-gradient-to-t from-action-primary/50 to-action-primary/30'
-                            }`}
+                            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/50`}
                             style={{ height: `${Math.max(height, 8)}%` }}
                             onClick={() => navigate(`/data?month=${data.date}`)}
+                            aria-label={t('dashboard.repos_count', { count: data.count }) + ` (${data.date})`}
                           />
                         </div>
                       );

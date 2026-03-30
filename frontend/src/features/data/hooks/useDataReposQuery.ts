@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getDataReposV2 } from '../../../api/v2/data';
 import { getGraphDataV2 } from '../../../api/v2/graph';
+import { queryKeys } from '../../../lib/queryKeys';
 import type { DataRepoItem } from '../../../api/v2/data';
 import type { ClusterInfo } from '../../../types';
 
@@ -59,7 +60,7 @@ export const useDataReposQuery = ({
   });
 
   const graphQuery = useQuery({
-    queryKey: ['v2-data-graph'],
+    queryKey: [...queryKeys.graphData(), 'data-page'],
     queryFn: () => getGraphDataV2({ version: 'active', include_edges: false }),
     staleTime: 15_000,
   });

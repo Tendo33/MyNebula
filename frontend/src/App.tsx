@@ -1,7 +1,10 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { ErrorBoundary } from 'react-error-boundary';
+import { useTranslation } from 'react-i18next';
 import { GraphProvider, useGraph } from './contexts/GraphContext';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
+import { ErrorFallback } from './components/ui/ErrorFallback';
 import CommandPalette from './components/ui/CommandPalette';
 import useCommandPalette from './hooks/useCommandPalette';
 import { ClusterInfo, GraphNode } from './types';
@@ -26,20 +29,27 @@ function AppContent() {
     navigate(`/graph?cluster=${cluster.id}`);
   };
 
+  const { t } = useTranslation();
+
   return (
     <>
       <div className="min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main font-sans selection:bg-action-primary/20">
-        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-text-muted">Loading...</div>}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/graph" element={<GraphPage />} />
-            <Route path="/data" element={<DataPage />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary FallbackComponent={ErrorFallback}>
+          <Suspense fallback={
+            <div className="flex min-h-screen items-center justify-center text-sm text-text-muted">
+              {t('common.loading', 'Loading...')}
+            </div>
+          }>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/graph" element={<GraphPage />} />
+              <Route path="/data" element={<DataPage />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </div>
 
-      {/* Global Command Palette (Cmd/Ctrl + K) */}
       <CommandPalette
         isOpen={isOpen}
         onClose={close}

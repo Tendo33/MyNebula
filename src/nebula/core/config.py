@@ -239,6 +239,15 @@ class AppSettings(BaseSettings):
     # Server
     api_port: int = Field(default=8000, description="API server port")
 
+    # CORS
+    cors_origins: str = Field(
+        default="",
+        description=(
+            "Comma-separated allowed origins for CORS. "
+            "Leave empty to allow localhost only."
+        ),
+    )
+
     # Sub-configurations (loaded separately for clean env prefix handling)
     # These are accessed via get_*_settings() functions
 

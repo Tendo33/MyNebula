@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ClusterInfo, GraphData, GraphNode, TimelineData } from '../types';
 import { GraphSettingsState, useGraphStore } from '../stores/graphStore';
@@ -130,7 +130,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setError(queryError instanceof Error ? queryError.message : 'Failed to load graph data');
   }, [graphQuery.error, timelineQuery.error]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setError(null);
       await Promise.all([
@@ -141,9 +141,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     }
-  };
+  }, [queryClient]);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     try {
       setError(null);
       setRefreshNonce((current) => current + 1);
@@ -151,7 +151,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh data');
     }
-  };
+  }, [graphQuery, timelineQuery]);
 
   const filteredData = useMemo(() => {
     if (!rawData) return null;
@@ -239,7 +239,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [filters, rawData, timelineData]);
 
-  const value: GraphContextValue = {
+  const retryEdgeLoading = edgesQuery.retryEdgeLoading;
+
+  const value: GraphContextValue = useMemo(() => ({
     rawData,
     timelineData,
     selectedNode,
@@ -268,8 +270,16 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updateSettings,
     setSyncing,
     setSyncStep,
-    retryEdgeLoading: edgesQuery.retryEdgeLoading,
-  };
+    retryEdgeLoading,
+  }), [
+    rawData, timelineData, selectedNode, filters, settings,
+    loading, edgesLoading, syncing, syncStep, error, filteredData,
+    loadData, refreshData,
+    setSelectedNode, setSearchQuery, toggleCluster, setSelectedClusters,
+    clearClusterFilter, toggleStarList, setSelectedStarLists,
+    clearStarListFilter, setTimeRange, setMinStars, toggleLanguage,
+    clearFilters, updateSettings, setSyncing, setSyncStep, retryEdgeLoading,
+  ]);
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>;
 };

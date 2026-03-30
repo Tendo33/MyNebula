@@ -5,11 +5,14 @@ import { getGraphEdgesPageV2 } from '../../../api/v2/graph';
 
 export const GRAPH_EDGES_QUERY_KEY = 'graph-edges';
 
+const MAX_AUTO_LOAD_PAGES = 20;
+
 interface UseGraphEdgesInfiniteQueryParams {
   version: string;
   refreshNonce: number;
   enabled: boolean;
   limit?: number;
+  maxAutoPages?: number;
 }
 
 export const useGraphEdgesInfiniteQuery = ({
@@ -17,13 +20,16 @@ export const useGraphEdgesInfiniteQuery = ({
   refreshNonce,
   enabled,
   limit = 1200,
+  maxAutoPages = MAX_AUTO_LOAD_PAGES,
 }: UseGraphEdgesInfiniteQueryParams) => {
+  const pagesLoadedRef = useRef(0);
   const [autoLoadHalted, setAutoLoadHalted] = useState(false);
   const [edgesError, setEdgesError] = useState<string | null>(null);
   const seenNextCursorsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     seenNextCursorsRef.current = new Set();
+    pagesLoadedRef.current = 0;
     setAutoLoadHalted(false);
     setEdgesError(null);
   }, [version, refreshNonce]);
@@ -56,6 +62,10 @@ export const useGraphEdgesInfiniteQuery = ({
     if (!hasNextPage || isFetchingNextPage || autoLoadHalted) {
       return;
     }
+    if (pagesLoadedRef.current >= maxAutoPages) {
+      setAutoLoadHalted(true);
+      return;
+    }
     const nextCursor = data?.pages.at(-1)?.next_cursor ?? null;
     if (nextCursor == null) {
       return;
@@ -66,6 +76,7 @@ export const useGraphEdgesInfiniteQuery = ({
       return;
     }
     seenNextCursorsRef.current.add(nextCursor);
+    pagesLoadedRef.current += 1;
     await fetchNextPage();
   }, [
     autoLoadHalted,
@@ -73,6 +84,7 @@ export const useGraphEdgesInfiniteQuery = ({
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    maxAutoPages,
   ]);
 
   useEffect(() => {
