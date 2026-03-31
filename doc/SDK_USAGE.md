@@ -1,112 +1,155 @@
-# SDK 使用指南 (SDK Usage Guide)
+# 程序化使用指南
 
-本文档介绍如何将 `nebula` 作为 SDK 使用，以及为什么在测试代码中导入时不需要加 `src` 前缀。
+MyNebula 的主入口仍然是 HTTP API 和 Web UI，但当前仓库也支持以 Python 包的方式被脚本或其他 ASGI 应用调用。
 
-## 1. 如何作为 SDK 使用
+需要先说明两点：
 
-### 安装
+1. 这个项目目前不是一个“稳定对外发布的通用 SDK”
+2. 比较稳定的程序化入口主要是应用工厂、配置读取和少数脚本工具
 
-如果你是在本地开发，推荐使用 "可编辑模式" (Editable Install) 安装：
+## 安装方式
+
+本地开发推荐 editable install：
 
 ```bash
-# 使用 pip
-pip install -e .
-
-# 或者使用 uv (本项目推荐)
+uv sync --all-extras
 uv pip install -e .
 ```
 
-如果已经发布到 PyPI，则直接安装包名：
+安装后导入名是 `nebula`，不是 `mynebula`。
 
-```bash
-pip install mynebula
-```
+## 最常用的程序化入口
 
-### 导入和使用
-
-安装完成后，你可以直接在任何 Python 脚本中导入 `nebula`，**不需要** 关心它在项目中的具体路径（如 `src`）。
-
-> 包名为 `mynebula`，导入名为 `nebula`。
+### 1. 创建 ASGI 应用
 
 ```python
-from nebula.utils import read_json
+from nebula.main import create_app
 
-# 使用工具函数
-data = read_json("data.json")
-print(data)
+app = create_app()
 ```
 
-## 2. 为什么测试文件夹导入不需要加 `src`？
+适合：
 
-你在 `tests` 文件夹中看到的代码：
+- 挂到自定义 ASGI 进程
+- 在集成测试里创建应用实例
+- 检查路由是否已注册
+
+### 2. 读取配置
 
 ```python
-from nebula.utils import read_json
+from nebula.core.config import (
+    get_app_settings,
+    get_database_settings,
+    get_embedding_settings,
+)
+
+app_settings = get_app_settings()
+db_settings = get_database_settings()
+embedding_settings = get_embedding_settings()
 ```
 
-之所以不需要写成 `from src.nebula.utils import ...`，主要有两个原因：
+这些 getter 都带 `lru_cache`，适合在进程内重复读取。
 
-### 原因一：`src` 布局 (Src Layout) 规范
+如果你在运行时改了环境变量并希望重新加载，可以调用：
 
-本项目采用了标准的 `src` 布局结构：
+```python
+from nebula.core.config import reload_all_settings
+
+reload_all_settings()
+```
+
+### 3. 运行离线质量检查
+
+```python
+from scripts.evals.run_all_quality_checks import run_checks
+
+metrics = run_checks()
+print(metrics)
+```
+
+### 4. 调用工具函数
+
+项目仍保留一批通用工具函数：
+
+```python
+from nebula.utils import get_logger
+
+logger = get_logger(__name__)
+logger.info("hello from MyNebula")
+```
+
+## 一个最小示例
+
+```python
+from nebula.main import create_app
+from nebula.core.config import get_app_settings
+
+app = create_app()
+settings = get_app_settings()
+
+print(app.title)
+print(settings.app_version)
+```
+
+## 为什么导入时不用写 `src.nebula`
+
+仓库采用标准 `src` 布局：
 
 ```text
-nebula/
+MyNebula/
 ├── src/
-│   └── nebula/  <-- 实际的包在这里
+│   └── nebula/
 ├── tests/
 └── pyproject.toml
 ```
 
-在这种布局下，`src` 目录本身不是包的一部分，它只是一个容器。当你执行 `pip install -e .` 时，Python 的包管理器会将 `src` 目录添加到 Python 的搜索路径（`sys.path`）中，或者通过 `.pth` 文件将 `nebula` 链接到环境中。
+这意味着：
 
-因此，Python 解释器在查找包时，会直接在 `src` 下找到 `nebula`，所以你直接 `import nebula` 即可。
+- 安装包后，直接 `import nebula`
+- 测试里也直接 `import nebula`
+- 不要写 `from src.nebula ...`
 
-### 原因二：Pytest 配置
-
-在 `pyproject.toml` 文件中，我们明确配置了 `pytest` 的 `pythonpath`：
+测试之所以也能这样写，是因为 `pyproject.toml` 里给 pytest 配了：
 
 ```toml
 [tool.pytest.ini_options]
-# ...
 pythonpath = ["src"]
 ```
 
-这行配置告诉 `pytest`：在运行测试之前，先把 `src` 目录加入到 `sys.path` 中。这样，测试代码运行时就能像安装了该包一样，直接找到 `nebula` 模块。
+## 路径和导入路径不要混淆
 
-## 总结
+### 导入路径
 
-*   **作为用户**：安装后直接 `import nebula`。
-*   **作为开发者**：在 `tests` 中也是直接 `import nebula`，这是由 `src` 布局规范和 `pytest` 配置共同保证的。永远不要在导入语句中包含 `src`（例如 `from src.nebula import ...` 是错误的写法）。
+`pythonpath = ["src"]` 只影响 Python 找模块的位置。
 
-## 3. 路径问题详解 (Paths Explained)
+### 文件路径
 
-很多开发者容易混淆 **Import Path (导入路径)** 和 **File Path (文件路径)**。
+日志、数据文件、临时文件仍然和当前工作目录有关，而不是和 `src/` 有关。
 
-### 3.1 Import Path (`pythonpath`)
-*   **定义**：Python 解释器查找模块（代码文件）的地方。
-*   **配置**：我们在 `pyproject.toml` 中配置 `pythonpath = ["src"]`，是为了让 Python 知道去 `src` 目录里找 `nebula` 这个包。
-*   **影响**：这只影响 `import` 语句。它 **不会** 改变文件读写、日志保存的默认路径。
+例如：
 
-### 3.2 File Path (文件路径)
-*   **定义**：程序读取数据、保存日志、写入文件时使用的路径。
-*   **基准**：相对路径通常是相对于 **当前工作目录 (Current Working Directory, CWD)** 的。
-    *   如果你在项目根目录运行 `python tests/test_data.py`，那么 CWD 就是根目录。
-    *   如果你进入 `tests` 目录运行 `python test_data.py`，那么 CWD 就是 `tests` 目录。
-*   **结论**：即使 `pythonpath` 设置为 `src`，日志文件（如 `logs/app.log`）和数据文件（如 `data/test.json`）的保存位置，依然取决于你 **在哪里运行命令**，而不是 `src` 在哪里。
+- 在项目根目录执行命令，`logs/app.log` 会相对项目根目录解析
+- 换一个目录执行脚本，相对路径结果就会变
 
-**最佳实践**：
-为了避免路径混淆，建议在代码中使用 `pathlib` 获取绝对路径，而不是依赖相对路径。
+所以在脚本里建议优先使用 `pathlib.Path` 构造绝对路径。
 
-```python
-from pathlib import Path
+## 当前不建议当作稳定 SDK 的部分
 
-# 获取当前文件所在目录的绝对路径
-CURRENT_DIR = Path(__file__).parent.absolute()
+下面这些更适合作为项目内部模块使用，而不是对外承诺稳定接口：
 
-# 获取项目根目录 (假设当前文件在 tests/ 下)
-PROJECT_ROOT = CURRENT_DIR.parent
+- `application/services/*`
+- `core/*` 中的具体 provider 实现
+- `db/models.py` 里直接操作持久化细节
+- 前端 `api/v2/*.ts` 之外的实现细节
 
-# 这样无论你在哪里运行命令，都能准确找到文件
-data_path = PROJECT_ROOT / "data" / "test.json"
-```
+如果你只是想集成 MyNebula，优先使用：
+
+- Web UI
+- `/api/v2` HTTP API
+- 现成脚本命令
+
+## 相关文档
+
+- `README.md`
+- `doc/ENV_VARS.md`
+- `doc/MODELS_GUIDE.md`

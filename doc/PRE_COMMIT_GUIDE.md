@@ -1,122 +1,112 @@
 # Pre-commit 使用指南
 
-Pre-commit 是一个 Git 钩子管理工具，可以在你执行 `git commit` 时**自动运行**代码检查和格式化。
+MyNebula 通过 `pre-commit` 在提交前自动执行一批轻量检查，主要负责基础文件卫生和 Python Ruff 规范，不负责替代完整测试流程。
 
-## 快速开始
+## 一次性安装
 
-### 1. 安装 pre-commit 钩子（只需一次）
+先准备依赖，再安装 Git hooks：
 
 ```bash
-# 使用 uv 运行
+uv sync --extra dev
 uv run pre-commit install
 ```
 
-运行后会显示：
-```
+安装成功后通常会看到：
+
+```text
 pre-commit installed at .git/hooks/pre-commit
 ```
 
-**这一步很关键**，如果不执行，pre-commit 不会自动触发！
-
-### 2. 正常使用 Git
-
-安装钩子后，每次 `git commit` 都会自动运行检查：
+## 日常工作流
 
 ```bash
 git add .
-git commit -m "feat: add new feature"
+git commit -m "docs: refresh docker guide"
 ```
 
-如果代码有问题，commit 会被阻止，并显示错误信息。
+执行 `git commit` 时，pre-commit 会自动运行。如果某个 hook 修改了文件或发现错误，提交会被拦下，你需要：
 
-## 工作流程
-
-```
-git add . → git commit → pre-commit 自动触发
-                              ↓
-                    ┌─────────────────────┐
-                    │  检查通过？          │
-                    └─────────────────────┘
-                        ↓           ↓
-                      是 ✅        否 ❌
-                        ↓           ↓
-                   提交成功      提交失败
-                                    ↓
-                            自动修复 + 手动修复
-                                    ↓
-                            重新 git add && commit
-```
+1. 查看输出
+2. 修复或接受自动修复结果
+3. 重新 `git add`
+4. 再次提交
 
 ## 常用命令
 
 ```bash
-# 安装 git 钩子（首次克隆项目后必须执行）
-uv run pre-commit install
-
-# 手动对所有文件运行检查（不需要 git commit）
+# 对所有文件执行一次完整检查
 uv run pre-commit run --all-files
 
-# 手动对暂存的文件运行检查
+# 只检查当前暂存区
 uv run pre-commit run
 
-# 跳过 pre-commit 检查（紧急情况使用，不推荐）
-git commit --no-verify -m "紧急提交"
-
-# 更新 pre-commit hooks 到最新版本
+# 更新 hook 版本
 uv run pre-commit autoupdate
 
-# 卸载 git 钩子
+# 卸载 hooks
 uv run pre-commit uninstall
 ```
 
-## 本项目配置的检查项
+## 当前仓库启用了哪些 hook
 
-查看 `.pre-commit-config.yaml`，本项目配置了：
+`.pre-commit-config.yaml` 目前包含：
 
-| 检查项 | 说明 |
-|--------|------|
+| Hook | 作用 |
+| --- | --- |
 | `trailing-whitespace` | 删除行尾空格 |
-| `end-of-file-fixer` | 确保文件以换行符结尾 |
-| `check-yaml` | 验证 YAML 语法 |
-| `check-toml` | 验证 TOML 语法 |
-| `check-json` | 验证 JSON 语法 |
-| `check-merge-conflict` | 检测合并冲突标记 |
-| `debug-statements` | 检测遗留的 print/debugger 语句 |
-| `ruff` | Python 代码 lint 检查 |
-| `ruff-format` | Python 代码自动格式化 |
+| `end-of-file-fixer` | 确保文件以换行结尾 |
+| `check-yaml` | 校验 YAML 语法 |
+| `check-toml` | 校验 TOML 语法 |
+| `check-json` | 校验 JSON 语法 |
+| `check-merge-conflict` | 检测冲突标记 |
+| `debug-statements` | 检测遗留调试语句 |
+| `ruff` | Python lint，可自动修复一部分问题 |
+| `ruff-format` | Python 格式化 |
+
+## 它不会帮你做什么
+
+pre-commit 当前不会自动执行下面这些较重检查：
+
+- `uv run pytest`
+- `npm --prefix frontend run lint`
+- `npx --prefix frontend tsc --noEmit`
+- `npm --prefix frontend run test`
+- `npm --prefix frontend run build`
+- `uv run python scripts/evals/run_all_quality_checks.py`
+
+这些仍然需要你按改动范围手动执行。
 
 ## 常见问题
 
-### Q: 为什么 pre-commit 没有自动运行？
+### 为什么提交时没有自动触发
 
-**A:** 你可能没有安装 git 钩子。运行：
+通常是因为还没安装 hooks：
+
 ```bash
 uv run pre-commit install
 ```
 
-### Q: 检查失败了怎么办？
+### Hook 自动改了文件，怎么办
 
-1. **如果是自动修复**（如格式化），文件会被自动修改，需要：
-   ```bash
-   git add .
-   git commit -m "你的提交信息"
-   ```
-
-2. **如果是需要手动修复**（如 lint 错误），根据错误提示修改代码，然后重新提交。
-
-### Q: 新克隆的项目需要做什么？
+很正常。重新暂存后再提交即可：
 
 ```bash
-# 1. 安装依赖
-uv sync
-
-# 2. 安装 pre-commit 钩子
-uv run pre-commit install
+git add .
+git commit -m "..."
 ```
 
-### Q: 怎么让 VS Code 保存时自动格式化？
+### 我只想先看结果，不想真的提交
 
-在 `.vscode/settings.json` 中添加：
+直接运行：
+
+```bash
+uv run pre-commit run --all-files
+```
+
+### VS Code 里怎么更顺滑
+
+可以让 Python 文件保存时直接走 Ruff：
+
 ```json
 {
   "editor.formatOnSave": true,
@@ -126,4 +116,4 @@ uv run pre-commit install
 }
 ```
 
-这样保存文件时会自动格式化，不用等到 commit 时才发现格式问题。
+这样很多格式问题会在提交前就被消掉。

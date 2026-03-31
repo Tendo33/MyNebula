@@ -1,228 +1,167 @@
 # MyNebula Docker Compose 部署指南
 
-本文档介绍如何通过 Docker Compose 一键部署 MyNebula（包含 PostgreSQL 数据库 + 后端 API + 前端界面）。
+本指南对应仓库根目录当前的 `docker-compose.yml`。
 
----
+Compose 会启动两个服务：
 
-## 目录
+- `db`: `pgvector/pgvector:pg16`
+- `api`: `simonsun3/mynebula:latest`
 
-- [前置要求](#前置要求)
-- [快速部署（3 步完成）](#快速部署3-步完成)
-- [配置说明](#配置说明)
-- [常见问题](#常见问题)
-- [运维操作](#运维操作)
-- [架构说明](#架构说明)
-
----
+前端静态资源已经包含在 `api` 镜像里，所以浏览器直接访问后端端口即可。
 
 ## 前置要求
-
-| 依赖 | 最低版本 | 说明 |
-|------|---------|------|
-| Docker | 20.10+ | [安装指南](https://docs.docker.com/get-docker/) |
-| Docker Compose | v2.0+ | 通常随 Docker Desktop 自带 |
-
-验证安装：
 
 ```bash
 docker --version
 docker compose version
 ```
 
-> **服务器要求**：建议至少 1 核 CPU / 1GB 内存。PostgreSQL + pgvector 会占用约 200-500MB 内存。
+建议至少：
 
----
+- 1 核 CPU
+- 1 GB 内存
+- 能稳定访问 GitHub API
+- 能稳定访问 embedding / LLM 服务
 
-## 快速部署（3 步完成）
+## 快速部署
 
-### 第 1 步：获取配置文件
+### 1. 获取文件
 
-你**不需要克隆整个仓库**，只需要两个文件：
-
-```bash
-# 创建项目目录
-mkdir mynebula && cd mynebula
-
-# 下载配置文件
-curl -O https://raw.githubusercontent.com/Tendo33/MyNebula/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/Tendo33/MyNebula/main/.env.example
-
-# 创建 .env
-cp .env.example .env
-```
-
-或者克隆仓库：
+推荐直接克隆仓库：
 
 ```bash
 git clone https://github.com/Tendo33/MyNebula.git
-cd mynebula
+cd MyNebula
 cp .env.example .env
 ```
 
-### 第 2 步：编辑 .env（填写必填项）
+如果你只想最小部署，至少也需要：
 
-用编辑器打开 `.env` 文件，**至少**修改以下两项（并建议设置管理员密码）：
+- `docker-compose.yml`
+- `.env.example`
+
+## 2. 编辑 `.env`
+
+最少配置这些项：
 
 ```bash
-# [必填] GitHub Personal Access Token
-# 创建地址: https://github.com/settings/tokens
-# 勾选权限: public_repo, read:user
 GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-
-# [必填] Embedding API Key (向量计算)
 EMBEDDING_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
-
-# [推荐] 管理员密码（用于 /settings 登录）
+EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
+EMBEDDING_MODEL=BAAI/bge-large-zh-v1.5
 ADMIN_PASSWORD=change_me
+ADMIN_SESSION_SECRET=change_this_to_a_long_random_secret
+```
 
-# [可选] LLM API Key (AI 摘要/聚类命名)
+如果你要启用 AI 摘要或聚类命名，再补充：
+
+```bash
 LLM_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
-
-# [可选] LLM 输出语言（zh=中文，en=英文）
 LLM_OUTPUT_LANGUAGE=zh
 ```
 
-> **安全提示**：生产环境请务必修改 `DATABASE_PASSWORD`，不要使用默认值。
+生产环境强烈建议额外修改：
 
-### 第 3 步：启动
+- `DATABASE_PASSWORD`
+- `ADMIN_USERNAME`
+- `API_PORT`
+
+## 3. 启动
 
 ```bash
 docker compose up -d
 ```
 
-首次启动会自动完成：
-1. 拉取 PostgreSQL (pgvector) 和 MyNebula Docker 镜像
-2. 创建数据库并初始化 pgvector 扩展
-3. **自动建表**（应用启动时自动执行，无需手动操作）
-4. 启动 API 服务并挂载前端界面
+启动后可访问：
 
-等待约 30-60 秒后，访问：
+- 主界面：<http://localhost:8000>
+- 健康检查：<http://localhost:8000/health>
+- OpenAPI：<http://localhost:8000/docs>，仅 `DEBUG=true` 可用
 
-| 服务 | 地址 | 说明 |
-|------|------|------|
-| Web 界面 | http://localhost:8000 | 主界面（端口由 `API_PORT` 决定） |
-| API 文档 | http://localhost:8000/docs | 仅 `DEBUG=true` 时可用 |
-| 健康检查 | http://localhost:8000/health | 服务状态 |
+## 首次启动时会发生什么
 
----
+`api` 服务启动时会：
 
-## 配置说明
+1. 等待 `db` 健康检查通过
+2. 建立数据库连接
+3. 执行 `CREATE EXTENSION IF NOT EXISTS vector`
+4. 检查 Alembic head
+5. 如果 `alembic_version` 缺失，自动尝试迁移到 `head`
+6. 启动 FastAPI 与 scheduler
 
-### 关于数据库初始化
+这意味着全新数据库通常不需要你手动跑迁移。
 
-**你不需要手动初始化数据库表。** MyNebula 应用启动时会自动完成以下操作：
+## 什么时候仍然要手动迁移
 
-1. 等待 PostgreSQL 容器健康检查通过（`service_healthy`）
-2. 连接数据库，自动创建 `vector` 扩展（pgvector）
-3. 通过 SQLAlchemy `create_all()` 自动创建所有表（若不存在）
-
-这意味着首次 `docker compose up` 后，数据库就是可用状态，不需要运行任何 SQL 或迁移命令。
-
-### 环境变量完整参考
-
-#### 必填项
-
-| 变量 | 说明 | 示例 |
-|------|------|------|
-| `GITHUB_TOKEN` | GitHub Personal Access Token | `ghp_xxxx` |
-| `EMBEDDING_API_KEY` | Embedding 服务的 API Key | `sk-xxxx` |
-| `ADMIN_PASSWORD` | 管理员密码（推荐，启用后台登录） | `change_me` |
-| `LLM_API_KEY` | LLM 服务的 API Key（可选） | `sk-xxxx` |
-
-#### 数据库
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `DATABASE_USER` | `mynebula` | 数据库用户名 |
-| `DATABASE_PASSWORD` | `mynebula_secret` | 数据库密码（**生产环境请修改**） |
-| `DATABASE_NAME` | `mynebula` | 数据库名 |
-
-> 注意：`DATABASE_HOST` 和 `DATABASE_PORT` 在 Docker Compose 下由容器网络内部固定（api 连接 `db:5432`），模板中可保留默认值，通常无需修改。
-
-#### Docker 镜像
-
-Docker 镜像由 `docker-compose.yml` 中的 `api.image` 决定，当前默认：`simonsun3/mynebula:latest`。如需自定义镜像，请直接修改 compose 文件。
-
-#### 应用
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `API_PORT` | `8000` | 宿主机映射端口 |
-| `DEBUG` | `false` | 调试模式（控制 /docs 是否可用） |
-| `LOG_LEVEL` | `INFO` | 日志级别 |
-
-#### Embedding 服务
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | API 地址 |
-| `EMBEDDING_MODEL` | `BAAI/bge-large-zh-v1.5` | 模型名称 |
-| `EMBEDDING_DIMENSIONS` | `1024` | 向量维度 |
-
-#### LLM 服务
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | API 地址 |
-| `LLM_MODEL` | `Qwen/Qwen2.5-7B-Instruct` | 模型名称 |
-| `LLM_OUTPUT_LANGUAGE` | `zh` | LLM 输出语言（`zh` 或 `en`） |
-
-### Docker Compose 下一般无需修改的变量（模板中可保留默认）
-
-| 变量 | 原因 |
-|------|------|
-| `DATABASE_HOST` | API 容器内部固定连接 `db`（容器服务名） |
-| `DATABASE_PORT` | API 容器内部固定连接 `5432` |
-| `DATABASE_URL` | docker-compose.yml 中显式设为空，防止覆盖分离式配置 |
-| `VITE_API_BASE_URL` | 前端已内置自动检测逻辑（使用 `window.location.origin`） |
-| `APP_VERSION` | 通常无需修改（Docker 镜像内已带默认版本） |
-| `LOG_FILE` | 容器内日志建议通过 `docker logs` 查看 |
-
----
-
-## 常见问题
-
-### Q: 需要手动建表 / 运行 SQL 吗？
-
-**不需要。** 应用启动时会自动创建 pgvector 扩展和所有数据表。你只需要 `docker compose up -d` 即可。
-
-### Q: 升级到新版本怎么做？
-
-```bash
-# 拉取最新镜像
-docker compose pull
-
-# 重启服务（数据库数据不会丢失）
-docker compose up -d
-```
-
-数据存储在 Docker Volume `postgres_data` 中，升级应用不影响数据。
-
-如果新版本包含数据库结构变更，可以进入容器运行 Alembic 迁移：
+如果数据库不是全新的，而是旧版本遗留数据，启动时可能出现 migration mismatch。此时执行：
 
 ```bash
 docker compose exec api uv run alembic upgrade head
 ```
 
-### Q: 如何查看日志？
+## Compose 文件里的关键约定
+
+### 数据库容器
+
+- 服务名固定为 `db`
+- 容器名默认 `mynebula-db`
+- 数据卷为 `postgres_data`
+- 宿主机默认暴露 `${DATABASE_PORT:-5432}:5432`
+
+### API 容器
+
+- 服务名固定为 `api`
+- 容器名默认 `mynebula-api`
+- 容器内部强制覆盖：
+  - `API_PORT=8000`
+  - `DATABASE_HOST=db`
+  - `DATABASE_PORT=5432`
+  - `DATABASE_URL=`
+
+所以在 Docker Compose 下：
+
+- `.env` 里的 `DATABASE_HOST` 和 `DATABASE_PORT` 主要影响宿主机访问
+- `api` 容器始终通过容器网络访问 `db:5432`
+
+## 常用运维命令
+
+### 查看状态和日志
 
 ```bash
-# 查看所有服务日志
-docker compose logs -f
-
-# 只看 API 日志
+docker compose ps
 docker compose logs -f api
-
-# 只看数据库日志
 docker compose logs -f db
-
-# 查看最近 100 行
-docker compose logs --tail=100 api
 ```
 
-### Q: 如何修改端口？
+### 重启
 
-在 `.env` 中修改 `API_PORT`：
+```bash
+docker compose restart
+```
+
+### 升级镜像
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+如果升级后涉及数据库结构变化，再执行：
+
+```bash
+docker compose exec api uv run alembic upgrade head
+```
+
+### 进入容器
+
+```bash
+docker compose exec api /bin/sh
+docker compose exec db psql -U "${DATABASE_USER:-mynebula}" -d "${DATABASE_NAME:-mynebula}"
+```
+
+## 修改端口
+
+如果想把应用暴露到 `9090`：
 
 ```bash
 API_PORT=9090
@@ -234,138 +173,62 @@ API_PORT=9090
 docker compose up -d
 ```
 
-访问地址变为 `http://localhost:9090`。
+## 数据库端口冲突
 
-### Q: 数据库端口冲突（本机已有 PostgreSQL）？
+如果宿主机已经占用 `5432`，有两种做法。
 
-默认会将 PostgreSQL 的 5432 端口映射到宿主机。如果本机已有 PostgreSQL 运行，有两种解决方案：
+### 方案 A：不暴露数据库端口
 
-**方案 A**：不暴露数据库端口（推荐，更安全）
+删除 `db` 服务的 `ports` 配置。API 容器仍然能通过 Docker 网络访问数据库。
 
-编辑 `docker-compose.yml`，删除 db 服务的 `ports` 配置：
+### 方案 B：修改宿主机映射端口
 
-```yaml
-db:
-  image: pgvector/pgvector:pg16
-  # ports:                        # 注释或删除这两行
-  #   - "${DATABASE_PORT:-5432}:5432"
-```
-
-API 容器通过 Docker 内部网络连接数据库，不需要宿主机端口映射。
-
-**方案 B**：修改映射端口
-
-在 `.env` 中添加：
+例如：
 
 ```bash
-DATABASE_PORT=15432
+DATABASE_PORT=55432
 ```
 
-### Q: 如何使用 Ollama 本地模型？
+这样宿主机访问数据库就改为 `localhost:55432`，容器内部仍然是 `5432`。
 
-在 `.env` 中修改 Embedding 配置：
+## 常见问题
+
+### 启动成功但 `/settings` 无法登录
+
+通常是没同时设置：
+
+- `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
+
+管理员鉴权只有这两项都非空时才启用。
+
+### 应用启动失败并提示 migration mismatch
+
+执行：
 
 ```bash
-EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1
-EMBEDDING_MODEL=nomic-embed-text
-EMBEDDING_DIMENSIONS=768
-EMBEDDING_API_KEY=ollama
+docker compose exec api uv run alembic upgrade head
 ```
 
-> `host.docker.internal` 是 Docker 提供的特殊域名，指向宿主机。Linux 用户可能需要在 docker-compose.yml 的 api 服务中添加 `extra_hosts: ["host.docker.internal:host-gateway"]`。
+### 更换 embedding 或 LLM 服务需要重建镜像吗
 
-### Q: 如何备份数据？
-
-```bash
-# 备份数据库
-docker compose exec db pg_dump -U mynebula mynebula > backup_$(date +%Y%m%d).sql
-
-# 恢复数据库
-cat backup_20260206.sql | docker compose exec -T db psql -U mynebula mynebula
-```
-
-### Q: 如何完全重置？
+不需要。只要它们通过环境变量配置，改 `.env` 后重启即可：
 
 ```bash
-# 停止并删除容器
-docker compose down
-
-# 删除数据卷（会清除所有数据！）
-# 查看实际卷名（一般为 <项目名>_postgres_data）
-docker volume ls | findstr postgres_data
-
-# 删除数据卷（会清除所有数据！）
-docker volume rm mynebula_postgres_data
-
-# 重新启动
 docker compose up -d
 ```
 
----
-
-## 运维操作
-
-### 启动 / 停止 / 重启
+### 想彻底删库重来
 
 ```bash
-# 启动（后台运行）
+docker compose down -v
 docker compose up -d
-
-# 停止
-docker compose down
-
-# 重启
-docker compose restart
-
-# 重启单个服务
-docker compose restart api
 ```
 
-### 查看状态
+注意这会删除 `postgres_data` volume。
 
-```bash
-# 服务状态
-docker compose ps
+## 相关文档
 
-# 健康检查
-curl http://localhost:8000/health
-```
-
-### 进入容器调试
-
-```bash
-# 进入 API 容器
-docker compose exec api bash
-
-# 进入数据库容器
-docker compose exec db psql -U mynebula
-```
-
----
-
-## 架构说明
-
-```
-┌──── Docker Compose ─────────────────────────────────────┐
-│                                                         │
-│  ┌─────────────┐       ┌───────────────────────────┐   │
-│  │  PostgreSQL  │◄──────│     MyNebula API          │   │
-│  │  + pgvector  │ :5432 │  (FastAPI + React SPA)    │   │
-│  │  (db)        │       │  (api)                    │   │
-│  └──────┬──────┘       └──────────┬────────────────┘   │
-│         │                         │                     │
-│    postgres_data             :8000 ──► 宿主机           │
-│    (持久化卷)                                           │
-│                        mynebula-net                      │
-└─────────────────────────────────────────────────────────┘
-
-外部依赖 (通过网络调用):
-  - GitHub API ← GITHUB_TOKEN
-  - Embedding API ← EMBEDDING_API_KEY
-  - LLM API ← LLM_API_KEY
-```
-
-- **db 容器**：运行 PostgreSQL 16 + pgvector 扩展，数据持久化到 Docker Volume
-- **api 容器**：运行 FastAPI 应用，同时托管 React 前端静态文件，单一端口对外服务
-- **网络**：两个容器通过 `mynebula-net` Bridge 网络通信，API 通过容器名 `db` 连接数据库
-- **前端**：已内置于 Docker 镜像，无需单独构建或部署
+- `README.md`
+- `doc/ENV_VARS.md`
+- `doc/RESET_GUIDE.md`

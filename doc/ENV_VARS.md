@@ -1,146 +1,160 @@
-﻿# 环境变量配置指南
+# 环境变量配置指南
 
-本文档说明 MyNebula 支持的环境变量，默认值来源以 `src/nebula/core/config.py` 为准。
+本文档基于 `src/nebula/core/config.py` 和当前前端开发配置整理，优先级以代码实现为准。
 
-## 快速开始
+## 最小可运行配置
 
-1. 复制示例配置文件：
-   ```bash
-   cp .env.example .env
-   ```
+复制模板：
 
-2. 至少配置以下必填项：
-   - `GITHUB_TOKEN`
-   - `EMBEDDING_API_KEY`
+```bash
+cp .env.example .env
+```
 
-3. 推荐配置（用于后台登录与管理操作）：
-   - `ADMIN_PASSWORD`
-   - `ADMIN_USERNAME`（可保持默认 `admin`）
+至少需要设置：
 
-4. 可选配置（用于摘要与聚类命名）：
-   - `LLM_API_KEY`
+- `GITHUB_TOKEN`
+- `EMBEDDING_API_KEY`
+- `EMBEDDING_BASE_URL`
+- `EMBEDDING_MODEL`
 
----
+如果你要使用 `/settings` 登录和所有写操作接口，还必须同时设置：
 
-## 应用与运行时配置
+- `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
 
-| 变量名 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `APP_NAME` | string | `mynebula` | 应用名称 |
-| `APP_VERSION` | string | `1.1.0` | 应用版本 |
-| `DEBUG` | boolean | `false` | 调试模式（控制 `/docs` 是否开放） |
-| `SINGLE_USER_MODE` | boolean | `true` | 单用户模式（读取接口默认使用首个用户） |
-| `SNAPSHOT_READ_FALLBACK_ON_ERROR` | boolean | `true` | 快照读取失败时回退到实时构建 |
-| `API_PORT` | integer | `8000` | API 监听端口 |
-| `SLOW_QUERY_LOG_MS` | integer | `200` | 慢查询日志阈值（毫秒） |
-| `API_QUERY_TIMEOUT_SECONDS` | integer | `15` | 查询超时时间（秒） |
-| `LOG_LEVEL` | string | `INFO` | 日志级别：`TRACE/DEBUG/INFO/SUCCESS/WARNING/ERROR/CRITICAL` |
-| `LOG_FILE` | string | `logs/app.log` | 日志文件路径 |
+如果要启用摘要、标签、聚类命名，再设置：
 
----
+- `LLM_API_KEY`
+
+## 应用与运行时
+
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `APP_NAME` | `mynebula` | 应用名 |
+| `APP_VERSION` | `1.2.0` | 应用版本 |
+| `DEBUG` | `false` | 为 `true` 时开放 `/docs` 和 `/redoc` |
+| `SINGLE_USER_MODE` | `true` | 读取接口默认使用首个用户 |
+| `SNAPSHOT_READ_FALLBACK_ON_ERROR` | `true` | 快照读取异常时回退到实时构建 |
+| `API_PORT` | `8000` | 后端监听端口 |
+| `LOG_LEVEL` | `INFO` | `TRACE/DEBUG/INFO/SUCCESS/WARNING/ERROR/CRITICAL` |
+| `LOG_FILE` | `logs/app.log` | 日志文件 |
+| `SLOW_QUERY_LOG_MS` | `200` | 慢查询阈值（毫秒） |
+| `API_QUERY_TIMEOUT_SECONDS` | `15` | 大查询超时（秒） |
+| `CORS_ORIGINS` | `""` | 逗号分隔来源列表；留空时仅允许 localhost/127.0.0.1 |
+
+## GitHub
+
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `GITHUB_TOKEN` | `""` | GitHub PAT，用于同步 stars 和列表 |
+
+建议权限：
+
+- `read:user`
+- `public_repo`
+
+如果你需要读取私有仓库，再追加对应私有仓库权限。
+
+## 数据库
+
+### 分离式配置
+
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DATABASE_HOST` | `localhost` | 数据库主机 |
+| `DATABASE_PORT` | `5432` | 数据库端口 |
+| `DATABASE_USER` | `mynebula` | 用户名 |
+| `DATABASE_PASSWORD` | `mynebula_secret` | 密码 |
+| `DATABASE_NAME` | `mynebula` | 数据库名 |
+
+### URL 配置
+
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DATABASE_URL` | `""` | 完整连接串，优先级高于分离式配置 |
+
+支持：
+
+- `postgresql://...`
+- `postgresql+asyncpg://...`
+
+代码会自动处理 asyncpg 驱动和部分 SSL 参数。
+
+## Embedding
+
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `EMBEDDING_API_KEY` | `""` | embedding 服务密钥 |
+| `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | OpenAI 兼容接口地址 |
+| `EMBEDDING_MODEL` | `BAAI/bge-large-zh-v1.5` | 模型名 |
+| `EMBEDDING_DIMENSIONS` | `1024` | 向量维度，范围 64-4096 |
+
+## LLM
+
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `LLM_API_KEY` | `""` | LLM 服务密钥 |
+| `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | OpenAI 兼容接口地址 |
+| `LLM_MODEL` | `Qwen/Qwen2.5-7B-Instruct` | 模型名 |
+| `LLM_OUTPUT_LANGUAGE` | `zh` | 生成内容语言，`zh` 或 `en` |
 
 ## 管理员鉴权
 
-| 变量名 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `ADMIN_USERNAME` | string | `admin` | 管理员用户名（用于 `/settings`） |
-| `ADMIN_PASSWORD` | string | *(空)* | 管理员密码（为空则管理员接口不可用） |
-| `ADMIN_SESSION_TTL_HOURS` | integer | `24` | 管理员会话有效期（小时） |
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `ADMIN_USERNAME` | `admin` | 管理员用户名 |
+| `ADMIN_PASSWORD` | `""` | 管理员密码 |
+| `ADMIN_SESSION_SECRET` | `""` | 签名 session 与 CSRF token 的密钥 |
+| `ADMIN_SESSION_TTL_HOURS` | `24` | 管理员会话有效期，范围 1-168 小时 |
 
----
+重要说明：
 
-## GitHub 配置（必填）
+- 只有 `ADMIN_PASSWORD` 和 `ADMIN_SESSION_SECRET` 同时非空时，管理员鉴权才会启用
+- 登录后后端会写入两个 Cookie：
+  - `nebula_admin_session`
+  - `nebula_admin_csrf`
 
-| 变量名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| `GITHUB_TOKEN` | string | ✅ | GitHub Personal Access Token (PAT) |
+## 同步相关
 
-> 建议权限：`read:user`、`public_repo`。如需访问私有仓库，请追加相应权限。
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `SYNC_BATCH_SIZE` | `100` | 每批处理仓库数，范围 10-500 |
+| `SYNC_README_MAX_LENGTH` | `10000` | README 存储最大长度 |
+| `SYNC_DEFAULT_SYNC_MODE` | `incremental` | 默认同步模式，`incremental` 或 `full` |
+| `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | `false` | 增量同步时是否主动检测取消 star 的仓库 |
 
----
+## 前端开发变量
 
-## 数据库配置（PostgreSQL + pgvector）
+前端开发变量不从根目录 `.env` 读取，而是由 `frontend/` 目录下的 Vite 配置或命令行环境变量提供。
 
-支持两种配置方式：
+### 常用变量
 
-### 方式 1：分离参数（推荐 Docker Compose）
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | `http://localhost:8071` | Vite 代理目标地址 |
+| `VITE_API_URL` | 无 | 构建产物备用 API 基地址 |
+| `E2E_BASE_URL` | `http://127.0.0.1:4173` | Playwright 目标地址 |
 
-| 变量名 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `DATABASE_HOST` | string | `localhost` | 数据库主机 |
-| `DATABASE_PORT` | integer | `5432` | 数据库端口 |
-| `DATABASE_USER` | string | `mynebula` | 数据库用户 |
-| `DATABASE_PASSWORD` | string | `mynebula_secret` | 数据库密码 |
-| `DATABASE_NAME` | string | `mynebula` | 数据库名称 |
+开发时推荐：
 
-### 方式 2：完整 URL（优先级更高）
+```bash
+VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
+```
 
-| 变量名 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `DATABASE_URL` | string | *(空)* | 完整数据库 URL（覆盖分离式配置） |
-
-支持 `postgresql://...` 或 `postgresql+asyncpg://...`，系统会自动处理 async 驱动前缀。
-
----
-
-## Embedding 配置（必填）
-
-用于生成仓库描述向量，使用 OpenAI 兼容接口。
-
-| 变量名 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `EMBEDDING_API_KEY` | string | *(空)* | API 密钥（必填） |
-| `EMBEDDING_BASE_URL` | string | `https://api.siliconflow.cn/v1` | API 基础 URL |
-| `EMBEDDING_MODEL` | string | `BAAI/bge-large-zh-v1.5` | 模型名称 |
-| `EMBEDDING_DIMENSIONS` | integer | `1024` | 向量维度 |
-
----
-
-## LLM 配置（可选）
-
-用于摘要与聚类命名，使用 OpenAI 兼容接口。
-
-| 变量名 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `LLM_API_KEY` | string | *(空)* | API 密钥 |
-| `LLM_BASE_URL` | string | `https://api.siliconflow.cn/v1` | API 基础 URL |
-| `LLM_MODEL` | string | `Qwen/Qwen2.5-7B-Instruct` | 模型名称 |
-| `LLM_OUTPUT_LANGUAGE` | string | `zh` | 输出语言（`zh` 或 `en`） |
-
----
-
-## 同步配置
-
-| 变量名 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `SYNC_BATCH_SIZE` | integer | `100` | 每批处理的仓库数量（10-500） |
-| `SYNC_README_MAX_LENGTH` | integer | `10000` | README 最大抓取长度（字符） |
-| `SYNC_DEFAULT_SYNC_MODE` | string | `incremental` | 默认同步模式（`incremental`/`full`） |
-| `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | boolean | `false` | 增量同步时检测取消 Star 的仓库（增加 API 开销） |
-
----
-
-## 前端开发（Vite）
-
-| 变量名 | 说明 |
-|--------|------|
-| `VITE_API_BASE_URL` | 前端开发时 API 目标地址（仅开发环境使用） |
-
-> 在开发模式中，前端默认通过 Vite 代理访问 `/api`，如需直连后端可设置 `VITE_API_BASE_URL`。
-
----
-
-## 示例配置（开发环境）
+## 开发环境示例
 
 ```bash
 APP_NAME=mynebula
-APP_VERSION=1.1.0
+APP_VERSION=1.2.0
 DEBUG=true
 SINGLE_USER_MODE=true
 SNAPSHOT_READ_FALLBACK_ON_ERROR=true
 API_PORT=8000
+LOG_LEVEL=INFO
+LOG_FILE=logs/app.log
 SLOW_QUERY_LOG_MS=200
 API_QUERY_TIMEOUT_SECONDS=15
+CORS_ORIGINS=
 
 GITHUB_TOKEN=your_pat_xxxxxxxxxxxxxxxx
 
@@ -162,6 +176,7 @@ LLM_OUTPUT_LANGUAGE=zh
 
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change_me
+ADMIN_SESSION_SECRET=change_this_to_a_long_random_secret
 ADMIN_SESSION_TTL_HOURS=24
 
 SYNC_BATCH_SIZE=100
@@ -170,11 +185,9 @@ SYNC_DEFAULT_SYNC_MODE=incremental
 SYNC_DETECT_UNSTARRED_ON_INCREMENTAL=false
 ```
 
----
-
 ## 安全建议
 
-1. **不要提交 `.env` 到版本控制**。
-2. 生产环境务必设置强密码的 `ADMIN_PASSWORD` 与数据库密码。
-3. 定期轮换 API 密钥。
-4. 使用 Secrets 管理工具（如 Vault、AWS Secrets Manager）存储敏感信息。
+1. 不要提交 `.env`。
+2. 生产环境必须替换默认数据库密码。
+3. 管理员密码与 `ADMIN_SESSION_SECRET` 都要用高强度随机值。
+4. API key 建议通过 Secret Manager 或 CI/CD Secret 注入。
