@@ -180,6 +180,12 @@ At minimum, update these values in `.env`:
 - `ADMIN_PASSWORD`
 - `ADMIN_SESSION_SECRET`
 - `ADMIN_USERNAME` if you do not want the default `admin`
+- `READ_ACCESS_MODE`
+
+Recommended defaults by deployment style:
+
+- Local demo: `READ_ACCESS_MODE=demo`
+- Internet-facing deployment: `READ_ACCESS_MODE=authenticated`, `FORCE_SECURE_COOKIES=true`, `TRUST_PROXY_HEADERS=true`
 
 ### 2. Start the stack
 

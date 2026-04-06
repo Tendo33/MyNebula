@@ -11,6 +11,37 @@ from typing import Any
 
 from loguru import logger
 
+SENSITIVE_LOG_KEYS = {
+    "password",
+    "session",
+    "csrf",
+    "api_key",
+    "authorization",
+    "token",
+    "secret",
+}
+
+
+def _sanitize_log_value(value: Any) -> Any:
+    """Recursively redact sensitive values in structured payloads."""
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            key_lower = str(key).lower()
+            if any(marker in key_lower for marker in SENSITIVE_LOG_KEYS):
+                sanitized[str(key)] = "***REDACTED***"
+            else:
+                sanitized[str(key)] = _sanitize_log_value(item)
+        return sanitized
+    if isinstance(value, list | tuple | set):
+        return [_sanitize_log_value(item) for item in value]
+    return value
+
+
+def _redact_record(record: dict[str, Any]) -> None:
+    """Loguru patcher that redacts sensitive structured extras."""
+    record["extra"] = _sanitize_log_value(record.get("extra", {}))
+
 
 def setup_logging(
     level: str = "INFO",
@@ -20,8 +51,8 @@ def setup_logging(
     retention: str = "1 week",
     compression: str = "gz",
     serialize: bool = False,
-    backtrace: bool = True,
-    diagnose: bool = True,
+    backtrace: bool = False,
+    diagnose: bool = False,
     enqueue: bool = False,
     catch: bool = True,
 ) -> None:
@@ -77,6 +108,7 @@ def setup_logging(
         enqueue=enqueue,
         catch=catch,
         serialize=serialize,
+        patcher=_redact_record,
     )
 
     # 文件输出处理器（如果指定了日志文件）
@@ -96,6 +128,7 @@ def setup_logging(
             enqueue=enqueue,
             catch=catch,
             serialize=serialize,
+            patcher=_redact_record,
         )
 
 
@@ -182,14 +215,20 @@ def log_function_calls(func):
         func_logger = get_logger(f"{func.__module__}.{func.__name__}")
 
         # 记录函数调用
-        func_logger.debug(f"Calling {func.__name__} with args={args}, kwargs={kwargs}")
+        func_logger.debug(
+            f"Calling {func.__name__} "
+            f"with args={_sanitize_log_value(args)}, "
+            f"kwargs={_sanitize_log_value(kwargs)}"
+        )
 
         try:
             # 执行函数
             result = func(*args, **kwargs)
 
             # 记录返回值
-            func_logger.debug(f"{func.__name__} returned: {result}")
+            func_logger.debug(
+                f"{func.__name__} returned: {_sanitize_log_value(result)}"
+            )
 
             return result
         except Exception as e:

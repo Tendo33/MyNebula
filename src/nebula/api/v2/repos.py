@@ -28,25 +28,10 @@ from nebula.schemas.repo import (
 )
 from nebula.utils import get_logger
 
+from .access import resolve_read_user
+
 logger = get_logger(__name__)
 router = APIRouter()
-
-
-async def get_default_user(db: AsyncSession) -> User:
-    """Get the first user from database.
-
-    Since authentication is disabled, we use the first available user.
-    """
-    result = await db.execute(select(User).limit(1))
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No user found. Please sync your GitHub stars first.",
-        )
-
-    return user
 
 
 @router.get("", response_model=RepoListResponse)
@@ -57,6 +42,7 @@ async def list_repos(
     cluster_id: int | None = Query(default=None, description="Filter by cluster"),
     sort_by: str = Query(default="starred_at", description="Sort field"),
     order: str = Query(default="desc", description="Sort order (asc/desc)"),
+    user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """List user's starred repositories.
@@ -73,8 +59,6 @@ async def list_repos(
     Returns:
         Paginated list of repositories
     """
-    user = await get_default_user(db)
-
     # Build query
     query = select(StarredRepo).where(StarredRepo.user_id == user.id)
 
@@ -134,6 +118,7 @@ async def list_repos(
 @router.get("/{repo_id}", response_model=RepoResponse)
 async def get_repo(
     repo_id: int,
+    user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get a specific repository by ID.
@@ -145,8 +130,6 @@ async def get_repo(
     Returns:
         Repository details
     """
-    user = await get_default_user(db)
-
     result = await db.execute(
         select(StarredRepo).where(
             StarredRepo.id == repo_id,
@@ -170,14 +153,13 @@ async def get_related_repositories(
     limit: int = Query(default=20, ge=1, le=100),
     min_score: float = Query(default=0.4, ge=0.0, le=1.0),
     min_semantic: float = Query(default=0.65, ge=0.0, le=1.0),
+    user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get related repositories ranked by hybrid relevance score.
 
     Unlike graph edges, this endpoint ranks against the full embedded repository set.
     """
-    user = await get_default_user(db)
-
     anchor_result = await db.execute(
         select(StarredRepo).where(
             StarredRepo.user_id == user.id,
@@ -208,11 +190,10 @@ async def get_related_repositories(
 async def submit_related_feedback(
     repo_id: int,
     request: RelatedFeedbackRequest,
+    user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Record user feedback for related repository recommendations."""
-    user = await get_default_user(db)
-
     anchor_result = await db.execute(
         select(StarredRepo.id).where(
             StarredRepo.user_id == user.id,
@@ -259,6 +240,7 @@ async def submit_related_feedback(
 @router.post("/search", response_model=list[RepoSearchResponse])
 async def search_repos(
     request: RepoSearchRequest,
+    user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Semantic search for repositories.
@@ -270,8 +252,6 @@ async def search_repos(
     Returns:
         List of matching repositories with similarity scores
     """
-    user = await get_default_user(db)
-
     # Get embedding for query
     embedding_service = get_embedding_service()
     query_embedding = await embedding_service.embed_text(request.query)
@@ -315,6 +295,7 @@ async def search_repos(
 
 @router.get("/languages/stats")
 async def get_language_stats(
+    user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Get language statistics for user's starred repos.
@@ -325,8 +306,6 @@ async def get_language_stats(
     Returns:
         Language breakdown with counts
     """
-    user = await get_default_user(db)
-
     query = (
         select(
             StarredRepo.language,

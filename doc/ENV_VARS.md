@@ -106,6 +106,9 @@ cp .env.example .env
 | `ADMIN_PASSWORD` | `""` | 管理员密码 |
 | `ADMIN_SESSION_SECRET` | `""` | 签名 session 与 CSRF token 的密钥 |
 | `ADMIN_SESSION_TTL_HOURS` | `24` | 管理员会话有效期，范围 1-168 小时 |
+| `ADMIN_LOGIN_RATE_LIMIT_WINDOW_SECONDS` | `300` | 管理员登录失败限流时间窗（秒） |
+| `ADMIN_LOGIN_RATE_LIMIT_MAX_ATTEMPTS` | `5` | 单个 IP / 用户名在时间窗内允许的失败次数 |
+| `FORCE_SECURE_COOKIES` | `false` | 生产环境建议开启，强制写入 Secure Cookie |
 
 重要说明：
 
@@ -113,6 +116,22 @@ cp .env.example .env
 - 登录后后端会写入两个 Cookie：
   - `nebula_admin_session`
   - `nebula_admin_csrf`
+- 如果部署在反向代理 / TLS 终止后面，建议同时配置 `TRUST_PROXY_HEADERS=true`
+
+## 访问与反向代理
+
+| 变量名 | 默认值 | 说明 |
+| --- | --- | --- |
+| `READ_ACCESS_MODE` | `demo` | 读接口访问模式：`demo` 或 `authenticated` |
+| `TRUST_PROXY_HEADERS` | `false` | 是否信任 `X-Forwarded-*` 代理头 |
+| `TRUSTED_HOSTS` | `""` | `TrustedHostMiddleware` 允许的 Host 列表，逗号分隔 |
+| `HTTPS_REDIRECT` | `false` | 是否启用 HTTP -> HTTPS 重定向 |
+| `CONTENT_SECURITY_POLICY` | `""` | 可选 CSP header 值 |
+
+模式说明：
+
+- `demo`：允许匿名只读访问，适合本地演示或受控内网环境
+- `authenticated`：读接口也要求管理员登录，不再匿名暴露现有数据
 
 ## 同步相关
 
@@ -148,6 +167,7 @@ APP_NAME=mynebula
 APP_VERSION=1.2.0
 DEBUG=true
 SINGLE_USER_MODE=true
+READ_ACCESS_MODE=demo
 SNAPSHOT_READ_FALLBACK_ON_ERROR=true
 API_PORT=8000
 LOG_LEVEL=INFO
@@ -155,6 +175,10 @@ LOG_FILE=logs/app.log
 SLOW_QUERY_LOG_MS=200
 API_QUERY_TIMEOUT_SECONDS=15
 CORS_ORIGINS=
+TRUST_PROXY_HEADERS=false
+TRUSTED_HOSTS=
+HTTPS_REDIRECT=false
+CONTENT_SECURITY_POLICY=
 
 GITHUB_TOKEN=your_pat_xxxxxxxxxxxxxxxx
 
@@ -175,9 +199,12 @@ LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 LLM_OUTPUT_LANGUAGE=zh
 
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=change_me
-ADMIN_SESSION_SECRET=change_this_to_a_long_random_secret
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
 ADMIN_SESSION_TTL_HOURS=24
+ADMIN_LOGIN_RATE_LIMIT_WINDOW_SECONDS=300
+ADMIN_LOGIN_RATE_LIMIT_MAX_ATTEMPTS=5
+FORCE_SECURE_COOKIES=false
 
 SYNC_BATCH_SIZE=100
 SYNC_README_MAX_LENGTH=10000
@@ -191,3 +218,4 @@ SYNC_DETECT_UNSTARRED_ON_INCREMENTAL=false
 2. 生产环境必须替换默认数据库密码。
 3. 管理员密码与 `ADMIN_SESSION_SECRET` 都要用高强度随机值。
 4. API key 建议通过 Secret Manager 或 CI/CD Secret 注入。
+5. 对公网部署，建议使用 `READ_ACCESS_MODE=authenticated`、`FORCE_SECURE_COOKIES=true`、`TRUST_PROXY_HEADERS=true`。

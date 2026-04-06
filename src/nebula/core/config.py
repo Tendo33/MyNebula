@@ -185,6 +185,14 @@ class AppSettings(BaseSettings):
             "Whether API runs in single-user mode (reads use the first user by default)"
         ),
     )
+    read_access_mode: Literal["demo", "authenticated"] | None = Field(
+        default=None,
+        description=(
+            "Explicit read access mode. 'demo' allows anonymous reads against the "
+            "single-user dataset, while 'authenticated' requires an authenticated "
+            "admin session for read APIs."
+        ),
+    )
     snapshot_read_fallback_on_error: bool = Field(
         default=True,
         description=(
@@ -231,6 +239,22 @@ class AppSettings(BaseSettings):
         le=168,
         description="Admin session TTL in hours",
     )
+    admin_login_rate_limit_window_seconds: int = Field(
+        default=300,
+        ge=30,
+        le=3600,
+        description="Rate limit window for admin login attempts",
+    )
+    admin_login_rate_limit_max_attempts: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum admin login attempts per rate limit bucket",
+    )
+    force_secure_cookies: bool = Field(
+        default=False,
+        description="Force Secure cookies even behind TLS-terminating proxies",
+    )
 
     # Logging
     log_level: str = Field(default="INFO", description="Log level")
@@ -246,6 +270,22 @@ class AppSettings(BaseSettings):
             "Comma-separated allowed origins for CORS. "
             "Leave empty to allow localhost only."
         ),
+    )
+    trusted_hosts: str = Field(
+        default="",
+        description="Comma-separated trusted Host header values for TrustedHostMiddleware",
+    )
+    trust_proxy_headers: bool = Field(
+        default=False,
+        description="Honor reverse-proxy forwarded proto/host headers",
+    )
+    https_redirect: bool = Field(
+        default=False,
+        description="Redirect HTTP requests to HTTPS",
+    )
+    content_security_policy: str = Field(
+        default="",
+        description="Optional Content-Security-Policy header value",
     )
 
     # Sub-configurations (loaded separately for clean env prefix handling)
@@ -266,6 +306,16 @@ class AppSettings(BaseSettings):
         if v_upper not in allowed:
             raise ValueError(f"Log level must be one of {allowed}")
         return v_upper
+
+    def effective_read_access_mode(self) -> Literal["demo", "authenticated"]:
+        """Resolve the active read access mode with backward compatibility."""
+        if self.read_access_mode is not None:
+            return self.read_access_mode
+        return "demo" if self.single_user_mode else "authenticated"
+
+    def trusted_hosts_list(self) -> list[str]:
+        """Return parsed trusted hosts."""
+        return [host.strip() for host in self.trusted_hosts.split(",") if host.strip()]
 
 
 @lru_cache

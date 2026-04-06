@@ -43,18 +43,14 @@ class _InvalidSnapshotRepo:
 
 
 @pytest.mark.asyncio
-async def test_rebuild_snapshot_requires_consistency_validation(monkeypatch):
-    async def fake_user(_db):
-        return SimpleNamespace(id=1)
-
-    monkeypatch.setattr(
-        "nebula.application.services.graph_query_service._get_default_user",
-        fake_user,
-    )
+async def test_rebuild_snapshot_requires_consistency_validation():
     service = GraphQueryService(
         snapshot_repo=_InvalidSnapshotRepo(),
         builder=_BuilderStub(),
     )
 
     with pytest.raises(ValueError, match="consistency validation failed"):
-        await service.rebuild_active_snapshot(db=object())
+        await service.rebuild_active_snapshot(
+            db=object(),
+            user=SimpleNamespace(id=1),
+        )

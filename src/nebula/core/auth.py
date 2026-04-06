@@ -9,6 +9,8 @@ import json
 import time
 from typing import Any
 
+from fastapi import Request
+
 from nebula.core.config import AppSettings
 
 
@@ -30,6 +32,37 @@ def verify_admin_credentials(
         return False
 
     return hmac.compare_digest(password, settings.admin_password)
+
+
+def get_admin_session_username(
+    request: Request,
+    settings: AppSettings,
+    *,
+    cookie_name: str,
+) -> str | None:
+    """Read the signed admin session cookie and return the username when valid."""
+    token = request.cookies.get(cookie_name)
+    if not token:
+        return None
+
+    payload = verify_signed_session_token(token, settings.admin_session_secret)
+    if not payload:
+        return None
+
+    username = payload.get("u")
+    if not isinstance(username, str):
+        return None
+    return username
+
+
+def get_client_ip(request: Request) -> str:
+    """Best-effort client IP for audit logging and coarse rate limiting."""
+    forwarded_for = request.headers.get("x-forwarded-for", "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
 
 
 def _urlsafe_b64encode(raw: bytes) -> str:

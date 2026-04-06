@@ -49,8 +49,13 @@ GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 EMBEDDING_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
 EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
 EMBEDDING_MODEL=BAAI/bge-large-zh-v1.5
-ADMIN_PASSWORD=change_me
-ADMIN_SESSION_SECRET=change_this_to_a_long_random_secret
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
+READ_ACCESS_MODE=authenticated
+FORCE_SECURE_COOKIES=true
+TRUST_PROXY_HEADERS=true
+TRUSTED_HOSTS=your-domain.com
+HTTPS_REDIRECT=true
 ```
 
 如果你要启用 AI 摘要或聚类命名，再补充：
@@ -201,6 +206,13 @@ DATABASE_PORT=55432
 - `ADMIN_SESSION_SECRET`
 
 管理员鉴权只有这两项都非空时才启用。
+
+如果是通过 Nginx / Caddy / Traefik 等反向代理访问，还要确认：
+
+- `TRUST_PROXY_HEADERS=true`
+- `FORCE_SECURE_COOKIES=true`
+- `READ_ACCESS_MODE=authenticated`
+- 代理正确转发了 `X-Forwarded-Proto=https`
 
 ### 应用启动失败并提示 migration mismatch
 

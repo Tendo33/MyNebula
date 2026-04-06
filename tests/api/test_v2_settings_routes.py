@@ -45,6 +45,7 @@ async def test_get_settings_returns_typed_payload(monkeypatch):
             last_sync_at=datetime(2026, 3, 3, tzinfo=timezone.utc),
             github_token_configured=True,
             single_user_mode=True,
+            read_access_mode="demo",
             total_repos=10,
             synced_repos=10,
             embedded_repos=10,

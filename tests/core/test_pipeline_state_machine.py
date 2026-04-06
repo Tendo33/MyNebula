@@ -8,6 +8,7 @@ from nebula.domain import PipelinePhase, PipelineStatus
 class _FakeDbContext:
     def __init__(self, run):
         self._run = run
+        self._user = SimpleNamespace(id=run.user_id)
 
     async def __aenter__(self):
         return self
@@ -18,6 +19,8 @@ class _FakeDbContext:
     async def get(self, model, _id):
         if model.__name__ == "PipelineRun":
             return self._run
+        if model.__name__ == "User":
+            return self._user
         return None
 
 
@@ -133,8 +136,8 @@ async def test_recluster_pipeline_runs_clustering_then_snapshot(monkeypatch):
 
     snapshot_calls: list[object] = []
 
-    async def fake_rebuild_active_snapshot(db):
-        snapshot_calls.append(db)
+    async def fake_rebuild_active_snapshot(db, *, user):
+        snapshot_calls.append((db, user.id))
         return None
 
     service = pipeline_module.SyncPipelineService(
@@ -171,4 +174,5 @@ async def test_recluster_pipeline_runs_clustering_then_snapshot(monkeypatch):
         }
     ]
     assert len(snapshot_calls) == 1
+    assert snapshot_calls[0][1] == 9
     assert status_updates[-1] == (PipelineStatus.completed, PipelinePhase.completed)

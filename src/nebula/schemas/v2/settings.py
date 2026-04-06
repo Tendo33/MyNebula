@@ -53,6 +53,9 @@ class SyncInfoResponse(BaseModel):
     single_user_mode: bool = Field(
         ..., description="Whether the backend currently runs in single-user mode"
     )
+    read_access_mode: str = Field(
+        ..., description="Effective read access mode: demo or authenticated"
+    )
     total_repos: int = Field(..., description="Total number of starred repositories")
     synced_repos: int = Field(..., description="Number of synced repositories")
     embedded_repos: int = Field(

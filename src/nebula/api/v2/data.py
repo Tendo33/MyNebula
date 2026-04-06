@@ -7,10 +7,10 @@ from sqlalchemy import and_, asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
-from nebula.application.services.user_service import get_default_user
-from nebula.db import StarredRepo, get_db
+from nebula.db import StarredRepo, User, get_db
 from nebula.schemas.v2 import DataRepoItem, DataReposResponse
 
+from .access import resolve_read_user
 from .metadata import build_v2_metadata
 
 router = APIRouter()
@@ -33,10 +33,10 @@ async def get_data_repos(
     sort_direction: str = Query(default="desc", pattern="^(asc|desc)$"),
     limit: int = Query(default=200, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
+    user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> DataReposResponse:
     """List repositories for Data page use-cases."""
-    user = await get_default_user(db)
     conditions = [StarredRepo.user_id == user.id]
 
     if cluster_ids:
@@ -97,6 +97,7 @@ async def get_data_repos(
     repos = result.scalars().all()
     graph_data = await graph_service.get_graph_data_with_options(
         db,
+        user=user,
         version="active",
         include_edges=False,
     )

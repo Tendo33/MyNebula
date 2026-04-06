@@ -2,13 +2,13 @@ from dataclasses import dataclass
 
 from sqlalchemy.dialects import postgresql
 
-from nebula.api.v2.repos import (
+from nebula.application.services.related_repo_service import (
     _build_related_cache_key,
-    _build_related_cache_upsert_stmt,
-    _deserialize_related_results,
-    _rank_related_candidates,
-    _serialize_related_results,
+    deserialize_related_results,
+    rank_related_candidates,
+    serialize_related_results,
 )
+from nebula.db import RepoRelatedCache
 
 
 @dataclass
@@ -79,7 +79,7 @@ def test_rank_related_candidates_returns_score_sorted_items():
     c1 = _dummy_repo(2, [0.99, 0.01], ["agent"], 5)
     c2 = _dummy_repo(3, [0.3, 0.7], ["frontend"], 500)
 
-    ranked = _rank_related_candidates(
+    ranked = rank_related_candidates(
         anchor_repo=anchor,
         candidates=[c1, c2],
         min_score=0.0,
@@ -96,7 +96,7 @@ def test_rank_related_candidates_filters_by_min_score():
     anchor = _dummy_repo(1, [1.0, 0.0], ["agent"], 10)
     c1 = _dummy_repo(2, [0.0, 1.0], ["frontend"], 5)
 
-    ranked = _rank_related_candidates(
+    ranked = rank_related_candidates(
         anchor_repo=anchor,
         candidates=[c1],
         min_score=0.9,
@@ -111,7 +111,7 @@ def test_rank_related_candidates_filters_low_semantic_even_with_other_signals():
     anchor = _dummy_repo(1, [1.0, 0.0], ["agent"], 10)
     candidate = _dummy_repo(2, [0.2, 0.98], ["agent"], 5)
 
-    ranked = _rank_related_candidates(
+    ranked = rank_related_candidates(
         anchor_repo=anchor,
         candidates=[candidate],
         min_score=0.0,
@@ -136,15 +136,15 @@ def test_related_results_cache_round_trip_restores_ranked_items():
     c1 = _dummy_repo(2, [0.99, 0.01], ["agent"], 5)
     c2 = _dummy_repo(3, [0.98, 0.02], ["rag"], 8)
 
-    ranked = _rank_related_candidates(
+    ranked = rank_related_candidates(
         anchor_repo=anchor,
         candidates=[c1, c2],
         min_score=0.0,
         min_semantic=0.0,
         limit=5,
     )
-    serialized = _serialize_related_results(ranked)
-    restored = _deserialize_related_results(
+    serialized = serialize_related_results(ranked)
+    restored = deserialize_related_results(
         serialized,
         repo_by_id={repo.id: repo for repo in [c1, c2]},
         limit=5,
@@ -157,13 +157,25 @@ def test_related_results_cache_round_trip_restores_ranked_items():
 
 
 def test_related_cache_upsert_stmt_uses_conflict_update():
-    stmt = _build_related_cache_upsert_stmt(
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    stmt = pg_insert(RepoRelatedCache).values(
         user_id=1,
         anchor_repo_id=2,
         cache_key="k",
         items=[{"repo_id": 3, "score": 0.9}],
         anchor_updated_at=None,
         user_last_sync_at=None,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[
+            RepoRelatedCache.user_id,
+            RepoRelatedCache.anchor_repo_id,
+            RepoRelatedCache.cache_key,
+        ],
+        set_={
+            "items": [{"repo_id": 3, "score": 0.9}],
+        },
     )
 
     compiled = str(stmt.compile(dialect=postgresql.dialect()))

@@ -117,7 +117,10 @@ class SyncPipelineService:
                 run_id, PipelineStatus.running, PipelinePhase.snapshot
             )
             async with get_db_context() as db:
-                await self.graph_service.rebuild_active_snapshot(db)
+                user = await db.get(User, user_id)
+                if user is None:
+                    raise ValueError(f"Pipeline user not found: {user_id}")
+                await self.graph_service.rebuild_active_snapshot(db, user=user)
 
             final_status = (
                 PipelineStatus.partial_failed
@@ -193,7 +196,10 @@ class SyncPipelineService:
                 run_id, PipelineStatus.running, PipelinePhase.snapshot
             )
             async with get_db_context() as db:
-                await self.graph_service.rebuild_active_snapshot(db)
+                user = await db.get(User, user_id)
+                if user is None:
+                    raise ValueError(f"Pipeline user not found: {user_id}")
+                await self.graph_service.rebuild_active_snapshot(db, user=user)
 
             final_status = (
                 PipelineStatus.partial_failed
@@ -336,7 +342,10 @@ class SyncPipelineService:
         user_id: int,
     ) -> None:
         """Acquire DB-level lock to serialize pipeline creation per user."""
-        bind = db.get_bind()
+        get_bind = getattr(db, "get_bind", None)
+        if get_bind is None:
+            return
+        bind = get_bind()
         dialect_name = bind.dialect.name if bind is not None else ""
         if dialect_name != "postgresql":
             return

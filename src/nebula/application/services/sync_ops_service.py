@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import BackgroundTasks, HTTPException, status
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
@@ -15,7 +15,7 @@ from nebula.application.services.sync_execution_service import (
 )
 from nebula.application.services.user_service import get_default_user
 from nebula.core.config import get_app_settings
-from nebula.db import StarredRepo, SyncSchedule, SyncTask
+from nebula.db import StarredRepo, SyncSchedule, SyncTask, User
 from nebula.schemas.v2.settings import (
     FullRefreshRequest,
     FullRefreshResponse,
@@ -27,6 +27,7 @@ from nebula.schemas.v2.settings import (
 from nebula.utils import get_logger
 
 logger = get_logger(__name__)
+FULL_REFRESH_LOCK_KEY_BASE = 890_000_000
 
 
 def _to_utc(dt: datetime | None) -> datetime | None:
@@ -348,7 +349,10 @@ async def full_refresh_task(user_id: int, task_id: int):
         )
         async with get_db_context() as db:
             graph_service = GraphQueryService()
-            await graph_service.rebuild_active_snapshot(db)
+            user = await db.get(User, user_id)
+            if user is None:
+                raise ValueError(f"Full refresh user not found: {user_id}")
+            await graph_service.rebuild_active_snapshot(db, user=user)
 
         await _update_main_task(
             status="completed",
@@ -384,6 +388,7 @@ async def trigger_full_refresh(
     """Trigger a full refresh of all repositories."""
     validate_full_refresh_confirmation(payload.confirm)
     user = await get_default_user(db)
+    await _acquire_full_refresh_creation_lock(db, user.id)
 
     result = await db.execute(
         select(SyncTask).where(
@@ -423,6 +428,24 @@ async def trigger_full_refresh(
         task_id=task.id,
         message=f"Full refresh started. {repo_count} repositories will be reprocessed.",
         reset_count=repo_count,
+    )
+
+
+async def _acquire_full_refresh_creation_lock(
+    db: AsyncSession,
+    user_id: int,
+) -> None:
+    """Serialize full-refresh creation per user on PostgreSQL."""
+    get_bind = getattr(db, "get_bind", None)
+    if get_bind is None:
+        return
+    bind = get_bind()
+    dialect_name = bind.dialect.name if bind is not None else ""
+    if dialect_name != "postgresql":
+        return
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(:lock_key)"),
+        {"lock_key": FULL_REFRESH_LOCK_KEY_BASE + int(user_id)},
     )
 
 
@@ -469,6 +492,7 @@ async def get_sync_info(
         last_sync_at=user.last_sync_at,
         github_token_configured=bool(app_settings.github_token),
         single_user_mode=app_settings.single_user_mode,
+        read_access_mode=app_settings.effective_read_access_mode(),
         total_repos=stats.total or 0,
         synced_repos=user.synced_stars or 0,
         embedded_repos=stats.embedded or 0,

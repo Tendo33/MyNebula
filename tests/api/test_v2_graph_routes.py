@@ -30,8 +30,9 @@ async def test_get_graph_returns_304_when_etag_matches(monkeypatch):
 
     called = {"count": 0}
 
-    async def resolve_snapshot_version(_db, *, version: str):
+    async def resolve_snapshot_version(_db, *, user, version: str):
         assert version == "active"
+        assert user.id == 1
         return "snapshot-a"
 
     async def get_graph_data_with_options(*_args, **_kwargs):
@@ -63,6 +64,7 @@ async def test_get_graph_returns_304_when_etag_matches(monkeypatch):
         response=response,
         version="active",
         include_edges=False,
+        user=SimpleNamespace(id=1),
         db=object(),
     )
 

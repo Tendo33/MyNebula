@@ -9,8 +9,11 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from nebula.api import api_router
 from nebula.core.config import get_app_settings
@@ -32,7 +35,12 @@ async def lifespan(app: FastAPI):
     settings = get_app_settings()
 
     # Setup logging
-    setup_logging(level=settings.log_level, log_file=settings.log_file)
+    setup_logging(
+        level=settings.log_level,
+        log_file=settings.log_file,
+        backtrace=settings.debug,
+        diagnose=settings.debug,
+    )
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info(f"Debug mode: {settings.debug}")
 
@@ -85,6 +93,16 @@ def create_app() -> FastAPI:
     # (typically 70-80% smaller for /api/v2/graph responses)
     app.add_middleware(GZipMiddleware, minimum_size=500)
 
+    if settings.trust_proxy_headers:
+        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+    trusted_hosts = settings.trusted_hosts_list()
+    if trusted_hosts:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
+
+    if settings.https_redirect:
+        app.add_middleware(HTTPSRedirectMiddleware)
+
     # Configure CORS from environment or default to localhost patterns
     cors_origins = settings.cors_origins
     cors_kwargs: dict = {
@@ -100,6 +118,27 @@ def create_app() -> FastAPI:
             r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
         )
     app.add_middleware(CORSMiddleware, **cors_kwargs)
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        if settings.content_security_policy:
+            response.headers.setdefault(
+                "Content-Security-Policy",
+                settings.content_security_policy,
+            )
+        return response
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        logger.exception(f"Unhandled application error path={request.url.path}: {exc}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
 
     # Include API routes
     app.include_router(api_router, prefix="/api")

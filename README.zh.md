@@ -178,7 +178,14 @@ cp .env.example .env
 - `EMBEDDING_MODEL`
 - 如果你要启用摘要、标签或 AI 命名，还需要配置 `LLM_API_KEY`
 - `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
 - 如果你不想使用默认值 `admin`，还需要修改 `ADMIN_USERNAME`
+- `READ_ACCESS_MODE`
+
+推荐配置：
+
+- 本地演示：`READ_ACCESS_MODE=demo`
+- 公网部署：`READ_ACCESS_MODE=authenticated`、`FORCE_SECURE_COOKIES=true`、`TRUST_PROXY_HEADERS=true`
 
 ### 2. 启动服务
 

@@ -1,6 +1,8 @@
 """Admin authentication API routes."""
 
 import hmac
+import time
+from collections import deque
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -8,17 +10,22 @@ from pydantic import BaseModel, Field
 
 from nebula.core.auth import (
     create_signed_session_token,
+    get_admin_session_username,
+    get_client_ip,
     is_admin_auth_enabled,
     verify_admin_credentials,
     verify_signed_session_token,
 )
 from nebula.core.config import AppSettings, get_app_settings
+from nebula.utils import get_logger
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 ADMIN_SESSION_COOKIE = "nebula_admin_session"
 ADMIN_CSRF_COOKIE = "nebula_admin_csrf"
 ADMIN_CSRF_HEADER = "x-csrf-token"
+_LOGIN_ATTEMPTS: dict[str, deque[float]] = {}
 
 
 class LoginRequest(BaseModel):
@@ -50,18 +57,11 @@ def _get_csrf_secret(settings: AppSettings) -> str:
 
 
 def _read_session_username(request: Request, settings: AppSettings) -> str | None:
-    token = request.cookies.get(ADMIN_SESSION_COOKIE)
-    if not token:
-        return None
-
-    payload = verify_signed_session_token(token, _get_session_secret(settings))
-    if not payload:
-        return None
-
-    username = payload.get("u")
-    if not isinstance(username, str):
-        return None
-    return username
+    return get_admin_session_username(
+        request,
+        settings,
+        cookie_name=ADMIN_SESSION_COOKIE,
+    )
 
 
 def _read_csrf_token(request: Request, settings: AppSettings) -> str | None:
@@ -77,6 +77,91 @@ def _read_csrf_token(request: Request, settings: AppSettings) -> str | None:
     if username != settings.admin_username:
         return None
     return csrf_token
+
+
+def _mask_username(username: str) -> str:
+    if len(username) <= 2:
+        return "*" * len(username)
+    return f"{username[:2]}***"
+
+
+def _login_rate_limit_keys(request: Request, username: str) -> tuple[str, str]:
+    client_ip = get_client_ip(request)
+    return (
+        f"ip:{client_ip}",
+        f"user:{username.strip().lower()}",
+    )
+
+
+def _prune_login_attempts(key: str, now_ts: float, window_seconds: int) -> deque[float]:
+    bucket = _LOGIN_ATTEMPTS.setdefault(key, deque())
+    cutoff = now_ts - window_seconds
+    while bucket and bucket[0] < cutoff:
+        bucket.popleft()
+    return bucket
+
+
+def _enforce_login_rate_limit(
+    request: Request,
+    username: str,
+    settings: AppSettings,
+) -> None:
+    now_ts = time.monotonic()
+    keys = _login_rate_limit_keys(request, username)
+    for key in keys:
+        bucket = _prune_login_attempts(
+            key,
+            now_ts,
+            settings.admin_login_rate_limit_window_seconds,
+        )
+        if len(bucket) >= settings.admin_login_rate_limit_max_attempts:
+            logger.warning(
+                "Admin login rate limit exceeded "
+                f"bucket={key.split(':', 1)[0]} "
+                f"username={_mask_username(username)} "
+                f"client_ip={get_client_ip(request)}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many login attempts. Please try again later.",
+            )
+
+
+def _record_failed_login(
+    request: Request,
+    username: str,
+    settings: AppSettings,
+) -> None:
+    now_ts = time.monotonic()
+    for key in _login_rate_limit_keys(request, username):
+        bucket = _prune_login_attempts(
+            key,
+            now_ts,
+            settings.admin_login_rate_limit_window_seconds,
+        )
+        bucket.append(now_ts)
+    logger.warning(
+        "Admin login failed "
+        f"username={_mask_username(username)} "
+        f"client_ip={get_client_ip(request)}"
+    )
+
+
+def _clear_login_failures(request: Request, username: str) -> None:
+    for key in _login_rate_limit_keys(request, username):
+        _LOGIN_ATTEMPTS.pop(key, None)
+
+
+def _request_is_secure(request: Request, settings: AppSettings) -> bool:
+    if settings.force_secure_cookies:
+        return True
+    if request.url.scheme == "https":
+        return True
+    if settings.trust_proxy_headers:
+        forwarded_proto = request.headers.get("x-forwarded-proto", "")
+        if forwarded_proto.split(",")[0].strip().lower() == "https":
+            return True
+    return False
 
 
 def require_admin(
@@ -138,11 +223,14 @@ async def login_admin(
             detail="Admin auth is not configured",
         )
 
+    _enforce_login_rate_limit(request, payload.username, settings)
     if not verify_admin_credentials(payload.username, payload.password, settings):
+        _record_failed_login(request, payload.username, settings)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
         )
+    _clear_login_failures(request, payload.username)
 
     expires_delta = timedelta(hours=settings.admin_session_ttl_hours)
     token = create_signed_session_token(
@@ -155,13 +243,20 @@ async def login_admin(
         secret=_get_csrf_secret(settings),
         expires_in_seconds=int(expires_delta.total_seconds()),
     )
+    secure_cookie = _request_is_secure(request, settings)
+    logger.info(
+        "Admin login succeeded "
+        f"username={_mask_username(settings.admin_username)} "
+        f"client_ip={get_client_ip(request)} "
+        f"secure_cookie={secure_cookie}"
+    )
 
     response.set_cookie(
         key=ADMIN_SESSION_COOKIE,
         value=token,
         max_age=int(expires_delta.total_seconds()),
         httponly=True,
-        secure=request.url.scheme == "https",
+        secure=secure_cookie,
         samesite="lax",
         path="/",
     )
@@ -170,7 +265,7 @@ async def login_admin(
         value=csrf_token,
         max_age=int(expires_delta.total_seconds()),
         httponly=False,
-        secure=request.url.scheme == "https",
+        secure=secure_cookie,
         samesite="lax",
         path="/",
     )

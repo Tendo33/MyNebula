@@ -53,18 +53,12 @@ class _SnapshotRepoStub:
 
 
 @pytest.mark.asyncio
-async def test_get_graph_data_with_options_omits_edges(monkeypatch):
-    async def _fake_user(_db):
-        return SimpleNamespace(id=1)
-
-    monkeypatch.setattr(
-        "nebula.application.services.graph_query_service._get_default_user",
-        _fake_user,
-    )
+async def test_get_graph_data_with_options_omits_edges():
     service = GraphQueryService(snapshot_repo=_SnapshotRepoStub())
 
     payload = await service.get_graph_data_with_options(
         db=object(),
+        user=SimpleNamespace(id=1),
         version="active",
         include_edges=False,
     )
@@ -75,19 +69,14 @@ async def test_get_graph_data_with_options_omits_edges(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_rollback_active_snapshot_activates_previous(monkeypatch):
+async def test_rollback_active_snapshot_activates_previous():
     repo = _SnapshotRepoStub()
-
-    async def _fake_user(_db):
-        return SimpleNamespace(id=1)
-
-    monkeypatch.setattr(
-        "nebula.application.services.graph_query_service._get_default_user",
-        _fake_user,
-    )
     service = GraphQueryService(snapshot_repo=repo)
 
-    payload = await service.rollback_active_snapshot(db=object())
+    payload = await service.rollback_active_snapshot(
+        db=object(),
+        user=SimpleNamespace(id=1),
+    )
 
     assert repo.activated_snapshot_id == 1
     assert payload.version == "snapshot-previous"
