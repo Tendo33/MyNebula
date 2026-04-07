@@ -34,6 +34,15 @@ class SyncPipelineService:
                     "Pipeline already running "
                     f"(user_id={user_id}, run_id={active_run.id}, status={active_run.status})"
                 )
+            active_full_refresh = await self._get_active_full_refresh_task_from_db(
+                db, user_id
+            )
+            if active_full_refresh is not None:
+                raise ValueError(
+                    "Full refresh already running "
+                    f"(user_id={user_id}, task_id={active_full_refresh.id}, "
+                    f"status={active_full_refresh.status})"
+                )
             run = PipelineRun(
                 user_id=user_id,
                 status=PipelineStatus.pending.value,
@@ -372,6 +381,25 @@ class SyncPipelineService:
                 ),
             )
             .order_by(PipelineRun.id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def _get_active_full_refresh_task_from_db(
+        self,
+        db: AsyncSession,
+        user_id: int,
+    ) -> SyncTask | None:
+        result = await db.execute(
+            select(SyncTask)
+            .where(
+                SyncTask.user_id == user_id,
+                SyncTask.task_type == "full_refresh",
+                SyncTask.status.in_(
+                    [PipelineStatus.pending.value, PipelineStatus.running.value]
+                ),
+            )
+            .order_by(SyncTask.id.desc())
             .limit(1)
         )
         return result.scalar_one_or_none()

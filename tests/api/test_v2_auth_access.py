@@ -163,3 +163,76 @@ async def test_login_admin_rate_limits_repeated_failures():
     assert second_exc.value.status_code == 429
 
     auth_api._LOGIN_ATTEMPTS.clear()
+
+
+@pytest.mark.asyncio
+async def test_repo_search_rejects_demo_mode(monkeypatch):
+    from nebula.api.v2 import repos as repos_api
+    from nebula.schemas.repo import RepoSearchRequest
+
+    class _FakeEmbeddingService:
+        async def embed_text(self, _query: str):
+            return [0.1, 0.2, 0.3]
+
+    class _FakeResult:
+        def all(self):
+            return []
+
+    class _FakeDb:
+        async def execute(self, _statement):
+            return _FakeResult()
+
+    monkeypatch.setattr(repos_api, "get_app_settings", lambda: AppSettings(read_access_mode="demo"), raising=False)
+    monkeypatch.setattr(repos_api, "get_embedding_service", lambda: _FakeEmbeddingService())
+
+    with pytest.raises(HTTPException) as exc_info:
+        await repos_api.search_repos(
+            request=RepoSearchRequest(query="vector search"),
+            http_request=_build_request(),
+            user=SimpleNamespace(id=1),
+            db=_FakeDb(),
+        )
+
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_repo_search_allows_demo_mode_with_valid_admin_session(monkeypatch):
+    from nebula.api.v2 import repos as repos_api
+    from nebula.schemas.repo import RepoSearchRequest
+
+    class _FakeEmbeddingService:
+        async def embed_text(self, _query: str):
+            return [0.1, 0.2, 0.3]
+
+    class _FakeResult:
+        def all(self):
+            return []
+
+    class _FakeDb:
+        async def execute(self, _statement):
+            return _FakeResult()
+
+    settings = AppSettings(
+        read_access_mode="demo",
+        admin_username="owner",
+        admin_password="topsecret",
+        admin_session_secret="session-secret",
+    )
+    session_cookie = create_signed_session_token(
+        username="owner",
+        secret=settings.admin_session_secret,
+        expires_in_seconds=60,
+    )
+
+    monkeypatch.setattr(repos_api, "get_embedding_service", lambda: _FakeEmbeddingService())
+
+    results = await repos_api.search_repos(
+        request=RepoSearchRequest(query="vector search"),
+        user=SimpleNamespace(id=1),
+        db=_FakeDb(),
+        settings=settings,
+        http_request=_build_request(session_cookie=session_cookie),
+    )
+
+    assert results == []

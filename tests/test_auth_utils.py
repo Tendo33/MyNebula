@@ -12,6 +12,7 @@ from nebula.api.v2.auth import (
 )
 from nebula.core.auth import (
     create_signed_session_token,
+    get_client_ip,
     is_admin_auth_enabled,
     verify_admin_credentials,
     verify_signed_session_token,
@@ -133,3 +134,19 @@ def test_require_admin_csrf_accepts_valid_token():
     request = _build_post_request(csrf_cookie=csrf_token, csrf_header=csrf_token)
 
     require_admin_csrf(request=request, settings=settings, _="owner")
+
+
+def test_get_client_ip_ignores_forwarded_for_by_default():
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v2/auth/me",
+        "headers": [(b"x-forwarded-for", b"203.0.113.9")],
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+
+    assert get_client_ip(request) == "127.0.0.1"

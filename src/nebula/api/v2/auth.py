@@ -85,8 +85,14 @@ def _mask_username(username: str) -> str:
     return f"{username[:2]}***"
 
 
-def _login_rate_limit_keys(request: Request, username: str) -> tuple[str, str]:
-    client_ip = get_client_ip(request)
+def _login_rate_limit_keys(
+    request: Request,
+    username: str,
+    settings: AppSettings,
+) -> tuple[str, str]:
+    client_ip = get_client_ip(
+        request, trust_proxy_headers=settings.trust_proxy_headers
+    )
     return (
         f"ip:{client_ip}",
         f"user:{username.strip().lower()}",
@@ -107,7 +113,7 @@ def _enforce_login_rate_limit(
     settings: AppSettings,
 ) -> None:
     now_ts = time.monotonic()
-    keys = _login_rate_limit_keys(request, username)
+    keys = _login_rate_limit_keys(request, username, settings)
     for key in keys:
         bucket = _prune_login_attempts(
             key,
@@ -119,7 +125,7 @@ def _enforce_login_rate_limit(
                 "Admin login rate limit exceeded "
                 f"bucket={key.split(':', 1)[0]} "
                 f"username={_mask_username(username)} "
-                f"client_ip={get_client_ip(request)}"
+                f"client_ip={get_client_ip(request, trust_proxy_headers=settings.trust_proxy_headers)}"
             )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -133,7 +139,7 @@ def _record_failed_login(
     settings: AppSettings,
 ) -> None:
     now_ts = time.monotonic()
-    for key in _login_rate_limit_keys(request, username):
+    for key in _login_rate_limit_keys(request, username, settings):
         bucket = _prune_login_attempts(
             key,
             now_ts,
@@ -143,12 +149,16 @@ def _record_failed_login(
     logger.warning(
         "Admin login failed "
         f"username={_mask_username(username)} "
-        f"client_ip={get_client_ip(request)}"
+        f"client_ip={get_client_ip(request, trust_proxy_headers=settings.trust_proxy_headers)}"
     )
 
 
-def _clear_login_failures(request: Request, username: str) -> None:
-    for key in _login_rate_limit_keys(request, username):
+def _clear_login_failures(
+    request: Request,
+    username: str,
+    settings: AppSettings,
+) -> None:
+    for key in _login_rate_limit_keys(request, username, settings):
         _LOGIN_ATTEMPTS.pop(key, None)
 
 
@@ -230,7 +240,7 @@ async def login_admin(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
         )
-    _clear_login_failures(request, payload.username)
+    _clear_login_failures(request, payload.username, settings)
 
     expires_delta = timedelta(hours=settings.admin_session_ttl_hours)
     token = create_signed_session_token(
@@ -247,7 +257,7 @@ async def login_admin(
     logger.info(
         "Admin login succeeded "
         f"username={_mask_username(settings.admin_username)} "
-        f"client_ip={get_client_ip(request)} "
+        f"client_ip={get_client_ip(request, trust_proxy_headers=settings.trust_proxy_headers)} "
         f"secure_cookie={secure_cookie}"
     )
 

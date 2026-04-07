@@ -5,11 +5,14 @@ Handles repository CRUD and semantic search operations.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.params import Depends as DependsParam
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.related_repo_service import get_related_repos
+from nebula.core.auth import get_admin_session_username
+from nebula.core.config import AppSettings, get_app_settings
 from nebula.core.embedding import get_embedding_service
 from nebula.db import (
     RepoRelatedFeedback,
@@ -29,6 +32,7 @@ from nebula.schemas.repo import (
 from nebula.utils import get_logger
 
 from .access import resolve_read_user
+from .auth import ADMIN_SESSION_COOKIE
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -240,8 +244,10 @@ async def submit_related_feedback(
 @router.post("/search", response_model=list[RepoSearchResponse])
 async def search_repos(
     request: RepoSearchRequest,
+    http_request: Request,
     user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
+    settings: AppSettings = Depends(get_app_settings),  # noqa: B008
 ):
     """Semantic search for repositories.
 
@@ -252,6 +258,22 @@ async def search_repos(
     Returns:
         List of matching repositories with similarity scores
     """
+    if isinstance(settings, DependsParam):
+        settings = get_app_settings()
+
+    session_username = get_admin_session_username(
+        http_request,
+        settings,
+        cookie_name=ADMIN_SESSION_COOKIE,
+    )
+    is_admin_session = session_username == settings.admin_username
+
+    if settings.effective_read_access_mode() == "demo" and not is_admin_session:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Semantic search requires authenticated read mode",
+        )
+
     # Get embedding for query
     embedding_service = get_embedding_service()
     query_embedding = await embedding_service.embed_text(request.query)

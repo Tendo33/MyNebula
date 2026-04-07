@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
+from fastapi.background import BackgroundTasks
 
 from nebula.schemas.v2.settings import ScheduleResponse, SyncInfoResponse
 
@@ -111,3 +112,69 @@ async def test_update_graph_defaults_rejects_invalid_bounds():
         )
 
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
+    from nebula.application.services import sync_ops_service
+    from nebula.schemas.v2.settings import FullRefreshRequest
+
+    user = type("User", (), {"id": 1})()
+
+    async def fake_get_default_user(*_args, **_kwargs):
+        return user
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    class _FakeResult:
+        def __init__(self, scalar_value):
+            self._scalar_value = scalar_value
+
+        def scalar_one_or_none(self):
+            return self._scalar_value
+
+        def scalar(self):
+            return self._scalar_value
+
+    class _Db:
+        def __init__(self):
+            self.execute_calls = 0
+            self.added = []
+
+        async def execute(self, _statement):
+            self.execute_calls += 1
+            if self.execute_calls == 1:
+                return _FakeResult(None)
+            return _FakeResult(0)
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def commit(self):
+            return None
+
+        async def refresh(self, obj):
+            obj.id = 123
+
+    db = _Db()
+    monkeypatch.setattr(sync_ops_service, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(sync_ops_service, "_acquire_full_refresh_creation_lock", noop)
+    async def fake_get_active_pipeline_run(*_args, **_kwargs):
+        return type("Run", (), {"id": 77, "status": "running"})()
+
+    monkeypatch.setattr(
+        sync_ops_service,
+        "_get_active_pipeline_run",
+        fake_get_active_pipeline_run,
+        raising=False,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await sync_ops_service.trigger_full_refresh(
+            payload=FullRefreshRequest(confirm=True),
+            background_tasks=BackgroundTasks(),
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 409

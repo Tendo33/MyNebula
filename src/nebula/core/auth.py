@@ -55,10 +55,10 @@ def get_admin_session_username(
     return username
 
 
-def get_client_ip(request: Request) -> str:
+def get_client_ip(request: Request, *, trust_proxy_headers: bool = False) -> str:
     """Best-effort client IP for audit logging and coarse rate limiting."""
     forwarded_for = request.headers.get("x-forwarded-for", "").strip()
-    if forwarded_for:
+    if trust_proxy_headers and forwarded_for:
         return forwarded_for.split(",")[0].strip()
     if request.client and request.client.host:
         return request.client.host

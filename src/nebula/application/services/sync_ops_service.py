@@ -8,6 +8,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
+from nebula.domain import PipelineStatus
 from nebula.application.services.sync_execution_service import (
     compute_embeddings_task,
     run_clustering_task,
@@ -15,7 +16,7 @@ from nebula.application.services.sync_execution_service import (
 )
 from nebula.application.services.user_service import get_default_user
 from nebula.core.config import get_app_settings
-from nebula.db import StarredRepo, SyncSchedule, SyncTask, User
+from nebula.db import PipelineRun, StarredRepo, SyncSchedule, SyncTask, User
 from nebula.schemas.v2.settings import (
     FullRefreshRequest,
     FullRefreshResponse,
@@ -27,7 +28,7 @@ from nebula.schemas.v2.settings import (
 from nebula.utils import get_logger
 
 logger = get_logger(__name__)
-FULL_REFRESH_LOCK_KEY_BASE = 890_000_000
+FULL_REFRESH_LOCK_KEY_BASE = 870_000_000
 
 
 def _to_utc(dt: datetime | None) -> datetime | None:
@@ -389,6 +390,12 @@ async def trigger_full_refresh(
     validate_full_refresh_confirmation(payload.confirm)
     user = await get_default_user(db)
     await _acquire_full_refresh_creation_lock(db, user.id)
+    active_pipeline = await _get_active_pipeline_run(db, user.id)
+    if active_pipeline is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Pipeline already running (run_id={active_pipeline.id})",
+        )
 
     result = await db.execute(
         select(SyncTask).where(
@@ -447,6 +454,24 @@ async def _acquire_full_refresh_creation_lock(
         text("SELECT pg_advisory_xact_lock(:lock_key)"),
         {"lock_key": FULL_REFRESH_LOCK_KEY_BASE + int(user_id)},
     )
+
+
+async def _get_active_pipeline_run(
+    db: AsyncSession,
+    user_id: int,
+) -> PipelineRun | None:
+    result = await db.execute(
+        select(PipelineRun)
+        .where(
+            PipelineRun.user_id == user_id,
+            PipelineRun.status.in_(
+                [PipelineStatus.pending.value, PipelineStatus.running.value]
+            ),
+        )
+        .order_by(PipelineRun.id.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 async def get_sync_info(

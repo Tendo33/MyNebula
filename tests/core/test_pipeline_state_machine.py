@@ -9,6 +9,7 @@ class _FakeDbContext:
     def __init__(self, run):
         self._run = run
         self._user = SimpleNamespace(id=run.user_id)
+        self._added: list[object] = []
 
     async def __aenter__(self):
         return self
@@ -22,6 +23,16 @@ class _FakeDbContext:
         if model.__name__ == "User":
             return self._user
         return None
+
+    def add(self, obj):
+        self._added.append(obj)
+
+    async def commit(self):
+        return None
+
+    async def refresh(self, obj):
+        if getattr(obj, "id", None) is None:
+            obj.id = 999
 
 
 @pytest.mark.asyncio
@@ -176,3 +187,34 @@ async def test_recluster_pipeline_runs_clustering_then_snapshot(monkeypatch):
     assert len(snapshot_calls) == 1
     assert snapshot_calls[0][1] == 9
     assert status_updates[-1] == (PipelineStatus.completed, PipelinePhase.completed)
+
+
+@pytest.mark.asyncio
+async def test_create_pipeline_run_rejects_when_full_refresh_task_active(monkeypatch):
+    from nebula.application.services import pipeline_service as pipeline_module
+
+    run = SimpleNamespace(id=1, user_id=9)
+    monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
+
+    service = pipeline_module.SyncPipelineService()
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    async def fake_get_active_pipeline_from_db(*_args, **_kwargs):
+        return None
+
+    async def fake_get_active_full_refresh_task_from_db(*_args, **_kwargs):
+        return SimpleNamespace(id=55, status="running")
+
+    monkeypatch.setattr(service, "_acquire_pipeline_creation_lock", noop)
+    monkeypatch.setattr(service, "_get_active_pipeline_from_db", fake_get_active_pipeline_from_db)
+    monkeypatch.setattr(
+        service,
+        "_get_active_full_refresh_task_from_db",
+        fake_get_active_full_refresh_task_from_db,
+        raising=False,
+    )
+
+    with pytest.raises(ValueError, match="Full refresh already running"):
+        await service.create_pipeline_run(user_id=9)
