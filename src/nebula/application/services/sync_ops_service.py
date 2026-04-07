@@ -8,7 +8,6 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
-from nebula.domain import PipelineStatus
 from nebula.application.services.sync_execution_service import (
     compute_embeddings_task,
     run_clustering_task,
@@ -17,6 +16,7 @@ from nebula.application.services.sync_execution_service import (
 from nebula.application.services.user_service import get_default_user
 from nebula.core.config import get_app_settings
 from nebula.db import PipelineRun, StarredRepo, SyncSchedule, SyncTask, User
+from nebula.domain import PipelineStatus
 from nebula.schemas.v2.settings import (
     FullRefreshRequest,
     FullRefreshResponse,

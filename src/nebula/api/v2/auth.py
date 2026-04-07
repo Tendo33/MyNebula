@@ -90,9 +90,7 @@ def _login_rate_limit_keys(
     username: str,
     settings: AppSettings,
 ) -> tuple[str, str]:
-    client_ip = get_client_ip(
-        request, trust_proxy_headers=settings.trust_proxy_headers
-    )
+    client_ip = get_client_ip(request, trust_proxy_headers=settings.trust_proxy_headers)
     return (
         f"ip:{client_ip}",
         f"user:{username.strip().lower()}",

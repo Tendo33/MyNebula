@@ -33,7 +33,9 @@ class GraphQueryService:
         self.builder = builder or GraphSnapshotBuilderService()
         self.settings = get_app_settings()
 
-    async def ensure_active_snapshot(self, db: AsyncSession, *, user: User) -> GraphSnapshot:
+    async def ensure_active_snapshot(
+        self, db: AsyncSession, *, user: User
+    ) -> GraphSnapshot:
         snapshot = await self.snapshot_repo.get_active_snapshot(db, user.id)
         if snapshot:
             return snapshot
@@ -179,7 +181,9 @@ class GraphQueryService:
         )
         return page
 
-    async def rebuild_active_snapshot(self, db: AsyncSession, *, user: User) -> GraphData:
+    async def rebuild_active_snapshot(
+        self, db: AsyncSession, *, user: User
+    ) -> GraphData:
         await self._acquire_snapshot_rebuild_lock(db, user.id)
         version, graph_data, timeline_data = await self.builder.build_payload(db)
         snapshot = await self.snapshot_repo.save_snapshot_payload(
