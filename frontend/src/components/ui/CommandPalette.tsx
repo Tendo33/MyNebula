@@ -60,7 +60,7 @@ const useRecentSearches = () => {
       if (stored) {
         setRecentSearches(JSON.parse(stored));
       }
-    } catch (e) {
+    } catch {
       console.warn('Failed to load recent searches');
     }
   }, []);
@@ -73,7 +73,7 @@ const useRecentSearches = () => {
       const updated = [query, ...filtered].slice(0, MAX_RECENT_SEARCHES);
       try {
         localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
-      } catch (e) {
+      } catch {
         console.warn('Failed to save recent searches');
       }
       return updated;
@@ -84,7 +84,7 @@ const useRecentSearches = () => {
     setRecentSearches([]);
     try {
       localStorage.removeItem(RECENT_SEARCHES_KEY);
-    } catch (e) {
+    } catch {
       console.warn('Failed to clear recent searches');
     }
   }, []);

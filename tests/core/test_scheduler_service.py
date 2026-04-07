@@ -12,7 +12,7 @@ class _FakeDbContext:
         self._events.append("enter")
         return self._db
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, _tb):
         self._events.append("exit")
         return False
 

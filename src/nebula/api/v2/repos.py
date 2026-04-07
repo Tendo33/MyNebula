@@ -63,6 +63,7 @@ async def list_repos(
     Returns:
         Paginated list of repositories
     """
+    # WARNING: AI 建议检查此接口是否仍被前端或外部调用方依赖；当前 frontend/src 中未发现直接调用证据。
     # Build query
     query = select(StarredRepo).where(StarredRepo.user_id == user.id)
 
@@ -134,6 +135,7 @@ async def get_repo(
     Returns:
         Repository details
     """
+    # WARNING: AI 建议检查此接口是否仍被前端或外部调用方依赖；当前 frontend/src 中未发现直接调用证据。
     result = await db.execute(
         select(StarredRepo).where(
             StarredRepo.id == repo_id,
@@ -258,6 +260,7 @@ async def search_repos(
     Returns:
         List of matching repositories with similarity scores
     """
+    # WARNING: AI 建议检查此接口是否仍被前端或外部调用方依赖；当前 frontend/src 中未发现直接调用证据。
     if isinstance(settings, DependsParam):
         settings = get_app_settings()
 
@@ -328,6 +331,7 @@ async def get_language_stats(
     Returns:
         Language breakdown with counts
     """
+    # WARNING: AI 建议检查此接口是否仍被前端或外部调用方依赖；当前 frontend/src 中未发现直接调用证据。
     query = (
         select(
             StarredRepo.language,

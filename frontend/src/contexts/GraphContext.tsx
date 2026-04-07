@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ClusterInfo, GraphData, GraphNode, TimelineData } from '../types';
+import { GraphData, GraphNode, TimelineData } from '../types';
 import { GraphSettingsState, useGraphStore } from '../stores/graphStore';
 import {
   GRAPH_DATA_QUERY_KEY,
@@ -290,30 +290,6 @@ export const useGraph = (): GraphContextValue => {
     throw new Error('useGraph must be used within a GraphProvider');
   }
   return context;
-};
-
-export const useLanguages = (): string[] => {
-  const { rawData } = useGraph();
-  return useMemo(() => {
-    if (!rawData) return [];
-    const languageCounts = new Map<string, number>();
-    rawData.nodes.forEach((node) => {
-      if (node.language) {
-        languageCounts.set(node.language, (languageCounts.get(node.language) || 0) + 1);
-      }
-    });
-    return Array.from(languageCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([language]) => language);
-  }, [rawData]);
-};
-
-export const useCluster = (clusterId: number | null): ClusterInfo | undefined => {
-  const { rawData } = useGraph();
-  return useMemo(() => {
-    if (!rawData || clusterId == null) return undefined;
-    return rawData.clusters.find((cluster) => cluster.id === clusterId);
-  }, [rawData, clusterId]);
 };
 
 export const useNodeNeighbors = (nodeId: number | undefined): Set<number> => {

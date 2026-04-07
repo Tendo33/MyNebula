@@ -14,7 +14,7 @@ class _FakeDbContext:
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, _tb):
         return False
 
     async def get(self, model, _id):
