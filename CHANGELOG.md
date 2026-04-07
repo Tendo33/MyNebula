@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-04-07
+
 ### Changed
 - Refreshed top-level and `doc/` documentation to match the current `/api/v2` routes, admin auth model, Docker behavior, frontend dev flow, and evaluation workflow.
 - Updated `.env.example` comments and runtime guidance to cover `CORS_ORIGINS` plus the requirement that admin auth needs both password and session secret.
+- Synchronized version metadata to `1.2.1` across backend package metadata, frontend package metadata, runtime config, environment templates/docs, and Python/frontend lockfiles.
 
 ## [1.2.0] - 2026-03-30
 
@@ -162,7 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Tendo33/mynebula/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Tendo33/mynebula/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/Tendo33/mynebula/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/Tendo33/mynebula/compare/v1.1.0...v1.1.1

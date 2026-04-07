@@ -61,13 +61,33 @@ class VersionUpdater:
                 '"version": "{version}"',
             ),
             (
+                project_root / "frontend" / "package-lock.json",
+                r'(^  "version": ")([^"]+)(",$)',
+                r"\g<1>{version}\g<3>",
+            ),
+            (
+                project_root / "frontend" / "package-lock.json",
+                r'("": \{\n\s*"name": "mynebula-frontend",\n\s*"version": ")([^"]+)(",)',
+                r"\g<1>{version}\g<3>",
+            ),
+            (
+                project_root / "uv.lock",
+                r'(name = "mynebula"\nversion = ")([^"]+)("\nsource = \{ editable = "\." \})',
+                r"\g<1>{version}\g<3>",
+            ),
+            (
+                project_root / ".env.example",
+                r"(APP_VERSION=)(\d+\.\d+\.\d+)",
+                r"\g<1>{version}",
+            ),
+            (
                 project_root / "doc" / "ENV_VARS.md",
                 r"(APP_VERSION=)(\d+\.\d+\.\d+)",
                 r"\g<1>{version}",
             ),
             (
                 project_root / "doc" / "ENV_VARS.md",
-                r"(\|\s*`APP_VERSION`\s*\|\s*string\s*\|\s*`)(\d+\.\d+\.\d+)(`\s*\|)",
+                r"(\|\s*`APP_VERSION`\s*\|\s*`)(\d+\.\d+\.\d+)(`\s*\|)",
                 r"\g<1>{version}\g<3>",
             ),
         ]
@@ -135,7 +155,14 @@ class VersionUpdater:
             if not match:
                 return False, f"Version pattern not found in {file_path}"
 
-            old_version = match.group(1)
+            old_version = next(
+                (
+                    group
+                    for group in match.groups()
+                    if group and self.validate_version(group)
+                ),
+                match.group(1),
+            )
 
             # Replace version
             new_line = replacement.format(version=new_version)
