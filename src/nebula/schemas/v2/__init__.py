@@ -1,7 +1,13 @@
 """V2 API schemas."""
 
-from .dashboard import DashboardCluster, DashboardResponse, DashboardSummary
-from .data import DataRepoItem, DataReposResponse
+from .dashboard import (
+    DashboardCluster,
+    DashboardLanguageStat,
+    DashboardResponse,
+    DashboardSummary,
+    DashboardTopicStat,
+)
+from .data import DataClusterInfo, DataRepoItem, DataReposResponse
 from .graph import GraphEdgesPage
 from .settings import (
     FullRefreshJobResponse,
@@ -22,8 +28,11 @@ from .sync import PipelineStartResponse, PipelineStatusResponse
 
 __all__ = [
     "DashboardCluster",
+    "DashboardLanguageStat",
     "DashboardResponse",
     "DashboardSummary",
+    "DashboardTopicStat",
+    "DataClusterInfo",
     "DataRepoItem",
     "DataReposResponse",
     "FullRefreshRequest",

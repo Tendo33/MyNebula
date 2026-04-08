@@ -114,6 +114,7 @@ async def test_login_admin_uses_secure_cookie_behind_trusted_proxy():
         admin_password="topsecret",
         admin_session_secret="session-secret",
         trust_proxy_headers=True,
+        trusted_proxy_ips="127.0.0.1",
     )
     response = Response()
 
@@ -128,6 +129,60 @@ async def test_login_admin_uses_secure_cookie_behind_trusted_proxy():
     set_cookie_headers = response.headers.getlist("set-cookie")
     assert len(set_cookie_headers) == 2
     assert all("Secure" in header for header in set_cookie_headers)
+
+
+@pytest.mark.asyncio
+async def test_login_admin_ignores_forwarded_proto_when_proxy_trust_disabled():
+    from nebula.api.v2 import auth as auth_api
+
+    auth_api._LOGIN_ATTEMPTS.clear()
+    settings = AppSettings(
+        admin_username="owner",
+        admin_password="topsecret",
+        admin_session_secret="session-secret",
+        trust_proxy_headers=False,
+        trusted_proxy_ips="127.0.0.1",
+    )
+    response = Response()
+
+    payload = auth_api.LoginRequest(username="owner", password="topsecret")
+    await auth_api.login_admin(
+        payload=payload,
+        request=_build_request(forwarded_proto="https"),
+        response=response,
+        settings=settings,
+    )
+
+    set_cookie_headers = response.headers.getlist("set-cookie")
+    assert len(set_cookie_headers) == 2
+    assert all("Secure" not in header for header in set_cookie_headers)
+
+
+@pytest.mark.asyncio
+async def test_login_admin_ignores_forwarded_proto_from_untrusted_proxy():
+    from nebula.api.v2 import auth as auth_api
+
+    auth_api._LOGIN_ATTEMPTS.clear()
+    settings = AppSettings(
+        admin_username="owner",
+        admin_password="topsecret",
+        admin_session_secret="session-secret",
+        trust_proxy_headers=True,
+        trusted_proxy_ips="10.0.0.1",
+    )
+    response = Response()
+
+    payload = auth_api.LoginRequest(username="owner", password="topsecret")
+    await auth_api.login_admin(
+        payload=payload,
+        request=_build_request(forwarded_proto="https"),
+        response=response,
+        settings=settings,
+    )
+
+    set_cookie_headers = response.headers.getlist("set-cookie")
+    assert len(set_cookie_headers) == 2
+    assert all("Secure" not in header for header in set_cookie_headers)
 
 
 @pytest.mark.asyncio

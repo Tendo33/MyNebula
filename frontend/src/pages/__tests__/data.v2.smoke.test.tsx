@@ -43,10 +43,11 @@ vi.mock('../../features/data/hooks/useDataReposQuery', () => ({
       },
     ],
     clusters: [{ id: 1, name: 'Cluster 1', color: '#000000', repo_count: 1, keywords: [] }],
-    totalNodes: 1,
+    totalNodes: 3,
     count: 1,
     loading: false,
     error: null,
+    retry: vi.fn(),
   }),
 }));
 

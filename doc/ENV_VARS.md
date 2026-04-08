@@ -2,6 +2,12 @@
 
 本文档基于 `src/nebula/core/config.py` 和当前前端开发配置整理，优先级以代码实现为准。
 
+和部署安全最相关的三个组合配置是：
+
+1. 管理员认证：`ADMIN_PASSWORD` + `ADMIN_SESSION_SECRET`
+2. 只读访问边界：`READ_ACCESS_MODE`
+3. 反向代理信任边界：`TRUST_PROXY_HEADERS` + `TRUSTED_PROXY_IPS`
+
 ## 最小可运行配置
 
 复制模板：
@@ -31,7 +37,7 @@ cp .env.example .env
 | 变量名 | 默认值 | 说明 |
 | --- | --- | --- |
 | `APP_NAME` | `mynebula` | 应用名 |
-| `APP_VERSION` | `1.2.2` | 应用版本 |
+| `APP_VERSION` | `1.2.3` | 应用版本 |
 | `DEBUG` | `false` | 为 `true` 时开放 `/docs` 和 `/redoc` |
 | `SINGLE_USER_MODE` | `true` | 读取接口默认使用首个用户 |
 | `SNAPSHOT_READ_FALLBACK_ON_ERROR` | `true` | 快照读取异常时回退到实时构建 |
@@ -116,7 +122,7 @@ cp .env.example .env
 - 登录后后端会写入两个 Cookie：
   - `nebula_admin_session`
   - `nebula_admin_csrf`
-- 如果部署在反向代理 / TLS 终止后面，建议同时配置 `TRUST_PROXY_HEADERS=true`
+- 如果部署在反向代理 / TLS 终止后面，建议同时配置 `TRUST_PROXY_HEADERS=true` 和 `TRUSTED_PROXY_IPS`
 
 ## 访问与反向代理
 
@@ -124,6 +130,7 @@ cp .env.example .env
 | --- | --- | --- |
 | `READ_ACCESS_MODE` | `demo` | 读接口访问模式：`demo` 或 `authenticated` |
 | `TRUST_PROXY_HEADERS` | `false` | 是否信任 `X-Forwarded-*` 代理头 |
+| `TRUSTED_PROXY_IPS` | `""` | 允许注入 `X-Forwarded-*` 的代理 IP 列表，逗号分隔 |
 | `TRUSTED_HOSTS` | `""` | `TrustedHostMiddleware` 允许的 Host 列表，逗号分隔 |
 | `HTTPS_REDIRECT` | `false` | 是否启用 HTTP -> HTTPS 重定向 |
 | `CONTENT_SECURITY_POLICY` | `""` | 可选 CSP header 值 |
@@ -132,6 +139,15 @@ cp .env.example .env
 
 - `demo`：允许匿名只读访问，适合本地演示或受控内网环境
 - `authenticated`：读接口也要求管理员登录，不再匿名暴露现有数据
+
+代理信任说明：
+
+- 只有 `TRUST_PROXY_HEADERS=true` 且请求来源 IP 命中 `TRUSTED_PROXY_IPS` 时，MyNebula 才会信任 `X-Forwarded-For` / `X-Forwarded-Proto`
+- 这直接影响：
+  - 登录限流的客户端 IP 归因
+  - 登录成功/失败审计日志里的 `client_ip`
+  - 是否判定当前请求处于 secure-cookie 场景
+- 只打开 `TRUST_PROXY_HEADERS=true` 但不配置 `TRUSTED_PROXY_IPS`，实际效果仍然是不信任代理头
 
 ## 同步相关
 
@@ -164,7 +180,7 @@ VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
 
 ```bash
 APP_NAME=mynebula
-APP_VERSION=1.2.2
+APP_VERSION=1.2.3
 DEBUG=true
 SINGLE_USER_MODE=true
 READ_ACCESS_MODE=demo

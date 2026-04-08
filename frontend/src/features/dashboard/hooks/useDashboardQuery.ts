@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { getDashboardV2 } from '../../../api/v2/dashboard';
-import { getGraphDataV2, getTimelineDataV2 } from '../../../api/v2/graph';
+import { getTimelineDataV2 } from '../../../api/v2/graph';
 import { queryKeys } from '../../../lib/queryKeys';
 
 const getLanguageColor = (language: string): string => {
@@ -37,11 +37,6 @@ export const useDashboardQuery = () => {
     queryFn: getDashboardV2,
     staleTime: 20_000,
   });
-  const graphQuery = useQuery({
-    queryKey: [...queryKeys.graphData(), 'dashboard'],
-    queryFn: () => getGraphDataV2({ version: 'active', include_edges: false }),
-    staleTime: 20_000,
-  });
   const timelineQuery = useQuery({
     queryKey: [...queryKeys.timeline(), 'dashboard'],
     queryFn: () => getTimelineDataV2('active'),
@@ -50,55 +45,22 @@ export const useDashboardQuery = () => {
 
   const stats = useMemo(() => {
     const dashboard = dashboardQuery.data;
-    const graph = graphQuery.data;
     const timeline = timelineQuery.data;
-    if (!dashboard || !graph) return null;
+    if (!dashboard) return null;
 
-    const topicCounts: Record<string, number> = {};
-    const languageCounts: Record<string, number> = {};
-
-    graph.nodes.forEach((node) => {
-      if (node.language) {
-        languageCounts[node.language] = (languageCounts[node.language] || 0) + 1;
-      }
-      if (Array.isArray(node.topics)) {
-        node.topics.forEach((topic) => {
-          const normalizedTopic = topic.toLowerCase();
-          topicCounts[normalizedTopic] = (topicCounts[normalizedTopic] || 0) + 1;
-        });
-      }
-    });
-
-    const topLanguages = Object.entries(languageCounts)
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 8)
-      .map(([language, count]) => ({
+    const topLanguages = dashboard.top_languages.map(({ language, count }) => ({
         language,
         count,
-        percentage: graph.total_nodes > 0 ? (count / graph.total_nodes) * 100 : 0,
+        percentage: dashboard.summary.total_repos > 0 ? (count / dashboard.summary.total_repos) * 100 : 0,
         color: getLanguageColor(language),
       }));
-
-    const topClusters = dashboard.top_clusters.map((cluster) => {
-      const fullCluster = graph.clusters.find((item) => item.id === cluster.id);
-      return {
-				...cluster,
-				color: fullCluster?.color || cluster.color,
-				keywords: fullCluster?.keywords ?? [],
-			};
-    });
 
     const recentMonths = timeline?.points.slice(-3) ?? [];
     const recentActivity = recentMonths.reduce((sum, point) => sum + point.count, 0);
 
-    const topTopics = Object.entries(topicCounts)
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 12)
-      .map(([topic, count]) => ({ topic, count }));
-
     return {
       totalRepos: dashboard.summary.total_repos,
-      totalTopics: Object.keys(topicCounts).length,
+      totalTopics: dashboard.summary.total_topics,
       totalClusters: dashboard.summary.total_clusters,
       totalEdges: dashboard.summary.total_edges,
       topLanguages,
@@ -106,11 +68,11 @@ export const useDashboardQuery = () => {
         topLanguages[0] != null
           ? `${topLanguages[0].language} (${topLanguages[0].count})`
           : null,
-      topClusters,
-      topTopics,
+      topClusters: dashboard.top_clusters,
+      topTopics: dashboard.top_topics,
       recentActivity,
     };
-  }, [dashboardQuery.data, graphQuery.data, timelineQuery.data]);
+  }, [dashboardQuery.data, timelineQuery.data]);
 
   const activityData = useMemo(() => {
     const points = timelineQuery.data?.points ?? [];
@@ -130,18 +92,15 @@ export const useDashboardQuery = () => {
     stats,
     activityData,
     maxActivity,
-    rawData: graphQuery.data,
     timelineData: timelineQuery.data,
-    loading: dashboardQuery.isLoading || graphQuery.isLoading || timelineQuery.isLoading,
+    loading: dashboardQuery.isLoading || timelineQuery.isLoading,
     error:
       dashboardQuery.error ??
-      graphQuery.error ??
       timelineQuery.error ??
       null,
     retry: async () => {
       await Promise.all([
         dashboardQuery.refetch(),
-        graphQuery.refetch(),
         timelineQuery.refetch(),
       ]);
     },

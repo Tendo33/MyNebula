@@ -14,6 +14,13 @@ import {
   TIMELINE_QUERY_KEY,
   useTimelineQuery,
 } from '../features/graph/hooks/useTimelineQuery';
+import {
+  buildGraphFilterIndexes,
+  createVisibleNodeIds,
+  filterVisibleClusters,
+  filterVisibleEdges,
+  filterVisibleNodes,
+} from './graphFiltering';
 
 interface GraphFilters {
   selectedClusters: Set<number>;
@@ -109,6 +116,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [graphQuery.data, stagedEdges]);
   const timelineData = timelineQuery.data ?? null;
+  const graphFilterIndexes = useMemo(() => buildGraphFilterIndexes(rawData), [rawData]);
   const loading = graphQuery.isLoading || timelineQuery.isLoading;
   const edgesLoading = Boolean(
     graphQuery.data &&
@@ -153,91 +161,46 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [graphQuery, timelineQuery]);
 
+  const visibleNodes = useMemo(
+    () =>
+      filterVisibleNodes({
+        rawData,
+        timelineData,
+        filters,
+        indexes: graphFilterIndexes,
+      }),
+    [filters, graphFilterIndexes, rawData, timelineData]
+  );
+
+  const visibleNodeIds = useMemo(() => createVisibleNodeIds(visibleNodes), [visibleNodes]);
+
+  const visibleEdges = useMemo(
+    () => (rawData ? filterVisibleEdges(rawData.edges, visibleNodeIds) : []),
+    [rawData, visibleNodeIds]
+  );
+
+  const visibleClusters = useMemo(
+    () => (rawData ? filterVisibleClusters(rawData.clusters, visibleNodes) : []),
+    [rawData, visibleNodes]
+  );
+
   const filteredData = useMemo(() => {
     if (!rawData) return null;
 
-    let filteredNodes = [...rawData.nodes];
-
-    if (filters.selectedClusters.size > 0) {
-      filteredNodes = filteredNodes.filter(
-        (node) => node.cluster_id != null && filters.selectedClusters.has(node.cluster_id)
-      );
-    }
-
-    if (filters.selectedStarLists.size > 0) {
-      filteredNodes = filteredNodes.filter(
-        (node) => node.star_list_id != null && filters.selectedStarLists.has(node.star_list_id)
-      );
-    }
-
-    if (filters.searchQuery.trim()) {
-      const query = filters.searchQuery.toLowerCase().trim();
-      const starQueryMatch = query.match(/^stars:\s*>\s*(\d+)$/);
-      if (starQueryMatch) {
-        const minStars = Number.parseInt(starQueryMatch[1], 10);
-        filteredNodes = filteredNodes.filter((node) => node.stargazers_count > minStars);
-      } else {
-        filteredNodes = filteredNodes.filter(
-          (node) =>
-            node.name.toLowerCase().includes(query) ||
-            node.full_name.toLowerCase().includes(query) ||
-            (node.description?.toLowerCase().includes(query) ?? false) ||
-            (node.ai_summary?.toLowerCase().includes(query) ?? false) ||
-            (node.language?.toLowerCase().includes(query) ?? false) ||
-            (node.ai_tags?.some((tag) => tag.toLowerCase().includes(query)) ?? false) ||
-            (node.topics?.some((topic) => topic.toLowerCase().includes(query)) ?? false)
-        );
-      }
-    }
-
-    if (filters.minStars > 0) {
-      filteredNodes = filteredNodes.filter((node) => node.stargazers_count >= filters.minStars);
-    }
-
-    if (filters.languages.size > 0) {
-      filteredNodes = filteredNodes.filter(
-        (node) => node.language && filters.languages.has(node.language)
-      );
-    }
-
-    if (filters.timeRange && timelineData && timelineData.points.length > 0) {
-      const [startIdx, endIdx] = filters.timeRange;
-      const startDate = timelineData.points[startIdx]?.date;
-      const endDate = timelineData.points[endIdx]?.date;
-      if (startDate && endDate) {
-        filteredNodes = filteredNodes.filter((node) => {
-          if (!node.starred_at) return true;
-          const nodeDate = node.starred_at.substring(0, 7);
-          return nodeDate >= startDate && nodeDate <= endDate;
-        });
-      }
-    }
-
-    const visibleNodeIds = new Set(filteredNodes.map((node) => node.id));
-    const filteredEdges = rawData.edges.filter((edge) => {
-      const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
-      const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
-      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
-    });
-    const visibleClusterIds = new Set(
-      filteredNodes.map((node) => node.cluster_id).filter((id): id is number => id != null)
-    );
-    const filteredClusters = rawData.clusters.filter((cluster) => visibleClusterIds.has(cluster.id));
-
     return {
-      nodes: filteredNodes,
-      edges: filteredEdges,
-      clusters: filteredClusters,
+      nodes: visibleNodes,
+      edges: visibleEdges,
+      clusters: visibleClusters,
       star_lists: rawData.star_lists || [],
-      total_nodes: filteredNodes.length,
-      total_edges: filteredEdges.length,
-      total_clusters: filteredClusters.length,
+      total_nodes: visibleNodes.length,
+      total_edges: visibleEdges.length,
+      total_clusters: visibleClusters.length,
       total_star_lists: rawData.star_lists?.length || 0,
       version: rawData.version,
       generated_at: rawData.generated_at,
       request_id: rawData.request_id,
     };
-  }, [filters, rawData, timelineData]);
+  }, [rawData, visibleClusters, visibleEdges, visibleNodes]);
 
   const retryEdgeLoading = edgesQuery.retryEdgeLoading;
 

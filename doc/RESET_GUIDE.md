@@ -11,6 +11,11 @@
 
 优先使用 Settings 页面里的 `Full Refresh`，它会重置仓库处理状态并重新跑同步链路，但不会破坏数据库 schema。
 
+当前实现中，`Full Refresh` 已经具备更严格的失败传播语义：
+
+- stars / embeddings / clustering 任一子任务 hard fail，父任务会直接标记为 `failed`
+- 子任务 partial failure 会保留在任务元数据里，不再误报成功
+
 ### 真正删库重来
 
 使用下面的 reset 流程。
@@ -117,6 +122,7 @@ curl http://localhost:8000/health
 
 - `incremental` 或 `full` 能正常启动
 - `/api/v2/sync/jobs/{run_id}` 能返回状态
+- `pending/running/completed/failed/partial_failed` 状态流转符合预期
 
 ## 常见坑
 

@@ -1,51 +1,32 @@
 # Logging Guidelines
 
-> How logging is done in this project.
-
----
-
 ## Overview
 
-<!--
-Document your project's logging conventions here.
-
-Questions to answer:
-- What logging library do you use?
-- What are the log levels and when to use each?
-- What should be logged?
-- What should NOT be logged (PII, secrets)?
--->
-
-(To be filled by the team)
-
----
+The backend uses the shared logger utility (`nebula.utils.get_logger`) backed by Loguru. Logging should help operators understand pipeline progress and failure boundaries without leaking secrets or request-derived sensitive data.
 
 ## Log Levels
 
-<!-- When to use each level: debug, info, warn, error -->
+- `info`: lifecycle milestones, sync phase transitions, scheduler launches, successful admin login
+- `warning`: recoverable failures, skipped work, secondary system degradation
+- `error`: request/service failures that terminate the current operation
+- `exception`: same as error, but when a traceback materially helps diagnose the issue
 
-(To be filled by the team)
+## What To Log
 
----
+- Background job identifiers: `run_id`, `task_id`, `user_id`, `phase`
+- Scheduler launch decisions and skip reasons
+- Auth success/failure metadata that is safe to expose, such as masked username and coarse client IP
+- Database/task state transitions that affect visible UI state
 
-## Structured Logging
+## What Not To Log
 
-<!-- Log format, required fields -->
+- Admin passwords, session secrets, API keys, CSRF token values
+- Full cookie contents or signed session payloads
+- Large embedding vectors or raw README bodies
+- Untrusted forwarded header chains unless they have already passed proxy validation
 
-(To be filled by the team)
+## Format Guidance
 
----
-
-## What to Log
-
-<!-- Important events to log -->
-
-(To be filled by the team)
-
----
-
-## What NOT to Log
-
-<!-- Sensitive data, PII, secrets -->
-
-(To be filled by the team)
+- Prefer short structured key-value fragments inside message strings over long prose.
+- Include the failure reason once; do not duplicate the same exception across nested layers unless ownership changes.
+- When an operation ends in `partial_failed`, log both the terminal status and the summarized partial error text.

@@ -1,5 +1,12 @@
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
+const normalizeUtcTimestamp = (value: string): string => {
+  if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(value)) {
+    return value;
+  }
+  return `${value}Z`;
+};
+
 export const formatNextRunTime = (
   nextRunAt: string | null,
   timezone: string,
@@ -8,7 +15,7 @@ export const formatNextRunTime = (
   if (!nextRunAt) return t('time.not_set');
 
   try {
-    const date = new Date(nextRunAt);
+    const date = new Date(normalizeUtcTimestamp(nextRunAt));
     return date.toLocaleString(undefined, {
       timeZone: timezone,
       year: 'numeric',

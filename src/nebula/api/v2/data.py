@@ -3,18 +3,30 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, asc, desc, func, select
+from sqlalchemy import Text, and_, asc, cast, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
-from nebula.db import StarredRepo, User, get_db
-from nebula.schemas.v2 import DataRepoItem, DataReposResponse
+from nebula.db import Cluster, StarredRepo, User, get_db
+from nebula.schemas.v2 import DataClusterInfo, DataRepoItem, DataReposResponse
 
 from .access import resolve_read_user
 from .metadata import build_v2_metadata
 
 router = APIRouter()
 graph_service = GraphQueryService()
+
+
+def _normalized_query(query: str | None) -> str:
+    return (query or "").strip().lower()
+
+
+def _parse_stars_threshold(query: str | None) -> int | None:
+    normalized = _normalized_query(query)
+    if not normalized.startswith("stars:>"):
+        return None
+    raw_value = normalized.split("stars:>", 1)[1].strip()
+    return int(raw_value) if raw_value.isdigit() else None
 
 
 @router.get("/repos", response_model=DataReposResponse)
@@ -50,10 +62,22 @@ async def get_data_repos(
     if min_stars > 0:
         conditions.append(StarredRepo.stargazers_count >= min_stars)
     if q:
-        like_q = f"%{q.strip()}%"
-        conditions.append(
-            StarredRepo.full_name.ilike(like_q) | StarredRepo.description.ilike(like_q)
-        )
+        stars_threshold = _parse_stars_threshold(q)
+        if stars_threshold is not None:
+            conditions.append(StarredRepo.stargazers_count > stars_threshold)
+        else:
+            like_q = f"%{q.strip()}%"
+            conditions.append(
+                or_(
+                    StarredRepo.name.ilike(like_q),
+                    StarredRepo.full_name.ilike(like_q),
+                    StarredRepo.description.ilike(like_q),
+                    StarredRepo.ai_summary.ilike(like_q),
+                    StarredRepo.language.ilike(like_q),
+                    cast(StarredRepo.ai_tags, Text).ilike(like_q),
+                    cast(StarredRepo.topics, Text).ilike(like_q),
+                )
+            )
     if month:
         try:
             month_dt = datetime.strptime(month, "%Y-%m")
@@ -87,6 +111,10 @@ async def get_data_repos(
         select(func.count(StarredRepo.id)).where(and_(*conditions))
     )
     total_count = int(total_result.scalar() or 0)
+    total_repos_result = await db.execute(
+        select(func.count(StarredRepo.id)).where(StarredRepo.user_id == user.id)
+    )
+    total_repos = int(total_repos_result.scalar() or 0)
     result = await db.execute(
         select(StarredRepo)
         .where(and_(*conditions))
@@ -95,6 +123,10 @@ async def get_data_repos(
         .limit(limit)
     )
     repos = result.scalars().all()
+    clusters_result = await db.execute(
+        select(Cluster).where(Cluster.user_id == user.id).order_by(Cluster.repo_count.desc())
+    )
+    clusters = clusters_result.scalars().all()
     graph_data = await graph_service.get_graph_data_with_options(
         db,
         user=user,
@@ -125,7 +157,18 @@ async def get_data_repos(
             )
             for repo in repos
         ],
+        clusters=[
+            DataClusterInfo(
+                id=cluster.id,
+                name=cluster.name,
+                color=cluster.color,
+                repo_count=cluster.repo_count,
+                keywords=cluster.keywords or [],
+            )
+            for cluster in clusters
+        ],
         count=total_count,
+        total_repos=total_repos,
         limit=limit,
         offset=offset,
         **build_v2_metadata(

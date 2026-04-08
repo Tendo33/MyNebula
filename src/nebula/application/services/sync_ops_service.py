@@ -16,6 +16,7 @@ from nebula.application.services.sync_execution_service import (
 from nebula.application.services.user_service import get_default_user
 from nebula.core.config import get_app_settings
 from nebula.db import PipelineRun, StarredRepo, SyncSchedule, SyncTask, User
+from nebula.db.database import get_db_context
 from nebula.domain import PipelineStatus
 from nebula.schemas.v2.settings import (
     FullRefreshRequest,
@@ -29,6 +30,14 @@ from nebula.utils import get_logger
 
 logger = get_logger(__name__)
 FULL_REFRESH_LOCK_KEY_BASE = 870_000_000
+
+
+class FullRefreshSubTaskError(ValueError):
+    """Raised when a full-refresh subtask hard-fails or ends unexpectedly."""
+
+    def __init__(self, phase: str, message: str) -> None:
+        super().__init__(message)
+        self.phase = phase
 
 
 def _to_utc(dt: datetime | None) -> datetime | None:
@@ -134,7 +143,7 @@ def calculate_next_run_time(schedule: SyncSchedule) -> datetime | None:
         if now_local >= scheduled_today:
             scheduled_today += timedelta(days=1)
 
-        return scheduled_today.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+        return scheduled_today.astimezone(timezone.utc)
     except Exception as exc:
         logger.warning(f"Error calculating next run time: {exc}")
         return None
@@ -264,8 +273,6 @@ async def update_schedule(
 
 async def full_refresh_task(user_id: int, task_id: int):
     """Background task to perform full refresh of all repositories."""
-    from nebula.db.database import get_db_context
-
     async def _update_main_task(**fields) -> bool:
         async with get_db_context() as db:
             task = await db.get(SyncTask, task_id)
@@ -284,7 +291,36 @@ async def full_refresh_task(user_id: int, task_id: int):
             await db.refresh(sub_task)
             return sub_task.id
 
+    async def _validate_sub_task(task_id: int, phase: str) -> dict | None:
+        async with get_db_context() as db:
+            task = await db.get(SyncTask, task_id)
+            if task is None:
+                raise FullRefreshSubTaskError(
+                    phase,
+                    f"Full refresh subtask missing phase={phase} task_id={task_id}"
+                )
+            if task.status == "failed":
+                raise FullRefreshSubTaskError(
+                    phase,
+                    f"Full refresh subtask failed phase={phase} task_id={task_id}: "
+                    f"{task.error_message or 'Unknown error'}"
+                )
+            if task.status != "completed":
+                raise FullRefreshSubTaskError(
+                    phase,
+                    f"Full refresh subtask incomplete phase={phase} "
+                    f"task_id={task_id} status={task.status}"
+                )
+            if task.failed_items and task.failed_items > 0:
+                return {
+                    "phase": phase,
+                    "task_id": task_id,
+                    "failed_items": task.failed_items,
+                }
+            return None
+
     try:
+        partial_failures: list[dict] = []
         task_exists = await _update_main_task(
             status="running",
             started_at=datetime.now(timezone.utc),
@@ -323,6 +359,9 @@ async def full_refresh_task(user_id: int, task_id: int):
         logger.info(f"Full refresh: Starting full star sync for user {user_id}")
         stars_task_id = await _create_sub_task("stars")
         await sync_stars_task(user_id, stars_task_id, "full")
+        stars_partial = await _validate_sub_task(stars_task_id, "stars")
+        if stars_partial is not None:
+            partial_failures.append(stars_partial)
         await _update_main_task(
             error_details={"phase": "stars", "reset_count": reset_count},
             processed_items=2,
@@ -331,6 +370,9 @@ async def full_refresh_task(user_id: int, task_id: int):
         logger.info(f"Full refresh: Computing embeddings for user {user_id}")
         embed_task_id = await _create_sub_task("embedding")
         await compute_embeddings_task(user_id, embed_task_id)
+        embedding_partial = await _validate_sub_task(embed_task_id, "embeddings")
+        if embedding_partial is not None:
+            partial_failures.append(embedding_partial)
         await _update_main_task(
             error_details={"phase": "embeddings", "reset_count": reset_count},
             processed_items=3,
@@ -343,6 +385,9 @@ async def full_refresh_task(user_id: int, task_id: int):
         )
         cluster_task_id = await _create_sub_task("cluster")
         await run_clustering_task(user_id, cluster_task_id, use_llm=True)
+        clustering_partial = await _validate_sub_task(cluster_task_id, "clustering")
+        if clustering_partial is not None:
+            partial_failures.append(clustering_partial)
 
         await _update_main_task(
             error_details={"phase": "snapshot", "reset_count": reset_count},
@@ -369,15 +414,20 @@ async def full_refresh_task(user_id: int, task_id: int):
                     "clustering",
                     "snapshot",
                 ],
+                "partial_failures": partial_failures,
             },
         )
         logger.info(f"Full refresh completed for user {user_id}")
     except Exception as exc:
         logger.exception(f"Full refresh failed for user {user_id}: {exc}")
+        failed_phase = (
+            exc.phase if isinstance(exc, FullRefreshSubTaskError) else "full_refresh"
+        )
         await _update_main_task(
             status="failed",
             error_message=str(exc),
             completed_at=datetime.now(timezone.utc),
+            error_details={"phase": failed_phase},
         )
 
 

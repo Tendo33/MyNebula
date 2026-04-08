@@ -9,6 +9,7 @@ from nebula.application.services.graph_edge_service import (
     _build_similarity_edges_knn,
 )
 from nebula.application.services.sync_ops_service import (
+    calculate_next_run_time,
     calculate_progress_percent,
     estimate_eta_seconds,
     is_schedule_due,
@@ -81,6 +82,24 @@ def test_is_schedule_due_handles_same_minute_deduplication():
     last_run_local = datetime(2026, 2, 19, 9, 30, 10)
     assert is_schedule_due(now_local, 9, 30, last_run_local) is False
     assert is_schedule_due(now_local, 9, 30, None) is True
+
+
+def test_calculate_next_run_time_returns_timezone_aware_utc():
+    schedule = type(
+        "Schedule",
+        (),
+        {
+            "is_enabled": True,
+            "schedule_hour": 9,
+            "schedule_minute": 0,
+            "timezone": "Asia/Shanghai",
+        },
+    )()
+
+    next_run = calculate_next_run_time(schedule)
+
+    assert next_run is not None
+    assert next_run.tzinfo == timezone.utc
 
 
 def test_build_similarity_edges_knn_returns_unique_edges():

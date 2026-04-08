@@ -7,6 +7,8 @@ MyNebula 的主入口仍然是 HTTP API 和 Web UI，但当前仓库也支持以
 1. 这个项目目前不是一个“稳定对外发布的通用 SDK”
 2. 比较稳定的程序化入口主要是应用工厂、配置读取和少数脚本工具
 
+如果你的目标是读取业务数据或驱动前端页面，优先仍然应该走 HTTP API，尤其是 `/api/v2/dashboard`、`/api/v2/data/repos`、`/api/v2/graph*` 和 `/api/v2/settings*` 这些已经稳定下来的聚合接口。
+
 ## 安装方式
 
 本地开发推荐 editable install：
@@ -147,6 +149,17 @@ pythonpath = ["src"]
 - Web UI
 - `/api/v2` HTTP API
 - 现成脚本命令
+
+其中比较值得直接依赖的 v2 契约有：
+
+- `/api/v2/dashboard`
+  - 直接返回 summary、top languages、top topics、top clusters
+- `/api/v2/data/repos`
+  - 直接返回分页仓库列表、轻量 cluster 元数据、`total_repos`
+- `/api/v2/graph`
+  - 返回当前 active snapshot 的图数据
+- `/api/v2/graph/edges`
+  - 用于大图分页边加载
 
 ## 相关文档
 

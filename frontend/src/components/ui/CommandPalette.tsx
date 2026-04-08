@@ -15,6 +15,14 @@ import {
 } from 'lucide-react';
 import { useGraph } from '../../contexts/GraphContext';
 import { GraphNode, ClusterInfo } from '../../types';
+import {
+  asRepoSearchCandidate,
+  matchesClusterSearch,
+  matchesFacetSearch,
+  matchesRepoSearch,
+  normalizeSearchQuery,
+  parseStarsThreshold,
+} from '../../utils/search';
 
 // ============================================================================
 // Types
@@ -157,21 +165,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     if (!rawData) return [];
 
     const searchResults: SearchResult[] = [];
-    const lowerQuery = query.toLowerCase().trim();
+    const normalizedQuery = normalizeSearchQuery(query);
+    const starsThreshold = parseStarsThreshold(normalizedQuery);
 
     // Search repos
     if (activeFilter === 'all' || activeFilter === 'repos') {
       const matchedRepos = rawData.nodes
         .filter(node => {
-          if (!lowerQuery) return false;
-          return (
-            node.name.toLowerCase().includes(lowerQuery) ||
-            node.full_name.toLowerCase().includes(lowerQuery) ||
-            node.description?.toLowerCase().includes(lowerQuery) ||
-            node.ai_summary?.toLowerCase().includes(lowerQuery) ||
-            node.ai_tags?.some(tag => tag.toLowerCase().includes(lowerQuery)) ||
-            node.topics?.some(topic => topic.toLowerCase().includes(lowerQuery))
-          );
+          if (!normalizedQuery) return false;
+          return matchesRepoSearch(asRepoSearchCandidate(node), normalizedQuery);
         })
         .slice(0, MAX_RESULTS)
         .map(node => ({
@@ -204,12 +206,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     if (activeFilter === 'all' || activeFilter === 'clusters') {
       const matchedClusters = rawData.clusters
         .filter(cluster => {
-          if (!lowerQuery) return false;
-          return (
-            cluster.name?.toLowerCase().includes(lowerQuery) ||
-            cluster.description?.toLowerCase().includes(lowerQuery) ||
-            cluster.keywords?.some(k => k.toLowerCase().includes(lowerQuery))
-          );
+          if (!normalizedQuery || starsThreshold !== null) return false;
+          return matchesClusterSearch(cluster, normalizedQuery);
         })
         .slice(0, 5)
         .map(cluster => ({
@@ -233,8 +231,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     if (activeFilter === 'all' || activeFilter === 'languages') {
       const matchedLanguages = languages
         .filter(([lang]) => {
-          if (!lowerQuery) return false;
-          return lang.toLowerCase().includes(lowerQuery);
+          if (!normalizedQuery || starsThreshold !== null) return false;
+          return matchesFacetSearch(lang, normalizedQuery);
         })
         .slice(0, 5)
         .map(([lang, count]) => ({
@@ -253,8 +251,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     if (activeFilter === 'all' || activeFilter === 'tags') {
       const matchedTags = allTags
         .filter(([tag]) => {
-          if (!lowerQuery) return false;
-          return tag.toLowerCase().includes(lowerQuery);
+          if (!normalizedQuery || starsThreshold !== null) return false;
+          return matchesFacetSearch(tag, normalizedQuery);
         })
         .slice(0, 5)
         .map(([tag, count]) => ({

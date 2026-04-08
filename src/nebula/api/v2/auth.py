@@ -13,6 +13,7 @@ from nebula.core.auth import (
     get_admin_session_username,
     get_client_ip,
     is_admin_auth_enabled,
+    request_uses_trusted_proxy,
     verify_admin_credentials,
     verify_signed_session_token,
 )
@@ -90,7 +91,7 @@ def _login_rate_limit_keys(
     username: str,
     settings: AppSettings,
 ) -> tuple[str, str]:
-    client_ip = get_client_ip(request, trust_proxy_headers=settings.trust_proxy_headers)
+    client_ip = get_client_ip(request, settings=settings)
     return (
         f"ip:{client_ip}",
         f"user:{username.strip().lower()}",
@@ -123,7 +124,7 @@ def _enforce_login_rate_limit(
                 "Admin login rate limit exceeded "
                 f"bucket={key.split(':', 1)[0]} "
                 f"username={_mask_username(username)} "
-                f"client_ip={get_client_ip(request, trust_proxy_headers=settings.trust_proxy_headers)}"
+                f"client_ip={get_client_ip(request, settings=settings)}"
             )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -147,7 +148,7 @@ def _record_failed_login(
     logger.warning(
         "Admin login failed "
         f"username={_mask_username(username)} "
-        f"client_ip={get_client_ip(request, trust_proxy_headers=settings.trust_proxy_headers)}"
+        f"client_ip={get_client_ip(request, settings=settings)}"
     )
 
 
@@ -165,7 +166,7 @@ def _request_is_secure(request: Request, settings: AppSettings) -> bool:
         return True
     if request.url.scheme == "https":
         return True
-    if settings.trust_proxy_headers:
+    if request_uses_trusted_proxy(request, settings=settings):
         forwarded_proto = request.headers.get("x-forwarded-proto", "")
         if forwarded_proto.split(",")[0].strip().lower() == "https":
             return True
@@ -255,7 +256,7 @@ async def login_admin(
     logger.info(
         "Admin login succeeded "
         f"username={_mask_username(settings.admin_username)} "
-        f"client_ip={get_client_ip(request, trust_proxy_headers=settings.trust_proxy_headers)} "
+        f"client_ip={get_client_ip(request, settings=settings)} "
         f"secure_cookie={secure_cookie}"
     )
 

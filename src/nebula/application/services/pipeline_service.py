@@ -16,6 +16,7 @@ from . import sync_execution_service
 from .graph_query_service import GraphQueryService
 
 logger = get_logger(__name__)
+PARTIAL_FAILURE_SEPARATOR = "; "
 
 
 class SyncPipelineService:
@@ -71,18 +72,24 @@ class SyncPipelineService:
             user_id = run.user_id
 
         try:
-            partial_failed = False
+            partial_errors: list[str] = []
 
             await self._update_run(run_id, PipelineStatus.running, PipelinePhase.stars)
             stars_task_id = await self._create_task(
                 user_id, run_id, "stars", PipelinePhase.stars
             )
             await sync_execution_service.sync_stars_task(user_id, stars_task_id, mode)
-            partial_failed = partial_failed or await self._inspect_task_outcome(
+            stars_partial_error = self._normalize_partial_error(
+                await self._inspect_task_outcome(
                 stars_task_id,
                 run_id=run_id,
                 phase=PipelinePhase.stars,
+                ),
+                phase=PipelinePhase.stars,
+                task_id=stars_task_id,
             )
+            if stars_partial_error:
+                partial_errors.append(stars_partial_error)
 
             await self._update_run(
                 run_id, PipelineStatus.running, PipelinePhase.embedding
@@ -93,11 +100,17 @@ class SyncPipelineService:
             await sync_execution_service.compute_embeddings_task(
                 user_id, embedding_task_id
             )
-            partial_failed = partial_failed or await self._inspect_task_outcome(
+            embedding_partial_error = self._normalize_partial_error(
+                await self._inspect_task_outcome(
                 embedding_task_id,
                 run_id=run_id,
                 phase=PipelinePhase.embedding,
+                ),
+                phase=PipelinePhase.embedding,
+                task_id=embedding_task_id,
             )
+            if embedding_partial_error:
+                partial_errors.append(embedding_partial_error)
 
             force_full_recluster = await self._should_force_full_recluster(
                 user_id, stars_task_id
@@ -116,11 +129,17 @@ class SyncPipelineService:
                 min_clusters=min_clusters,
                 incremental=not force_full_recluster,
             )
-            partial_failed = partial_failed or await self._inspect_task_outcome(
+            clustering_partial_error = self._normalize_partial_error(
+                await self._inspect_task_outcome(
                 clustering_task_id,
                 run_id=run_id,
                 phase=PipelinePhase.clustering,
+                ),
+                phase=PipelinePhase.clustering,
+                task_id=clustering_task_id,
             )
+            if clustering_partial_error:
+                partial_errors.append(clustering_partial_error)
 
             await self._update_run(
                 run_id, PipelineStatus.running, PipelinePhase.snapshot
@@ -133,10 +152,18 @@ class SyncPipelineService:
 
             final_status = (
                 PipelineStatus.partial_failed
-                if partial_failed
+                if partial_errors
                 else PipelineStatus.completed
             )
-            await self._update_run(run_id, final_status, PipelinePhase.completed)
+            final_error = (
+                PARTIAL_FAILURE_SEPARATOR.join(partial_errors) if partial_errors else None
+            )
+            await self._update_run(
+                run_id,
+                final_status,
+                PipelinePhase.completed,
+                error=final_error,
+            )
             return run_id
         except Exception as exc:
             logger.exception(f"Pipeline {run_id} failed: {exc}")
@@ -195,10 +222,14 @@ class SyncPipelineService:
                 min_clusters=min_clusters,
                 incremental=False,
             )
-            partial_failed = await self._inspect_task_outcome(
-                clustering_task_id,
-                run_id=run_id,
+            partial_error = self._normalize_partial_error(
+                await self._inspect_task_outcome(
+                    clustering_task_id,
+                    run_id=run_id,
+                    phase=PipelinePhase.clustering,
+                ),
                 phase=PipelinePhase.clustering,
+                task_id=clustering_task_id,
             )
 
             await self._update_run(
@@ -212,10 +243,15 @@ class SyncPipelineService:
 
             final_status = (
                 PipelineStatus.partial_failed
-                if partial_failed
+                if partial_error
                 else PipelineStatus.completed
             )
-            await self._update_run(run_id, final_status, PipelinePhase.completed)
+            await self._update_run(
+                run_id,
+                final_status,
+                PipelinePhase.completed,
+                error=partial_error,
+            )
             return run_id
         except Exception as exc:
             logger.exception(f"Recluster pipeline {run_id} failed: {exc}")
@@ -315,8 +351,8 @@ class SyncPipelineService:
         *,
         run_id: int,
         phase: PipelinePhase,
-    ) -> bool:
-        """Return whether task has partial failures, or raise on hard failure."""
+    ) -> str | None:
+        """Return partial-failure detail, or raise on hard failure."""
         async with get_db_context() as db:
             task = await db.get(SyncTask, task_id)
             if task is None:
@@ -335,7 +371,12 @@ class SyncPipelineService:
                     f"Pipeline phase failed phase={phase.value} task_id={task_id}: {task.error_message}"
                 )
 
-            has_partial_failure = bool(task.failed_items and task.failed_items > 0)
+            partial_error = None
+            if task.failed_items and task.failed_items > 0:
+                partial_error = (
+                    f"Pipeline phase partial failure phase={phase.value} "
+                    f"task_id={task_id} failed_items={task.failed_items}"
+                )
             logger.info(
                 f"Pipeline phase completed run_id={run_id} "
                 f"task_id={task_id} "
@@ -343,7 +384,24 @@ class SyncPipelineService:
                 f"status={task.status} "
                 f"failed_items={task.failed_items}"
             )
-            return has_partial_failure
+            return partial_error
+
+    def _normalize_partial_error(
+        self,
+        outcome: str | bool | None,
+        *,
+        phase: PipelinePhase,
+        task_id: int,
+    ) -> str | None:
+        """Normalize partial-failure outcomes from tests and runtime checks."""
+        if isinstance(outcome, str):
+            return outcome
+        if outcome:
+            return (
+                f"Pipeline phase partial failure phase={phase.value} "
+                f"task_id={task_id}"
+            )
+        return None
 
     async def _acquire_pipeline_creation_lock(
         self,

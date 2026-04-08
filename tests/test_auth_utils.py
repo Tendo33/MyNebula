@@ -8,6 +8,7 @@ from nebula.api.v2.auth import (
     ADMIN_CSRF_COOKIE,
     ADMIN_CSRF_HEADER,
     _get_csrf_secret,
+    _login_rate_limit_keys,
     require_admin_csrf,
 )
 from nebula.core.auth import (
@@ -150,3 +151,66 @@ def test_get_client_ip_ignores_forwarded_for_by_default():
     request = Request(scope)
 
     assert get_client_ip(request) == "127.0.0.1"
+
+
+def test_get_client_ip_uses_forwarded_for_from_trusted_proxy():
+    settings = AppSettings(
+        trust_proxy_headers=True,
+        trusted_proxy_ips="127.0.0.1",
+    )
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v2/auth/me",
+        "headers": [(b"x-forwarded-for", b"203.0.113.9, 127.0.0.1")],
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+
+    assert get_client_ip(request, settings=settings) == "203.0.113.9"
+
+
+def test_get_client_ip_ignores_forwarded_for_from_untrusted_proxy():
+    settings = AppSettings(
+        trust_proxy_headers=True,
+        trusted_proxy_ips="10.0.0.1",
+    )
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v2/auth/me",
+        "headers": [(b"x-forwarded-for", b"203.0.113.9, 127.0.0.1")],
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+
+    assert get_client_ip(request, settings=settings) == "127.0.0.1"
+
+
+def test_login_rate_limit_keys_use_forwarded_ip_from_trusted_proxy():
+    settings = AppSettings(
+        trust_proxy_headers=True,
+        trusted_proxy_ips="127.0.0.1",
+    )
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v2/auth/login",
+        "headers": [(b"x-forwarded-for", b"203.0.113.9, 127.0.0.1")],
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+
+    assert _login_rate_limit_keys(request, "Owner", settings) == (
+        "ip:203.0.113.9",
+        "user:owner",
+    )

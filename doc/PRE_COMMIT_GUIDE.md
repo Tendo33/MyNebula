@@ -68,6 +68,7 @@ uv run pre-commit uninstall
 pre-commit 当前不会自动执行下面这些较重检查：
 
 - `uv run pytest`
+- `uv run ruff check src tests alembic/versions`
 - `npm --prefix frontend run lint`
 - `npx --prefix frontend tsc --noEmit`
 - `npm --prefix frontend run test`
@@ -75,6 +76,15 @@ pre-commit 当前不会自动执行下面这些较重检查：
 - `uv run python scripts/evals/run_all_quality_checks.py`
 
 这些仍然需要你按改动范围手动执行。
+
+推荐把 pre-commit 和当前 release gate 配合使用：
+
+1. `uv run pre-commit run --all-files`
+2. `uv run ruff check src tests alembic/versions`
+3. `uv run pytest -q`
+4. `npm --prefix frontend run lint -- --quiet`
+5. `npm --prefix frontend run test`
+6. `npm --prefix frontend run build`
 
 ## 常见问题
 

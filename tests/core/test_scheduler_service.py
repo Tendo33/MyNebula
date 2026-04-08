@@ -36,9 +36,18 @@ class _FakeResult:
 class _FakeDb:
     def __init__(self, schedules):
         self._schedules = schedules
+        self.committed = False
 
     async def execute(self, _statement):
         return _FakeResult(self._schedules)
+
+    async def scalar(self, _statement):
+        if isinstance(self._schedules, list):
+            return self._schedules[0] if self._schedules else None
+        return self._schedules
+
+    async def commit(self):
+        self.committed = True
 
 
 @pytest.mark.asyncio
@@ -131,3 +140,80 @@ async def test_scheduler_uses_transaction_level_advisory_lock():
     assert acquired is True
     assert any("pg_try_advisory_xact_lock" in sql for sql in executed_sql)
     assert not hasattr(service, "_release_scheduler_lock")
+
+
+@pytest.mark.asyncio
+async def test_scheduler_marks_schedule_failed_when_pipeline_launch_fails(monkeypatch):
+    from nebula.core import scheduler as scheduler_module
+    from nebula.db import database as db_module
+
+    schedule = SimpleNamespace(
+        user_id=7,
+        timezone="UTC",
+        schedule_hour=8,
+        schedule_minute=30,
+        last_run_at=None,
+        last_run_status="running",
+        last_run_error=None,
+    )
+    fake_db = _FakeDb(schedule)
+    monkeypatch.setattr(db_module, "get_db_context", lambda: _FakeDbContext(fake_db))
+
+    service = scheduler_module.SchedulerService()
+
+    class _FakePipelineService:
+        async def get_active_pipeline(self, _user_id: int):
+            return None
+
+        async def create_pipeline_run(self, _user_id: int):
+            raise RuntimeError("launch boom")
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "SyncPipelineService",
+        lambda: _FakePipelineService(),
+    )
+
+    await service._run_user_sync_pipeline(7)
+
+    assert schedule.last_run_status == "failed"
+    assert schedule.last_run_error == "launch boom"
+    assert fake_db.committed is True
+
+
+@pytest.mark.asyncio
+async def test_scheduler_marks_schedule_failed_when_active_pipeline_exists_at_launch(
+    monkeypatch,
+):
+    from nebula.core import scheduler as scheduler_module
+    from nebula.db import database as db_module
+
+    schedule = SimpleNamespace(
+        user_id=7,
+        timezone="UTC",
+        schedule_hour=8,
+        schedule_minute=30,
+        last_run_at=None,
+        last_run_status="running",
+        last_run_error=None,
+    )
+    fake_db = _FakeDb(schedule)
+    monkeypatch.setattr(db_module, "get_db_context", lambda: _FakeDbContext(fake_db))
+
+    service = scheduler_module.SchedulerService()
+
+    class _FakePipelineService:
+        async def get_active_pipeline(self, _user_id: int):
+            return SimpleNamespace(id=88, status="running")
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "SyncPipelineService",
+        lambda: _FakePipelineService(),
+    )
+
+    await service._run_user_sync_pipeline(7)
+
+    assert schedule.last_run_status == "failed"
+    assert "Pipeline already running" in schedule.last_run_error
+    assert fake_db.committed is True

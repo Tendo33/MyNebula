@@ -1,12 +1,20 @@
 """V2 dashboard route."""
 
+from collections import Counter
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
 from nebula.db import Cluster, StarredRepo, User, get_db
-from nebula.schemas.v2 import DashboardCluster, DashboardResponse, DashboardSummary
+from nebula.schemas.v2 import (
+    DashboardCluster,
+    DashboardLanguageStat,
+    DashboardResponse,
+    DashboardSummary,
+    DashboardTopicStat,
+)
 
 from .access import resolve_read_user
 from .metadata import build_v2_metadata
@@ -38,6 +46,19 @@ async def get_dashboard_data(
     )
     counts = repo_count_result.one()
 
+    repo_stats_result = await db.execute(
+        select(StarredRepo.language, StarredRepo.topics).where(StarredRepo.user_id == user.id)
+    )
+    language_counter: Counter[str] = Counter()
+    topic_counter: Counter[str] = Counter()
+    for language, topics in repo_stats_result.all():
+        if language:
+            language_counter[language] += 1
+        if topics:
+            topic_counter.update(
+                topic.strip().lower() for topic in topics if isinstance(topic, str) and topic.strip()
+            )
+
     clusters_result = await db.execute(
         select(Cluster)
         .where(Cluster.user_id == user.id)
@@ -55,15 +76,25 @@ async def get_dashboard_data(
         summary=DashboardSummary(
             total_repos=int(counts.total or 0),
             embedded_repos=int(counts.embedded or 0),
+            total_topics=len(topic_counter),
             total_clusters=graph_data.total_clusters,
             total_edges=graph_data.total_edges,
         ),
+        top_languages=[
+            DashboardLanguageStat(language=language, count=count)
+            for language, count in language_counter.most_common(8)
+        ],
+        top_topics=[
+            DashboardTopicStat(topic=topic, count=count)
+            for topic, count in topic_counter.most_common(12)
+        ],
         top_clusters=[
             DashboardCluster(
                 id=cluster.id,
                 name=cluster.name,
                 repo_count=cluster.repo_count,
                 color=cluster.color,
+                keywords=cluster.keywords or [],
             )
             for cluster in top_clusters
         ],

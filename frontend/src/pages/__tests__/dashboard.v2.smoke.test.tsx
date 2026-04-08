@@ -26,12 +26,14 @@ vi.mock('../../features/dashboard/hooks/useDashboardQuery', () => ({
       totalEdges: 9,
       topLanguages: [],
       topLanguage: 'TypeScript (6)',
-      topClusters: [],
-      topTopics: [],
+      topClusters: [{ id: 1, name: 'Cluster 1', color: '#000000', repo_count: 4, keywords: ['graph'] }],
+      topTopics: [{ topic: 'graph', count: 4 }],
       recentActivity: 4,
     },
     activityData: [],
     maxActivity: 1,
+    error: null,
+    retry: vi.fn(),
   }),
 }));
 
