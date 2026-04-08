@@ -175,7 +175,7 @@ class AppSettings(BaseSettings):
 
     # Basic settings
     app_name: str = Field(default="mynebula", description="Application name")
-    app_version: str = Field(default="1.2.2", description="Application version")
+    app_version: str = Field(default="1.2.3", description="Application version")
     debug: bool = Field(
         default=False, description="Debug mode (also controls environment)"
     )
@@ -279,6 +279,10 @@ class AppSettings(BaseSettings):
         default=False,
         description="Honor reverse-proxy forwarded proto/host headers",
     )
+    trusted_proxy_ips: str = Field(
+        default="",
+        description="Comma-separated proxy IPs allowed to supply forwarded headers",
+    )
     https_redirect: bool = Field(
         default=False,
         description="Redirect HTTP requests to HTTPS",
@@ -316,6 +320,10 @@ class AppSettings(BaseSettings):
     def trusted_hosts_list(self) -> list[str]:
         """Return parsed trusted hosts."""
         return [host.strip() for host in self.trusted_hosts.split(",") if host.strip()]
+
+    def trusted_proxy_ips_list(self) -> list[str]:
+        """Return parsed trusted proxy IP allowlist."""
+        return [ip.strip() for ip in self.trusted_proxy_ips.split(",") if ip.strip()]
 
 
 @lru_cache

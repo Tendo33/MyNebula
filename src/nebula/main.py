@@ -94,7 +94,17 @@ def create_app() -> FastAPI:
     app.add_middleware(GZipMiddleware, minimum_size=500)
 
     if settings.trust_proxy_headers:
-        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+        trusted_proxy_ips = settings.trusted_proxy_ips_list()
+        if trusted_proxy_ips:
+            app.add_middleware(
+                ProxyHeadersMiddleware,
+                trusted_hosts=trusted_proxy_ips,
+            )
+        else:
+            logger.warning(
+                "TRUST_PROXY_HEADERS is enabled but TRUSTED_PROXY_IPS is empty; "
+                "forwarded headers will not be trusted"
+            )
 
     trusted_hosts = settings.trusted_hosts_list()
     if trusted_hosts:

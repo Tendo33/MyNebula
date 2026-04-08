@@ -84,6 +84,56 @@ async def test_pipeline_marks_partial_failed_when_phase_has_failed_items(monkeyp
 
 
 @pytest.mark.asyncio
+async def test_pipeline_records_last_error_for_partial_failure(monkeypatch):
+    from nebula.application.services import pipeline_service as pipeline_module
+
+    run = SimpleNamespace(id=1, user_id=9)
+    monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(pipeline_module.sync_execution_service, "sync_stars_task", noop)
+    monkeypatch.setattr(
+        pipeline_module.sync_execution_service, "compute_embeddings_task", noop
+    )
+    monkeypatch.setattr(
+        pipeline_module.sync_execution_service, "run_clustering_task", noop
+    )
+
+    service = pipeline_module.SyncPipelineService(
+        graph_service=SimpleNamespace(rebuild_active_snapshot=noop)
+    )
+
+    async def fake_create_task(*_args, **_kwargs):
+        return 11
+
+    outcomes = [False, "embedding had partial failures", False]
+
+    async def fake_inspect(*_args, **_kwargs):
+        outcome = outcomes.pop(0)
+        return outcome
+
+    status_updates: list[tuple[PipelineStatus, PipelinePhase, str | None]] = []
+
+    async def fake_update(_run_id, status, phase, error=None):
+        status_updates.append((status, phase, error))
+
+    monkeypatch.setattr(service, "_create_task", fake_create_task)
+    monkeypatch.setattr(service, "_inspect_task_outcome", fake_inspect)
+    monkeypatch.setattr(service, "_update_run", fake_update)
+    monkeypatch.setattr(service, "_should_force_full_recluster", noop)
+
+    await service.run_pipeline(1)
+
+    assert status_updates[-1] == (
+        PipelineStatus.partial_failed,
+        PipelinePhase.completed,
+        "embedding had partial failures",
+    )
+
+
+@pytest.mark.asyncio
 async def test_pipeline_marks_failed_when_phase_raises(monkeypatch):
     from nebula.application.services import pipeline_service as pipeline_module
 

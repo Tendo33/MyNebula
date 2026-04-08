@@ -55,10 +55,70 @@ def get_admin_session_username(
     return username
 
 
-def get_client_ip(request: Request, *, trust_proxy_headers: bool = False) -> str:
+def _trusted_proxy_ip_list(
+    *,
+    settings: AppSettings | None,
+    trusted_proxy_ips: list[str] | None,
+) -> list[str]:
+    if trusted_proxy_ips is not None:
+        return trusted_proxy_ips
+    if settings is not None:
+        return settings.trusted_proxy_ips_list()
+    return []
+
+
+def _trust_proxy_headers_enabled(
+    *,
+    settings: AppSettings | None,
+    trust_proxy_headers: bool | None,
+) -> bool:
+    if trust_proxy_headers is not None:
+        return trust_proxy_headers
+    if settings is not None:
+        return settings.trust_proxy_headers
+    return False
+
+
+def request_uses_trusted_proxy(
+    request: Request,
+    *,
+    settings: AppSettings | None = None,
+    trust_proxy_headers: bool | None = None,
+    trusted_proxy_ips: list[str] | None = None,
+) -> bool:
+    """Return whether forwarded headers should be trusted for this request."""
+    if not _trust_proxy_headers_enabled(
+        settings=settings,
+        trust_proxy_headers=trust_proxy_headers,
+    ):
+        return False
+
+    proxy_ips = _trusted_proxy_ip_list(
+        settings=settings,
+        trusted_proxy_ips=trusted_proxy_ips,
+    )
+    if not proxy_ips:
+        return False
+
+    client_host = request.client.host if request.client and request.client.host else None
+    return bool(client_host and client_host in proxy_ips)
+
+
+def get_client_ip(
+    request: Request,
+    *,
+    settings: AppSettings | None = None,
+    trust_proxy_headers: bool | None = None,
+    trusted_proxy_ips: list[str] | None = None,
+) -> str:
     """Best-effort client IP for audit logging and coarse rate limiting."""
     forwarded_for = request.headers.get("x-forwarded-for", "").strip()
-    if trust_proxy_headers and forwarded_for:
+    if request_uses_trusted_proxy(
+        request,
+        settings=settings,
+        trust_proxy_headers=trust_proxy_headers,
+        trusted_proxy_ips=trusted_proxy_ips,
+    ) and forwarded_for:
         return forwarded_for.split(",")[0].strip()
     if request.client and request.client.host:
         return request.client.host

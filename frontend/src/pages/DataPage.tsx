@@ -4,12 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { Sidebar } from '../components/layout/Sidebar';
 import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { SearchInput } from '../components/ui/SearchInput';
-import { ClusterInfo } from '../types';
 import {
   Loader2, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, X, Layers, Calendar, Tag
 } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router-dom';
+import type { DataClusterInfo } from '../api/v2/data';
 import { useDataReposQuery } from '../features/data/hooks/useDataReposQuery';
 
 // ============================================================================
@@ -92,7 +92,7 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({
 };
 
 interface ClusterBadgeProps {
-  cluster: ClusterInfo | undefined;
+  cluster: DataClusterInfo | undefined;
   onClick?: () => void;
 }
 
@@ -110,12 +110,12 @@ const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) => {
       }}
       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium hover:opacity-80 transition-opacity text-text-main dark:text-dark-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
       style={{
-        backgroundColor: cluster.color + '30',
+        backgroundColor: `${cluster.color || '#6B7280'}30`,
       }}
     >
       <div
         className="w-2 h-2 rounded-full"
-        style={{ backgroundColor: cluster.color }}
+        style={{ backgroundColor: cluster.color || '#6B7280' }}
       />
       {cluster.name || `Cluster ${cluster.id}`}
     </button>
@@ -165,8 +165,8 @@ const DataPage = () => {
 
   // Cluster map for quick lookup
   const clusterMap = useMemo(() => {
-    const map = new Map<number, ClusterInfo>();
-    clusters.forEach((c: ClusterInfo) => map.set(c.id, c));
+    const map = new Map<number, DataClusterInfo>();
+    clusters.forEach((c: DataClusterInfo) => map.set(c.id, c));
     return map;
   }, [clusters]);
 
@@ -380,7 +380,7 @@ const DataPage = () => {
                         <Layers className="w-4 h-4" />
                         <span>{t('data.filter_by_cluster')}:</span>
                       </div>
-                  {clusters.map((cluster: ClusterInfo) => (
+                  {clusters.map((cluster: DataClusterInfo) => (
                     <button
                       key={cluster.id}
                       onClick={() => handleClusterFilter(cluster.id)}
@@ -390,13 +390,13 @@ const DataPage = () => {
                           : 'hover:opacity-80'
                       } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30`}
                       style={{
-                        backgroundColor: cluster.color + '30',
-                        '--tw-ring-color': cluster.color,
+                        backgroundColor: `${cluster.color || '#6B7280'}30`,
+                        '--tw-ring-color': cluster.color || '#6B7280',
                       } as React.CSSProperties}
                     >
                       <div
                         className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: cluster.color }}
+                        style={{ backgroundColor: cluster.color || '#6B7280' }}
                       />
                       {cluster.name || `Cluster ${cluster.id}`}
                       <span className="opacity-75">({cluster.repo_count})</span>

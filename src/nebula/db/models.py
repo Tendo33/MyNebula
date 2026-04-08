@@ -150,7 +150,9 @@ class StarredRepo(Base):
     )  # Combined text used for embedding
 
     # Vector embedding (dimension set from settings)
-    # Note: Vector dimension is set dynamically based on embedding model
+    # Note: Vector dimension is set dynamically based on embedding model.
+    # Semantic search and related-repo ranking rely on the ANN migration that
+    # adds an ivfflat cosine index for this column.
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(get_embedding_settings().dimensions), nullable=True
     )

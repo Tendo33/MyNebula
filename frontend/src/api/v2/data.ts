@@ -1,5 +1,13 @@
 import client from '../client';
 
+export interface DataClusterInfo {
+  id: number;
+  name?: string | null;
+  color?: string | null;
+  repo_count: number;
+  keywords: string[];
+}
+
 export interface DataRepoItem {
   id: number;
   full_name: string;
@@ -20,7 +28,9 @@ export interface DataRepoItem {
 
 export interface DataReposResponse {
   items: DataRepoItem[];
+  clusters: DataClusterInfo[];
   count: number;
+  total_repos: number;
   limit: number;
   offset: number;
   version?: string;

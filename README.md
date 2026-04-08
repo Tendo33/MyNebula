@@ -72,6 +72,7 @@ It is built for people who star heavily, revisit often, and want their repositor
   - [Frontend](#frontend)
   - [Serve the built frontend from FastAPI](#serve-the-built-frontend-from-fastapi)
 - [Configuration Overview](#configuration-overview)
+- [Documentation Map](#documentation-map)
 - [API Quick Reference](#api-quick-reference)
   - [Read endpoints](#read-endpoints)
   - [Admin endpoints](#admin-endpoints)
@@ -185,7 +186,7 @@ At minimum, update these values in `.env`:
 Recommended defaults by deployment style:
 
 - Local demo: `READ_ACCESS_MODE=demo`
-- Internet-facing deployment: `READ_ACCESS_MODE=authenticated`, `FORCE_SECURE_COOKIES=true`, `TRUST_PROXY_HEADERS=true`
+- Internet-facing deployment: `READ_ACCESS_MODE=authenticated`, `FORCE_SECURE_COOKIES=true`, `TRUST_PROXY_HEADERS=true`, `TRUSTED_PROXY_IPS=<your reverse proxy IPs>`
 
 ### 2. Start the stack
 
@@ -253,6 +254,17 @@ If `frontend/dist` exists, FastAPI will serve the SPA and static assets directly
 
 For the full environment reference, see `doc/ENV_VARS.md`.
 
+## Documentation Map
+
+- `doc/INDEX.md`: documentation entrypoint and topic map
+- `doc/DOCKER_DEPLOY.md`: Docker Compose deployment and operations
+- `doc/ENV_VARS.md`: complete environment variable reference
+- `doc/QUALITY_GATES.md`: local verification, CI gates, and offline eval rules
+- `doc/RESET_GUIDE.md`: reset and recovery playbooks
+- `doc/MODELS_GUIDE.md`: ORM and API schema boundaries
+- `doc/SDK_USAGE.md`: supported Python-level entry points
+- `doc/REMEDIATION_BACKLOG.md`: completed remediation items and verification commands
+
 ## API Quick Reference
 
 Base prefix: `/api`
@@ -279,6 +291,12 @@ Base prefix: `/api`
 
 Legacy compatibility routes under `/api/sync` are still available.
 
+Current API contract notes:
+
+- `/api/v2/data/repos` now returns lightweight cluster metadata and `total_repos`, so the Data page no longer needs an extra graph snapshot request.
+- `/api/v2/dashboard` now carries summary, top languages, top topics, and top clusters directly; only timeline data is fetched separately for activity charts.
+- Data, Graph, and Command Palette share the same literal search fields and `stars:>N` search syntax.
+
 ## Project Structure
 
 ```text
@@ -304,10 +322,14 @@ MyNebula/
 ### Backend
 
 ```bash
+uv sync --all-extras
 uv run ruff format
 uv run ruff check --fix
 uv run pytest
 ```
+
+If your environment cannot write to the default uv cache, use
+`UV_CACHE_DIR=.uv-cache uv run pytest`.
 
 ### Frontend
 

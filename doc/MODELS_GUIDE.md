@@ -80,6 +80,21 @@ src/nebula/schemas/v2/           # v2 路由专用 schema
 - `DataReposResponse`：Data 页面列表查询
 - `GraphEdgesPage`：图谱边分页结果
 
+当前这几个 v2 聚合响应已经包含最近整改后的新契约：
+
+- `DataReposResponse`
+  - `items`
+  - `clusters`
+  - `count`
+  - `total_repos`
+  - 元数据字段 `version/generated_at/request_id`
+- `DashboardResponse`
+  - `summary`
+  - `top_languages`
+  - `top_topics`
+  - `top_clusters`
+  - 元数据字段 `version/generated_at/request_id`
+
 ## 什么时候加 ORM，什么时候只加 Schema
 
 ### 只加 Schema
@@ -153,11 +168,13 @@ class Example(BaseModel):
 
 - 原始图谱返回结构位于 `src/nebula/schemas/graph.py`
 - `/api/v2/graph/edges` 的分页结构位于 `src/nebula/schemas/v2/graph.py`
+- Graph 页面内部过滤后的派生结构仍复用 `GraphData` 形状，但过滤逻辑已经集中到前端纯函数，不再在组件里散落复制
 
 ### 设置页
 
 - 设置聚合响应与 schedule/full-refresh 结构位于 `src/nebula/schemas/v2/settings.py`
 - 管理员认证响应定义在 `src/nebula/api/v2/auth.py` 内部
+- schedule 相关时间字段现在统一按 timezone-aware UTC 语义输出，前端按本地时区展示
 
 ### 同步流程
 
@@ -178,3 +195,4 @@ class Example(BaseModel):
 - `doc/ENV_VARS.md`
 - `doc/QUALITY_GATES.md`
 - `doc/SDK_USAGE.md`
+- `.trellis/spec/frontend/query-and-filtering.md`

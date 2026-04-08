@@ -3,6 +3,16 @@
 from pydantic import BaseModel, Field
 
 
+class DataClusterInfo(BaseModel):
+    """Cluster metadata for Data page filtering and badges."""
+
+    id: int
+    name: str | None = None
+    color: str | None = None
+    repo_count: int = 0
+    keywords: list[str] = Field(default_factory=list)
+
+
 class DataRepoItem(BaseModel):
     """Repository item payload for Data page."""
 
@@ -27,7 +37,9 @@ class DataReposResponse(BaseModel):
     """Paged repositories response."""
 
     items: list[DataRepoItem] = Field(default_factory=list)
+    clusters: list[DataClusterInfo] = Field(default_factory=list)
     count: int
+    total_repos: int
     limit: int
     offset: int
     version: str | None = None

@@ -37,11 +37,7 @@ import {
   type SyncInfoResponse,
 } from '../api/v2/settings';
 import { getAdminAuthConfig } from '../api/auth';
-
-interface TaskCompletionResult {
-  success: boolean;
-  error: string | null;
-}
+import { pollUntilComplete, type TaskCompletionResult } from './settings/polling';
 
 const createPipelineSyncSteps = (): { id: string; status: SyncStepStatus; progress?: number; error?: string }[] => ([
   { id: 'stars', status: 'pending', progress: 0 },
@@ -90,6 +86,7 @@ const Settings = () => {
     { id: string; status: SyncStepStatus; progress?: number; error?: string }[]
   >(createPipelineSyncSteps);
   const graphDefaultsRef = useRef<{ max: number; min: number } | null>(null);
+  const activePollControllerRef = useRef<AbortController | null>(null);
 
   const translatedSteps = useMemo(
     () =>
@@ -153,6 +150,8 @@ const Settings = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
+      activePollControllerRef.current?.abort();
+      activePollControllerRef.current = null;
       setSchedule(null);
       setSyncInfo(null);
       return;
@@ -211,57 +210,57 @@ const Settings = () => {
 
   const waitForPipelineComplete = async (
     runId: number,
+    signal: AbortSignal,
     onProgress?: (pipeline: PipelineStatusResponse) => void
   ): Promise<TaskCompletionResult> => {
-    while (true) {
-      try {
-        const pipeline = await getPipelineStatusV2(runId);
-        onProgress?.(pipeline);
-
-        if (pipeline.status === 'completed') {
-          return { success: true, error: null };
-        }
-
-        if (pipeline.status === 'failed' || pipeline.status === 'partial_failed') {
-          return { success: false, error: pipeline.last_error || null };
-        }
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : 'poll_pipeline_status_failed',
-        };
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
+    return pollUntilComplete({
+      signal,
+      poll: () => getPipelineStatusV2(runId),
+      onProgress,
+      isSuccess: (pipeline) => pipeline.status === 'completed',
+      isFailure: (pipeline) =>
+        pipeline.status === 'failed' || pipeline.status === 'partial_failed',
+      getFailureError: (pipeline) => pipeline.last_error || null,
+      getPollError: (err) =>
+        err instanceof Error ? err.message : 'poll_pipeline_status_failed',
+    });
   };
 
   const waitForFullRefreshJobComplete = async (
     taskId: number,
+    signal: AbortSignal,
     onProgress?: (job: FullRefreshJobStatus) => void
   ): Promise<TaskCompletionResult> => {
-    while (true) {
-      try {
-        const jobResponse = await getFullRefreshJobStatusV2(taskId);
-        onProgress?.(jobResponse.job);
-
-        if (jobResponse.job.status === 'completed') {
-          return { success: true, error: null };
-        }
-
-        if (jobResponse.job.status === 'failed') {
-          return { success: false, error: jobResponse.job.last_error };
-        }
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : 'poll_job_status_failed',
-        };
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
+    return pollUntilComplete({
+      signal,
+      poll: async () => (await getFullRefreshJobStatusV2(taskId)).job,
+      onProgress,
+      isSuccess: (job) => job.status === 'completed',
+      isFailure: (job) => job.status === 'failed',
+      getFailureError: (job) => job.last_error,
+      getPollError: (err) => (err instanceof Error ? err.message : 'poll_job_status_failed'),
+    });
   };
+
+  const beginPollingOperation = useCallback(() => {
+    activePollControllerRef.current?.abort();
+    const controller = new AbortController();
+    activePollControllerRef.current = controller;
+    return controller;
+  }, []);
+
+  const finishPollingOperation = useCallback((controller: AbortController) => {
+    if (activePollControllerRef.current === controller) {
+      activePollControllerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      activePollControllerRef.current?.abort();
+      activePollControllerRef.current = null;
+    };
+  }, []);
 
   const resetSteps = () => {
     setSyncSteps(createPipelineSyncSteps());
@@ -462,6 +461,8 @@ const Settings = () => {
   };
 
   const handleAdminLogout = async () => {
+    activePollControllerRef.current?.abort();
+    activePollControllerRef.current = null;
     await logout();
     setSchedule(null);
     setSyncInfo(null);
@@ -523,10 +524,16 @@ const Settings = () => {
         max_clusters: settings.maxClusters,
         min_clusters: settings.minClusters,
       });
+      const controller = beginPollingOperation();
       const pipelineResult = await waitForPipelineComplete(
         started.pipeline_run_id,
+        controller.signal,
         updatePipelineProgress
       );
+      finishPollingOperation(controller);
+      if (pipelineResult.cancelled) {
+        return;
+      }
       if (!pipelineResult.success) {
         throw new Error(pipelineResult.error || t('errors.sync_failed'));
       }
@@ -541,6 +548,7 @@ const Settings = () => {
       setError(t('errors.sync_failed'));
       console.error('Sync failed:', err);
     } finally {
+      activePollControllerRef.current?.abort();
       setSyncing(false);
       setSyncStep('');
     }
@@ -555,7 +563,15 @@ const Settings = () => {
         max_clusters: settings.maxClusters,
         min_clusters: settings.minClusters,
       });
-      const pipelineResult = await waitForPipelineComplete(started.pipeline_run_id);
+      const controller = beginPollingOperation();
+      const pipelineResult = await waitForPipelineComplete(
+        started.pipeline_run_id,
+        controller.signal
+      );
+      finishPollingOperation(controller);
+      if (pipelineResult.cancelled) {
+        return;
+      }
       if (!pipelineResult.success) {
         throw new Error(pipelineResult.error || t('errors.clustering_failed'));
       }
@@ -572,6 +588,7 @@ const Settings = () => {
 
   const handleFullRefresh = async () => {
     setShowConfirmDialog(false);
+    activePollControllerRef.current?.abort();
     setRefreshLoading(true);
     setError(null);
     setSyncing(true);
@@ -581,10 +598,16 @@ const Settings = () => {
 
     try {
       const started = await triggerFullRefreshV2();
+      const controller = beginPollingOperation();
       const fullRefreshStatus = await waitForFullRefreshJobComplete(
         started.task.task_id,
+        controller.signal,
         updateFullRefreshProgress
       );
+      finishPollingOperation(controller);
+      if (fullRefreshStatus.cancelled) {
+        return;
+      }
       if (!fullRefreshStatus.success) {
         throw new Error(fullRefreshStatus.error || t('settings.full_refresh_error'));
       }
@@ -606,6 +629,8 @@ const Settings = () => {
   };
 
   const handleSyncProgressClose = () => {
+    activePollControllerRef.current?.abort();
+    activePollControllerRef.current = null;
     setShowSyncProgress(false);
     if (!syncing) {
       resetSteps();

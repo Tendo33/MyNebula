@@ -228,10 +228,13 @@ class SchedulerService:
             pipeline_service = SyncPipelineService()
             active_run = await pipeline_service.get_active_pipeline(user_id)
             if active_run is not None:
-                logger.info(
-                    "Skipping scheduled sync: pipeline already active "
-                    f"(user_id={user_id}, run_id={active_run.id})"
+                error = (
+                    "Pipeline already running "
+                    f"(user_id={user_id}, run_id={active_run.id}, "
+                    f"status={active_run.status})"
                 )
+                logger.info(f"Skipping scheduled sync: {error}")
+                await self._mark_schedule_failed(user_id, error)
                 return
             run_id = await pipeline_service.create_pipeline_run(user_id)
             await pipeline_service.run_pipeline(
@@ -295,6 +298,7 @@ class SchedulerService:
             if schedule:
                 schedule.last_run_status = "failed"
                 schedule.last_run_error = error
+                await db.commit()
 
 
 def get_scheduler_service() -> SchedulerService:

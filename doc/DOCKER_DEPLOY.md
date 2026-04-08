@@ -2,6 +2,12 @@
 
 本指南对应仓库根目录当前的 `docker-compose.yml`。
 
+建议先同时阅读：
+
+- [README.md](/Users/simonsun/.codex/worktrees/bcde/MyNebula/README.md)
+- [doc/ENV_VARS.md](/Users/simonsun/.codex/worktrees/bcde/MyNebula/doc/ENV_VARS.md)
+- [doc/QUALITY_GATES.md](/Users/simonsun/.codex/worktrees/bcde/MyNebula/doc/QUALITY_GATES.md)
+
 Compose 会启动两个服务：
 
 - `db`: `pgvector/pgvector:pg16`
@@ -54,6 +60,7 @@ ADMIN_SESSION_SECRET=
 READ_ACCESS_MODE=authenticated
 FORCE_SECURE_COOKIES=true
 TRUST_PROXY_HEADERS=true
+TRUSTED_PROXY_IPS=127.0.0.1,10.0.0.10
 TRUSTED_HOSTS=your-domain.com
 HTTPS_REDIRECT=true
 ```
@@ -69,7 +76,10 @@ LLM_OUTPUT_LANGUAGE=zh
 
 - `DATABASE_PASSWORD`
 - `ADMIN_USERNAME`
+- `ADMIN_SESSION_SECRET`
 - `API_PORT`
+
+如果你通过 Nginx、Caddy、Traefik 或云负载均衡做 TLS 终止，`TRUST_PROXY_HEADERS=true` 还不够，必须同时把真正的代理来源写进 `TRUSTED_PROXY_IPS`。否则 MyNebula 不会信任 `X-Forwarded-*` 头，也不会按代理头判断客户端 IP 或 secure cookie 场景。
 
 ## 3. 启动
 
@@ -210,6 +220,7 @@ DATABASE_PORT=55432
 如果是通过 Nginx / Caddy / Traefik 等反向代理访问，还要确认：
 
 - `TRUST_PROXY_HEADERS=true`
+- `TRUSTED_PROXY_IPS` 已正确填写代理 IP
 - `FORCE_SECURE_COOKIES=true`
 - `READ_ACCESS_MODE=authenticated`
 - 代理正确转发了 `X-Forwarded-Proto=https`
