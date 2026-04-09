@@ -87,6 +87,8 @@ def resolve_job_phase(
     """Resolve user-facing job phase from task metadata."""
     if status == "completed":
         return "completed"
+    if status == "partial_failed":
+        return "completed"
     if status == "failed":
         return "failed"
     if isinstance(error_details, dict):
@@ -190,6 +192,7 @@ async def get_job_status(
         retryable=task.status == "failed",
         started_at=task.started_at,
         completed_at=task.completed_at,
+        error_details=task.error_details,
     )
 
 
@@ -273,6 +276,7 @@ async def update_schedule(
 
 async def full_refresh_task(user_id: int, task_id: int):
     """Background task to perform full refresh of all repositories."""
+
     async def _update_main_task(**fields) -> bool:
         async with get_db_context() as db:
             task = await db.get(SyncTask, task_id)
@@ -297,19 +301,19 @@ async def full_refresh_task(user_id: int, task_id: int):
             if task is None:
                 raise FullRefreshSubTaskError(
                     phase,
-                    f"Full refresh subtask missing phase={phase} task_id={task_id}"
+                    f"Full refresh subtask missing phase={phase} task_id={task_id}",
                 )
             if task.status == "failed":
                 raise FullRefreshSubTaskError(
                     phase,
                     f"Full refresh subtask failed phase={phase} task_id={task_id}: "
-                    f"{task.error_message or 'Unknown error'}"
+                    f"{task.error_message or 'Unknown error'}",
                 )
             if task.status != "completed":
                 raise FullRefreshSubTaskError(
                     phase,
                     f"Full refresh subtask incomplete phase={phase} "
-                    f"task_id={task_id} status={task.status}"
+                    f"task_id={task_id} status={task.status}",
                 )
             if task.failed_items and task.failed_items > 0:
                 return {
@@ -400,8 +404,13 @@ async def full_refresh_task(user_id: int, task_id: int):
                 raise ValueError(f"Full refresh user not found: {user_id}")
             await graph_service.rebuild_active_snapshot(db, user=user)
 
+        terminal_status = (
+            PipelineStatus.partial_failed.value
+            if partial_failures
+            else PipelineStatus.completed.value
+        )
         await _update_main_task(
-            status="completed",
+            status=terminal_status,
             completed_at=datetime.now(timezone.utc),
             processed_items=5,
             error_details={

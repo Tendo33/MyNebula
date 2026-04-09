@@ -151,3 +151,50 @@ async def test_full_refresh_marks_parent_failed_when_subtask_sets_failed_status(
     assert main_task.completed_at is not None
     assert main_task.error_details["phase"] == failed_phase
     assert state.snapshot_calls == []
+
+
+@pytest.mark.asyncio
+async def test_full_refresh_marks_parent_partial_failed_when_subtask_has_failed_items(
+    monkeypatch,
+):
+    from nebula.application.services import sync_ops_service
+
+    state = _FakeState()
+
+    async def _complete_with_partial_failure(_user_id, task_id, *_args, **_kwargs):
+        task = state.tasks[task_id]
+        task.status = "completed"
+        task.failed_items = 2
+        task.completed_at = datetime.now(timezone.utc)
+
+    async def _complete_subtask(_user_id, task_id, *_args, **_kwargs):
+        task = state.tasks[task_id]
+        task.status = "completed"
+        task.completed_at = datetime.now(timezone.utc)
+
+    async def fake_snapshot(db, *, user):
+        state.snapshot_calls.append((db.state.user.id, user.id))
+
+    monkeypatch.setattr(
+        sync_ops_service,
+        "get_db_context",
+        _DbContextFactory(state),
+        raising=False,
+    )
+    monkeypatch.setattr(sync_ops_service, "sync_stars_task", _complete_with_partial_failure)
+    monkeypatch.setattr(sync_ops_service, "compute_embeddings_task", _complete_subtask)
+    monkeypatch.setattr(sync_ops_service, "run_clustering_task", _complete_subtask)
+    monkeypatch.setattr(
+        sync_ops_service,
+        "GraphQueryService",
+        lambda: SimpleNamespace(rebuild_active_snapshot=fake_snapshot),
+    )
+
+    await sync_ops_service.full_refresh_task(user_id=7, task_id=1)
+
+    main_task = state.tasks[1]
+    assert main_task.status == "partial_failed"
+    assert main_task.error_details["phase"] == "complete"
+    assert main_task.error_details["partial_failures"] == [
+        {"phase": "stars", "task_id": 2, "failed_items": 2}
+    ]

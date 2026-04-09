@@ -33,19 +33,44 @@ interface CommandPaletteProps {
   onClose: () => void;
   onSelectNode?: (node: GraphNode) => void;
   onSelectCluster?: (cluster: ClusterInfo) => void;
+  onSelectSearch?: (value: string, facet?: 'search' | 'language' | 'tag') => void;
 }
 
 type FilterType = 'all' | 'repos' | 'clusters' | 'languages' | 'tags';
 
-interface SearchResult {
-  type: 'repo' | 'cluster' | 'language' | 'tag';
+interface SearchResultBase {
   id: string | number;
   title: string;
   subtitle?: string;
   icon?: React.ReactNode;
   meta?: string;
-  data: any;
 }
+
+interface RepoSearchResult extends SearchResultBase {
+  type: 'repo';
+  data: GraphNode;
+}
+
+interface ClusterSearchResult extends SearchResultBase {
+  type: 'cluster';
+  data: ClusterInfo;
+}
+
+interface LanguageSearchResult extends SearchResultBase {
+  type: 'language';
+  data: { language: string };
+}
+
+interface TagSearchResult extends SearchResultBase {
+  type: 'tag';
+  data: { tag: string };
+}
+
+type SearchResult =
+  | RepoSearchResult
+  | ClusterSearchResult
+  | LanguageSearchResult
+  | TagSearchResult;
 
 // ============================================================================
 // Constants
@@ -109,6 +134,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onClose,
   onSelectNode,
   onSelectCluster,
+  onSelectSearch,
 }) => {
   const { t } = useTranslation();
   const { rawData, setSelectedNode, setSearchQuery } = useGraph();
@@ -299,14 +325,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         break;
       case 'language':
         setSearchQuery(result.data.language);
+        onSelectSearch?.(result.data.language, 'language');
         break;
       case 'tag':
         setSearchQuery(result.data.tag);
+        onSelectSearch?.(result.data.tag, 'tag');
         break;
     }
 
     onClose();
-  }, [query, addRecentSearch, setSelectedNode, onSelectNode, onSelectCluster, setSearchQuery, onClose]);
+  }, [query, addRecentSearch, setSelectedNode, onSelectNode, onSelectCluster, onSelectSearch, setSearchQuery, onClose]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -330,6 +358,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             const normalizedQuery = query.trim();
             addRecentSearch(normalizedQuery);
             setSearchQuery(normalizedQuery);
+            onSelectSearch?.(normalizedQuery, 'search');
             onClose();
           }
           break;
@@ -342,7 +371,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, results, selectedIndex, query, addRecentSearch, setSearchQuery, onClose, handleSelectResult]);
+  }, [isOpen, results, selectedIndex, query, addRecentSearch, onSelectSearch, setSearchQuery, onClose, handleSelectResult]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -514,6 +543,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                           const starQuery = `stars:>${range.min}`;
                           addRecentSearch(starQuery);
                           setSearchQuery(starQuery);
+                          onSelectSearch?.(starQuery, 'search');
                           onClose();
                         }}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-action-primary/10 text-action-primary hover:bg-action-primary/15 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"

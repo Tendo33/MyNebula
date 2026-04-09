@@ -81,9 +81,9 @@ class SyncPipelineService:
             await sync_execution_service.sync_stars_task(user_id, stars_task_id, mode)
             stars_partial_error = self._normalize_partial_error(
                 await self._inspect_task_outcome(
-                stars_task_id,
-                run_id=run_id,
-                phase=PipelinePhase.stars,
+                    stars_task_id,
+                    run_id=run_id,
+                    phase=PipelinePhase.stars,
                 ),
                 phase=PipelinePhase.stars,
                 task_id=stars_task_id,
@@ -102,9 +102,9 @@ class SyncPipelineService:
             )
             embedding_partial_error = self._normalize_partial_error(
                 await self._inspect_task_outcome(
-                embedding_task_id,
-                run_id=run_id,
-                phase=PipelinePhase.embedding,
+                    embedding_task_id,
+                    run_id=run_id,
+                    phase=PipelinePhase.embedding,
                 ),
                 phase=PipelinePhase.embedding,
                 task_id=embedding_task_id,
@@ -131,9 +131,9 @@ class SyncPipelineService:
             )
             clustering_partial_error = self._normalize_partial_error(
                 await self._inspect_task_outcome(
-                clustering_task_id,
-                run_id=run_id,
-                phase=PipelinePhase.clustering,
+                    clustering_task_id,
+                    run_id=run_id,
+                    phase=PipelinePhase.clustering,
                 ),
                 phase=PipelinePhase.clustering,
                 task_id=clustering_task_id,
@@ -156,7 +156,9 @@ class SyncPipelineService:
                 else PipelineStatus.completed
             )
             final_error = (
-                PARTIAL_FAILURE_SEPARATOR.join(partial_errors) if partial_errors else None
+                PARTIAL_FAILURE_SEPARATOR.join(partial_errors)
+                if partial_errors
+                else None
             )
             await self._update_run(
                 run_id,
@@ -398,8 +400,7 @@ class SyncPipelineService:
             return outcome
         if outcome:
             return (
-                f"Pipeline phase partial failure phase={phase.value} "
-                f"task_id={task_id}"
+                f"Pipeline phase partial failure phase={phase.value} task_id={task_id}"
             )
         return None
 

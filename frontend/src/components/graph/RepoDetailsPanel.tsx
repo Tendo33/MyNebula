@@ -21,6 +21,7 @@ interface RelatedRepoItemProps {
 type RelatedTab = 'similar' | 'sameTags' | 'sameLang';
 type RelatedGraphNode = GraphNode & { _score: number; _matchReason: string };
 type CachedRelatedItem = { repoId: number; score: number; matchReason: string };
+type LocalRelatedRepo = GraphNode | RelatedGraphNode;
 
 const normalizeTag = (tag: string): string => {
   return tag
@@ -516,13 +517,13 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           {/* Related Repos List — independently scrollable, sized to remaining space */}
           {currentRelatedRepos.length > 0 ? (
             <div className="bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 p-1.5 flex-1 min-h-0 overflow-y-auto overscroll-contain dark:bg-dark-bg-sidebar/60 dark:border-dark-border dark:divide-dark-border/60">
-              {currentRelatedRepos.map((repo: any) => (
+              {currentRelatedRepos.map((repo: LocalRelatedRepo) => (
                 <RelatedRepoItem
                   key={repo.id}
                   repo={repo}
                   onClick={() => handleRelatedRepoClick(repo)}
-                  matchReason={repo._matchReason}
-                  score={repo._score}
+                  matchReason={'_matchReason' in repo ? repo._matchReason : undefined}
+                  score={'_score' in repo ? repo._score : undefined}
                 />
               ))}
             </div>

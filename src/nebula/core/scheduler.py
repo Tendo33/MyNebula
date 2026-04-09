@@ -41,6 +41,7 @@ class SchedulerService:
         """Initialize the scheduler service."""
         self._scheduler: AsyncIOScheduler | None = None
         self._running = False
+        self._last_error: str | None = None
         self._active_user_tasks: dict[int, asyncio.Task[None]] = {}
         self._task_lock = asyncio.Lock()
 
@@ -71,7 +72,12 @@ class SchedulerService:
             max_instances=1,  # Prevent overlapping executions
         )
 
-        scheduler.start()
+        try:
+            scheduler.start()
+        except Exception as exc:
+            self._last_error = str(exc)
+            raise
+        self._last_error = None
         self._running = True
         logger.info(
             "Scheduler service started - checking for scheduled syncs every minute"
@@ -93,6 +99,11 @@ class SchedulerService:
     def is_running(self) -> bool:
         """Check if scheduler is running."""
         return self._running
+
+    @property
+    def last_error(self) -> str | None:
+        """Return the last scheduler startup/runtime error."""
+        return self._last_error
 
     async def _check_and_trigger_syncs(self) -> None:
         """Check for users who need their scheduled sync executed.

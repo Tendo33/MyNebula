@@ -1,9 +1,7 @@
 """V2 dashboard route."""
 
-from collections import Counter
-
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
@@ -29,11 +27,10 @@ async def get_dashboard_data(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> DashboardResponse:
     """Get consolidated dashboard payload."""
-    graph_data = await graph_service.get_graph_data_with_options(
+    graph_meta = await graph_service.get_snapshot_metadata(
         db,
         user=user,
         version="active",
-        include_edges=False,
     )
 
     repo_count_result = await db.execute(
@@ -46,18 +43,50 @@ async def get_dashboard_data(
     )
     counts = repo_count_result.one()
 
-    repo_stats_result = await db.execute(
-        select(StarredRepo.language, StarredRepo.topics).where(StarredRepo.user_id == user.id)
+    language_stats_result = await db.execute(
+        select(StarredRepo.language, func.count(StarredRepo.id).label("count"))
+        .where(
+            StarredRepo.user_id == user.id,
+            StarredRepo.language.is_not(None),
+        )
+        .group_by(StarredRepo.language)
+        .order_by(func.count(StarredRepo.id).desc(), StarredRepo.language.asc())
+        .limit(8)
     )
-    language_counter: Counter[str] = Counter()
-    topic_counter: Counter[str] = Counter()
-    for language, topics in repo_stats_result.all():
-        if language:
-            language_counter[language] += 1
-        if topics:
-            topic_counter.update(
-                topic.strip().lower() for topic in topics if isinstance(topic, str) and topic.strip()
-            )
+    topic_stats_result = await db.execute(
+        text(
+            """
+            SELECT lower(trim(topic)) AS topic, count(*) AS count
+            FROM starred_repos
+            CROSS JOIN LATERAL unnest(topics) AS topic
+            WHERE user_id = :user_id
+              AND topic IS NOT NULL
+              AND trim(topic) <> ''
+            GROUP BY lower(trim(topic))
+            ORDER BY count(*) DESC, lower(trim(topic)) ASC
+            LIMIT 12
+            """
+        ),
+        {"user_id": user.id},
+    )
+    topic_rows = topic_stats_result.all()
+    total_topics_result = await db.execute(
+        text(
+            """
+            SELECT count(*) AS total_topics
+            FROM (
+                SELECT DISTINCT lower(trim(topic)) AS topic
+                FROM starred_repos
+                CROSS JOIN LATERAL unnest(topics) AS topic
+                WHERE user_id = :user_id
+                  AND topic IS NOT NULL
+                  AND trim(topic) <> ''
+            ) AS distinct_topics
+            """
+        ),
+        {"user_id": user.id},
+    )
+    total_topics = int(total_topics_result.scalar() or 0)
 
     clusters_result = await db.execute(
         select(Cluster)
@@ -67,26 +96,25 @@ async def get_dashboard_data(
     )
     top_clusters = clusters_result.scalars().all()
     metadata = build_v2_metadata(
-        version=graph_data.version,
-        generated_at=graph_data.generated_at,
-        request_id=graph_data.request_id,
+        version=graph_meta["version"],
+        generated_at=graph_meta["generated_at"],
+        request_id=graph_meta["request_id"],
     )
 
     return DashboardResponse(
         summary=DashboardSummary(
             total_repos=int(counts.total or 0),
             embedded_repos=int(counts.embedded or 0),
-            total_topics=len(topic_counter),
-            total_clusters=graph_data.total_clusters,
-            total_edges=graph_data.total_edges,
+            total_topics=total_topics,
+            total_clusters=int(graph_meta["total_clusters"] or 0),
+            total_edges=int(graph_meta["total_edges"] or 0),
         ),
         top_languages=[
-            DashboardLanguageStat(language=language, count=count)
-            for language, count in language_counter.most_common(8)
+            DashboardLanguageStat(language=row.language, count=row.count)
+            for row in language_stats_result
         ],
         top_topics=[
-            DashboardTopicStat(topic=topic, count=count)
-            for topic, count in topic_counter.most_common(12)
+            DashboardTopicStat(topic=row.topic, count=row.count) for row in topic_rows
         ],
         top_clusters=[
             DashboardCluster(

@@ -178,3 +178,40 @@ async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
         )
 
     assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_get_full_refresh_job_status_preserves_partial_failed_status(monkeypatch):
+    from nebula.api.v2 import settings as settings_api
+
+    async def fake_get_job_status(*_args, **_kwargs):
+        return type(
+            "JobStatus",
+            (),
+            {
+                "task_id": 99,
+                "task_type": "full_refresh",
+                "status": "partial_failed",
+                "phase": "complete",
+                "progress_percent": 100.0,
+                "eta_seconds": None,
+                "last_error": None,
+                "retryable": False,
+                "started_at": None,
+                "completed_at": None,
+                "error_details": {
+                    "partial_failures": [
+                        {"phase": "stars", "task_id": 12, "failed_items": 2}
+                    ]
+                },
+            },
+        )()
+
+    monkeypatch.setattr(settings_api, "get_job_status", fake_get_job_status)
+
+    payload = await settings_api.get_full_refresh_job_status(task_id=99, db=object())
+
+    assert payload.job.status == "partial_failed"
+    assert payload.job.error_details == {
+        "partial_failures": [{"phase": "stars", "task_id": 12, "failed_items": 2}]
+    }

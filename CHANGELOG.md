@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-04-09
+
+### Fixed
+- Hardened related recommendation feedback writes with atomic upsert semantics, admin-only CSRF protection, and duplicate-row prevention.
+- Exposed `partial_failed` job details end-to-end so Settings can show warning summaries instead of masking partial refresh failures.
+- Corrected dashboard topic totals to report the full distinct topic count rather than the limited top-topic slice.
+- Prevented non-graph routes from fetching heavy graph payloads when opening the command palette.
+- Resolved frontend TypeScript regressions uncovered by the CI typecheck/build steps.
+
+### Changed
+- Synchronized version metadata to `1.2.4` across backend package metadata, frontend package metadata, runtime config, and changelog.
+
 ## [1.2.2] - 2026-04-07
 
 ### Changed
@@ -170,7 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.4...HEAD
+[1.2.4]: https://github.com/Tendo33/mynebula/compare/v1.2.3...v1.2.4
 [1.2.2]: https://github.com/Tendo33/mynebula/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/Tendo33/mynebula/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Tendo33/mynebula/compare/v1.1.2...v1.2.0

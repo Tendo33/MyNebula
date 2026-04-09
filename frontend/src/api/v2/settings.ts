@@ -77,7 +77,7 @@ export interface FullRefreshStartResponse {
 export interface FullRefreshJobStatus {
   task_id: number;
   task_type: string;
-  status: string;
+  status: 'pending' | 'running' | 'completed' | 'partial_failed' | 'failed';
   phase: string;
   progress_percent: number;
   eta_seconds: number | null;
@@ -85,6 +85,13 @@ export interface FullRefreshJobStatus {
   retryable: boolean;
   started_at: string | null;
   completed_at: string | null;
+  error_details?: {
+    partial_failures?: Array<{
+      phase: string;
+      task_id: number;
+      failed_items: number;
+    }>;
+  } | null;
 }
 
 export interface FullRefreshJobResponse {

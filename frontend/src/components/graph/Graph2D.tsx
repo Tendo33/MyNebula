@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods, NodeObject, LinkObject } from 'react-force-graph-2d';
-import * as d3 from 'd3-force';
+import { forceCollide, forceX, forceY } from 'd3-force';
 import { useResizeObserver } from '../../hooks/useResizeObserver';
 import { useTranslation } from 'react-i18next';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
@@ -44,6 +44,19 @@ interface ProcessedData {
   nodes: ProcessedNode[];
   links: ProcessedLink[];
 }
+
+interface ClusterCenter {
+  x: number;
+  y: number;
+  count: number;
+}
+
+interface ClusterLayoutData {
+  centers: Map<number, ClusterCenter>;
+  clusterNodes: Map<number, ProcessedNode[]>;
+}
+
+type RegisteredForce = NonNullable<Parameters<ForceGraphMethods['d3Force']>[1]>;
 
 // ============================================================================
 // Constants
@@ -228,6 +241,34 @@ const Graph2D: React.FC = () => {
     [processedData.nodes.length, processedData.links.length]
   );
 
+  const clusterLayoutData = useMemo((): ClusterLayoutData => {
+    const centers = new Map<number, ClusterCenter>();
+    const clusterNodes = new Map<number, ProcessedNode[]>();
+
+    processedData.nodes.forEach((node) => {
+      if (node.cluster_id == null || node.x === undefined || node.y === undefined) {
+        return;
+      }
+
+      const clusterMembers = clusterNodes.get(node.cluster_id) ?? [];
+      clusterMembers.push(node);
+      clusterNodes.set(node.cluster_id, clusterMembers);
+
+      const currentCenter = centers.get(node.cluster_id) ?? { x: 0, y: 0, count: 0 };
+      currentCenter.x += node.x;
+      currentCenter.y += node.y;
+      currentCenter.count += 1;
+      centers.set(node.cluster_id, currentCenter);
+    });
+
+    centers.forEach((center) => {
+      center.x /= center.count;
+      center.y /= center.count;
+    });
+
+    return { centers, clusterNodes };
+  }, [processedData.nodes]);
+
   // Group nodes by cluster for hull drawing
   const clusterGroups = useMemo(() => {
     if (!rawData) return new Map<number, ClusterInfo>();
@@ -247,13 +288,13 @@ const Graph2D: React.FC = () => {
 
     // Configure link force - increased distance for cross-cluster links
     fg.d3Force('link')
-      ?.distance((link: any) => {
+      ?.distance((link: LinkObject<NodeObject, LinkObject<NodeObject>>) => {
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
         const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : null;
         // Same cluster: moderate distance, Different cluster: larger separation
         return sourceCluster === targetCluster ? 38 : 75;
       })
-      .strength((link: any) => {
+      .strength((link: LinkObject<NodeObject, LinkObject<NodeObject>>) => {
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
         const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : null;
         // Stronger links within same cluster, very weak for cross-cluster
@@ -266,39 +307,34 @@ const Graph2D: React.FC = () => {
       .distanceMax(250);
 
     // Gentle pull toward the origin to avoid disconnected groups drifting far apart
-    fg.d3Force('x', (d3 as any).forceX(0).strength(CENTER_PULL_STRENGTH));
-    fg.d3Force('y', (d3 as any).forceY(0).strength(CENTER_PULL_STRENGTH));
+    fg.d3Force(
+      'x',
+      forceX(0).strength(CENTER_PULL_STRENGTH) as unknown as RegisteredForce,
+    );
+    fg.d3Force(
+      'y',
+      forceY(0).strength(CENTER_PULL_STRENGTH) as unknown as RegisteredForce,
+    );
 
     // Add collision force to prevent overlap
-    fg.d3Force('collide', (d3 as any).forceCollide()
-      .radius((node: any) => calculateNodeRadius(node.stargazers_count) * 1.5 + 3)
-      .strength(0.9)
-      .iterations(2));
+    fg.d3Force(
+      'collide',
+      forceCollide<ProcessedNode>()
+        .radius(
+          (node: ProcessedNode) =>
+            calculateNodeRadius(node.stargazers_count) * 1.5 + 3,
+        )
+        .strength(0.9)
+        .iterations(2) as unknown as RegisteredForce,
+    );
 
-    // Enhanced cluster force with cluster-center repulsion
+    // Cluster force keeps members compact while preventing cluster centers from collapsing together.
     const clusterForce = (alpha: number) => {
-      const clusterCenters = new Map<number, { x: number; y: number; count: number }>();
+      if (alpha < 0.015) {
+        return;
+      }
 
-      // Calculate cluster centers
-      processedData.nodes.forEach(node => {
-        if (node.cluster_id != null && node.x !== undefined && node.y !== undefined) {
-          const current = clusterCenters.get(node.cluster_id) || { x: 0, y: 0, count: 0 };
-          current.x += node.x;
-          current.y += node.y;
-          current.count += 1;
-          clusterCenters.set(node.cluster_id, current);
-        }
-      });
-
-      // Normalize centers
-      clusterCenters.forEach(center => {
-        center.x /= center.count;
-        center.y /= center.count;
-      });
-
-      // Convert to array for center-to-center repulsion
-      const centersArray = Array.from(clusterCenters.entries());
-      const minClusterDistance = MIN_CLUSTER_DISTANCE; // Minimum distance between cluster centers
+      const centersArray = Array.from(clusterLayoutData.centers.entries());
 
       // Apply repulsion between cluster centers
       for (let i = 0; i < centersArray.length; i++) {
@@ -311,42 +347,47 @@ const Graph2D: React.FC = () => {
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
           // If clusters are too close, push them apart
-          if (dist < minClusterDistance) {
-            const force = ((minClusterDistance - dist) / dist) * alpha * 2;
+          if (dist < MIN_CLUSTER_DISTANCE) {
+            const force = ((MIN_CLUSTER_DISTANCE - dist) / dist) * alpha * 2;
             const fx = dx * force;
             const fy = dy * force;
+            const cluster1Nodes = clusterLayoutData.clusterNodes.get(clusterId1) ?? [];
+            const cluster2Nodes = clusterLayoutData.clusterNodes.get(clusterId2) ?? [];
 
-            // Apply force to all nodes in each cluster
-            processedData.nodes.forEach((node: any) => {
-              if (node.cluster_id === clusterId1) {
-                node.vx = (node.vx || 0) - fx;
-                node.vy = (node.vy || 0) - fy;
-              } else if (node.cluster_id === clusterId2) {
-                node.vx = (node.vx || 0) + fx;
-                node.vy = (node.vy || 0) + fy;
-              }
+            cluster1Nodes.forEach((node) => {
+              node.vx = (node.vx || 0) - fx;
+              node.vy = (node.vy || 0) - fy;
+            });
+            cluster2Nodes.forEach((node) => {
+              node.vx = (node.vx || 0) + fx;
+              node.vy = (node.vy || 0) + fy;
             });
           }
         }
       }
 
-      // Apply stronger force toward cluster center (increased from 0.1 to 0.3)
-      processedData.nodes.forEach((node: any) => {
-        if (node.cluster_id != null) {
-          const center = clusterCenters.get(node.cluster_id);
-          if (center && node.x !== undefined && node.y !== undefined) {
-            const k = alpha * 0.2; // Moderate clustering strength
-            node.vx = (node.vx || 0) + (center.x - node.x) * k;
-            node.vy = (node.vy || 0) + (center.y - node.y) * k;
-          }
+      clusterLayoutData.clusterNodes.forEach((clusterNodes, clusterId) => {
+        const center = clusterLayoutData.centers.get(clusterId);
+        if (!center) {
+          return;
         }
+
+        clusterNodes.forEach((node) => {
+          if (node.x === undefined || node.y === undefined) {
+            return;
+          }
+
+          const k = alpha * 0.2;
+          node.vx = (node.vx || 0) + (center.x - node.x) * k;
+          node.vy = (node.vy || 0) + (center.y - node.y) * k;
+        });
       });
     };
 
     // Register custom force
     fg.d3Force('cluster', clusterForce);
 
-  }, [processedData.nodes]);
+  }, [clusterLayoutData]);
 
   const tryAutoFit = useCallback(() => {
     if (!graphRef.current || processedData.nodes.length === 0) return;
@@ -460,8 +501,9 @@ const Graph2D: React.FC = () => {
   }, [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]);
 
   // Custom node painting
-  const paintNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-    const { x, y, name, stargazers_count, owner_avatar_url } = node as ProcessedNode;
+  const paintNode = useCallback((nodeObject: NodeObject<NodeObject>, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    const node = nodeObject as ProcessedNode;
+    const { x, y, name, stargazers_count, owner_avatar_url } = node;
     if (x === undefined || y === undefined) return;
 
     const isVisible = visibleNodeIds.has(node.id);
@@ -588,8 +630,9 @@ const Graph2D: React.FC = () => {
   }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering, triggerAvatarRedraw, visibleNodeIds]);
 
   // Node pointer area for click detection
-  const paintNodeArea = useCallback((node: any, color: string, ctx: CanvasRenderingContext2D) => {
-    const { x, y, stargazers_count } = node as ProcessedNode;
+  const paintNodeArea = useCallback((nodeObject: NodeObject<NodeObject>, color: string, ctx: CanvasRenderingContext2D) => {
+    const node = nodeObject as ProcessedNode;
+    const { x, y, stargazers_count } = node;
     if (x === undefined || y === undefined) return;
 
     const radius = calculateNodeRadius(stargazers_count);
@@ -745,8 +788,8 @@ const Graph2D: React.FC = () => {
   }, [selectedNodeId, focusNodeById, getLiveNodeById]);
 
   // Handle node click
-  const handleNodeClick = useCallback((node: any) => {
-    const processedNode = node as ProcessedNode;
+  const handleNodeClick = useCallback((nodeObject: NodeObject<NodeObject>) => {
+    const processedNode = nodeObject as ProcessedNode;
 
     // Find the full node data from raw data
     const fullNode = rawData?.nodes.find(n => n.id === processedNode.id);
@@ -762,8 +805,8 @@ const Graph2D: React.FC = () => {
   }, [rawData, selectedNode, setSelectedNode, focusNodeById]);
 
   // Handle node hover
-  const handleNodeHover = useCallback((node: any) => {
-    const processedNode = node as ProcessedNode | null;
+  const handleNodeHover = useCallback((nodeObject: NodeObject<NodeObject> | null) => {
+    const processedNode = nodeObject as ProcessedNode | null;
 
     setActiveHoverNode(processedNode);
     document.body.style.cursor = processedNode ? 'pointer' : '';
@@ -845,8 +888,8 @@ const Graph2D: React.FC = () => {
         // Physics
         d3AlphaDecay={0.02}
         d3VelocityDecay={0.3}
-        cooldownTicks={200}
-        warmupTicks={100}
+        cooldownTicks={120}
+        warmupTicks={60}
 
         // After engine stops
         onEngineStop={tryAutoFit}

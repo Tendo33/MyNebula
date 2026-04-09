@@ -101,6 +101,18 @@ class GraphQueryService:
         self._log_if_slow("get_graph_data_with_options", started, version=version)
         return graph_data
 
+    async def get_snapshot_metadata(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        version: str = "active",
+    ) -> dict[str, int | str | None]:
+        snapshot = await self._resolve_snapshot(db, user, version)
+        metadata = await self.snapshot_repo.get_snapshot_metadata(db, snapshot)
+        metadata["request_id"] = str(uuid.uuid4())
+        return metadata
+
     async def get_timeline_data(
         self, db: AsyncSession, *, user: User, version: str = "active"
     ) -> TimelineData:

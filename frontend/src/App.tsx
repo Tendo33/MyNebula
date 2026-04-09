@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import { GraphProvider, useGraph } from './contexts/GraphContext';
@@ -15,18 +15,34 @@ const DataPage = lazy(() => import('./pages/DataPage'));
 const Settings = lazy(() => import('./pages/Settings'));
 
 // Inner component that uses router hooks
-function AppContent() {
+function GraphAppContent({
+  isOpen,
+  close,
+}: {
+  isOpen: boolean;
+  close: () => void;
+}) {
   const navigate = useNavigate();
-  const { isOpen, close } = useCommandPalette();
   const { setSelectedNode } = useGraph();
 
   const handleSelectNode = (node: GraphNode) => {
     setSelectedNode(node);
-    navigate('/graph');
+    navigate(`/graph?node=${node.id}`);
   };
 
   const handleSelectCluster = (cluster: ClusterInfo) => {
     navigate(`/graph?cluster=${cluster.id}`);
+  };
+
+  const handleSelectSearch = (
+    value: string,
+    facet: 'search' | 'language' | 'tag' = 'search'
+  ) => {
+    const params = new URLSearchParams();
+    if (facet === 'language') params.set('language', value);
+    else if (facet === 'tag') params.set('tag', value);
+    else params.set('q', value);
+    navigate(`/graph?${params.toString()}`);
   };
 
   const { t } = useTranslation();
@@ -55,20 +71,31 @@ function AppContent() {
         onClose={close}
         onSelectNode={handleSelectNode}
         onSelectCluster={handleSelectCluster}
+        onSelectSearch={handleSelectSearch}
       />
     </>
   );
 }
 
+function AppContent() {
+  const location = useLocation();
+  const { isOpen, close } = useCommandPalette();
+  const graphEnabled = location.pathname === '/graph';
+
+  return (
+    <GraphProvider enabled={graphEnabled}>
+      <GraphAppContent isOpen={isOpen} close={close} />
+    </GraphProvider>
+  );
+}
+
 function App() {
   return (
-    <GraphProvider>
-      <AdminAuthProvider>
-        <Router>
-          <AppContent />
-        </Router>
-      </AdminAuthProvider>
-    </GraphProvider>
+    <AdminAuthProvider>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <AppContent />
+      </Router>
+    </AdminAuthProvider>
   );
 }
 

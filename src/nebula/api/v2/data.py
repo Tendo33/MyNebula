@@ -124,14 +124,15 @@ async def get_data_repos(
     )
     repos = result.scalars().all()
     clusters_result = await db.execute(
-        select(Cluster).where(Cluster.user_id == user.id).order_by(Cluster.repo_count.desc())
+        select(Cluster)
+        .where(Cluster.user_id == user.id)
+        .order_by(Cluster.repo_count.desc())
     )
     clusters = clusters_result.scalars().all()
-    graph_data = await graph_service.get_graph_data_with_options(
+    graph_meta = await graph_service.get_snapshot_metadata(
         db,
         user=user,
         version="active",
-        include_edges=False,
     )
 
     return DataReposResponse(
@@ -172,8 +173,8 @@ async def get_data_repos(
         limit=limit,
         offset=offset,
         **build_v2_metadata(
-            version=graph_data.version,
-            generated_at=graph_data.generated_at,
-            request_id=graph_data.request_id,
+            version=graph_meta["version"],
+            generated_at=graph_meta["generated_at"],
+            request_id=graph_meta["request_id"],
         ),
     )

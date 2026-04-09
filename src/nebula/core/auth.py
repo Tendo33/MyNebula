@@ -100,7 +100,9 @@ def request_uses_trusted_proxy(
     if not proxy_ips:
         return False
 
-    client_host = request.client.host if request.client and request.client.host else None
+    client_host = (
+        request.client.host if request.client and request.client.host else None
+    )
     return bool(client_host and client_host in proxy_ips)
 
 
@@ -113,12 +115,15 @@ def get_client_ip(
 ) -> str:
     """Best-effort client IP for audit logging and coarse rate limiting."""
     forwarded_for = request.headers.get("x-forwarded-for", "").strip()
-    if request_uses_trusted_proxy(
-        request,
-        settings=settings,
-        trust_proxy_headers=trust_proxy_headers,
-        trusted_proxy_ips=trusted_proxy_ips,
-    ) and forwarded_for:
+    if (
+        request_uses_trusted_proxy(
+            request,
+            settings=settings,
+            trust_proxy_headers=trust_proxy_headers,
+            trusted_proxy_ips=trusted_proxy_ips,
+        )
+        and forwarded_for
+    ):
         return forwarded_for.split(",")[0].strip()
     if request.client and request.client.host:
         return request.client.host

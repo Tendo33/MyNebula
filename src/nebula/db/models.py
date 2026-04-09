@@ -20,6 +20,7 @@ from sqlalchemy import (
     MetaData,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
@@ -396,6 +397,11 @@ class RepoRelatedFeedback(Base):
     )
 
     __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "anchor_repo_id",
+            "candidate_repo_id",
+        ),
         Index(
             "ix_related_feedback_user_anchor_candidate",
             "user_id",

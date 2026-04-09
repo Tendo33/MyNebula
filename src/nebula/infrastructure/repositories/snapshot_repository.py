@@ -282,6 +282,23 @@ class SnapshotStoreRepository:
             else None,
         )
 
+    async def get_snapshot_metadata(
+        self,
+        _db: AsyncSession,
+        snapshot: GraphSnapshot,
+    ) -> dict[str, int | str | None]:
+        meta = snapshot.meta or {}
+        return {
+            "version": snapshot.version,
+            "generated_at": snapshot.created_at.isoformat()
+            if snapshot.created_at
+            else None,
+            "total_nodes": int(meta.get("total_nodes", 0)),
+            "total_edges": int(meta.get("total_edges", 0)),
+            "total_clusters": int(meta.get("total_clusters", 0)),
+            "total_star_lists": int(meta.get("total_star_lists", 0)),
+        }
+
     async def hydrate_timeline_data(
         self, db: AsyncSession, snapshot_id: int
     ) -> TimelineData | None:

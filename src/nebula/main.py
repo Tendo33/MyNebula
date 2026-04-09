@@ -162,9 +162,17 @@ def create_app() -> FastAPI:
         from nebula.db.database import check_db_connection
 
         db_healthy = await check_db_connection()
+        scheduler = get_scheduler_service()
+        scheduler_running = scheduler.is_running
+        scheduler_status = "running" if scheduler_running else "stopped"
+        overall_status = "healthy" if db_healthy and scheduler_running else "degraded"
         return {
-            "status": "healthy" if db_healthy else "degraded",
+            "status": overall_status,
             "database": "connected" if db_healthy else "disconnected",
+            "scheduler": {
+                "status": scheduler_status,
+                "last_error": scheduler.last_error,
+            },
             "version": settings.app_version,
         }
 

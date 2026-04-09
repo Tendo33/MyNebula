@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
@@ -19,6 +19,13 @@ import { Filter, X } from 'lucide-react';
 const GraphPage = () => {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const lastAppliedSearchRef = useRef<string | null>(null);
+  const searchSignature = useMemo(() => searchParams.toString(), [searchParams]);
+  const urlNodeId = useMemo(() => searchParams.get('node'), [searchParams]);
+  const urlClusterIds = useMemo(() => searchParams.get('clusters'), [searchParams]);
+  const urlClusterId = useMemo(() => searchParams.get('cluster'), [searchParams]);
+  const urlLanguage = useMemo(() => searchParams.get('language'), [searchParams]);
+  const urlQuery = useMemo(() => searchParams.get('q') ?? searchParams.get('tag') ?? '', [searchParams]);
 
   // Global state
   const {
@@ -32,44 +39,108 @@ const GraphPage = () => {
     filters,
     setSelectedClusters,
     setSearchQuery,
+    setSelectedLanguages,
     clearFilters,
     retryEdgeLoading,
   } = useGraph();
 
-  // Handle URL parameter for node selection
+  // Apply URL state to graph filters/details.
   useEffect(() => {
-    const nodeId = searchParams.get('node');
-    if (!nodeId || !rawData?.nodes) return;
+    if (!rawData) return;
+    if (lastAppliedSearchRef.current === searchSignature) {
+      return;
+    }
+    lastAppliedSearchRef.current = searchSignature;
 
-    const parsedNodeId = Number.parseInt(nodeId, 10);
-    if (Number.isFinite(parsedNodeId)) {
-      const node = rawData.nodes.find(n => n.id === parsedNodeId);
-      if (node) {
-        setSelectedNode(node);
+    if (urlNodeId) {
+      const parsedNodeId = Number.parseInt(urlNodeId, 10);
+      if (Number.isFinite(parsedNodeId)) {
+        const node = rawData.nodes.find(n => n.id === parsedNodeId);
+        if (node && selectedNode?.id !== node.id) {
+          setSelectedNode(node);
+        } else if (!node && selectedNode) {
+          setSelectedNode(null);
+        }
+      } else if (selectedNode) {
+        setSelectedNode(null);
       }
+    } else if (selectedNode) {
+      setSelectedNode(null);
     }
 
-    // Clear URL parameter regardless of whether node exists to avoid stale links.
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('node');
-    setSearchParams(nextParams, { replace: true });
-  }, [searchParams, rawData, setSelectedNode, setSearchParams]);
+    const parsedClusterIds = urlClusterIds
+      ? urlClusterIds
+          .split(',')
+          .map((value) => Number.parseInt(value, 10))
+          .filter((value) => Number.isFinite(value))
+      : urlClusterId
+        ? [Number.parseInt(urlClusterId, 10)].filter((value) => Number.isFinite(value))
+        : [];
+    const validClusterIds = parsedClusterIds.filter((clusterId) =>
+      rawData.clusters.some((cluster) => cluster.id === clusterId)
+    );
+    const currentClusters = Array.from(filters.selectedClusters).sort((left, right) => left - right);
+    if (currentClusters.join(',') !== validClusterIds.join(',')) {
+      setSelectedClusters(validClusterIds);
+    }
 
-  // Handle URL parameter for cluster filter
+    if (filters.searchQuery !== urlQuery) {
+      setSearchQuery(urlQuery);
+    }
+
+    const currentLanguages = Array.from(filters.languages);
+    if (urlLanguage) {
+      if (currentLanguages.length !== 1 || currentLanguages[0] !== urlLanguage) {
+        setSelectedLanguages([urlLanguage]);
+      }
+    } else if (currentLanguages.length > 0) {
+      setSelectedLanguages([]);
+    }
+  }, [
+    filters.languages,
+    filters.searchQuery,
+    filters.selectedClusters,
+    rawData,
+    searchSignature,
+    selectedNode,
+    setSearchQuery,
+    setSelectedClusters,
+    setSelectedLanguages,
+    setSelectedNode,
+    urlClusterId,
+    urlClusterIds,
+    urlLanguage,
+    urlNodeId,
+    urlQuery,
+  ]);
+
   useEffect(() => {
-    const clusterIdParam = searchParams.get('cluster');
-    if (!clusterIdParam || !rawData) return;
+    const nextParams = new URLSearchParams();
 
-    const clusterId = parseInt(clusterIdParam, 10);
-    if (Number.isFinite(clusterId) && rawData.clusters.some(cluster => cluster.id === clusterId)) {
-      clearFilters();
-      setSelectedClusters([clusterId]);
+    if (selectedNode) {
+      nextParams.set('node', String(selectedNode.id));
+    }
+    if (filters.selectedClusters.size === 1) {
+      nextParams.set('cluster', String(Array.from(filters.selectedClusters)[0]));
+    } else if (filters.selectedClusters.size > 1) {
+      nextParams.set(
+        'clusters',
+        Array.from(filters.selectedClusters).sort((left, right) => left - right).join(',')
+      );
+    }
+    if (filters.languages.size === 1) {
+      nextParams.set('language', Array.from(filters.languages)[0]);
+    }
+    if (filters.searchQuery.trim()) {
+      nextParams.set('q', filters.searchQuery.trim());
     }
 
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('cluster');
-    setSearchParams(nextParams, { replace: true });
-  }, [searchParams, rawData, setSearchParams, clearFilters, setSelectedClusters]);
+    const nextSignature = nextParams.toString();
+    if (nextSignature !== searchSignature) {
+      lastAppliedSearchRef.current = nextSignature;
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [filters.languages, filters.searchQuery, filters.selectedClusters, searchSignature, selectedNode, setSearchParams]);
 
   // Local UI state
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);
@@ -207,7 +278,10 @@ const GraphPage = () => {
               {/* Clear all filters */}
               {hasActiveFilters && (
                 <button
-                  onClick={clearFilters}
+                  onClick={() => {
+                    clearFilters();
+                    setSelectedNode(null);
+                  }}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-text-main hover:bg-bg-hover rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                 >
                   <X className="w-4 h-4" />

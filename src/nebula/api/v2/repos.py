@@ -8,9 +8,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.params import Depends as DependsParam
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.related_repo_service import get_related_repos
+from nebula.application.services.user_service import get_default_user
 from nebula.core.auth import get_admin_session_username
 from nebula.core.config import AppSettings, get_app_settings
 from nebula.core.embedding import get_embedding_service
@@ -32,7 +34,7 @@ from nebula.schemas.repo import (
 from nebula.utils import get_logger
 
 from .access import resolve_read_user
-from .auth import ADMIN_SESSION_COOKIE
+from .auth import ADMIN_SESSION_COOKIE, require_admin, require_admin_csrf
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -196,10 +198,12 @@ async def get_related_repositories(
 async def submit_related_feedback(
     repo_id: int,
     request: RelatedFeedbackRequest,
-    user: User = Depends(resolve_read_user),  # noqa: B008
+    _: str = Depends(require_admin),  # noqa: B008
+    __: None = Depends(require_admin_csrf),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Record user feedback for related repository recommendations."""
+    user = await get_default_user(db)
     anchor_result = await db.execute(
         select(StarredRepo.id).where(
             StarredRepo.user_id == user.id,
@@ -226,7 +230,7 @@ async def submit_related_feedback(
             detail="Candidate repository not found",
         )
 
-    feedback = RepoRelatedFeedback(
+    stmt = insert(RepoRelatedFeedback).values(
         user_id=user.id,
         anchor_repo_id=repo_id,
         candidate_repo_id=request.candidate_repo_id,
@@ -234,7 +238,20 @@ async def submit_related_feedback(
         score_snapshot=request.score_snapshot,
         model_version=request.model_version,
     )
-    db.add(feedback)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[
+            RepoRelatedFeedback.user_id,
+            RepoRelatedFeedback.anchor_repo_id,
+            RepoRelatedFeedback.candidate_repo_id,
+        ],
+        set_={
+            "feedback": stmt.excluded.feedback,
+            "score_snapshot": stmt.excluded.score_snapshot,
+            "model_version": stmt.excluded.model_version,
+            "created_at": func.now(),
+        },
+    )
+    await db.execute(stmt)
     await db.commit()
 
     return RelatedFeedbackResponse(

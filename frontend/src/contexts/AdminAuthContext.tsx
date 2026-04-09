@@ -109,6 +109,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAdminAuth = (): AdminAuthContextValue => {
   const context = useContext(AdminAuthContext);
   if (!context) {

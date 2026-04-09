@@ -60,6 +60,7 @@ interface GraphContextValue extends GraphState {
   clearStarListFilter: () => void;
   setTimeRange: (range: [number, number] | null) => void;
   setMinStars: (min: number) => void;
+  setSelectedLanguages: (languages: string[]) => void;
   toggleLanguage: (language: string) => void;
   clearFilters: () => void;
   updateSettings: (settings: Partial<GraphSettings>) => void;
@@ -70,7 +71,10 @@ interface GraphContextValue extends GraphState {
 
 const GraphContext = createContext<GraphContextValue | null>(null);
 
-export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: boolean }> = ({
+  children,
+  enabled = true,
+}) => {
   const queryClient = useQueryClient();
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -92,18 +96,19 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const clearStarListFilter = useGraphStore((state) => state.clearStarListFilter);
   const setTimeRange = useGraphStore((state) => state.setTimeRange);
   const setMinStars = useGraphStore((state) => state.setMinStars);
+  const setSelectedLanguages = useGraphStore((state) => state.setSelectedLanguages);
   const toggleLanguage = useGraphStore((state) => state.toggleLanguage);
   const clearFilters = useGraphStore((state) => state.clearFilters);
   const setSyncing = useGraphStore((state) => state.setSyncing);
   const setSyncStep = useGraphStore((state) => state.setSyncStep);
 
-  const graphQuery = useGraphDataQuery(refreshNonce);
-  const timelineQuery = useTimelineQuery(refreshNonce);
+  const graphQuery = useGraphDataQuery(refreshNonce, enabled);
+  const timelineQuery = useTimelineQuery(refreshNonce, enabled);
   const graphVersion = graphQuery.data?.version ?? 'active';
   const edgesQuery = useGraphEdgesInfiniteQuery({
     version: graphVersion,
     refreshNonce,
-    enabled: !!graphQuery.data,
+    enabled: enabled && !!graphQuery.data,
   });
   const stagedEdges = edgesQuery.stagedEdges;
   const rawData = useMemo(() => {
@@ -117,7 +122,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [graphQuery.data, stagedEdges]);
   const timelineData = timelineQuery.data ?? null;
   const graphFilterIndexes = useMemo(() => buildGraphFilterIndexes(rawData), [rawData]);
-  const loading = graphQuery.isLoading || timelineQuery.isLoading;
+  const loading = enabled && (graphQuery.isLoading || timelineQuery.isLoading);
   const edgesLoading = Boolean(
     graphQuery.data &&
       (edgesQuery.isLoading || edgesQuery.isFetchingNextPage || edgesQuery.hasNextPage)
@@ -228,6 +233,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     clearStarListFilter,
     setTimeRange,
     setMinStars,
+    setSelectedLanguages,
     toggleLanguage,
     clearFilters,
     updateSettings,
@@ -240,13 +246,14 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loadData, refreshData,
     setSelectedNode, setSearchQuery, toggleCluster, setSelectedClusters,
     clearClusterFilter, toggleStarList, setSelectedStarLists,
-    clearStarListFilter, setTimeRange, setMinStars, toggleLanguage,
+    clearStarListFilter, setTimeRange, setMinStars, setSelectedLanguages, toggleLanguage,
     clearFilters, updateSettings, setSyncing, setSyncStep, retryEdgeLoading,
   ]);
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useGraph = (): GraphContextValue => {
   const context = useContext(GraphContext);
   if (!context) {
@@ -255,6 +262,7 @@ export const useGraph = (): GraphContextValue => {
   return context;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNodeNeighbors = (nodeId: number | undefined): Set<number> => {
   const { rawData } = useGraph();
   const adjacencyIndex = useMemo(() => {

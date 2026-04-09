@@ -29,6 +29,7 @@ interface GraphUiState {
   setSearchQuery: (query: string) => void;
   setTimeRange: (range: [number, number] | null) => void;
   setMinStars: (min: number) => void;
+  setSelectedLanguages: (languages: string[]) => void;
   toggleLanguage: (language: string) => void;
   toggleCluster: (clusterId: number) => void;
   setSelectedClusters: (clusterIds: number[]) => void;
@@ -89,6 +90,10 @@ export const useGraphStore = create<GraphUiState>((set) => ({
     set((state) => ({ filters: { ...state.filters, timeRange: range } })),
   setMinStars: (min) =>
     set((state) => ({ filters: { ...state.filters, minStars: min } })),
+  setSelectedLanguages: (languages) =>
+    set((state) => ({
+      filters: { ...state.filters, languages: new Set(languages) },
+    })),
   toggleLanguage: (language) =>
     set((state) => {
       const next = new Set(state.filters.languages);

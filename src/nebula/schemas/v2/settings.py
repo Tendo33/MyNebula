@@ -103,6 +103,12 @@ class JobStatusResponse(BaseModel):
     retryable: bool = Field(..., description="Whether this job can be retried")
     started_at: datetime | None = Field(None, description="Task start time")
     completed_at: datetime | None = Field(None, description="Task completion time")
+    error_details: dict | None = Field(
+        None,
+        description="Structured error or partial failure details",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GraphDefaults(BaseModel):

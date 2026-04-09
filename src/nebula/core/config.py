@@ -175,7 +175,7 @@ class AppSettings(BaseSettings):
 
     # Basic settings
     app_name: str = Field(default="mynebula", description="Application name")
-    app_version: str = Field(default="1.2.3", description="Application version")
+    app_version: str = Field(default="1.2.4", description="Application version")
     debug: bool = Field(
         default=False, description="Debug mode (also controls environment)"
     )
@@ -194,7 +194,7 @@ class AppSettings(BaseSettings):
         ),
     )
     snapshot_read_fallback_on_error: bool = Field(
-        default=True,
+        default=False,
         description=(
             "Fallback to live payload build when snapshot read fails unexpectedly"
         ),

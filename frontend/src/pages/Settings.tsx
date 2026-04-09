@@ -73,6 +73,7 @@ const Settings = () => {
   const [reclusterLoading, setReclusterLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -87,6 +88,7 @@ const Settings = () => {
   >(createPipelineSyncSteps);
   const graphDefaultsRef = useRef<{ max: number; min: number } | null>(null);
   const activePollControllerRef = useRef<AbortController | null>(null);
+  const latestFullRefreshJobRef = useRef<FullRefreshJobStatus | null>(null);
 
   const translatedSteps = useMemo(
     () =>
@@ -127,6 +129,7 @@ const Settings = () => {
   const loadScheduleData = useCallback(async () => {
     try {
       setError(null);
+      setWarning(null);
       const settingsPayload = await getSettingsV2();
       setSchedule(settingsPayload.schedule);
       setSyncInfo(settingsPayload.sync_info);
@@ -235,7 +238,7 @@ const Settings = () => {
       signal,
       poll: async () => (await getFullRefreshJobStatusV2(taskId)).job,
       onProgress,
-      isSuccess: (job) => job.status === 'completed',
+      isSuccess: (job) => job.status === 'completed' || job.status === 'partial_failed',
       isFailure: (job) => job.status === 'failed',
       getFailureError: (job) => job.last_error,
       getPollError: (err) => (err instanceof Error ? err.message : 'poll_job_status_failed'),
@@ -367,6 +370,7 @@ const Settings = () => {
   };
 
   const updateFullRefreshProgress = (job: FullRefreshJobStatus) => {
+    latestFullRefreshJobRef.current = job;
     const phaseOrder = ['reset', 'stars', 'embeddings', 'clustering', 'snapshot'] as const;
     const normalizedPhase = normalizeFullRefreshPhase(job.phase);
     const stepProgressSpan = 100 / phaseOrder.length;
@@ -390,7 +394,7 @@ const Settings = () => {
 
     setSyncSteps((previous) =>
       previous.map((step, index) => {
-        if (job.status === 'completed') {
+        if (job.status === 'completed' || job.status === 'partial_failed') {
           return { ...step, status: 'completed', progress: 100, error: undefined };
         }
 
@@ -589,8 +593,10 @@ const Settings = () => {
   const handleFullRefresh = async () => {
     setShowConfirmDialog(false);
     activePollControllerRef.current?.abort();
+    latestFullRefreshJobRef.current = null;
     setRefreshLoading(true);
     setError(null);
+    setWarning(null);
     setSyncing(true);
     setShowSyncProgress(true);
     setProgressTitle(t('settings.full_refresh'));
@@ -610,6 +616,26 @@ const Settings = () => {
       }
       if (!fullRefreshStatus.success) {
         throw new Error(fullRefreshStatus.error || t('settings.full_refresh_error'));
+      }
+
+      const latestJob = latestFullRefreshJobRef.current as FullRefreshJobStatus | null;
+      const partialFailures =
+        (latestJob?.error_details?.partial_failures ?? []) as Array<{
+          phase: string;
+          task_id: number;
+          failed_items: number;
+        }>;
+      if (latestJob?.status === 'partial_failed') {
+        const failedItems = partialFailures.reduce(
+          (sum: number, entry) => sum + (entry.failed_items ?? 0),
+          0,
+        );
+        setWarning(
+          t(
+            'settings.full_refresh_partial_failed',
+            `Full refresh completed with warnings (${partialFailures.length} stages, ${failedItems} failed items).`
+          )
+        );
       }
 
       setSyncSteps((prev) =>
@@ -680,6 +706,12 @@ const Settings = () => {
               <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
                 {error}
+              </div>
+            )}
+            {warning && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                {warning}
               </div>
             )}
 

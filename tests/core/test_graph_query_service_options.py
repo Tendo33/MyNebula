@@ -51,6 +51,16 @@ class _SnapshotRepoStub:
     async def validate_snapshot_consistency(self, _db, _snapshot):
         return True, None
 
+    async def get_snapshot_metadata(self, _db, snapshot):
+        return {
+            "version": snapshot.version,
+            "generated_at": snapshot.created_at.isoformat(),
+            "total_nodes": 0,
+            "total_edges": 1,
+            "total_clusters": 0,
+            "total_star_lists": 0,
+        }
+
 
 @pytest.mark.asyncio
 async def test_get_graph_data_with_options_omits_edges():
@@ -81,3 +91,18 @@ async def test_rollback_active_snapshot_activates_previous():
     assert repo.activated_snapshot_id == 1
     assert payload.version == "snapshot-previous"
     assert payload.request_id is not None
+
+
+@pytest.mark.asyncio
+async def test_get_snapshot_metadata_returns_request_id():
+    service = GraphQueryService(snapshot_repo=_SnapshotRepoStub())
+
+    payload = await service.get_snapshot_metadata(
+        db=object(),
+        user=SimpleNamespace(id=1),
+        version="active",
+    )
+
+    assert payload["version"] == "snapshot-active"
+    assert payload["total_edges"] == 1
+    assert payload["request_id"]
