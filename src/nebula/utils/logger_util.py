@@ -73,6 +73,7 @@ def setup_logging(
     """
     # 移除默认的处理器
     logger.remove()
+    logger.configure(patcher=_redact_record)
 
     # 如果未指定日志文件，则使用默认路径
     if log_file is None:
@@ -108,7 +109,6 @@ def setup_logging(
         enqueue=enqueue,
         catch=catch,
         serialize=serialize,
-        patcher=_redact_record,
     )
 
     # 文件输出处理器（如果指定了日志文件）
@@ -128,7 +128,6 @@ def setup_logging(
             enqueue=enqueue,
             catch=catch,
             serialize=serialize,
-            patcher=_redact_record,
         )
 
 

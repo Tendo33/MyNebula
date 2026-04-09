@@ -30,7 +30,9 @@ def test_health_reports_degraded_when_scheduler_not_running(monkeypatch):
     async def fake_check_db_connection():
         return True
 
-    monkeypatch.setattr("nebula.db.database.check_db_connection", fake_check_db_connection)
+    monkeypatch.setattr(
+        "nebula.db.database.check_db_connection", fake_check_db_connection
+    )
 
     with TestClient(main_module.create_app()) as client:
         response = client.get("/health")
@@ -38,3 +40,29 @@ def test_health_reports_degraded_when_scheduler_not_running(monkeypatch):
     assert response.status_code == 200
     assert response.json()["status"] == "degraded"
     assert response.json()["scheduler"]["status"] == "stopped"
+
+
+def test_setup_logging_redacts_sensitive_extras_without_type_error(tmp_path):
+    from nebula.utils import logger_util
+
+    log_path = tmp_path / "app.log"
+
+    try:
+        logger_util.setup_logging(
+            format_string="{extra}",
+            log_file=str(log_path),
+            catch=False,
+        )
+
+        logger_util.get_logger("test").bind(
+            api_key="top-secret",
+            nested={"token": "nested-secret", "safe": "visible"},
+        ).info("structured log")
+    finally:
+        logger_util.logger.remove()
+        logger_util.logger.configure(patcher=None)
+
+    content = log_path.read_text(encoding="utf-8")
+    assert "***REDACTED***" in content
+    assert "top-secret" not in content
+    assert "nested-secret" not in content
