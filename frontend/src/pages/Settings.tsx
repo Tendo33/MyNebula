@@ -667,7 +667,7 @@ const Settings = () => {
     <div className="flex min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main">
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-h-[3.5rem] px-4 sm:px-8 py-3 sm:py-0 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 dark:bg-dark-bg-main/95 dark:border-dark-border">
+        <header className="sticky top-0 z-40 flex flex-col gap-3 border-b border-border-light bg-bg-main/92 px-4 py-3 backdrop-blur-md sm:min-h-[4.5rem] sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-dark-border dark:bg-dark-bg-main/92">
           <h1 className="text-base font-semibold text-text-main select-none tracking-tight">
             {t('settings.title')}
           </h1>
@@ -676,7 +676,7 @@ const Settings = () => {
             {isAuthenticated && (
               <button
                 onClick={handleAdminLogout}
-                className="h-8 px-3 rounded-md text-xs font-medium border border-border-light bg-bg-main hover:bg-bg-hover text-text-main transition-colors inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:bg-dark-bg-main dark:border-dark-border dark:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
+                className="header-action min-h-0 px-3 text-xs"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 {t('app.logout')}
@@ -701,15 +701,15 @@ const Settings = () => {
             onSubmit={handleAdminLogin}
           />
         ) : (
-          <div className="max-w-3xl px-4 sm:px-8 py-6 sm:py-10 space-y-12">
+          <div className="max-w-3xl px-4 py-6 sm:px-8 sm:py-10 space-y-12">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex items-center gap-2">
+              <div className="panel-surface flex items-center gap-2 border-red-200 bg-red-50/95 p-3 text-sm text-red-700">
                 <AlertTriangle className="w-4 h-4" />
                 {error}
               </div>
             )}
             {warning && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 flex items-center gap-2">
+              <div className="panel-surface flex items-center gap-2 border-amber-200 bg-amber-50/95 p-3 text-sm text-amber-800">
                 <AlertTriangle className="w-4 h-4" />
                 {warning}
               </div>
@@ -724,7 +724,7 @@ const Settings = () => {
                 {t('settings.operations')}
               </h2>
               <div className="space-y-4">
-                <div className="p-3 border border-border-light rounded-md">
+                <div className="panel-surface p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-text-muted" />
@@ -734,7 +734,7 @@ const Settings = () => {
                     onClick={handleSyncStars}
                     disabled={syncing || refreshLoading || reclusterLoading}
                     className={clsx(
-                      'h-9 px-4 rounded-md text-sm font-medium transition-all flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                      'inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl px-4 text-sm font-medium transition-all',
                       syncing || refreshLoading || reclusterLoading
                         ? 'bg-bg-hover text-text-dim cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60'
                         : 'bg-text-main text-bg-main hover:bg-text-main/90 shadow-sm'
@@ -746,7 +746,7 @@ const Settings = () => {
                   </div>
                 </div>
 
-                <div className="p-3 border border-border-light rounded-md space-y-3">
+                <div className="panel-surface space-y-3 p-4">
                   <div className="flex items-center gap-2">
                     <RefreshCw className="w-4 h-4 text-text-muted" />
                     <span className="text-sm font-medium text-text-main">{t('graph.recluster')}</span>
@@ -802,7 +802,7 @@ const Settings = () => {
                     onClick={handleRecluster}
                     disabled={reclusterLoading || syncing || refreshLoading}
                     className={clsx(
-                      'h-9 px-4 rounded-md text-sm font-medium border transition-colors inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                      'inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl border px-4 text-sm font-medium transition-colors',
                       reclusterLoading || syncing || refreshLoading
                         ? 'bg-bg-hover text-text-dim border-border-light cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60 dark:border-dark-border'
                         : 'bg-bg-main text-text-main border-border-light hover:bg-bg-hover dark:bg-dark-bg-main dark:text-dark-text-main dark:border-dark-border dark:hover:bg-dark-bg-sidebar/70'

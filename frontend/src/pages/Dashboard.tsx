@@ -52,7 +52,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
           </div>
         )}
       </div>
-      <div className="p-2 bg-bg-hover rounded-md text-text-main dark:bg-dark-bg-sidebar">
+      <div className="rounded-xl bg-bg-hover p-2.5 text-text-main dark:bg-dark-bg-sidebar">
         <Icon className="w-5 h-5" />
       </div>
     </>
@@ -63,7 +63,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
       <button
         type="button"
         onClick={onClick}
-        className="bg-bg-main/90 p-6 rounded-xl border border-border-light shadow-sm flex items-start justify-between transition-all backdrop-blur-sm cursor-pointer hover:shadow-md hover:border-border-light hover:-translate-y-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:bg-dark-bg-main/90 dark:border-dark-border"
+        className="panel-surface flex items-start justify-between p-6 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
       >
         {content}
       </button>
@@ -71,7 +71,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
   }
 
   return (
-    <div className="bg-bg-main/90 p-6 rounded-xl border border-border-light shadow-sm flex items-start justify-between transition-all backdrop-blur-sm dark:bg-dark-bg-main/90 dark:border-dark-border">
+    <div className="panel-surface flex items-start justify-between p-6 transition-all">
       {content}
     </div>
   );
@@ -140,7 +140,7 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
       <button
         type="button"
         onClick={onClick}
-        className="p-4 rounded-xl border border-border-light bg-bg-main/90 hover:shadow-md hover:border-border-light hover:-translate-y-0.5 transition-all cursor-pointer backdrop-blur-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:bg-dark-bg-main/90 dark:border-dark-border"
+        className="panel-surface p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
       >
         {content}
       </button>
@@ -148,7 +148,7 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
   }
 
   return (
-    <div className="p-4 rounded-xl border border-border-light bg-bg-main/90 backdrop-blur-sm dark:bg-dark-bg-main/90 dark:border-dark-border">
+    <div className="panel-surface p-4">
       {content}
     </div>
   );
@@ -173,7 +173,7 @@ const Dashboard = () => {
       <Sidebar />
 
       <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-h-[3.5rem] px-4 sm:px-8 py-3 sm:py-0 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 dark:bg-dark-bg-main/95 dark:border-dark-border">
+        <header className="sticky top-0 z-40 flex flex-col gap-3 border-b border-border-light bg-bg-main/92 px-4 py-3 backdrop-blur-md sm:min-h-[4.5rem] sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-dark-border dark:bg-dark-bg-main/92">
           <div className="flex items-center gap-3 select-none">
             <h2 className="text-base font-semibold text-text-main tracking-tight">
               {t('sidebar.dashboard')}
@@ -183,8 +183,9 @@ const Dashboard = () => {
           <div className="flex items-center gap-3">
             <LanguageSwitch />
             <button
+              type="button"
               onClick={() => navigate('/graph')}
-              className="flex items-center gap-2 text-sm text-text-muted hover:text-text-main transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main/70 dark:hover:text-dark-text-main"
+              className="header-action-ghost"
             >
               <span>{t('dashboard.explore_graph')}</span>
               <ArrowRight className="w-4 h-4" />
@@ -203,7 +204,7 @@ const Dashboard = () => {
                 onClick={() => {
                   void retry();
                 }}
-                className="px-3 py-1.5 rounded border border-border-light text-sm hover:bg-bg-hover dark:border-dark-border"
+                className="header-action"
               >
                 {t('common.retry')}
               </button>
@@ -242,7 +243,7 @@ const Dashboard = () => {
               {/* Charts Row */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 {/* Language Distribution */}
-                <div className="bg-bg-main/90 p-6 rounded-xl border border-border-light shadow-sm backdrop-blur-sm dark:bg-dark-bg-main/90 dark:border-dark-border">
+                <div className="panel-surface p-6">
                   <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-semibold text-text-main">
                       {t('dashboard.language_distribution')}
@@ -274,7 +275,7 @@ const Dashboard = () => {
                 {/* Right Column: Activity + Topics */}
                 <div className="flex flex-col gap-6">
                   {/* Activity Timeline */}
-                  <div className="bg-bg-main/90 p-6 rounded-xl border border-border-light shadow-sm backdrop-blur-sm dark:bg-dark-bg-main/90 dark:border-dark-border">
+                  <div className="panel-surface p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-text-muted" />
@@ -344,7 +345,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Popular Topics */}
-                <div className="bg-bg-main/90 p-6 rounded-xl border border-border-light shadow-sm backdrop-blur-sm dark:bg-dark-bg-main/90 dark:border-dark-border">
+                <div className="panel-surface p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <Tag className="w-4 h-4 text-text-muted" />
@@ -400,8 +401,9 @@ const Dashboard = () => {
                     {t('dashboard.top_clusters')}
                   </h3>
                   <button
+                    type="button"
                     onClick={() => navigate('/graph')}
-                    className="text-xs text-action-primary hover:text-action-hover transition-colors flex items-center gap-1"
+                    className="header-action-ghost min-h-0 px-0 text-xs text-action-primary hover:bg-transparent hover:text-action-hover"
                   >
                     {t('common.view_all')}
                     <ArrowRight className="w-3 h-3" />

@@ -26,7 +26,7 @@ export const SettingsSchedule = ({
       </h2>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
+        <div className="panel-subtle flex items-center justify-between p-3 transition-all group">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Clock className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -63,7 +63,7 @@ export const SettingsSchedule = ({
         </div>
 
         {schedule?.is_enabled && (
-          <div className="p-3 pl-14">
+          <div className="panel-subtle ml-14 p-3">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <label className="text-sm text-text-muted">{t('settings.execution_time')}:</label>
@@ -71,7 +71,7 @@ export const SettingsSchedule = ({
                   value={schedule.schedule_hour}
                   onChange={(e) => onTimeChange(Number(e.target.value), schedule.schedule_minute)}
                   disabled={scheduleLoading}
-                  className="bg-bg-sidebar border border-border-light rounded-md px-3 py-1.5 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-black"
+                  className="field-surface h-10 px-3 py-1.5 text-sm"
                 >
                   {Array.from({ length: 24 }, (_, i) => (
                     <option key={i} value={i}>
@@ -84,7 +84,7 @@ export const SettingsSchedule = ({
                   value={schedule.schedule_minute}
                   onChange={(e) => onTimeChange(schedule.schedule_hour, Number(e.target.value))}
                   disabled={scheduleLoading}
-                  className="bg-bg-sidebar border border-border-light rounded-md px-3 py-1.5 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-black"
+                  className="field-surface h-10 px-3 py-1.5 text-sm"
                 >
                   {[0, 15, 30, 45].map((m) => (
                     <option key={m} value={m}>
@@ -98,7 +98,7 @@ export const SettingsSchedule = ({
           </div>
         )}
 
-        <div className="p-3 pl-14 space-y-1">
+        <div className="panel-subtle ml-14 space-y-1 p-3">
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <span>{t('settings.last_run')}:</span>
             <span className="text-text-main">

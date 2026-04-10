@@ -102,8 +102,9 @@ export const Sidebar = () => {
     <>
       {isMobile && (
         <button
+          type="button"
           onClick={() => setMobileOpen((prev) => !prev)}
-          className="fixed left-3 top-3 z-[70] inline-flex h-11 w-11 items-center justify-center rounded-md border border-border-light bg-bg-main/95 text-text-main shadow-sm backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:bg-dark-bg-main/95 dark:text-dark-text-main dark:border-dark-border"
+          className="fixed left-3 top-3 z-[70] inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border-light bg-bg-main/96 text-text-main shadow-sm backdrop-blur-md dark:border-dark-border dark:bg-dark-bg-main/96 dark:text-dark-text-main"
           aria-label={mobileOpen ? t('common.close') : t('common.open_menu', 'Open menu')}
         >
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -112,7 +113,8 @@ export const Sidebar = () => {
 
       {isMobile && mobileOpen && (
         <button
-          className="fixed inset-0 z-[55] bg-black/40"
+          type="button"
+          className="fixed inset-0 z-[55] bg-slate-950/28 backdrop-blur-[1px]"
           onClick={() => setMobileOpen(false)}
           aria-label={t('common.close')}
         />
@@ -120,7 +122,7 @@ export const Sidebar = () => {
 
       <aside
         className={clsx(
-          'fixed left-0 top-0 bottom-0 bg-bg-sidebar/95 backdrop-blur-sm border-r border-border-light flex flex-col z-[60] transition-transform duration-200 dark:bg-dark-bg-sidebar/95 dark:border-dark-border',
+          'fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border-light bg-bg-sidebar/95 backdrop-blur-md shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)] transition-transform duration-200 dark:border-dark-border dark:bg-dark-bg-sidebar/95',
           isMobile ? (mobileOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
         )}
         style={{ width: `${isMobile ? Math.min(sidebarWidth, 300) : sidebarWidth}px` }}
@@ -130,18 +132,18 @@ export const Sidebar = () => {
         href="https://github.com/Tendo33/MyNebula"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 px-4 h-12 mt-2 cursor-pointer select-none transition-colors hover:bg-bg-hover mx-2 rounded-lg mb-2 border border-transparent hover:border-border-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:hover:bg-dark-bg-sidebar/80 dark:hover:border-dark-border"
+        className="mx-2 mb-2 mt-2 flex h-12 items-center gap-2 rounded-xl border border-transparent px-4 transition-colors hover:border-border-light hover:bg-bg-main/75 dark:hover:border-dark-border dark:hover:bg-dark-bg-main/65"
       >
-        <div className="w-5 h-5 flex items-center justify-center text-text-main">
-           <Github className="w-4 h-4" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-bg-main/80 text-text-main shadow-sm dark:bg-dark-bg-main/80">
+           <Github className="h-4 w-4" />
         </div>
-        <span className="text-sm font-semibold text-text-main truncate">
+        <span className="truncate text-sm font-semibold tracking-tight text-text-main">
           {t('app.title')}
         </span>
       </a>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-1 space-y-1 px-3 py-2">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
@@ -154,17 +156,17 @@ export const Sidebar = () => {
             className={({ isActive }) =>
               clsx(
                 'relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 group select-none border',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                'min-h-[44px] rounded-xl border text-sm transition-all duration-200',
                 isActive
-                  ? 'bg-bg-main text-text-main font-medium shadow-sm border-border-light dark:bg-dark-bg-main dark:text-dark-text-main dark:border-dark-border'
-                  : 'text-text-muted border-transparent hover:bg-bg-hover hover:text-text-main hover:border-border-light/70 dark:text-dark-text-main/70 dark:hover:bg-dark-bg-sidebar/70 dark:hover:text-dark-text-main dark:hover:border-dark-border'
+                  ? 'border-border-light bg-bg-main/92 font-medium text-text-main shadow-sm dark:border-dark-border dark:bg-dark-bg-main/92 dark:text-dark-text-main'
+                  : 'border-transparent text-text-muted hover:-translate-y-px hover:border-border-light/70 hover:bg-bg-main/72 hover:text-text-main dark:text-dark-text-main/70 dark:hover:border-dark-border dark:hover:bg-dark-bg-main/58 dark:hover:text-dark-text-main'
               )
             }
           >
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <span className="absolute left-1 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-action-primary/60" />
+                  <span className="absolute left-1.5 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-action-primary/70" />
                 )}
                 <item.icon
                   className={clsx(
@@ -190,7 +192,7 @@ export const Sidebar = () => {
             event.preventDefault();
             setIsResizing(true);
           }}
-          className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize group"
+          className="group absolute right-0 top-0 h-full w-2 cursor-col-resize"
         >
           <div
             className={clsx(

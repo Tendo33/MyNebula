@@ -110,13 +110,10 @@ export const SettingsDataSection = ({
             </div>
             <p className="text-xs text-text-muted mb-3">{t('settings.full_refresh_desc')}</p>
             <button
+              type="button"
               onClick={onShowConfirm}
               disabled={refreshLoading || syncing || reclusterLoading}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-                'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100',
-                (refreshLoading || syncing || reclusterLoading) && 'opacity-50 cursor-not-allowed'
-              )}
+              className={clsx('danger-button-soft', (refreshLoading || syncing || reclusterLoading) && 'cursor-not-allowed opacity-50')}
             >
               {refreshLoading ? (
                 <>
@@ -135,10 +132,10 @@ export const SettingsDataSection = ({
       </section>
 
       {showConfirmDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm">
           <div
             ref={dialogRef}
-            className="bg-bg-main rounded-lg shadow-xl max-w-md w-full mx-4 p-6 dark:bg-dark-bg-main"
+            className="panel-surface-strong mx-4 w-full max-w-md p-6"
             role="dialog"
             aria-modal="true"
             aria-labelledby="full-refresh-title"

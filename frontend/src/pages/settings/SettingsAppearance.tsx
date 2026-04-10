@@ -18,7 +18,7 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
       </h2>
       <div className="space-y-2">
         {/* HQ Rendering toggle */}
-        <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
+        <div className="panel-subtle flex items-center justify-between p-3 transition-all group">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Zap className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -49,7 +49,7 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
         </div>
 
         {/* Show Trajectories toggle */}
-        <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-all group">
+        <div className="panel-subtle flex items-center justify-between p-3 transition-all group">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Eye className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -80,7 +80,7 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
         </div>
 
         {/* Related min semantic slider */}
-        <div className="p-3 border border-border-light rounded-md space-y-2">
+        <div className="panel-subtle space-y-2 p-3">
           <div className="flex items-center gap-2">
             <Link2 className="w-4 h-4 text-text-muted" />
             <span className="text-sm font-medium text-text-main">

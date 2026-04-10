@@ -99,14 +99,14 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center px-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-slate-950/42 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-bg-main rounded-xl shadow-2xl border border-border-light overflow-hidden animate-in fade-in zoom-in-95 duration-200 dark:bg-dark-bg-main dark:border-dark-border">
+      <div className="panel-surface-strong relative w-full max-w-md overflow-hidden rounded-[1.35rem] animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-light dark:border-dark-border">
+        <div className="flex items-center justify-between border-b border-border-light px-5 py-4 dark:border-dark-border">
           <div className="flex items-center gap-3">
             {allCompleted ? (
               <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
@@ -140,7 +140,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
           {canClose && (
             <button
               onClick={onClose}
-              className="p-2 hover:bg-bg-hover rounded-lg transition-colors dark:hover:bg-dark-bg-sidebar/70"
+              className="rounded-xl p-2 transition-colors hover:bg-bg-hover dark:hover:bg-dark-bg-sidebar/70"
             >
               <X className="w-5 h-5 text-text-muted dark:text-dark-text-main/70" />
             </button>
@@ -174,7 +174,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
             <div
               key={step.id}
               className={clsx(
-                'flex items-start gap-3 p-3 rounded-lg transition-colors',
+                'relative flex items-start gap-3 rounded-xl p-3 transition-colors',
                 step.status === 'running' && 'bg-action-primary/5 ring-1 ring-action-primary/20',
                 step.status === 'failed' && 'bg-red-50 ring-1 ring-red-200'
               )}
@@ -243,7 +243,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
 
         {/* Footer */}
         {(allCompleted || hasFailed) && (
-          <div className="px-5 py-4 border-t border-border-light bg-bg-sidebar/30 dark:border-dark-border dark:bg-dark-bg-sidebar/60">
+          <div className="border-t border-border-light bg-bg-sidebar/30 px-5 py-4 dark:border-dark-border dark:bg-dark-bg-sidebar/60">
             <button
               onClick={onClose}
               className={clsx(

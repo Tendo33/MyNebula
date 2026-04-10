@@ -65,14 +65,14 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   return (
     <div className={clsx('relative group', className)}>
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <Search className="h-4 w-4 text-text-dim group-focus-within:text-action-primary transition-colors" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+        <Search className="h-4 w-4 text-text-dim transition-colors group-focus-within:text-action-primary" />
       </div>
       <input
-        type="text"
+        type="search"
         value={localValue}
         onChange={handleChange}
-        className="block w-full pl-9 pr-8 py-2 h-9 border border-border-light rounded-lg leading-5 bg-bg-main/85 text-text-main placeholder-text-dim focus:outline-none focus:bg-bg-main focus:ring-2 focus:ring-action-primary/15 focus:border-action-primary text-sm shadow-sm hover:border-border-light dark:bg-dark-bg-main/85 dark:text-dark-text-main dark:border-dark-border dark:focus:bg-dark-bg-main"
+        className="field-surface block h-11 w-full pl-10 pr-10 text-sm leading-5 placeholder:text-text-dim sm:h-10"
         placeholder={placeholder || t('dashboard.search_placeholder')}
         aria-label={computedAriaLabel}
         {...props}
@@ -82,7 +82,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           type="button"
           onClick={handleClear}
           aria-label={t('common.clear', 'Clear')}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-dim hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 rounded"
+          className="absolute inset-y-0 right-0 flex items-center pr-3 text-text-dim hover:text-text-main"
         >
           <X className="h-4 w-4" />
         </button>
