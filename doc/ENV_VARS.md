@@ -37,7 +37,7 @@ cp .env.example .env
 | 变量名 | 默认值 | 说明 |
 | --- | --- | --- |
 | `APP_NAME` | `mynebula` | 应用名 |
-| `APP_VERSION` | `1.2.3` | 应用版本 |
+| `APP_VERSION` | `1.2.5` | 应用版本 |
 | `DEBUG` | `false` | 为 `true` 时开放 `/docs` 和 `/redoc` |
 | `SINGLE_USER_MODE` | `true` | 读取接口默认使用首个用户 |
 | `SNAPSHOT_READ_FALLBACK_ON_ERROR` | `true` | 快照读取异常时回退到实时构建 |
@@ -180,7 +180,7 @@ VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
 
 ```bash
 APP_NAME=mynebula
-APP_VERSION=1.2.3
+APP_VERSION=1.2.5
 DEBUG=true
 SINGLE_USER_MODE=true
 READ_ACCESS_MODE=demo
