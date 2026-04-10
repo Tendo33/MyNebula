@@ -1,22 +1,34 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams, Link } from 'react-router-dom';
+import {
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Layers,
+  Loader2,
+  Star,
+  Tag,
+  X,
+} from 'lucide-react';
 
 import { Sidebar } from '../components/layout/Sidebar';
 import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { SearchInput } from '../components/ui/SearchInput';
-import {
-  Loader2, ChevronUp, ChevronDown,
-  ChevronLeft, ChevronRight, X, Layers, Calendar, Tag
-} from 'lucide-react';
-import { useSearchParams, Link } from 'react-router-dom';
 import type { DataClusterInfo } from '../api/v2/data';
 import { useDataReposQuery } from '../features/data/hooks/useDataReposQuery';
+import { getClusterAccent } from '../utils/clusterAccent';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-type SortField = 'name' | 'language' | 'stargazers_count' | 'starred_at' | 'cluster' | 'summary' | 'last_commit_time';
+type SortField =
+  | 'name'
+  | 'language'
+  | 'stargazers_count'
+  | 'starred_at'
+  | 'cluster'
+  | 'summary'
+  | 'last_commit_time';
 type SortDirection = 'asc' | 'desc';
 
 interface SortConfig {
@@ -24,16 +36,8 @@ interface SortConfig {
   direction: SortDirection;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const PAGE_SIZES = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
-
-// ============================================================================
-// Sub Components
-// ============================================================================
 
 interface SortableHeaderProps {
   label: string;
@@ -53,33 +57,30 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({
   align = 'left',
 }) => {
   const isActive = currentSort.field === field;
-  const justifyClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
+  const justifyClass =
+    align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
   const ariaSort: React.AriaAttributes['aria-sort'] = isActive
-    ? (currentSort.direction === 'asc' ? 'ascending' : 'descending')
+    ? currentSort.direction === 'asc'
+      ? 'ascending'
+      : 'descending'
     : 'none';
 
   return (
-    <th
-      className={`px-4 py-3 whitespace-nowrap ${className}`}
-      scope="col"
-      aria-sort={ariaSort}
-    >
+    <th className={`px-4 py-3 whitespace-nowrap ${className}`} scope="col" aria-sort={ariaSort}>
       <button
         type="button"
         onClick={() => onSort(field)}
-        className={`w-full flex items-center gap-1 ${justifyClass} hover:bg-bg-hover transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 rounded px-1 py-0.5 dark:hover:bg-dark-bg-sidebar/70`}
+        className={`flex w-full items-center gap-1 rounded-lg px-1 py-0.5 transition-colors hover:bg-bg-hover ${justifyClass} dark:hover:bg-dark-bg-sidebar/70`}
       >
         <span>{label}</span>
         <span className="flex flex-col">
           <ChevronUp
-            className={`w-3 h-3 -mb-1 ${
-              isActive && currentSort.direction === 'asc'
-                ? 'text-action-primary'
-                : 'text-text-dim'
+            className={`-mb-1 h-3 w-3 ${
+              isActive && currentSort.direction === 'asc' ? 'text-action-primary' : 'text-text-dim'
             }`}
           />
           <ChevronDown
-            className={`w-3 h-3 ${
+            className={`h-3 w-3 ${
               isActive && currentSort.direction === 'desc'
                 ? 'text-action-primary'
                 : 'text-text-dim'
@@ -98,45 +99,42 @@ interface ClusterBadgeProps {
 
 const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) => {
   const { t } = useTranslation();
+
   if (!cluster) {
-    return <span className="text-text-dim italic text-xs">{t('data.unclustered')}</span>;
+    return <span className="text-xs italic text-text-dim">{t('data.unclustered')}</span>;
   }
+
+  const accent = getClusterAccent({ id: cluster.id, color: cluster.color });
 
   return (
     <button
-      onClick={(e) => {
-        e.stopPropagation();
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
         onClick?.();
       }}
-      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium hover:opacity-80 transition-opacity text-text-main dark:text-dark-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
+      className="chip-button"
       style={{
-        backgroundColor: `${cluster.color || '#6B7280'}30`,
+        backgroundColor: accent.softBackground,
+        borderColor: accent.softBorder,
+        color: accent.text,
       }}
     >
-      <div
-        className="w-2 h-2 rounded-full"
-        style={{ backgroundColor: cluster.color || '#6B7280' }}
-      />
+      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: accent.dot }} />
       {cluster.name || `Cluster ${cluster.id}`}
     </button>
   );
 };
 
-// ============================================================================
-// Main Component
-// ============================================================================
-
 const DataPage = () => {
   const { t } = useTranslation();
-
   const [searchParams, setSearchParams] = useSearchParams();
   const monthFilter = searchParams.get('month');
   const topicFilter = searchParams.get('topic');
 
-  // Local state
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: 'starred_at',
-    direction: 'desc'
+    direction: 'desc',
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -144,15 +142,7 @@ const DataPage = () => {
   const [selectedClusters, setSelectedClusters] = useState<Set<number>>(new Set());
   const offset = (currentPage - 1) * pageSize;
 
-  const {
-    repos,
-    clusters,
-    totalNodes,
-    count,
-    loading,
-    error,
-    retry,
-  } = useDataReposQuery({
+  const { repos, clusters, totalNodes, count, loading, error, retry } = useDataReposQuery({
     searchQuery: localSearch,
     clusterIds: Array.from(selectedClusters),
     month: monthFilter,
@@ -163,15 +153,13 @@ const DataPage = () => {
     offset,
   });
 
-  // Cluster map for quick lookup
   const clusterMap = useMemo(() => {
     const map = new Map<number, DataClusterInfo>();
-    clusters.forEach((c: DataClusterInfo) => map.set(c.id, c));
+    clusters.forEach((cluster) => map.set(cluster.id, cluster));
     return map;
   }, [clusters]);
 
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
-  const paginatedData = repos;
   const hasActiveFilters = Boolean(
     selectedClusters.size > 0 || localSearch.trim() || monthFilter || topicFilter
   );
@@ -182,22 +170,19 @@ const DataPage = () => {
     }
   }, [currentPage, totalPages]);
 
-  // Reset to page 1 when filters change
   const handleSearch = useCallback((query: string) => {
     setLocalSearch(query);
     setCurrentPage(1);
   }, []);
 
-  // Handle sort
   const handleSort = useCallback((field: SortField) => {
-    setSortConfig(prev => ({
+    setSortConfig((prev) => ({
       field,
       direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
     setCurrentPage(1);
   }, []);
 
-  // Handle cluster filter
   const handleClusterFilter = useCallback((clusterId: number) => {
     setSelectedClusters((current) => {
       const next = new Set(current);
@@ -211,36 +196,33 @@ const DataPage = () => {
     setCurrentPage(1);
   }, []);
 
-
-
-  // Format date
   const formatDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(dateStr).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   return (
     <div className="flex min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main">
       <Sidebar />
 
-      <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
-        {/* Header */}
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-h-[3.5rem] px-4 sm:px-8 py-3 sm:py-0 border-b border-border-light sticky top-0 bg-bg-main/95 backdrop-blur-sm z-40 transition-all dark:bg-dark-bg-main/95 dark:border-dark-border">
+      <main className="flex min-w-0 flex-1 flex-col" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
+        <header className="sticky top-0 z-40 flex flex-col gap-3 border-b border-border-light bg-bg-main/92 px-4 py-3 backdrop-blur-md sm:min-h-[4.5rem] sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-dark-border dark:bg-dark-bg-main/92">
           <div className="flex items-center gap-3 select-none">
-            <h2 className="text-base font-semibold text-text-main tracking-tight">
-              {t('sidebar.data')}
-            </h2>
-            <div className="h-4 w-[1px] bg-border-light mx-1" />
-            <span className="text-sm text-text-muted">
+            <h2 className="text-base font-semibold tracking-tight text-text-main">{t('sidebar.data')}</h2>
+            <div className="mx-1 h-4 w-px bg-border-light" />
+            <span className="rounded-full bg-bg-sidebar/75 px-2.5 py-1 text-xs font-medium text-text-muted dark:bg-dark-bg-sidebar/75 dark:text-dark-text-main/70">
               {count} / {totalNodes} {t('common.repositories')}
             </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <LanguageSwitch />
 
-            {/* Search */}
-            <div className="w-full sm:w-64">
+            <div className="w-full sm:w-72">
               <SearchInput
                 onSearch={handleSearch}
                 value={localSearch}
@@ -248,19 +230,18 @@ const DataPage = () => {
               />
             </div>
 
-            {/* Mobile sort */}
             <div className="flex items-center gap-2 sm:hidden">
               <label className="text-xs text-text-muted">{t('data.sort', 'Sort')}:</label>
               <select
                 value={sortConfig.field}
-                onChange={(e) => {
+                onChange={(event) => {
                   setSortConfig((prev) => ({
-                    field: e.target.value as SortField,
+                    field: event.target.value as SortField,
                     direction: prev.direction,
                   }));
                   setCurrentPage(1);
                 }}
-                className="flex-1 border border-border-light rounded px-2 py-1 bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main dark:border-dark-border"
+                className="field-surface h-11 flex-1 px-3 text-sm"
               >
                 <option value="starred_at">{t('data.starred_date')}</option>
                 <option value="name">{t('data.repository')}</option>
@@ -279,148 +260,157 @@ const DataPage = () => {
                   }));
                   setCurrentPage(1);
                 }}
-                className="px-2 py-1 rounded border border-border-light bg-bg-main text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:bg-dark-bg-main dark:text-dark-text-main dark:border-dark-border"
+                className="header-action w-11 px-0"
                 aria-label={t('data.sort_direction', 'Toggle sort direction')}
               >
-                {sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {sortConfig.direction === 'asc' ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
               </button>
             </div>
 
-            {/* Clear filters */}
             {hasActiveFilters && (
               <button
+                type="button"
                 onClick={() => {
                   setSelectedClusters(new Set());
                   setLocalSearch('');
                   setSearchParams({});
                   setCurrentPage(1);
                 }}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm text-text-muted hover:text-text-main hover:bg-bg-hover rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
+                className="header-action-ghost self-start sm:self-auto"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
                 {t('common.clear_filters')}
               </button>
             )}
           </div>
         </header>
 
-        {/* Content */}
-        <div className="flex-1 p-4 sm:p-6 overflow-auto">
+        <div className="flex-1 overflow-auto p-4 sm:p-6">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="animate-spin h-8 w-8 text-text-muted" />
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-text-muted" />
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center gap-3 h-64">
+            <div className="flex h-64 flex-col items-center justify-center gap-3">
               <p className="text-sm text-red-600">{t('common.load_failed', 'Failed to load data')}</p>
               <button
                 type="button"
                 onClick={() => {
                   void retry();
                 }}
-                className="px-3 py-1.5 rounded border border-border-light text-sm hover:bg-bg-hover dark:border-dark-border"
+                className="header-action"
               >
                 {t('common.retry')}
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Filter chips */}
-              {(clusters.length > 0) || monthFilter || topicFilter ? (
-                <div className="flex items-center gap-4 flex-wrap">
-                  {/* Month Filter Chip */}
+              {(clusters.length > 0 || monthFilter || topicFilter) && (
+                <div className="panel-subtle flex flex-wrap items-center gap-3 px-4 py-3">
                   {monthFilter && (
                     <div className="flex items-center gap-2">
-                       <div className="flex items-center gap-1 text-xs text-text-muted">
-                        <Calendar className="w-4 h-4" />
+                      <div className="flex items-center gap-1 text-xs text-text-muted">
+                        <Calendar className="h-4 w-4" />
                         <span>{t('data.filter_label')}</span>
                       </div>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-action-primary/10 text-action-primary ring-1 ring-inset ring-action-primary/20">
+                      <span className="chip-button border-action-primary/10 bg-action-primary/10 text-action-primary ring-1 ring-inset ring-action-primary/20">
                         {monthFilter}
                         <button
+                          type="button"
                           onClick={() => {
                             const nextParams = new URLSearchParams(searchParams);
                             nextParams.delete('month');
                             setSearchParams(nextParams);
                           }}
-                          className="hover:bg-action-primary/20 rounded-full p-0.5"
+                          className="rounded-full p-0.5 hover:bg-action-primary/20"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="h-3 w-3" />
                         </button>
                       </span>
                     </div>
                   )}
 
-                  {/* Topic Filter Chip */}
                   {topicFilter && (
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 text-xs text-text-muted">
-                        <Tag className="w-4 h-4" />
+                        <Tag className="h-4 w-4" />
                         <span>{t('data.filter_label')}</span>
                       </div>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-action-primary/10 text-action-primary ring-1 ring-inset ring-action-primary/20">
+                      <span className="chip-button border-action-primary/10 bg-action-primary/10 text-action-primary ring-1 ring-inset ring-action-primary/20">
                         {t('data.topic', 'Topic')}: {topicFilter}
                         <button
+                          type="button"
                           onClick={() => {
                             const nextParams = new URLSearchParams(searchParams);
                             nextParams.delete('topic');
                             setSearchParams(nextParams);
                           }}
-                          className="hover:bg-action-primary/20 rounded-full p-0.5"
+                          className="rounded-full p-0.5 hover:bg-action-primary/20"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="h-3 w-3" />
                         </button>
                       </span>
                     </div>
                   )}
 
                   {clusters.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2">
                       <div className="flex items-center gap-1 text-xs text-text-muted">
-                        <Layers className="w-4 h-4" />
+                        <Layers className="h-4 w-4" />
                         <span>{t('data.filter_by_cluster')}:</span>
                       </div>
-                  {clusters.map((cluster: DataClusterInfo) => (
-                    <button
-                      key={cluster.id}
-                      onClick={() => handleClusterFilter(cluster.id)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all text-text-main dark:text-dark-text-main ${
-                        selectedClusters.has(cluster.id)
-                          ? 'ring-2 ring-offset-1'
-                          : 'hover:opacity-80'
-                      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30`}
-                      style={{
-                        backgroundColor: `${cluster.color || '#6B7280'}30`,
-                        '--tw-ring-color': cluster.color || '#6B7280',
-                      } as React.CSSProperties}
-                    >
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: cluster.color || '#6B7280' }}
-                      />
-                      {cluster.name || `Cluster ${cluster.id}`}
-                      <span className="opacity-75">({cluster.repo_count})</span>
-                    </button>
-                  ))}
+                      {clusters.map((cluster) => (
+                        (() => {
+                          const accent = getClusterAccent({ id: cluster.id, color: cluster.color });
+                          const selected = selectedClusters.has(cluster.id);
+
+                          return (
+                            <button
+                              key={cluster.id}
+                              type="button"
+                              onClick={() => handleClusterFilter(cluster.id)}
+                              className={`chip-button ${selected ? 'ring-2 ring-offset-1 shadow-sm' : 'hover:opacity-90'}`}
+                              style={
+                                {
+                                  backgroundColor: selected ? accent.strongBackground : accent.softBackground,
+                                  borderColor: selected ? accent.strongBorder : accent.softBorder,
+                                  color: accent.text,
+                                  '--tw-ring-color': accent.base,
+                                } as React.CSSProperties
+                              }
+                            >
+                              <div
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: accent.dot }}
+                              />
+                              {cluster.name || `Cluster ${cluster.id}`}
+                              <span className="opacity-75">({cluster.repo_count})</span>
+                            </button>
+                          );
+                        })()
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          ) : null}
 
-              {/* Table (desktop) */}
-              <div className="hidden sm:block w-full overflow-hidden rounded-lg border border-border-light bg-bg-main shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
+              <div className="panel-surface hidden w-full overflow-hidden sm:block">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-bg-hover text-text-muted font-medium border-b border-border-light dark:bg-dark-bg-sidebar/60 dark:text-dark-text-main/70 dark:border-dark-border">
+                    <thead className="border-b border-border-light bg-bg-hover font-medium text-text-muted dark:border-dark-border dark:bg-dark-bg-sidebar/60 dark:text-dark-text-main/70">
                       <tr>
-                        <th className="px-2 py-3 w-14 text-center text-xs text-text-muted/50">#</th>
+                        <th className="w-14 px-2 py-3 text-center text-xs text-text-muted/50">#</th>
                         <SortableHeader
                           label={t('data.repository')}
                           field="name"
                           currentSort={sortConfig}
                           onSort={handleSort}
                         />
-                         <SortableHeader
+                        <SortableHeader
                           label={t('data.summary')}
                           field="summary"
                           currentSort={sortConfig}
@@ -461,58 +451,62 @@ const DataPage = () => {
                           onSort={handleSort}
                           align="center"
                         />
-                        <th className="px-4 py-3 w-20 hidden">{t('data.description')}</th>
+                        <th className="hidden w-20 px-4 py-3">{t('data.description')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-light dark:divide-dark-border">
-                      {paginatedData.map((repo) => (
+                      {repos.map((repo) => (
                         <tr
                           key={repo.id}
-                          className="hover:bg-bg-hover/50 transition-colors dark:hover:bg-dark-bg-sidebar/60"
+                          className="transition-colors hover:bg-bg-hover/50 dark:hover:bg-dark-bg-sidebar/60"
                         >
                           <td className="px-2 py-3 text-center">
                             {repo.owner_avatar_url ? (
                               <img
                                 src={repo.owner_avatar_url}
                                 alt={repo.owner}
-                                className="w-6 h-6 min-w-6 min-h-6 mx-auto object-cover rounded-none"
+                                className="mx-auto h-6 min-h-6 w-6 min-w-6 object-cover"
                                 loading="lazy"
                                 decoding="async"
                                 width={24}
                                 height={24}
                               />
                             ) : (
-                               <div className="w-6 h-6 min-w-6 min-h-6 bg-border-light mx-auto flex items-center justify-center text-[10px] text-text-dim rounded-none dark:bg-dark-border dark:text-dark-text-main/60">
-                                 {repo.owner.charAt(0).toUpperCase()}
-                               </div>
+                              <div className="mx-auto flex h-6 min-h-6 w-6 min-w-6 items-center justify-center bg-border-light text-[10px] text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
+                                {repo.owner.charAt(0).toUpperCase()}
+                              </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 max-w-xs">
+                          <td className="max-w-xs px-4 py-3">
                             <div className="flex items-center gap-2">
                               <Link
                                 to={`/graph?node=${repo.id}`}
-                                className="font-medium text-text-main hover:text-action-primary truncate block hover:underline"
+                                className="block truncate font-medium text-text-main hover:text-action-primary hover:underline"
                               >
                                 {repo.full_name}
                               </Link>
-
                             </div>
                           </td>
-                          <td className="px-4 py-3 max-w-md">
-                            <p className="line-clamp-2 text-sm text-text-muted" title={repo.ai_summary || repo.description}>
-                                {repo.ai_summary || repo.description || <span className="italic text-text-dim">{t('data.no_summary')}</span>}
+                          <td className="max-w-md px-4 py-3">
+                            <p
+                              className="line-clamp-2 text-sm text-text-muted"
+                              title={repo.ai_summary || repo.description}
+                            >
+                              {repo.ai_summary || repo.description || (
+                                <span className="italic text-text-dim">{t('data.no_summary')}</span>
+                              )}
                             </p>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-center">
+                          <td className="px-4 py-3 text-center">
                             {repo.language ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-bg-hover text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
+                              <span className="inline-flex items-center rounded-full bg-bg-hover px-2.5 py-1 text-xs font-medium text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
                                 {repo.language}
                               </span>
                             ) : (
-                              <span className="text-text-muted italic">-</span>
+                              <span className="italic text-text-muted">-</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-center font-mono text-text-dim tabular-nums">
+                          <td className="px-4 py-3 text-center font-mono tabular-nums text-text-dim">
                             {repo.stargazers_count.toLocaleString()}
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -521,27 +515,26 @@ const DataPage = () => {
                               onClick={() => repo.cluster_id != null && handleClusterFilter(repo.cluster_id)}
                             />
                           </td>
-                          <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap text-center">
+                          <td className="whitespace-nowrap px-4 py-3 text-center text-xs text-text-muted">
                             {formatDate(repo.starred_at)}
                           </td>
-                          <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap text-center">
+                          <td className="whitespace-nowrap px-4 py-3 text-center text-xs text-text-muted">
                             {formatDate(repo.last_commit_time)}
                           </td>
-                          <td className="px-4 py-3 max-w-md hidden">
-                            <p className="truncate text-text-muted text-xs">
-                              {repo.description || <span className="italic text-text-dim">{t('data.no_description')}</span>}
+                          <td className="hidden max-w-md px-4 py-3">
+                            <p className="truncate text-xs text-text-muted">
+                              {repo.description || (
+                                <span className="italic text-text-dim">{t('data.no_description')}</span>
+                              )}
                             </p>
                           </td>
                         </tr>
                       ))}
 
-                      {paginatedData.length === 0 && (
+                      {repos.length === 0 && (
                         <tr>
                           <td colSpan={8} className="px-4 py-12 text-center text-text-muted">
-                            {hasActiveFilters
-                              ? t('data.no_results')
-                              : t('data.no_data')
-                            }
+                            {hasActiveFilters ? t('data.no_results') : t('data.no_data')}
                           </td>
                         </tr>
                       )}
@@ -550,45 +543,48 @@ const DataPage = () => {
                 </div>
               </div>
 
-              {/* Cards (mobile) */}
-              <div className="sm:hidden space-y-3">
-                {paginatedData.map((repo) => (
-                  <div key={repo.id} className="rounded-lg border border-border-light bg-bg-main p-4 shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
+              <div className="space-y-3 sm:hidden">
+                {repos.map((repo) => (
+                  <div key={repo.id} className="panel-surface p-4">
                     <div className="flex items-start gap-3">
                       {repo.owner_avatar_url ? (
                         <img
                           src={repo.owner_avatar_url}
                           alt={repo.owner}
-                          className="w-10 h-10 rounded-md border border-border-light object-cover"
+                          className="h-10 w-10 rounded-xl border border-border-light object-cover"
                           loading="lazy"
                           decoding="async"
                           width={40}
                           height={40}
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-md bg-border-light flex items-center justify-center text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-border-light text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
                           {repo.owner.charAt(0).toUpperCase()}
                         </div>
                       )}
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <Link
                           to={`/graph?node=${repo.id}`}
-                          className="font-semibold text-text-main hover:text-action-primary block truncate"
+                          className="block truncate font-semibold text-text-main hover:text-action-primary"
                         >
                           {repo.full_name}
                         </Link>
-                        <p className="mt-1 text-xs text-text-muted line-clamp-2 dark:text-dark-text-main/70">
+                        <p className="mt-1 line-clamp-2 text-xs text-text-muted dark:text-dark-text-main/70">
                           {repo.ai_summary || repo.description || t('data.no_summary')}
                         </p>
                       </div>
-                      <div className="text-xs text-text-muted tabular-nums whitespace-nowrap dark:text-dark-text-main/70">
-                        ⭐ {repo.stargazers_count.toLocaleString()}
+                      <div
+                        className="inline-flex items-center gap-1.5 rounded-full bg-bg-sidebar/75 px-2.5 py-1 text-xs font-medium text-text-muted dark:bg-dark-bg-sidebar/75 dark:text-dark-text-main/70"
+                        aria-label={`${t('data.stars')}: ${repo.stargazers_count.toLocaleString()}`}
+                      >
+                        <Star className="h-3.5 w-3.5 fill-current" />
+                        <span className="tabular-nums">{repo.stargazers_count.toLocaleString()}</span>
                       </div>
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-muted dark:text-dark-text-main/70">
                       {repo.language && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-bg-hover text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
+                        <span className="inline-flex items-center rounded-full bg-bg-hover px-2.5 py-1 text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
                           {repo.language}
                         </span>
                       )}
@@ -602,31 +598,29 @@ const DataPage = () => {
                   </div>
                 ))}
 
-                {paginatedData.length === 0 && (
-                  <div className="rounded-lg border border-border-light bg-bg-main p-6 text-center text-sm text-text-muted dark:bg-dark-bg-main dark:border-dark-border">
-                    {hasActiveFilters
-                      ? t('data.no_results')
-                      : t('data.no_data')
-                    }
+                {repos.length === 0 && (
+                  <div className="panel-surface p-6 text-center text-sm text-text-muted">
+                    {hasActiveFilters ? t('data.no_results') : t('data.no_data')}
                   </div>
                 )}
               </div>
 
-              {/* Pagination */}
               {count > 0 && (
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2 text-text-muted">
                     <span>{t('data.rows_per_page')}:</span>
                     <select
                       value={pageSize}
-                      onChange={(e) => {
-                        setPageSize(Number(e.target.value));
+                      onChange={(event) => {
+                        setPageSize(Number(event.target.value));
                         setCurrentPage(1);
                       }}
-                      className="border border-border-light rounded px-2 py-1 bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main dark:border-dark-border"
+                      className="field-surface h-10 px-3 text-sm"
                     >
-                      {PAGE_SIZES.map(size => (
-                        <option key={size} value={size}>{size}</option>
+                      {PAGE_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -635,32 +629,34 @@ const DataPage = () => {
                     <span className="text-text-muted">
                       {t('data.showing', {
                         start: offset + 1,
-                        end: offset + paginatedData.length,
+                        end: offset + repos.length,
                         total: count,
                       })}
                     </span>
 
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        type="button"
+                        onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                         disabled={currentPage === 1}
-                        className="p-1.5 rounded hover:bg-bg-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
+                        className="header-action h-10 min-h-0 w-10 px-0 disabled:cursor-not-allowed disabled:opacity-30"
                         aria-label={t('data.previous_page', 'Previous page')}
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <ChevronLeft className="h-4 w-4" />
                       </button>
 
-                      <span className="px-3 py-1 text-text-main font-medium">
+                      <span className="px-3 py-1 font-medium text-text-main">
                         {currentPage} / {totalPages || 1}
                       </span>
 
                       <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        type="button"
+                        onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                         disabled={currentPage === totalPages || totalPages === 0}
-                        className="p-1.5 rounded hover:bg-bg-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
+                        className="header-action h-10 min-h-0 w-10 px-0 disabled:cursor-not-allowed disabled:opacity-30"
                         aria-label={t('data.next_page', 'Next page')}
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="h-4 w-4" />
                       </button>
                     </div>
                   </div>

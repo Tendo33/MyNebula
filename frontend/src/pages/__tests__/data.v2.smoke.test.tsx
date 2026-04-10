@@ -57,12 +57,14 @@ import DataPage from '../DataPage';
 
 describe('Data page v2 smoke', () => {
   it('renders repository rows from v2 data query', () => {
-    render(
+    const { container } = render(
       <MemoryRouter future={routerFuture}>
         <DataPage />
       </MemoryRouter>
     );
 
     expect(screen.getAllByText('octo/repo').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('data.stars: 42')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent('猸');
   });
 });

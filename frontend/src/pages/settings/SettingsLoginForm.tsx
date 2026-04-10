@@ -28,7 +28,7 @@ export const SettingsLoginForm = ({
 
   return (
     <section className="flex-1 flex items-center justify-center px-8">
-      <div className="w-full max-w-md bg-bg-main border border-border-light rounded-xl shadow-sm p-6 dark:bg-dark-bg-main dark:border-dark-border">
+      <div className="panel-surface w-full max-w-md p-6">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 rounded-full bg-bg-sidebar flex items-center justify-center">
             <Shield className="w-5 h-5 text-text-main" />
@@ -57,7 +57,7 @@ export const SettingsLoginForm = ({
                 type="text"
                 value={loginUsername}
                 onChange={(e) => onUsernameChange(e.target.value)}
-                className="w-full h-10 pl-9 pr-3 rounded-md border border-border-light text-sm bg-bg-main focus:outline-none focus:ring-1 focus:ring-text-main/30 dark:bg-dark-bg-main dark:border-dark-border dark:text-dark-text-main"
+                className="field-surface h-11 w-full pl-9 pr-3 text-sm"
                 autoComplete="username"
                 required
               />
@@ -73,7 +73,7 @@ export const SettingsLoginForm = ({
               type="password"
               value={loginPassword}
               onChange={(e) => onPasswordChange(e.target.value)}
-              className="w-full h-10 px-3 rounded-md border border-border-light text-sm bg-bg-main focus:outline-none focus:ring-1 focus:ring-text-main/30 dark:bg-dark-bg-main dark:border-dark-border dark:text-dark-text-main"
+              className="field-surface h-11 w-full px-3 text-sm"
               autoComplete="current-password"
               required
             />
@@ -89,7 +89,7 @@ export const SettingsLoginForm = ({
             type="submit"
             disabled={loginLoading || adminAuthConfigured === false}
             className={clsx(
-              'w-full h-10 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2',
+              'flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-medium transition-colors',
               loginLoading || adminAuthConfigured === false
                 ? 'bg-bg-hover text-text-dim border border-border-light cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60 dark:border-dark-border'
                 : 'bg-text-main text-bg-main hover:bg-text-main/90'
