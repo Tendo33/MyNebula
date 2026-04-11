@@ -27,21 +27,22 @@ export const SettingsLoginForm = ({
   const { t } = useTranslation();
 
   return (
-    <section className="flex-1 flex items-center justify-center px-8">
-      <div className="panel-surface w-full max-w-md p-6">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-full bg-bg-sidebar flex items-center justify-center">
+    <section className="flex flex-1 items-center justify-center px-6 py-10">
+      <div className="panel-surface-strong w-full max-w-lg p-7 sm:p-8">
+        <div className="mb-6 flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-sidebar text-text-main shadow-sm">
             <Shield className="w-5 h-5 text-text-main" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-text-main">{t('settings.admin_access')}</h2>
-            <p className="text-xs text-text-muted">{t('settings.login_required_desc')}</p>
+            <div className="section-kicker mb-2 px-0">{t('settings.title')}</div>
+            <h2 className="font-heading text-xl font-semibold text-text-main">{t('settings.admin_access')}</h2>
+            <p className="mt-1 text-sm text-text-muted">{t('settings.login_required_desc')}</p>
           </div>
         </div>
 
         <form className="space-y-4" onSubmit={onSubmit}>
           {adminAuthConfigured === false && (
-            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+            <div className="status-banner" data-tone="warning">
               {t('settings.admin_not_configured')}
             </div>
           )}
@@ -80,7 +81,7 @@ export const SettingsLoginForm = ({
           </div>
 
           {loginError && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            <div className="status-banner" data-tone="error">
               {loginError}
             </div>
           )}
@@ -89,10 +90,10 @@ export const SettingsLoginForm = ({
             type="submit"
             disabled={loginLoading || adminAuthConfigured === false}
             className={clsx(
-              'flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-medium transition-colors',
+              'flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-colors',
               loginLoading || adminAuthConfigured === false
                 ? 'bg-bg-hover text-text-dim border border-border-light cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60 dark:border-dark-border'
-                : 'bg-text-main text-bg-main hover:bg-text-main/90'
+                : 'bg-text-main text-bg-main shadow-sm hover:-translate-y-px hover:bg-text-main/92'
             )}
           >
             {loginLoading && <Loader2 className="w-4 h-4 animate-spin" />}

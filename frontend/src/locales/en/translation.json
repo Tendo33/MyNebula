@@ -10,12 +10,15 @@
     "dashboard": "Dashboard",
     "graph": "Graph",
     "data": "Data",
-    "settings": "Settings"
+    "settings": "Settings",
+    "tagline": "Knowledge Nebula"
   },
   "common": {
     "loading": "Loading...",
     "total": "total",
     "repositories": "repositories",
+    "overview": "Overview",
+    "explore": "Explore",
     "languages": "languages",
     "clear": "Clear",
     "clear_filter": "Clear filter",

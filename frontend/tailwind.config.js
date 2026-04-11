@@ -8,44 +8,43 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Notion-like Semantic Palette
         bg: {
-          main: "#FFFFFF",        // White
-          sidebar: "#F7F7F5",     // Light Gray
-          hover: "#EFEFED",       // Hover Gray
+          main: "#FBFAF6",
+          sidebar: "#F2EFE6",
+          hover: "#ECE6DA",
         },
         text: {
-          main: "#37352F",        // Dark Gray (Primary)
-          muted: "#787774",       // Medium Gray (Secondary)
-          dim: "#9B9A97",         // Light Gray (Placeholder/Icon)
+          main: "#272B35",
+          muted: "#616A78",
+          dim: "#8A92A0",
         },
         border: {
-          light: "#E9E9E7",       // Pale Gray
+          light: "#DAD5C8",
         },
         action: {
-          primary: "#2383E2",     // Notion Blue
-          hover: "#1C6EB4",       // Darker Blue
+          primary: "#2D59C8",
+          hover: "#2347A3",
         },
-        // Dark Mode Support (Optional/Mapped)
         dark: {
           bg: {
-            main: "#191919",
-            sidebar: "#202020",
+            main: "#171A22",
+            sidebar: "#1D212C",
           },
           text: {
-            main: "#D4D4D4",
+            main: "#ECE8DE",
           },
-          border: "#2F2F2F",
+          border: "#343B4A",
         }
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Avenir Next', 'Segoe UI', '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif'],
+        heading: ['Avenir Next', 'Segoe UI', '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
-        serif: ['Lyon-Text', 'Georgia', 'serif'], // Notion uses serif for some content
+        serif: ['Spectral', 'Georgia', 'serif'],
       },
       boxShadow: {
-        'sm': 'rgba(15, 15, 15, 0.1) 0px 0px 0px 1px, rgba(15, 15, 15, 0.1) 0px 2px 4px',
-        'md': '0px 1px 4px rgba(0, 0, 0, 0.08)',
+        'sm': '0 1px 2px rgba(34, 38, 47, 0.05), 0 0 0 1px rgba(77, 88, 107, 0.08)',
+        'md': '0 14px 34px -24px rgba(24, 30, 45, 0.28)',
       }
     },
   },

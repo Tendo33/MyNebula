@@ -21,12 +21,12 @@ export const SettingsSchedule = ({
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">
+      <h2 className="section-kicker mb-4 select-none">
         {t('settings.scheduled_sync')}
       </h2>
 
       <div className="space-y-2">
-        <div className="panel-subtle flex items-center justify-between p-3 transition-all group">
+        <div className="panel-subtle flex items-center justify-between p-4 transition-all group">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Clock className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -39,10 +39,10 @@ export const SettingsSchedule = ({
           <button
             disabled={scheduleLoading}
             className={clsx(
-              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-              schedule?.is_enabled ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border',
+              'toggle-control',
               scheduleLoading && 'opacity-50 cursor-not-allowed'
             )}
+            data-state={schedule?.is_enabled ? 'on' : 'off'}
             type="button"
             role="switch"
             aria-checked={Boolean(schedule?.is_enabled)}
@@ -54,8 +54,8 @@ export const SettingsSchedule = ({
             ) : (
               <span
                 className={clsx(
-                  'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
-                  schedule?.is_enabled ? 'translate-x-5' : 'translate-x-0.5'
+                  'toggle-handle',
+                  schedule?.is_enabled ? 'translate-x-6' : 'translate-x-0.5'
                 )}
               />
             )}
@@ -63,8 +63,8 @@ export const SettingsSchedule = ({
         </div>
 
         {schedule?.is_enabled && (
-          <div className="panel-subtle ml-14 p-3">
-            <div className="flex items-center gap-4">
+          <div className="panel-subtle ml-0 p-4 sm:ml-14">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <label className="text-sm text-text-muted">{t('settings.execution_time')}:</label>
                 <select
@@ -98,7 +98,7 @@ export const SettingsSchedule = ({
           </div>
         )}
 
-        <div className="panel-subtle ml-14 space-y-1 p-3">
+        <div className="panel-subtle ml-0 space-y-1 p-4 sm:ml-14">
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <span>{t('settings.last_run')}:</span>
             <span className="text-text-main">

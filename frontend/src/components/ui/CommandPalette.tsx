@@ -23,6 +23,7 @@ import {
   normalizeSearchQuery,
   parseStarsThreshold,
 } from '../../utils/search';
+import { logClientWarn } from '../../utils/debug';
 
 // ============================================================================
 // Types
@@ -94,7 +95,7 @@ const useRecentSearches = () => {
         setRecentSearches(JSON.parse(stored));
       }
     } catch {
-      console.warn('Failed to load recent searches');
+      logClientWarn('Failed to load recent searches');
     }
   }, []);
 
@@ -107,7 +108,7 @@ const useRecentSearches = () => {
       try {
         localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
       } catch {
-        console.warn('Failed to save recent searches');
+        logClientWarn('Failed to save recent searches');
       }
       return updated;
     });
@@ -118,7 +119,7 @@ const useRecentSearches = () => {
     try {
       localStorage.removeItem(RECENT_SEARCHES_KEY);
     } catch {
-      console.warn('Failed to clear recent searches');
+      logClientWarn('Failed to clear recent searches');
     }
   }, []);
 

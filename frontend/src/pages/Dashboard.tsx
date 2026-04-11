@@ -42,17 +42,17 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
   const content = (
     <>
       <div>
-        <p className="text-sm font-medium text-text-muted">{title}</p>
-        <h3 className="text-2xl font-bold text-text-main mt-2">{value}</h3>
-        {subValue && <p className="text-xs text-text-dim mt-1">{subValue}</p>}
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-dim">{title}</p>
+        <h3 className="font-heading mt-3 text-3xl font-semibold text-text-main">{value}</h3>
+        {subValue && <p className="mt-1.5 text-sm text-text-muted">{subValue}</p>}
         {trend && (
-          <div className={`flex items-center gap-1 mt-2 text-xs ${trend.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <div className={`mt-3 flex items-center gap-1 text-xs font-medium ${trend.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             <TrendingUp className={`w-3 h-3 ${trend.value < 0 ? 'rotate-180' : ''}`} />
             <span>{trend.value >= 0 ? '+' : ''}{trend.value}% {trend.label}</span>
           </div>
         )}
       </div>
-      <div className="rounded-xl bg-bg-hover p-2.5 text-text-main dark:bg-dark-bg-sidebar">
+      <div className="rounded-2xl bg-bg-hover/85 p-3 text-text-main dark:bg-dark-bg-sidebar">
         <Icon className="w-5 h-5" />
       </div>
     </>
@@ -63,7 +63,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
       <button
         type="button"
         onClick={onClick}
-        className="panel-surface flex items-start justify-between p-6 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+        className="panel-surface-strong flex items-start justify-between p-6 text-left transition-all hover:-translate-y-0.5"
       >
         {content}
       </button>
@@ -71,7 +71,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
   }
 
   return (
-    <div className="panel-surface flex items-start justify-between p-6 transition-all">
+    <div className="panel-surface-strong flex items-start justify-between p-6 transition-all">
       {content}
     </div>
   );
@@ -93,9 +93,9 @@ const LanguageBar: React.FC<LanguageBarProps> = ({ language, count, percentage, 
           {t('dashboard.repos_count', { count })}
         </span>
       </div>
-      <div className="h-2 bg-bg-hover rounded-full overflow-hidden dark:bg-dark-bg-sidebar">
+      <div className="h-2.5 overflow-hidden rounded-full bg-bg-hover/90 dark:bg-dark-bg-sidebar">
         <div
-          className="h-full rounded-full transition-all duration-500 group-hover:opacity-80"
+          className="h-full rounded-full transition-all duration-500 group-hover:opacity-90"
           style={{
             width: `${percentage}%`,
             backgroundColor: color,
@@ -115,16 +115,16 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
         style={{ backgroundColor: color }}
       />
       <div className="flex-1 min-w-0">
-        <h4 className="text-sm font-semibold text-text-main truncate dark:text-dark-text-main">{name}</h4>
-        <p className="text-xs text-text-muted mt-0.5 dark:text-dark-text-main/70">
+        <h4 className="font-heading text-sm font-semibold text-text-main truncate dark:text-dark-text-main">{name}</h4>
+        <p className="text-xs text-text-muted mt-1 dark:text-dark-text-main/70">
           {t('common.repositories', { count: repoCount })}
         </p>
         {keywords.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
+          <div className="mt-3 flex flex-wrap gap-1.5">
             {keywords.slice(0, 4).map((keyword, idx) => (
               <span
                 key={idx}
-                className="text-[10px] px-1.5 py-0.5 bg-bg-hover text-text-muted rounded-full dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
+                className="rounded-full bg-bg-hover px-2 py-1 text-[10px] font-semibold text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
               >
                 {keyword}
               </span>
@@ -140,7 +140,7 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
       <button
         type="button"
         onClick={onClick}
-        className="panel-surface p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+        className="panel-surface p-5 text-left transition-all hover:-translate-y-px"
       >
         {content}
       </button>
@@ -169,15 +169,18 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main">
+    <div className="page-shell">
       <Sidebar />
 
-      <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
-        <header className="sticky top-0 z-40 flex flex-col gap-3 border-b border-border-light bg-bg-main/92 px-4 py-3 backdrop-blur-md sm:min-h-[4.5rem] sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-dark-border dark:bg-dark-bg-main/92">
-          <div className="flex items-center gap-3 select-none">
-            <h2 className="text-base font-semibold text-text-main tracking-tight">
+      <main className="page-main">
+        <header className="page-header">
+          <div className="page-header-inner select-none">
+            <div>
+              <div className="section-kicker mb-1 px-0">{t('common.overview')}</div>
+              <h2 className="page-title">
               {t('sidebar.dashboard')}
-            </h2>
+              </h2>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -193,7 +196,7 @@ const Dashboard = () => {
           </div>
         </header>
 
-        <section className="flex-1 p-4 sm:p-8 overflow-auto">
+        <section className="page-content">
           {loading ? (
             <DashboardSkeleton />
           ) : error ? (
@@ -210,7 +213,7 @@ const Dashboard = () => {
               </button>
             </div>
           ) : (
-            <div className="max-w-6xl mx-auto space-y-8">
+            <div className="mx-auto max-w-[88rem] space-y-8">
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
@@ -245,7 +248,7 @@ const Dashboard = () => {
                 {/* Language Distribution */}
                 <div className="panel-surface p-6">
                   <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-sm font-semibold text-text-main">
+                    <h3 className="font-heading text-sm font-semibold text-text-main">
                       {t('dashboard.language_distribution')}
                     </h3>
                     <span className="text-xs text-text-muted">
@@ -276,19 +279,19 @@ const Dashboard = () => {
                 <div className="flex flex-col gap-6">
                   {/* Activity Timeline */}
                   <div className="panel-surface p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-text-muted" />
-                      <h3 className="text-sm font-semibold text-text-main">
-                        {t('dashboard.star_activity')}
-                      </h3>
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-text-muted" />
+                        <h3 className="font-heading text-sm font-semibold text-text-main">
+                          {t('dashboard.star_activity')}
+                        </h3>
+                      </div>
+                      {stats?.recentActivity !== undefined && stats.recentActivity > 0 && (
+                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full font-medium">
+                          +{stats.recentActivity} {t('dashboard.last_3_months')}
+                        </span>
+                      )}
                     </div>
-                    {stats?.recentActivity !== undefined && stats.recentActivity > 0 && (
-                      <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full font-medium">
-                        +{stats.recentActivity} {t('dashboard.last_3_months')}
-                      </span>
-                    )}
-                  </div>
 
                   {/* Activity bars */}
                   <div className="flex items-end gap-1.5 h-32 pt-8">
@@ -315,7 +318,7 @@ const Dashboard = () => {
                             className={`w-full rounded-t transition-all duration-300 cursor-pointer hover:opacity-90 ${
                               isRecent
                                 ? 'bg-gradient-to-t from-action-primary to-action-hover shadow-sm'
-                                : 'bg-gradient-to-t from-action-primary/50 to-action-primary/30'
+                                : 'bg-gradient-to-t from-action-primary/45 to-action-primary/20'
                             } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/50`}
                             style={{ height: `${Math.max(height, 8)}%` }}
                             onClick={() => navigate(`/data?month=${data.date}`)}
@@ -349,7 +352,7 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <Tag className="w-4 h-4 text-text-muted" />
-                      <h3 className="text-sm font-semibold text-text-main">
+                      <h3 className="font-heading text-sm font-semibold text-text-main">
                         {t('dashboard.popular_topics')}
                       </h3>
                     </div>
@@ -368,11 +371,11 @@ const Dashboard = () => {
                         <button
                           key={item.topic}
                           onClick={() => navigate(`/data?topic=${encodeURIComponent(item.topic)}`)}
-                          className="group px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-md hover:scale-105"
+                          className="group rounded-full px-3 py-1.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
                           style={{
-                            backgroundColor: `rgba(59, 130, 246, ${intensity * 0.15})`,
-                            color: `rgba(37, 99, 235, ${0.7 + intensity * 0.3})`,
-                            border: `1px solid rgba(59, 130, 246, ${intensity * 0.3})`,
+                            backgroundColor: `rgba(45, 89, 200, ${intensity * 0.11})`,
+                            color: `rgba(35, 71, 163, ${0.76 + intensity * 0.2})`,
+                            border: `1px solid rgba(45, 89, 200, ${intensity * 0.22})`,
                           }}
                         >
                           <span>{item.topic}</span>
@@ -397,7 +400,7 @@ const Dashboard = () => {
             {stats?.topClusters && stats.topClusters.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-text-main">
+                  <h3 className="font-heading text-sm font-semibold text-text-main">
                     {t('dashboard.top_clusters')}
                   </h3>
                   <button

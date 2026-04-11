@@ -64,15 +64,15 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   }, [onSearch]);
 
   return (
-    <div className={clsx('relative group', className)}>
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+    <div className={clsx('group relative', className)}>
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
         <Search className="h-4 w-4 text-text-dim transition-colors group-focus-within:text-action-primary" />
       </div>
       <input
         type="search"
         value={localValue}
         onChange={handleChange}
-        className="field-surface block h-11 w-full pl-10 pr-10 text-sm leading-5 placeholder:text-text-dim sm:h-10"
+        className="field-surface block h-11 w-full pl-11 pr-11 text-sm font-medium leading-5 placeholder:text-text-dim/90 sm:h-11"
         placeholder={placeholder || t('dashboard.search_placeholder')}
         aria-label={computedAriaLabel}
         {...props}
@@ -82,7 +82,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           type="button"
           onClick={handleClear}
           aria-label={t('common.clear', 'Clear')}
-          className="absolute inset-y-0 right-0 flex items-center pr-3 text-text-dim hover:text-text-main"
+          className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-text-dim hover:text-text-main"
         >
           <X className="h-4 w-4" />
         </button>

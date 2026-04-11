@@ -206,15 +206,17 @@ const DataPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main">
+    <div className="page-shell">
       <Sidebar />
 
-      <main className="flex min-w-0 flex-1 flex-col" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
-        <header className="sticky top-0 z-40 flex flex-col gap-3 border-b border-border-light bg-bg-main/92 px-4 py-3 backdrop-blur-md sm:min-h-[4.5rem] sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-dark-border dark:bg-dark-bg-main/92">
-          <div className="flex items-center gap-3 select-none">
-            <h2 className="text-base font-semibold tracking-tight text-text-main">{t('sidebar.data')}</h2>
-            <div className="mx-1 h-4 w-px bg-border-light" />
-            <span className="rounded-full bg-bg-sidebar/75 px-2.5 py-1 text-xs font-medium text-text-muted dark:bg-dark-bg-sidebar/75 dark:text-dark-text-main/70">
+      <main className="page-main">
+        <header className="page-header">
+          <div className="page-header-inner select-none">
+            <div>
+              <div className="section-kicker mb-1 px-0">{t('common.repositories')}</div>
+              <h2 className="page-title">{t('sidebar.data')}</h2>
+            </div>
+            <span className="toolbar-badge">
               {count} / {totalNodes} {t('common.repositories')}
             </span>
           </div>
@@ -289,7 +291,7 @@ const DataPage = () => {
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-4 sm:p-6">
+        <div className="page-content">
           {loading ? (
             <div className="flex h-64 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-text-muted" />
@@ -465,14 +467,14 @@ const DataPage = () => {
                               <img
                                 src={repo.owner_avatar_url}
                                 alt={repo.owner}
-                                className="mx-auto h-6 min-h-6 w-6 min-w-6 object-cover"
+                                className="mx-auto h-7 min-h-7 w-7 min-w-7 rounded-lg object-cover"
                                 loading="lazy"
                                 decoding="async"
                                 width={24}
                                 height={24}
                               />
                             ) : (
-                              <div className="mx-auto flex h-6 min-h-6 w-6 min-w-6 items-center justify-center bg-border-light text-[10px] text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
+                              <div className="mx-auto flex h-7 min-h-7 w-7 min-w-7 items-center justify-center rounded-lg bg-border-light text-[10px] text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
                                 {repo.owner.charAt(0).toUpperCase()}
                               </div>
                             )}

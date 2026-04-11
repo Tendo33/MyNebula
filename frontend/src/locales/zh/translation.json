@@ -10,12 +10,15 @@
     "dashboard": "仪表盘",
     "graph": "图谱",
     "data": "数据",
-    "settings": "设置"
+    "settings": "设置",
+    "tagline": "知识星云"
   },
   "common": {
     "loading": "加载中...",
     "total": "总计",
     "repositories": "仓库",
+    "overview": "概览",
+    "explore": "探索",
     "languages": "语言",
     "clear": "清除",
     "clear_filter": "清除筛选",

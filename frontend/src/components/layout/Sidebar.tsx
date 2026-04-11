@@ -104,7 +104,7 @@ export const Sidebar = () => {
         <button
           type="button"
           onClick={() => setMobileOpen((prev) => !prev)}
-          className="fixed left-3 top-3 z-[70] inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border-light bg-bg-main/96 text-text-main shadow-sm backdrop-blur-md dark:border-dark-border dark:bg-dark-bg-main/96 dark:text-dark-text-main"
+          className="header-action fixed left-3 top-3 z-[70] h-11 w-11 px-0"
           aria-label={mobileOpen ? t('common.close') : t('common.open_menu', 'Open menu')}
         >
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -114,7 +114,7 @@ export const Sidebar = () => {
       {isMobile && mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-[55] bg-slate-950/28 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[55] bg-slate-950/34 backdrop-blur-[2px]"
           onClick={() => setMobileOpen(false)}
           aria-label={t('common.close')}
         />
@@ -122,28 +122,31 @@ export const Sidebar = () => {
 
       <aside
         className={clsx(
-          'fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border-light bg-bg-sidebar/95 backdrop-blur-md shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)] transition-transform duration-200 dark:border-dark-border dark:bg-dark-bg-sidebar/95',
+          'fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border-light/85 bg-bg-sidebar/88 backdrop-blur-xl shadow-[0_24px_64px_-36px_rgba(28,34,46,0.28)] transition-transform duration-200 dark:border-dark-border/90 dark:bg-dark-bg-sidebar/88',
           isMobile ? (mobileOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
         )}
         style={{ width: `${isMobile ? Math.min(sidebarWidth, 300) : sidebarWidth}px` }}
       >
-      {/* Header / Brand */}
-      <a
-        href="https://github.com/Tendo33/MyNebula"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mx-2 mb-2 mt-2 flex h-12 items-center gap-2 rounded-xl border border-transparent px-4 transition-colors hover:border-border-light hover:bg-bg-main/75 dark:hover:border-dark-border dark:hover:bg-dark-bg-main/65"
-      >
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-bg-main/80 text-text-main shadow-sm dark:bg-dark-bg-main/80">
-           <Github className="h-4 w-4" />
-        </div>
-        <span className="truncate text-sm font-semibold tracking-tight text-text-main">
-          {t('app.title')}
-        </span>
-      </a>
+        <a
+          href="https://github.com/Tendo33/MyNebula"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="panel-subtle mx-3 mb-3 mt-3 flex min-h-[4.5rem] items-center gap-3 px-4 py-3 hover:bg-bg-main/78 dark:hover:bg-dark-bg-main/72"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-bg-main/85 text-text-main shadow-sm dark:bg-dark-bg-main/85">
+            <Github className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-heading truncate text-sm font-semibold text-text-main">
+              {t('app.title')}
+            </div>
+            <div className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-text-dim">
+              {t('sidebar.tagline')}
+            </div>
+          </div>
+        </a>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-2">
+        <nav className="flex-1 space-y-1.5 px-3 py-1">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
@@ -155,33 +158,37 @@ export const Sidebar = () => {
             }}
             className={({ isActive }) =>
               clsx(
-                'relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 group select-none border',
-                'min-h-[44px] rounded-xl border text-sm transition-all duration-200',
+                'group relative flex min-h-[48px] items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm transition-all duration-200',
                 isActive
-                  ? 'border-border-light bg-bg-main/92 font-medium text-text-main shadow-sm dark:border-dark-border dark:bg-dark-bg-main/92 dark:text-dark-text-main'
-                  : 'border-transparent text-text-muted hover:-translate-y-px hover:border-border-light/70 hover:bg-bg-main/72 hover:text-text-main dark:text-dark-text-main/70 dark:hover:border-dark-border dark:hover:bg-dark-bg-main/58 dark:hover:text-dark-text-main'
+                  ? 'border-border-light/95 bg-bg-main/94 text-text-main shadow-sm dark:border-dark-border/90 dark:bg-dark-bg-main/90 dark:text-dark-text-main'
+                  : 'border-transparent text-text-muted hover:-translate-y-px hover:border-border-light/70 hover:bg-bg-main/68 hover:text-text-main dark:text-dark-text-main/70 dark:hover:border-dark-border/85 dark:hover:bg-dark-bg-main/58 dark:hover:text-dark-text-main'
               )
             }
           >
             {({ isActive }) => (
               <>
-                {isActive && (
-                  <span className="absolute left-1.5 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-action-primary/70" />
-                )}
+                <span
+                  className={clsx(
+                    'h-2 w-2 rounded-full transition-all',
+                    isActive
+                      ? 'scale-100 bg-action-primary shadow-[0_0_0_4px_rgba(45,89,200,0.12)]'
+                      : 'scale-75 bg-border-light group-hover:bg-action-primary/45 dark:bg-dark-border'
+                  )}
+                />
                 <item.icon
                   className={clsx(
                     'h-4 w-4',
                     isActive ? 'text-text-main' : 'text-text-dim group-hover:text-text-main'
                   )}
                 />
-                <span className="truncate">{item.label}</span>
+                <span className={clsx('truncate font-medium', isActive && 'font-semibold')}>
+                  {item.label}
+                </span>
               </>
             )}
           </NavLink>
         ))}
-      </nav>
-
-      {/* Optional User/Footer Area could go here */}
+        </nav>
 
       {!isMobile && (
         <div
@@ -202,7 +209,7 @@ export const Sidebar = () => {
           />
         </div>
       )}
-    </aside>
+      </aside>
     </>
   );
 };

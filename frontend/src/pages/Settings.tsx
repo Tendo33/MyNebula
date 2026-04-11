@@ -38,6 +38,7 @@ import {
 } from '../api/v2/settings';
 import { getAdminAuthConfig } from '../api/auth';
 import { pollUntilComplete, type TaskCompletionResult } from './settings/polling';
+import { logClientError } from '../utils/debug';
 
 const createPipelineSyncSteps = (): { id: string; status: SyncStepStatus; progress?: number; error?: string }[] => ([
   { id: 'stars', status: 'pending', progress: 0 },
@@ -147,7 +148,7 @@ const Settings = () => {
       };
     } catch (err) {
       setError(t('settings.load_schedule_error'));
-      console.error('Failed to load schedule data:', err);
+      logClientError('Failed to load schedule data:', err);
     }
   }, [t, updateSettings]);
 
@@ -180,7 +181,7 @@ const Settings = () => {
         graphDefaultsRef.current = current;
       } catch (err) {
         setError(t('settings.update_graph_defaults_error', 'Failed to save graph defaults'));
-        console.error('Failed to update graph defaults:', err);
+        logClientError('Failed to update graph defaults:', err);
       }
     }, 500);
 
@@ -458,7 +459,7 @@ const Settings = () => {
       } else {
         setLoginError(t('settings.login_failed'));
       }
-      console.error('Admin login failed:', err);
+      logClientError('Admin login failed:', err);
     } finally {
       setLoginLoading(false);
     }
@@ -487,7 +488,7 @@ const Settings = () => {
       setSchedule(updated.schedule);
     } catch (err) {
       setError(t('settings.update_schedule_error'));
-      console.error('Failed to update schedule:', err);
+      logClientError('Failed to update schedule:', err);
     } finally {
       setScheduleLoading(false);
     }
@@ -508,7 +509,7 @@ const Settings = () => {
       setSchedule(updated.schedule);
     } catch (err) {
       setError(t('settings.update_time_error'));
-      console.error('Failed to update schedule time:', err);
+      logClientError('Failed to update schedule time:', err);
     } finally {
       setScheduleLoading(false);
     }
@@ -550,7 +551,7 @@ const Settings = () => {
       await loadScheduleData();
     } catch (err) {
       setError(t('errors.sync_failed'));
-      console.error('Sync failed:', err);
+      logClientError('Sync failed:', err);
     } finally {
       activePollControllerRef.current?.abort();
       setSyncing(false);
@@ -584,7 +585,7 @@ const Settings = () => {
       await loadScheduleData();
     } catch (err) {
       setError(t('errors.clustering_failed'));
-      console.error('Re-cluster failed:', err);
+      logClientError('Re-cluster failed:', err);
     } finally {
       setReclusterLoading(false);
     }
@@ -646,7 +647,7 @@ const Settings = () => {
       await loadScheduleData();
     } catch (err) {
       setError(t('settings.full_refresh_error'));
-      console.error('Failed to trigger full refresh:', err);
+      logClientError('Failed to trigger full refresh:', err);
     } finally {
       setRefreshLoading(false);
       setSyncing(false);
@@ -664,13 +665,16 @@ const Settings = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main">
+    <div className="page-shell">
       <Sidebar />
-      <main className="flex-1 flex flex-col min-w-0" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
-        <header className="sticky top-0 z-40 flex flex-col gap-3 border-b border-border-light bg-bg-main/92 px-4 py-3 backdrop-blur-md sm:min-h-[4.5rem] sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-dark-border dark:bg-dark-bg-main/92">
-          <h1 className="text-base font-semibold text-text-main select-none tracking-tight">
-            {t('settings.title')}
-          </h1>
+      <main className="page-main">
+        <header className="page-header">
+          <div className="page-header-inner">
+            <div>
+              <div className="section-kicker mb-1 px-0">{t('sidebar.settings')}</div>
+              <h1 className="page-title select-none">{t('settings.title')}</h1>
+            </div>
+          </div>
           <div className="flex items-center gap-3">
             <LanguageSwitch />
             {isAuthenticated && (
@@ -701,15 +705,16 @@ const Settings = () => {
             onSubmit={handleAdminLogin}
           />
         ) : (
-          <div className="max-w-3xl px-4 py-6 sm:px-8 sm:py-10 space-y-12">
+          <div className="page-content">
+            <div className="max-w-4xl space-y-12">
             {error && (
-              <div className="panel-surface flex items-center gap-2 border-red-200 bg-red-50/95 p-3 text-sm text-red-700">
+              <div className="status-banner" data-tone="error">
                 <AlertTriangle className="w-4 h-4" />
                 {error}
               </div>
             )}
             {warning && (
-              <div className="panel-surface flex items-center gap-2 border-amber-200 bg-amber-50/95 p-3 text-sm text-amber-800">
+              <div className="status-banner" data-tone="warning">
                 <AlertTriangle className="w-4 h-4" />
                 {warning}
               </div>
@@ -717,14 +722,14 @@ const Settings = () => {
 
             <SettingsAppearance settings={settings} updateSettings={updateSettings} />
 
-            <hr className="border-t border-border-light" />
+            <hr className="border-t border-border-light/80" />
 
             <section>
-              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">
+              <h2 className="section-kicker mb-4 select-none">
                 {t('settings.operations')}
               </h2>
               <div className="space-y-4">
-                <div className="panel-surface p-4">
+                <div className="panel-surface p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-text-muted" />
@@ -746,7 +751,7 @@ const Settings = () => {
                   </div>
                 </div>
 
-                <div className="panel-surface space-y-3 p-4">
+                <div className="panel-surface space-y-3 p-5">
                   <div className="flex items-center gap-2">
                     <RefreshCw className="w-4 h-4 text-text-muted" />
                     <span className="text-sm font-medium text-text-main">{t('graph.recluster')}</span>
@@ -816,14 +821,14 @@ const Settings = () => {
               </div>
             </section>
 
-            <hr className="border-t border-border-light" />
+            <hr className="border-t border-border-light/80" />
 
             <section>
-              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">
+              <h2 className="section-kicker mb-4 select-none">
                 {t('settings.connection')}
               </h2>
               <div className="space-y-2">
-                <div className="p-3">
+                <div className="panel-subtle p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Server className="w-4 h-4 text-text-muted" />
                     <label className="text-sm font-medium text-text-main">{t('settings.api_endpoint')}</label>
@@ -836,7 +841,7 @@ const Settings = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-md hover:bg-bg-hover transition-colors">
+                <div className="panel-subtle flex items-center justify-between p-4 transition-colors">
                   <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-text-muted" />
                     <label className="text-sm font-medium text-text-main">{t('settings.github_token_status')}</label>
@@ -865,7 +870,7 @@ const Settings = () => {
               </div>
             </section>
 
-            <hr className="border-t border-border-light" />
+            <hr className="border-t border-border-light/80" />
 
             <SettingsSchedule
               schedule={schedule}
@@ -874,7 +879,7 @@ const Settings = () => {
               onTimeChange={handleTimeChange}
             />
 
-            <hr className="border-t border-border-light" />
+            <hr className="border-t border-border-light/80" />
 
             <SettingsDataSection
               syncInfo={syncInfo}
@@ -886,6 +891,7 @@ const Settings = () => {
               onHideConfirm={() => setShowConfirmDialog(false)}
               onConfirmRefresh={handleFullRefresh}
             />
+            </div>
           </div>
         )}
       </main>

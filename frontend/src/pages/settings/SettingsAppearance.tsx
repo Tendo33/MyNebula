@@ -13,12 +13,12 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">
+      <h2 className="section-kicker mb-4 select-none">
         {t('settings.appearance')}
       </h2>
       <div className="space-y-2">
         {/* HQ Rendering toggle */}
-        <div className="panel-subtle flex items-center justify-between p-3 transition-all group">
+        <div className="panel-subtle flex items-center justify-between p-4 transition-all group">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Zap className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -29,10 +29,8 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
             </div>
           </div>
           <button
-            className={clsx(
-              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-              settings.hqRendering ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border'
-            )}
+            className={clsx('toggle-control')}
+            data-state={settings.hqRendering ? 'on' : 'off'}
             type="button"
             role="switch"
             aria-checked={settings.hqRendering}
@@ -41,15 +39,15 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
           >
             <span
               className={clsx(
-                'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
-                settings.hqRendering ? 'translate-x-5' : 'translate-x-0.5'
+                'toggle-handle',
+                settings.hqRendering ? 'translate-x-6' : 'translate-x-0.5'
               )}
             />
           </button>
         </div>
 
         {/* Show Trajectories toggle */}
-        <div className="panel-subtle flex items-center justify-between p-3 transition-all group">
+        <div className="panel-subtle flex items-center justify-between p-4 transition-all group">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Eye className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -60,10 +58,8 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
             </div>
           </div>
           <button
-            className={clsx(
-              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-              settings.showTrajectories ? 'bg-text-main' : 'bg-border-light dark:bg-dark-border'
-            )}
+            className={clsx('toggle-control')}
+            data-state={settings.showTrajectories ? 'on' : 'off'}
             type="button"
             role="switch"
             aria-checked={settings.showTrajectories}
@@ -72,15 +68,15 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
           >
             <span
               className={clsx(
-                'inline-block h-5 w-5 transform rounded-full bg-bg-main transition duration-200 ease-in-out shadow-sm dark:bg-dark-bg-main',
-                settings.showTrajectories ? 'translate-x-5' : 'translate-x-0.5'
+                'toggle-handle',
+                settings.showTrajectories ? 'translate-x-6' : 'translate-x-0.5'
               )}
             />
           </button>
         </div>
 
         {/* Related min semantic slider */}
-        <div className="panel-subtle space-y-2 p-3">
+        <div className="panel-subtle space-y-3 p-4">
           <div className="flex items-center gap-2">
             <Link2 className="w-4 h-4 text-text-muted" />
             <span className="text-sm font-medium text-text-main">

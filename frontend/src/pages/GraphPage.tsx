@@ -172,15 +172,17 @@ const GraphPage = () => {
     filters.languages.size > 0;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main">
+    <div className="page-shell h-screen overflow-hidden">
       <Sidebar />
 
-      <main className="flex min-w-0 flex-1 flex-col" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
-        <header className="sticky top-0 z-40 flex min-h-[4.5rem] items-center justify-between border-b border-border-light bg-bg-main/92 px-4 py-3 backdrop-blur-md sm:px-6 dark:border-dark-border dark:bg-dark-bg-main/92">
-          <div className="flex items-center gap-3 select-none">
-            <h2 className="text-base font-semibold tracking-tight text-text-main">{t('sidebar.graph')}</h2>
-            <div className="mx-1 hidden h-4 w-px bg-border-light sm:block" />
-            <span className="hidden text-sm text-text-muted sm:inline">
+      <main className="page-main">
+        <header className="page-header sm:px-6">
+          <div className="page-header-inner select-none">
+            <div>
+              <div className="section-kicker mb-1 px-0">{t('common.explore')}</div>
+              <h2 className="page-title">{t('sidebar.graph')}</h2>
+            </div>
+            <span className="hidden page-subtitle sm:inline">
               {filteredData?.total_nodes !== undefined
                 ? t('dashboard.subtitle', { count: filteredData.total_nodes })
                 : t('dashboard.subtitle_infinite')}
@@ -191,7 +193,7 @@ const GraphPage = () => {
               </span>
             )}
             {edgesLoading && (
-              <span className="hidden rounded-full bg-bg-sidebar/75 px-2.5 py-1 text-xs font-medium text-text-dim sm:inline dark:bg-dark-bg-sidebar/75 dark:text-dark-text-main/60">
+              <span className="hidden toolbar-badge sm:inline-flex">
                 {t('sync.loading', 'Loading')} edges...
               </span>
             )}
@@ -237,7 +239,7 @@ const GraphPage = () => {
           {isMobile && showFilters && (
             <button
               type="button"
-              className="absolute inset-0 z-20 bg-slate-950/28 backdrop-blur-[1px]"
+              className="absolute inset-0 z-20 bg-slate-950/34 backdrop-blur-[2px]"
               onClick={() => setShowFilters(false)}
               aria-label={t('common.close')}
             />
@@ -248,7 +250,7 @@ const GraphPage = () => {
               id="graph-filters-panel"
               className={`${
                 isMobile ? 'absolute inset-y-0 left-0 w-[85vw] max-w-sm' : 'w-72 flex-shrink-0'
-              } relative z-30 space-y-4 overflow-y-auto border-r border-border-light bg-bg-sidebar/92 p-4 backdrop-blur-md dark:border-dark-border dark:bg-dark-bg-sidebar/92`}
+              } relative z-30 space-y-4 overflow-y-auto border-r border-border-light/85 bg-bg-sidebar/88 p-4 backdrop-blur-xl dark:border-dark-border/90 dark:bg-dark-bg-sidebar/88`}
             >
               {hasActiveFilters && (
                 <button

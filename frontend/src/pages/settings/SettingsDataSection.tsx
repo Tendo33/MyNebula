@@ -69,16 +69,16 @@ export const SettingsDataSection = ({
   return (
     <>
       <section>
-        <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4 px-2 select-none">
+        <h2 className="section-kicker mb-4 select-none">
           {t('settings.data_management')}
         </h2>
         <div className="space-y-2">
-          <div className="p-3">
+          <div className="panel-subtle p-4">
             <div className="flex items-center gap-2 mb-3">
               <Database className="w-4 h-4 text-text-muted" />
               <label className="text-sm font-medium text-text-main">{t('settings.repo_stats')}</label>
             </div>
-            <div className="grid grid-cols-2 gap-4 bg-bg-sidebar/50 rounded-md p-4">
+            <div className="grid grid-cols-2 gap-4 rounded-2xl bg-bg-main/68 p-4 dark:bg-dark-bg-main/50">
               <div>
                 <div className="text-2xl font-semibold text-text-main">{syncInfo?.total_repos ?? '-'}</div>
                 <div className="text-xs text-text-muted">{t('settings.total_repos')}</div>
@@ -103,7 +103,7 @@ export const SettingsDataSection = ({
             )}
           </div>
 
-          <div className="p-3">
+          <div className="panel-subtle p-4">
             <div className="flex items-center gap-2 mb-3">
               <RefreshCw className="w-4 h-4 text-text-muted" />
               <label className="text-sm font-medium text-text-main">{t('settings.full_refresh')}</label>
@@ -142,7 +142,7 @@ export const SettingsDataSection = ({
             aria-describedby="full-refresh-desc"
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-red-100 rounded-full">
+              <div className="rounded-2xl bg-red-100 p-2.5">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
               <h3 id="full-refresh-title" className="text-lg font-semibold text-text-main dark:text-dark-text-main">
@@ -158,18 +158,18 @@ export const SettingsDataSection = ({
               <li>{t('settings.confirm_step_embed')}</li>
               <li>{t('settings.confirm_step_cluster')}</li>
             </ul>
-            <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mb-6">{t('settings.confirm_warning')}</p>
+            <p className="mb-6 rounded-2xl bg-amber-50 p-3 text-xs text-amber-700">{t('settings.confirm_warning')}</p>
             <div className="flex justify-end gap-3">
               <button
                 ref={cancelButtonRef}
                 onClick={onHideConfirm}
-                className="px-4 py-2 text-sm font-medium text-text-main bg-bg-hover hover:bg-border-light rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-border"
+                className="rounded-2xl bg-bg-hover px-4 py-2.5 text-sm font-semibold text-text-main transition-colors hover:bg-border-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main dark:hover:bg-dark-border"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={onConfirmRefresh}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
+                className="rounded-2xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
               >
                 {t('settings.execute_full_refresh')}
               </button>
