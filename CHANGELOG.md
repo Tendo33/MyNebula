@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-04-12
+
+### Fixed
+- Stopped `/graph` from oscillating between stale and incoming `node` query parameters when navigating in from `/data` or other routes.
+- Normalized command palette tag navigation onto the shared `q` query parameter so graph search links no longer rewrite themselves between `tag` and `q`.
+
+### Changed
+- Synchronized version metadata to `1.2.7` across backend package metadata, frontend package metadata, runtime config, environment template, lockfiles, and documentation examples.
+
 ## [1.2.6] - 2026-04-12
 
 ### Added
@@ -192,7 +201,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.6...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.7...HEAD
+[1.2.7]: https://github.com/Tendo33/mynebula/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/Tendo33/mynebula/compare/v1.2.5...v1.2.6
 [1.2.4]: https://github.com/Tendo33/mynebula/compare/v1.2.3...v1.2.4
 [1.2.2]: https://github.com/Tendo33/mynebula/compare/v1.2.1...v1.2.2

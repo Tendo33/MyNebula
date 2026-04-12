@@ -108,6 +108,43 @@ const GraphPage = () => {
   ]);
 
   useEffect(() => {
+    if (!rawData) return;
+
+    const parsedNodeId = urlNodeId ? Number.parseInt(urlNodeId, 10) : null;
+    const requestedNode = Number.isFinite(parsedNodeId)
+      ? rawData.nodes.find((item) => item.id === parsedNodeId)
+      : null;
+    const hasPendingNodeSync = urlNodeId
+      ? requestedNode
+        ? selectedNode?.id !== requestedNode.id
+        : selectedNode !== null
+      : selectedNode !== null;
+
+    const requestedClusterIds = urlClusterIds
+      ? urlClusterIds
+          .split(',')
+          .map((value) => Number.parseInt(value, 10))
+          .filter((value) => Number.isFinite(value))
+      : urlClusterId
+        ? [Number.parseInt(urlClusterId, 10)].filter((value) => Number.isFinite(value))
+        : [];
+    const validClusterIds = requestedClusterIds
+      .filter((clusterId) => rawData.clusters.some((cluster) => cluster.id === clusterId))
+      .sort((left, right) => left - right);
+    const currentClusterIds = Array.from(filters.selectedClusters).sort((left, right) => left - right);
+    const hasPendingClusterSync = currentClusterIds.join(',') !== validClusterIds.join(',');
+
+    const currentLanguages = Array.from(filters.languages);
+    const hasPendingLanguageSync = urlLanguage
+      ? currentLanguages.length !== 1 || currentLanguages[0] !== urlLanguage
+      : currentLanguages.length > 0;
+
+    const hasPendingSearchSync = filters.searchQuery !== urlQuery;
+
+    if (hasPendingNodeSync || hasPendingClusterSync || hasPendingLanguageSync || hasPendingSearchSync) {
+      return;
+    }
+
     const nextParams = new URLSearchParams();
 
     if (selectedNode) {
@@ -133,7 +170,20 @@ const GraphPage = () => {
       lastAppliedSearchRef.current = nextSignature;
       setSearchParams(nextParams, { replace: true });
     }
-  }, [filters.languages, filters.searchQuery, filters.selectedClusters, searchSignature, selectedNode, setSearchParams]);
+  }, [
+    filters.languages,
+    filters.searchQuery,
+    filters.selectedClusters,
+    rawData,
+    searchSignature,
+    selectedNode,
+    setSearchParams,
+    urlClusterId,
+    urlClusterIds,
+    urlLanguage,
+    urlNodeId,
+    urlQuery,
+  ]);
 
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);
   const [starListPanelCollapsed, setStarListPanelCollapsed] = useState(false);

@@ -40,7 +40,7 @@ function GraphAppContent({
   ) => {
     const params = new URLSearchParams();
     if (facet === 'language') params.set('language', value);
-    else if (facet === 'tag') params.set('tag', value);
+    else if (facet === 'tag') params.set('q', value);
     else params.set('q', value);
     navigate(`/graph?${params.toString()}`);
   };

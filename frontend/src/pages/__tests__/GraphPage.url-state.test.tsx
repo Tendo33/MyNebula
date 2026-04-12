@@ -1,5 +1,5 @@
 import { render, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { GraphNode } from '../../types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,19 +24,34 @@ const sampleNode: GraphNode = {
   stargazers_count: 42,
 };
 
+const otherNode: GraphNode = {
+  ...sampleNode,
+  id: 196,
+  github_id: 196,
+  name: 'supernova',
+  full_name: 'octo/supernova',
+  cluster_id: 3,
+};
+
 const graphState = {
   filteredData: {
     total_nodes: 1,
     nodes: [{ id: 1 }],
   },
   rawData: {
-    nodes: [sampleNode],
+    nodes: [
+      sampleNode,
+      otherNode,
+    ],
     edges: [],
-    clusters: [{ id: 2, name: 'Core', keywords: [], color: '#123456', repo_count: 1 }],
+    clusters: [
+      { id: 2, name: 'Core', keywords: [], color: '#123456', repo_count: 1 },
+      { id: 3, name: 'Explore', keywords: [], color: '#654321', repo_count: 1 },
+    ],
     star_lists: [],
-    total_nodes: 1,
+    total_nodes: 2,
     total_edges: 0,
-    total_clusters: 1,
+    total_clusters: 2,
     total_star_lists: 0,
   },
   loadData: vi.fn(),
@@ -118,6 +133,11 @@ vi.mock('../../components/ui/SearchInput', () => ({
 
 import GraphPage from '../GraphPage';
 
+const LocationProbe = () => {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+};
+
 describe('GraphPage URL state', () => {
   beforeEach(() => {
     graphState.selectedNode = null;
@@ -165,6 +185,29 @@ describe('GraphPage URL state', () => {
 
     await waitFor(() => {
       expect(graphState.setSelectedNode).toHaveBeenCalledWith(null);
+    });
+  });
+
+  it('prefers the incoming node query over a stale selected node in store state', async () => {
+    graphState.selectedNode = sampleNode;
+
+    const { getByTestId } = render(
+      <MemoryRouter initialEntries={['/graph?node=196']} future={routerFuture}>
+        <LocationProbe />
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(graphState.setSelectedNode).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 196 })
+      );
+    });
+
+    await waitFor(() => {
+      expect(getByTestId('location')).toHaveTextContent('/graph?node=196');
     });
   });
 });

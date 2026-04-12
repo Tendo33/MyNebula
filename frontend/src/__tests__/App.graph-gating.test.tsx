@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -33,7 +33,15 @@ vi.mock('../hooks/useCommandPalette', () => ({
 
 vi.mock('../components/ui/CommandPalette', () => ({
   __esModule: true,
-  default: () => null,
+  default: ({
+    onSelectSearch,
+  }: {
+    onSelectSearch?: (value: string, facet?: 'search' | 'language' | 'tag') => void;
+  }) => (
+    <button type="button" onClick={() => onSelectSearch?.('graph', 'tag')}>
+      trigger-tag-search
+    </button>
+  ),
 }));
 
 vi.mock('../pages/Dashboard', () => ({
@@ -71,6 +79,28 @@ describe('App graph gating', () => {
     graphApiMocks.getGraphDataV2.mockReset();
     graphApiMocks.getTimelineDataV2.mockReset();
     graphApiMocks.getGraphEdgesPageV2.mockReset();
+    graphApiMocks.getGraphDataV2.mockResolvedValue({
+      nodes: [],
+      edges: [],
+      clusters: [],
+      star_lists: [],
+      total_nodes: 0,
+      total_edges: 0,
+      total_clusters: 0,
+      total_star_lists: 0,
+      version: 'active',
+    });
+    graphApiMocks.getTimelineDataV2.mockResolvedValue({
+      points: [],
+      total_stars: 0,
+      date_range: ['2026-01-01', '2026-01-01'],
+      version: 'active',
+    });
+    graphApiMocks.getGraphEdgesPageV2.mockResolvedValue({
+      edges: [],
+      next_cursor: null,
+      version: 'active',
+    });
     mockedUseCommandPalette.mockReturnValue({
       isOpen: false,
       close: vi.fn(),
@@ -112,6 +142,21 @@ describe('App graph gating', () => {
       expect(graphApiMocks.getGraphDataV2).not.toHaveBeenCalled();
       expect(graphApiMocks.getTimelineDataV2).not.toHaveBeenCalled();
       expect(graphApiMocks.getGraphEdgesPageV2).not.toHaveBeenCalled();
+    });
+  });
+
+  it('normalizes tag palette navigation onto the shared q search param', async () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-tag-search' }));
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/graph');
+      expect(window.location.search).toBe('?q=graph');
     });
   });
 });
