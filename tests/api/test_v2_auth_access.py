@@ -52,7 +52,9 @@ async def test_resolve_read_user_allows_demo_mode(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_resolve_read_user_rejects_authenticated_mode_without_session(monkeypatch):
+async def test_resolve_read_user_rejects_authenticated_mode_without_session(
+    monkeypatch,
+):
     from nebula.api.v2 import access as access_api
 
     async def fake_get_default_user(_db):
@@ -76,7 +78,9 @@ async def test_resolve_read_user_rejects_authenticated_mode_without_session(monk
 
 
 @pytest.mark.asyncio
-async def test_resolve_read_user_accepts_authenticated_mode_with_valid_session(monkeypatch):
+async def test_resolve_read_user_accepts_authenticated_mode_with_valid_session(
+    monkeypatch,
+):
     from nebula.api.v2 import access as access_api
 
     async def fake_get_default_user(_db):
@@ -237,8 +241,15 @@ async def test_repo_search_rejects_demo_mode(monkeypatch):
         async def execute(self, _statement):
             return _FakeResult()
 
-    monkeypatch.setattr(repos_api, "get_app_settings", lambda: AppSettings(read_access_mode="demo"), raising=False)
-    monkeypatch.setattr(repos_api, "get_embedding_service", lambda: _FakeEmbeddingService())
+    monkeypatch.setattr(
+        repos_api,
+        "get_app_settings",
+        lambda: AppSettings(read_access_mode="demo"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        repos_api, "get_embedding_service", lambda: _FakeEmbeddingService()
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await repos_api.search_repos(
@@ -280,7 +291,9 @@ async def test_repo_search_allows_demo_mode_with_valid_admin_session(monkeypatch
         expires_in_seconds=60,
     )
 
-    monkeypatch.setattr(repos_api, "get_embedding_service", lambda: _FakeEmbeddingService())
+    monkeypatch.setattr(
+        repos_api, "get_embedding_service", lambda: _FakeEmbeddingService()
+    )
 
     results = await repos_api.search_repos(
         request=RepoSearchRequest(query="vector search"),

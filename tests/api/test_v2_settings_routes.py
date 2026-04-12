@@ -160,6 +160,7 @@ async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
     db = _Db()
     monkeypatch.setattr(sync_ops_service, "get_default_user", fake_get_default_user)
     monkeypatch.setattr(sync_ops_service, "_acquire_full_refresh_creation_lock", noop)
+
     async def fake_get_active_pipeline_run(*_args, **_kwargs):
         return type("Run", (), {"id": 77, "status": "running"})()
 

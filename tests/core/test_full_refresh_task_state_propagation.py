@@ -181,7 +181,9 @@ async def test_full_refresh_marks_parent_partial_failed_when_subtask_has_failed_
         _DbContextFactory(state),
         raising=False,
     )
-    monkeypatch.setattr(sync_ops_service, "sync_stars_task", _complete_with_partial_failure)
+    monkeypatch.setattr(
+        sync_ops_service, "sync_stars_task", _complete_with_partial_failure
+    )
     monkeypatch.setattr(sync_ops_service, "compute_embeddings_task", _complete_subtask)
     monkeypatch.setattr(sync_ops_service, "run_clustering_task", _complete_subtask)
     monkeypatch.setattr(

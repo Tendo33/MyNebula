@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-04-12
+
+### Added
+- Introduced the `ai_docs/` documentation system as the primary AI and engineering documentation entrypoint.
+
+### Changed
+- Consolidated deployment, backend, frontend, scripts, release, and shared reference facts under `ai_docs/`.
+- Converted legacy `doc/` pages into compatibility redirects and updated `README*`, `CONTRIBUTING.md`, `AGENTS.md`, and `CLAUDE.md` to point at the new entrypoints.
+- Synchronized version metadata to `1.2.6` across backend package metadata, frontend package metadata, runtime config, environment template, lockfiles, and documentation examples.
+
 ## [1.2.4] - 2026-04-09
 
 ### Fixed
@@ -182,7 +192,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.4...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.6...HEAD
+[1.2.6]: https://github.com/Tendo33/mynebula/compare/v1.2.5...v1.2.6
 [1.2.4]: https://github.com/Tendo33/mynebula/compare/v1.2.3...v1.2.4
 [1.2.2]: https://github.com/Tendo33/mynebula/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/Tendo33/mynebula/compare/v1.2.0...v1.2.1

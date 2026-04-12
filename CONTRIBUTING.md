@@ -7,14 +7,14 @@
 在开始改代码前，建议先读这几份文档：
 
 - `README.md` 或 `README.zh.md`
-- `doc/ENV_VARS.md`
-- `doc/QUALITY_GATES.md`
-- `doc/DOCKER_DEPLOY.md`
+- `ai_docs/current/operations.md`
+- `ai_docs/reference/verification.md`
+- `ai_docs/current/release.md`
 
 如果你要改动接口、同步流程或数据库结构，再补读：
 
-- `doc/MODELS_GUIDE.md`
-- `doc/RESET_GUIDE.md`
+- `ai_docs/current/backend.md`
+- `ai_docs/current/operations.md`
 
 ## 本地开发环境
 
@@ -41,7 +41,7 @@ VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
 uv run pre-commit install
 ```
 
-更多说明见 `doc/PRE_COMMIT_GUIDE.md`。
+更多说明见 `ai_docs/current/scripts.md` 和 `ai_docs/reference/verification.md`。
 
 ## 分支和提交建议
 
@@ -139,9 +139,9 @@ uv run python scripts/reset_db.py
 
 - `README.md`
 - `README.zh.md`
-- `doc/ENV_VARS.md`
-- `doc/DOCKER_DEPLOY.md`
-- `doc/QUALITY_GATES.md`
+- `ai_docs/current/operations.md`
+- `ai_docs/current/release.md`
+- `ai_docs/reference/verification.md`
 
 ## Pull Request 建议
 

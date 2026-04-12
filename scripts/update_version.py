@@ -6,7 +6,7 @@ This script updates the version number across all relevant files in the project:
 - src/nebula/__init__.py
 - src/nebula/core/config.py
 - frontend/package.json
-- doc/ENV_VARS.md
+- ai_docs/current/operations.md
 
 该脚本用于更新项目中所有相关文件的版本号。
 
@@ -81,13 +81,13 @@ class VersionUpdater:
                 r"\g<1>{version}",
             ),
             (
-                project_root / "doc" / "ENV_VARS.md",
+                project_root / "ai_docs" / "current" / "operations.md",
                 r"(APP_VERSION=)(\d+\.\d+\.\d+)",
                 r"\g<1>{version}",
             ),
             (
-                project_root / "doc" / "ENV_VARS.md",
-                r"(\|\s*`APP_VERSION`\s*\|\s*`)(\d+\.\d+\.\d+)(`\s*\|)",
+                project_root / "ai_docs" / "current" / "scripts.md",
+                r"(当前版本示例：`)(\d+\.\d+\.\d+)(`)",
                 r"\g<1>{version}\g<3>",
             ),
         ]

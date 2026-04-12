@@ -40,7 +40,9 @@ async def test_dashboard_uses_snapshot_metadata_instead_of_hydrating_graph(monke
         }
 
     async def should_not_be_called(*_args, **_kwargs):
-        raise AssertionError("graph hydration should not be used for dashboard metadata")
+        raise AssertionError(
+            "graph hydration should not be used for dashboard metadata"
+        )
 
     class _FakeDb:
         def __init__(self):
@@ -49,9 +51,7 @@ async def test_dashboard_uses_snapshot_metadata_instead_of_hydrating_graph(monke
         async def execute(self, _statement, _params=None):
             self.calls += 1
             if self.calls == 1:
-                return _FakeResult(
-                    scalar=SimpleNamespace(total=10, embedded=8)
-                )
+                return _FakeResult(scalar=SimpleNamespace(total=10, embedded=8))
             if self.calls == 2:
                 return _FakeResult(
                     rows=[SimpleNamespace(language="TypeScript", count=6)]
@@ -95,7 +95,9 @@ async def test_dashboard_uses_snapshot_metadata_instead_of_hydrating_graph(monke
 
 
 @pytest.mark.asyncio
-async def test_data_repos_uses_snapshot_metadata_instead_of_hydrating_graph(monkeypatch):
+async def test_data_repos_uses_snapshot_metadata_instead_of_hydrating_graph(
+    monkeypatch,
+):
     from nebula.api.v2 import data as data_api
 
     async def fake_snapshot_metadata(*_args, **_kwargs):

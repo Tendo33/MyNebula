@@ -10,14 +10,22 @@ def test_search_and_related_queries_keep_cosine_distance_ordering():
     related_source = getsource(related_repo_service.get_related_repos)
 
     assert "cosine_distance" in search_source
-    assert "order_by(StarredRepo.embedding.cosine_distance(query_embedding))" in search_source
+    assert (
+        "order_by(StarredRepo.embedding.cosine_distance(query_embedding))"
+        in search_source
+    )
     assert "cosine_distance" in related_source
-    assert "order_by(StarredRepo.embedding.cosine_distance(anchor_repo.embedding))" in related_source
+    assert (
+        "order_by(StarredRepo.embedding.cosine_distance(anchor_repo.embedding))"
+        in related_source
+    )
 
 
 def test_ann_migration_exists_for_starred_repo_embeddings():
     versions_dir = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-    matching_files = sorted(versions_dir.glob("*add_starred_repo_embedding_ann_index.py"))
+    matching_files = sorted(
+        versions_dir.glob("*add_starred_repo_embedding_ann_index.py")
+    )
 
     assert matching_files, "Expected ANN index migration file to exist"
 

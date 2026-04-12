@@ -252,18 +252,18 @@ uv run uvicorn nebula.main:app --reload --port 8000
 | 同步 | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | 可选 | 控制吞吐量与成本 |
 | 运行时 | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | 可选 | 调试、日志与可观测性相关配置 |
 
-完整环境变量说明见 `doc/ENV_VARS.md`。
+完整环境变量与运维说明见 `ai_docs/current/operations.md`。
 
 ## 文档地图
 
-- `doc/INDEX.md`：文档入口与主题导航
-- `doc/DOCKER_DEPLOY.md`：Docker Compose 部署与运维
-- `doc/ENV_VARS.md`：完整环境变量说明
-- `doc/QUALITY_GATES.md`：本地验证、CI 门禁与离线评测规则
-- `doc/RESET_GUIDE.md`：重置与恢复手册
-- `doc/MODELS_GUIDE.md`：ORM 与 API schema 边界
-- `doc/SDK_USAGE.md`：Python 级程序化入口
-- `doc/REMEDIATION_BACKLOG.md`：已完成整改项与验证命令
+- `ai_docs/START_HERE.md`：主文档入口
+- `ai_docs/INDEX.md`：按任务导航的索引
+- `ai_docs/current/operations.md`：部署、环境变量、认证、代理与重置
+- `ai_docs/current/backend.md`：后端实现与服务边界
+- `ai_docs/current/frontend.md`：前端实现与页面/数据边界
+- `ai_docs/current/scripts.md`：维护脚本与评估工具
+- `ai_docs/current/release.md`：CI 与发布流程总览
+- `ai_docs/reference/verification.md`：本地验证、CI 门禁与文档链接检查
 
 ## API 快速参考
 
@@ -312,7 +312,8 @@ MyNebula/
 |-- alembic/                   # 数据库迁移
 |-- tests/                     # 后端测试
 |-- scripts/                   # 自动化、评估与维护脚本
-|-- doc/                       # 部署、配置与运维文档
+|-- ai_docs/                   # 主文档系统
+|-- doc/                       # 兼容页与 README 图片资源
 |-- docker-compose.yml
 `-- .env.example
 ```
@@ -354,7 +355,7 @@ RUN_E2E=1 npm --prefix frontend run test:e2e
 uv run python scripts/evals/run_all_quality_checks.py
 ```
 
-质量门禁阈值说明见 `doc/QUALITY_GATES.md`。
+质量门禁与验证命令说明见 `ai_docs/reference/verification.md`。
 
 ## 常见问题
 

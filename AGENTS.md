@@ -1,3 +1,20 @@
+﻿# Project Agent Entrypoint
+
+This file is the shared root entrypoint for AI assistants in this repository.
+
+## Read order
+
+1. Start at [ai_docs/START_HERE.md](ai_docs/START_HERE.md)
+2. Use [ai_docs/INDEX.md](ai_docs/INDEX.md) to choose the right task path
+3. Use [ai_docs/reference/verification.md](ai_docs/reference/verification.md) before claiming completion
+
+## Working rules
+
+- Treat `ai_docs/` as the only detailed project documentation source of truth
+- Read `current/` before `standards/`, and use `reference/` for shared commands or paths
+- Keep changes minimal, explicit, and verifiable
+- Update docs whenever behavior, structure, scripts, adapters, or public APIs change
+
 <!-- TRELLIS:START -->
 # Trellis Instructions
 

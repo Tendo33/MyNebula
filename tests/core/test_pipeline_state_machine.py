@@ -258,7 +258,9 @@ async def test_create_pipeline_run_rejects_when_full_refresh_task_active(monkeyp
         return SimpleNamespace(id=55, status="running")
 
     monkeypatch.setattr(service, "_acquire_pipeline_creation_lock", noop)
-    monkeypatch.setattr(service, "_get_active_pipeline_from_db", fake_get_active_pipeline_from_db)
+    monkeypatch.setattr(
+        service, "_get_active_pipeline_from_db", fake_get_active_pipeline_from_db
+    )
     monkeypatch.setattr(
         service,
         "_get_active_full_refresh_task_from_db",

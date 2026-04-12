@@ -252,18 +252,18 @@ If `frontend/dist` exists, FastAPI will serve the SPA and static assets directly
 | Sync | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | Optional | Controls throughput and cost |
 | Runtime | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | Optional | Debugging and observability settings |
 
-For the full environment reference, see `doc/ENV_VARS.md`.
+For the full environment and operations reference, see `ai_docs/current/operations.md`.
 
 ## Documentation Map
 
-- `doc/INDEX.md`: documentation entrypoint and topic map
-- `doc/DOCKER_DEPLOY.md`: Docker Compose deployment and operations
-- `doc/ENV_VARS.md`: complete environment variable reference
-- `doc/QUALITY_GATES.md`: local verification, CI gates, and offline eval rules
-- `doc/RESET_GUIDE.md`: reset and recovery playbooks
-- `doc/MODELS_GUIDE.md`: ORM and API schema boundaries
-- `doc/SDK_USAGE.md`: supported Python-level entry points
-- `doc/REMEDIATION_BACKLOG.md`: completed remediation items and verification commands
+- `ai_docs/START_HERE.md`: main documentation entrypoint
+- `ai_docs/INDEX.md`: task-oriented documentation router
+- `ai_docs/current/operations.md`: deployment, environment variables, auth, proxy, and reset facts
+- `ai_docs/current/backend.md`: backend implementation map and service boundaries
+- `ai_docs/current/frontend.md`: frontend implementation map and data-surface boundaries
+- `ai_docs/current/scripts.md`: maintenance scripts and evaluation tooling
+- `ai_docs/current/release.md`: CI and release workflow overview
+- `ai_docs/reference/verification.md`: local verification, CI gates, and docs link checks
 
 ## API Quick Reference
 
@@ -312,7 +312,8 @@ MyNebula/
 |-- alembic/                   # database migrations
 |-- tests/                     # backend tests
 |-- scripts/                   # automation, evaluation, and maintenance scripts
-|-- doc/                       # deployment, config, and operations docs
+|-- ai_docs/                   # main AI and engineering docs
+|-- doc/                       # compatibility pages and README image assets
 |-- docker-compose.yml
 `-- .env.example
 ```
@@ -351,7 +352,7 @@ RUN_E2E=1 npm --prefix frontend run test:e2e
 uv run python scripts/evals/run_all_quality_checks.py
 ```
 
-Threshold details live in `doc/QUALITY_GATES.md`.
+Threshold details live in `ai_docs/reference/verification.md` and `ai_docs/current/scripts.md`.
 
 ## Troubleshooting
 
