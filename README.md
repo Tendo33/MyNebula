@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/Tendo33/MyNebula">
-    <img src="doc/images/logo2.png" width="120" alt="MyNebula Logo" />
+    <img src="doc/images/logo.png" width="120" alt="MyNebula Logo" />
   </a>
 
   <h1>MyNebula</h1>
