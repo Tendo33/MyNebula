@@ -24,7 +24,7 @@ async def test_v2_settings_router_has_admin_dependency():
 async def test_get_settings_returns_typed_payload(monkeypatch):
     from nebula.api.v2 import settings as settings_api
 
-    async def fake_get_default_user(*_args, **_kwargs):
+    async def fake_resolve_single_user(*_args, **_kwargs):
         return type(
             "User", (), {"id": 1, "graph_max_clusters": 12, "graph_min_clusters": 4}
         )()
@@ -56,9 +56,11 @@ async def test_get_settings_returns_typed_payload(monkeypatch):
 
     monkeypatch.setattr(settings_api, "get_schedule", fake_get_schedule)
     monkeypatch.setattr(settings_api, "get_sync_info", fake_get_sync_info)
-    monkeypatch.setattr(settings_api, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(settings_api, "resolve_single_user", fake_resolve_single_user)
 
-    payload = await settings_api.get_settings(db=object())
+    payload = await settings_api.get_settings(
+        user=await fake_resolve_single_user(), db=object()
+    )
 
     assert payload.schedule.is_enabled is True
     assert payload.sync_info.total_repos == 10
@@ -76,7 +78,7 @@ async def test_update_graph_defaults_persists_user_values(monkeypatch):
         "User", (), {"id": 1, "graph_max_clusters": 8, "graph_min_clusters": 3}
     )()
 
-    async def fake_get_default_user(*_args, **_kwargs):
+    async def fake_resolve_single_user(*_args, **_kwargs):
         return user
 
     class _Db:
@@ -86,10 +88,11 @@ async def test_update_graph_defaults_persists_user_values(monkeypatch):
             self.committed = True
 
     db = _Db()
-    monkeypatch.setattr(settings_api, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(settings_api, "resolve_single_user", fake_resolve_single_user)
 
     payload = await settings_api.update_graph_defaults(
         config=GraphDefaultsUpdateRequest(max_clusters=15, min_clusters=5),
+        user=user,
         db=db,
     )
 
@@ -120,9 +123,6 @@ async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
     from nebula.schemas.v2.settings import FullRefreshRequest
 
     user = type("User", (), {"id": 1})()
-
-    async def fake_get_default_user(*_args, **_kwargs):
-        return user
 
     async def noop(*_args, **_kwargs):
         return None
@@ -158,7 +158,6 @@ async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
             obj.id = 123
 
     db = _Db()
-    monkeypatch.setattr(sync_ops_service, "get_default_user", fake_get_default_user)
     monkeypatch.setattr(sync_ops_service, "_acquire_full_refresh_creation_lock", noop)
 
     async def fake_get_active_pipeline_run(*_args, **_kwargs):
@@ -175,6 +174,7 @@ async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
         await sync_ops_service.trigger_full_refresh(
             payload=FullRefreshRequest(confirm=True),
             background_tasks=BackgroundTasks(),
+            user=user,
             db=db,
         )
 
@@ -210,7 +210,11 @@ async def test_get_full_refresh_job_status_preserves_partial_failed_status(monke
 
     monkeypatch.setattr(settings_api, "get_job_status", fake_get_job_status)
 
-    payload = await settings_api.get_full_refresh_job_status(task_id=99, db=object())
+    payload = await settings_api.get_full_refresh_job_status(
+        task_id=99,
+        user=type("User", (), {"id": 1})(),
+        db=object(),
+    )
 
     assert payload.job.status == "partial_failed"
     assert payload.job.error_details == {

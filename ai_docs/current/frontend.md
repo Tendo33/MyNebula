@@ -34,6 +34,10 @@
 - Graph 页面拥有活动快照视图，不应让其他页面重复抓整份图快照
 - Graph、Data、Command Palette 的搜索语义必须保持一致
 - Settings 轮询必须与组件生命周期和认证状态绑定
+- Graph 边数据采用渐进加载，并在自动预取达到阈值后切换为用户显式继续加载
+- 图谱过滤已经为边集建立节点到边的索引，在“小可见子集”场景下优先走索引过滤，避免每次都全量扫描边数组
+- Settings 中 full refresh 的 `partial_failed` 需要保留 warning 语义，不能在步骤 UI 上伪装成完全成功
+- Settings 的同步步骤映射已经拆到 `frontend/src/pages/settings/progress.ts`，页面容器应尽量只保留交互编排
 
 ## 当前高价值事实源
 

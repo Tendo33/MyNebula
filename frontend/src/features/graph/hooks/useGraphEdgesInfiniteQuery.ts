@@ -5,7 +5,8 @@ import { getGraphEdgesPageV2 } from '../../../api/v2/graph';
 
 export const GRAPH_EDGES_QUERY_KEY = 'graph-edges';
 
-const MAX_AUTO_LOAD_PAGES = 20;
+const DEFAULT_EDGE_PAGE_SIZE = 400;
+const MAX_AUTO_LOAD_PAGES = 4;
 
 interface UseGraphEdgesInfiniteQueryParams {
   version: string;
@@ -19,15 +20,17 @@ export const useGraphEdgesInfiniteQuery = ({
   version,
   refreshNonce,
   enabled,
-  limit = 1200,
+  limit = DEFAULT_EDGE_PAGE_SIZE,
   maxAutoPages = MAX_AUTO_LOAD_PAGES,
 }: UseGraphEdgesInfiniteQueryParams) => {
   const pagesLoadedRef = useRef(0);
+  const autoLoadEnabledRef = useRef(true);
   const [autoLoadHalted, setAutoLoadHalted] = useState(false);
   const [edgesError, setEdgesError] = useState<string | null>(null);
   const seenNextCursorsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
+    autoLoadEnabledRef.current = true;
     seenNextCursorsRef.current = new Set();
     pagesLoadedRef.current = 0;
     setAutoLoadHalted(false);
@@ -59,10 +62,11 @@ export const useGraphEdgesInfiniteQuery = ({
   } = query;
 
   const attemptLoadNextPage = useCallback(async () => {
-    if (!hasNextPage || isFetchingNextPage || autoLoadHalted) {
+    if (!hasNextPage || isFetchingNextPage || autoLoadHalted || !autoLoadEnabledRef.current) {
       return;
     }
     if (pagesLoadedRef.current >= maxAutoPages) {
+      autoLoadEnabledRef.current = false;
       setAutoLoadHalted(true);
       return;
     }
@@ -71,6 +75,7 @@ export const useGraphEdgesInfiniteQuery = ({
       return;
     }
     if (seenNextCursorsRef.current.has(nextCursor)) {
+      autoLoadEnabledRef.current = false;
       setAutoLoadHalted(true);
       setEdgesError(`Detected duplicated edge cursor ${nextCursor}, auto-loading halted`);
       return;
@@ -105,6 +110,7 @@ export const useGraphEdgesInfiniteQuery = ({
   }, [error]);
 
   const retryEdgeLoading = useCallback(async () => {
+    autoLoadEnabledRef.current = true;
     setAutoLoadHalted(false);
     setEdgesError(null);
     seenNextCursorsRef.current.clear();
@@ -115,10 +121,28 @@ export const useGraphEdgesInfiniteQuery = ({
     await attemptLoadNextPage();
   }, [attemptLoadNextPage, isError, refetch]);
 
+  const loadMoreEdges = useCallback(async () => {
+    setEdgesError(null);
+    const nextCursor = data?.pages.at(-1)?.next_cursor ?? null;
+    if (nextCursor == null || isFetchingNextPage || !hasNextPage) {
+      return;
+    }
+    if (seenNextCursorsRef.current.has(nextCursor)) {
+      setAutoLoadHalted(true);
+      setEdgesError(`Detected duplicated edge cursor ${nextCursor}, manual loading halted`);
+      return;
+    }
+    seenNextCursorsRef.current.add(nextCursor);
+    await fetchNextPage();
+  }, [data?.pages, fetchNextPage, hasNextPage, isFetchingNextPage]);
+
   const stagedEdges = useMemo(
     () => data?.pages.flatMap((page) => page.edges) ?? [],
     [data]
   );
+  const loadedPages = data?.pages.length ?? 0;
+  const nextCursor = data?.pages.at(-1)?.next_cursor ?? null;
+  const manualLoadBlocked = nextCursor !== null && seenNextCursorsRef.current.has(nextCursor);
 
   return {
     ...query,
@@ -126,5 +150,10 @@ export const useGraphEdgesInfiniteQuery = ({
     edgesError,
     autoLoadHalted,
     retryEdgeLoading,
+    loadMoreEdges,
+    canLoadMoreEdges:
+      Boolean(hasNextPage) && !isFetchingNextPage && !manualLoadBlocked,
+    loadedPages,
+    pageSize: limit,
   };
 };

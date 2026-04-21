@@ -151,6 +151,24 @@ class SyncSettings(BaseSettings):
         ge=1000,
         le=100000,
     )
+    readme_fetch_concurrency: int = Field(
+        default=6,
+        description="Maximum concurrent README fetches during sync",
+        ge=1,
+        le=32,
+    )
+    llm_enhancement_concurrency: int = Field(
+        default=4,
+        description="Maximum concurrent LLM enhancement requests during embedding prep",
+        ge=1,
+        le=16,
+    )
+    progress_commit_interval: int = Field(
+        default=25,
+        description="How many repos to process before persisting sync progress",
+        ge=1,
+        le=500,
+    )
     default_sync_mode: Literal["incremental", "full"] = Field(
         default="incremental",
         description="Default sync mode: incremental (fast) or full (complete)",

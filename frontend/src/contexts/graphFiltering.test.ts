@@ -123,4 +123,11 @@ describe('graph filtering', () => {
 
     expect(visibleNodes.map((node) => node.id)).toEqual([1]);
   });
+
+  it('reuses edge indexes when filtering a small visible subset', () => {
+    const indexes = buildGraphFilterIndexes(rawData);
+    const visibleNodeIds = new Set([1]);
+
+    expect(filterVisibleEdges(rawData.edges, visibleNodeIds, indexes)).toEqual([]);
+  });
 });

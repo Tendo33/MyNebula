@@ -8,7 +8,7 @@ from nebula.schemas.graph import GraphData, TimelineData
 
 
 class _BuilderStub:
-    async def build_payload(self, _db):
+    async def build_payload(self, _db, *, user=None):
         now = datetime(2026, 3, 4, tzinfo=timezone.utc)
         return (
             "snapshot-v1",

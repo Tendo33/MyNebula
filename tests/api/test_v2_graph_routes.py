@@ -87,3 +87,37 @@ async def test_graph_rebuild_route_requires_admin_auth_and_csrf():
     }
     assert "require_admin" in dependency_calls
     assert "require_admin_csrf" in dependency_calls
+
+
+@pytest.mark.asyncio
+async def test_get_graph_returns_404_for_missing_snapshot_version(monkeypatch):
+    from nebula.api.v2 import graph as graph_api
+    from nebula.application.services.graph_query_service import (
+        SnapshotVersionNotFoundError,
+    )
+
+    async def resolve_snapshot_version(_db, *, user, version: str):
+        assert user.id == 1
+        raise SnapshotVersionNotFoundError(f"Snapshot version not found: {version}")
+
+    monkeypatch.setattr(
+        graph_api,
+        "graph_service",
+        SimpleNamespace(resolve_snapshot_version=resolve_snapshot_version),
+    )
+
+    request = _build_request()
+    response = Response()
+
+    with pytest.raises(graph_api.HTTPException) as exc_info:
+        await graph_api.get_graph(
+            request=request,
+            response=response,
+            version="snapshot-missing",
+            include_edges=False,
+            user=SimpleNamespace(id=1),
+            db=object(),
+        )
+
+    assert exc_info.value.status_code == 404
+    assert "snapshot-missing" in str(exc_info.value.detail)

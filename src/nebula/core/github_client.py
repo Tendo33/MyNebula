@@ -241,24 +241,42 @@ class GitHubClient:
         Returns:
             List of GitHubStarList objects containing list info and repo IDs.
         """
-        # GraphQL endpoint
         graphql_url = "https://api.github.com/graphql"
-
-        query = """
-        query {
+        lists_query = """
+        query($cursor: String) {
           viewer {
-            lists(first: 100) {
+            lists(first: 100, after: $cursor) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
               nodes {
                 id
                 name
                 description
                 isPrivate
-                items(first: 100) {
+                items(first: 1) {
                   totalCount
-                  nodes {
-                    ... on Repository {
-                      databaseId
-                    }
+                }
+              }
+            }
+          }
+        }
+        """
+        items_query = """
+        query($listId: ID!, $cursor: String) {
+          node(id: $listId) {
+            __typename
+            ... on UserList {
+              items(first: 100, after: $cursor) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                totalCount
+                nodes {
+                  ... on Repository {
+                    databaseId
                   }
                 }
               }
@@ -268,50 +286,92 @@ class GitHubClient:
         """
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
+            star_lists = []
+            lists_cursor = None
+
+            while True:
+                response = await self.client.post(
                     graphql_url,
-                    json={"query": query},
-                    headers={
-                        "Authorization": f"Bearer {self._access_token}",
-                        "Content-Type": "application/json",
-                    },
-                    timeout=30.0,
+                    json={"query": lists_query, "variables": {"cursor": lists_cursor}},
+                    headers={"Content-Type": "application/json"},
                 )
                 response.raise_for_status()
                 data = response.json()
 
-            if "errors" in data:
-                logger.warning(f"GraphQL errors: {data['errors']}")
-                return []
+                if "errors" in data:
+                    logger.warning(f"GraphQL errors: {data['errors']}")
+                    return []
 
-            lists_data = (
-                data.get("data", {}).get("viewer", {}).get("lists", {}).get("nodes", [])
-            )
+                lists_payload = data.get("data", {}).get("viewer", {}).get("lists", {})
+                lists_data = lists_payload.get("nodes", [])
 
-            star_lists = []
-            for list_data in lists_data:
-                if not list_data:
-                    continue
+                for list_data in lists_data:
+                    if not list_data:
+                        continue
 
-                # Extract repo IDs from items
-                repo_ids = []
-                items = list_data.get("items", {}).get("nodes", [])
-                for item in items:
-                    if item and "databaseId" in item and item["databaseId"]:
-                        repo_ids.append(item["databaseId"])
+                    repo_ids: list[int] = []
+                    items_cursor = None
+                    while True:
+                        items_response = await self.client.post(
+                            graphql_url,
+                            json={
+                                "query": items_query,
+                                "variables": {
+                                    "listId": list_data["id"],
+                                    "cursor": items_cursor,
+                                },
+                            },
+                            headers={"Content-Type": "application/json"},
+                        )
+                        items_response.raise_for_status()
+                        items_data = items_response.json()
+                        if "errors" in items_data:
+                            logger.warning(
+                                "GraphQL star list items errors "
+                                f"list_id={list_data['id']} errors={items_data['errors']}"
+                            )
+                            break
 
-                star_list = GitHubStarList(
-                    id=list_data["id"],
-                    name=list_data["name"],
-                    description=list_data.get("description"),
-                    is_public=not list_data.get("isPrivate", False),
-                    repos_count=list_data.get("items", {}).get("totalCount", 0),
-                    repo_ids=repo_ids,
-                )
-                star_lists.append(star_list)
+                        items_payload = (
+                            items_data.get("data", {}).get("node", {}).get("items", {})
+                        )
+                        if not items_payload:
+                            node_typename = (
+                                items_data.get("data", {})
+                                .get("node", {})
+                                .get("__typename")
+                            )
+                            logger.warning(
+                                "GraphQL star list items payload missing "
+                                f"list_id={list_data['id']} typename={node_typename}"
+                            )
+                            break
+                        for item in items_payload.get("nodes", []):
+                            if item and "databaseId" in item and item["databaseId"]:
+                                repo_ids.append(item["databaseId"])
 
-            logger.info(f"Fetched {len(star_lists)} star lists")
+                        page_info = items_payload.get("pageInfo", {})
+                        if not page_info.get("hasNextPage"):
+                            break
+                        items_cursor = page_info.get("endCursor")
+
+                    star_lists.append(
+                        GitHubStarList(
+                            id=list_data["id"],
+                            name=list_data["name"],
+                            description=list_data.get("description"),
+                            is_public=not list_data.get("isPrivate", False),
+                            repos_count=list_data.get("items", {}).get("totalCount", 0),
+                            repo_ids=repo_ids,
+                        )
+                    )
+
+                page_info = lists_payload.get("pageInfo", {})
+                if not page_info.get("hasNextPage"):
+                    break
+                lists_cursor = page_info.get("endCursor")
+
+            logger.info(f"Fetched {len(star_lists)} star lists with paginated items")
             return star_lists
 
         except Exception as e:

@@ -13,7 +13,6 @@ from nebula.application.services.sync_execution_service import (
     run_clustering_task,
     sync_stars_task,
 )
-from nebula.application.services.user_service import get_default_user
 from nebula.core.config import get_app_settings
 from nebula.db import PipelineRun, StarredRepo, SyncSchedule, SyncTask, User
 from nebula.db.database import get_db_context
@@ -154,9 +153,10 @@ def calculate_next_run_time(schedule: SyncSchedule) -> datetime | None:
 async def get_job_status(
     task_id: int,
     db: AsyncSession,
+    *,
+    user: User,
 ) -> JobStatusResponse:
     """Get aggregated job status for richer progress UI."""
-    user = await get_default_user(db)
     result = await db.execute(
         select(SyncTask).where(
             SyncTask.id == task_id,
@@ -198,9 +198,10 @@ async def get_job_status(
 
 async def get_schedule(
     db: AsyncSession,
+    *,
+    user: User,
 ) -> ScheduleResponse:
     """Get current sync schedule configuration."""
-    user = await get_default_user(db)
     result = await db.execute(
         select(SyncSchedule).where(SyncSchedule.user_id == user.id)
     )
@@ -234,9 +235,10 @@ async def get_schedule(
 async def update_schedule(
     config: ScheduleConfig,
     db: AsyncSession,
+    *,
+    user: User,
 ) -> ScheduleResponse:
     """Create or update sync schedule configuration."""
-    user = await get_default_user(db)
     result = await db.execute(
         select(SyncSchedule).where(SyncSchedule.user_id == user.id)
     )
@@ -444,10 +446,11 @@ async def trigger_full_refresh(
     payload: FullRefreshRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession,
+    *,
+    user: User,
 ) -> FullRefreshResponse:
     """Trigger a full refresh of all repositories."""
     validate_full_refresh_confirmation(payload.confirm)
-    user = await get_default_user(db)
     await _acquire_full_refresh_creation_lock(db, user.id)
     active_pipeline = await _get_active_pipeline_run(db, user.id)
     if active_pipeline is not None:
@@ -535,9 +538,10 @@ async def _get_active_pipeline_run(
 
 async def get_sync_info(
     db: AsyncSession,
+    *,
+    user: User,
 ) -> SyncInfoResponse:
     """Get comprehensive sync status information."""
-    user = await get_default_user(db)
     app_settings = get_app_settings()
 
     stats_result = await db.execute(

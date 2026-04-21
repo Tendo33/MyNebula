@@ -5,7 +5,10 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nebula.application.services.graph_query_service import GraphQueryService
+from nebula.application.services.graph_query_service import (
+    GraphQueryService,
+    SnapshotVersionNotFoundError,
+)
 from nebula.core.config import get_app_settings
 from nebula.db import User, get_db
 from nebula.schemas.graph import GraphData, TimelineData
@@ -32,11 +35,14 @@ async def get_graph(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> GraphData:
     """Get graph payload by snapshot version."""
-    resolved_version = await graph_service.resolve_snapshot_version(
-        db,
-        user=user,
-        version=version,
-    )
+    try:
+        resolved_version = await graph_service.resolve_snapshot_version(
+            db,
+            user=user,
+            version=version,
+        )
+    except SnapshotVersionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     etag = f'W/"graph:{resolved_version}:edges:{int(include_edges)}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
@@ -67,11 +73,14 @@ async def get_graph_edges(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> GraphEdgesPage:
     """Get paged graph edges from snapshot storage."""
-    resolved_version = await graph_service.resolve_snapshot_version(
-        db,
-        user=user,
-        version=version,
-    )
+    try:
+        resolved_version = await graph_service.resolve_snapshot_version(
+            db,
+            user=user,
+            version=version,
+        )
+    except SnapshotVersionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     etag = f'W/"graph-edges:{resolved_version}:cursor:{cursor}:limit:{limit}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
@@ -104,11 +113,14 @@ async def get_graph_timeline(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> TimelineData:
     """Get timeline data by snapshot version."""
-    resolved_version = await graph_service.resolve_snapshot_version(
-        db,
-        user=user,
-        version=version,
-    )
+    try:
+        resolved_version = await graph_service.resolve_snapshot_version(
+            db,
+            user=user,
+            version=version,
+        )
+    except SnapshotVersionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     etag = f'W/"graph-timeline:{resolved_version}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})

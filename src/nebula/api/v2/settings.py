@@ -10,8 +10,7 @@ from nebula.application.services.sync_ops_service import (
     trigger_full_refresh,
     update_schedule,
 )
-from nebula.application.services.user_service import get_default_user
-from nebula.db import get_db
+from nebula.db import User, get_db
 from nebula.schemas.v2 import (
     FullRefreshJobResponse,
     FullRefreshRequest,
@@ -24,6 +23,7 @@ from nebula.schemas.v2 import (
     SettingsResponse,
 )
 
+from .access import resolve_single_user
 from .auth import require_admin, require_admin_csrf
 from .metadata import build_v2_metadata
 
@@ -32,12 +32,12 @@ router = APIRouter(dependencies=[Depends(require_admin), Depends(require_admin_c
 
 @router.get("", response_model=SettingsResponse)
 async def get_settings(
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> SettingsResponse:
     """Get consolidated settings payload used by frontend."""
-    user = await get_default_user(db)
-    schedule = await get_schedule(db=db)
-    sync_info = await get_sync_info(db=db)
+    schedule = await get_schedule(db=db, user=user)
+    sync_info = await get_sync_info(db=db, user=user)
     version = (
         sync_info.last_sync_at.isoformat()
         if sync_info.last_sync_at is not None
@@ -62,10 +62,11 @@ async def get_settings(
 @router.post("/schedule", response_model=ScheduleUpdateResponse)
 async def update_settings_schedule(
     config: ScheduleConfig,
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> ScheduleUpdateResponse:
     """Update sync schedule configuration through v2 route."""
-    schedule = await update_schedule(config=config, db=db)
+    schedule = await update_schedule(config=config, db=db, user=user)
     version = (
         schedule.last_run_at.isoformat()
         if schedule.last_run_at is not None
@@ -81,6 +82,7 @@ async def update_settings_schedule(
 @router.post("/graph-defaults", response_model=GraphDefaultsUpdateResponse)
 async def update_graph_defaults(
     config: GraphDefaultsUpdateRequest,
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> GraphDefaultsUpdateResponse:
     """Update user graph default settings."""
@@ -90,7 +92,6 @@ async def update_graph_defaults(
             detail="min_clusters must be less than or equal to max_clusters",
         )
 
-    user = await get_default_user(db)
     user.graph_max_clusters = config.max_clusters
     user.graph_min_clusters = config.min_clusters
     await db.commit()
@@ -112,11 +113,12 @@ async def update_graph_defaults(
 async def trigger_settings_full_refresh(
     payload: FullRefreshRequest,
     background_tasks: BackgroundTasks,
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> FullRefreshStartResponse:
     """Trigger full refresh via v2 settings route."""
     task = await trigger_full_refresh(
-        payload=payload, background_tasks=background_tasks, db=db
+        payload=payload, background_tasks=background_tasks, db=db, user=user
     )
     return FullRefreshStartResponse(
         task=task,
@@ -127,10 +129,11 @@ async def trigger_settings_full_refresh(
 @router.get("/full-refresh/jobs/{task_id}", response_model=FullRefreshJobResponse)
 async def get_full_refresh_job_status(
     task_id: int,
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> FullRefreshJobResponse:
     """Get full refresh status via v2 settings route."""
-    job = await get_job_status(task_id=task_id, db=db)
+    job = await get_job_status(task_id=task_id, db=db, user=user)
     return FullRefreshJobResponse(
         job=job,
         **build_v2_metadata(version=f"full-refresh-{task_id}"),

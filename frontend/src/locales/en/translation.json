@@ -76,7 +76,9 @@
     "min_clusters": "Min Clusters (Larger is finer)",
     "recluster": "Re-cluster",
     "reclustering": "Clustering...",
-    "recluster_hint": "Re-cluster with current settings"
+    "recluster_hint": "Re-cluster with current settings",
+    "load_more_edges": "Load more edges",
+    "edge_load_paused": "Loaded {{pages}} edge pages (about {{edges}} edge slots). Continue on demand."
   },
   "data": {
     "repository": "Repository",
@@ -151,7 +153,8 @@
     "load_schedule_error": "Failed to load schedule data",
     "update_schedule_error": "Failed to update schedule settings",
     "update_time_error": "Failed to update schedule time",
-    "full_refresh_error": "Failed to start full refresh"
+    "full_refresh_error": "Failed to start full refresh",
+    "full_refresh_partial_phase_detail": "{{count}} items failed in this stage."
   },
   "repoDetails": {
     "close": "Close",
@@ -193,8 +196,10 @@
   "sync": {
     "title": "Syncing Data",
     "completed": "Sync Completed",
+    "completed_with_warnings": "Completed With Warnings",
     "failed": "Sync Failed",
     "allDone": "All tasks completed successfully",
+    "partial_done": "Completed, but some steps need attention",
     "steps": "steps",
     "overallProgress": "Overall Progress",
     "viewResults": "View Results",

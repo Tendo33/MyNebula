@@ -23,7 +23,7 @@ async def test_v2_sync_router_has_admin_dependency():
 async def test_start_pipeline_sync_returns_metadata(monkeypatch):
     from nebula.api.v2 import sync as sync_api
 
-    async def fake_get_default_user(_db):
+    async def fake_resolve_single_user(_db=None):
         return SimpleNamespace(id=1, graph_max_clusters=8, graph_min_clusters=3)
 
     async def fake_create_pipeline_run(_user_id):
@@ -32,7 +32,7 @@ async def test_start_pipeline_sync_returns_metadata(monkeypatch):
     async def fake_get_active_pipeline(_user_id):
         return None
 
-    monkeypatch.setattr(sync_api, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(sync_api, "resolve_single_user", fake_resolve_single_user)
     monkeypatch.setattr(
         sync_api,
         "pipeline_service",
@@ -49,6 +49,7 @@ async def test_start_pipeline_sync_returns_metadata(monkeypatch):
         use_llm=True,
         max_clusters=8,
         min_clusters=3,
+        user=await fake_resolve_single_user(),
         db=object(),
     )
 
@@ -63,7 +64,7 @@ async def test_start_recluster_sync_returns_metadata(monkeypatch):
 
     user = SimpleNamespace(id=1, graph_max_clusters=8, graph_min_clusters=3)
 
-    async def fake_get_default_user(_db):
+    async def fake_resolve_single_user(_db=None):
         return user
 
     async def fake_create_pipeline_run(_user_id):
@@ -72,7 +73,7 @@ async def test_start_recluster_sync_returns_metadata(monkeypatch):
     async def fake_get_active_pipeline(_user_id):
         return None
 
-    monkeypatch.setattr(sync_api, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(sync_api, "resolve_single_user", fake_resolve_single_user)
     monkeypatch.setattr(
         sync_api,
         "pipeline_service",
@@ -93,6 +94,7 @@ async def test_start_recluster_sync_returns_metadata(monkeypatch):
         background_tasks=BackgroundTasks(),
         max_clusters=12,
         min_clusters=5,
+        user=user,
         db=db,
     )
 
@@ -107,7 +109,7 @@ async def test_start_recluster_sync_returns_metadata(monkeypatch):
 async def test_get_pipeline_status_returns_404_for_other_user(monkeypatch):
     from nebula.api.v2 import sync as sync_api
 
-    async def fake_get_default_user(_db):
+    async def fake_resolve_single_user(_db=None):
         return SimpleNamespace(id=2, graph_max_clusters=8, graph_min_clusters=3)
 
     async def fake_get_pipeline(_run_id):
@@ -122,7 +124,7 @@ async def test_get_pipeline_status_returns_404_for_other_user(monkeypatch):
             completed_at=None,
         )
 
-    monkeypatch.setattr(sync_api, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(sync_api, "resolve_single_user", fake_resolve_single_user)
     monkeypatch.setattr(
         sync_api,
         "pipeline_service",
@@ -130,7 +132,11 @@ async def test_get_pipeline_status_returns_404_for_other_user(monkeypatch):
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        await sync_api.get_pipeline_status(run_id=1, db=object())
+        await sync_api.get_pipeline_status(
+            run_id=1,
+            user=await fake_resolve_single_user(),
+            db=object(),
+        )
 
     assert exc_info.value.status_code == 404
 
@@ -139,13 +145,13 @@ async def test_get_pipeline_status_returns_404_for_other_user(monkeypatch):
 async def test_start_pipeline_sync_rejects_when_active_pipeline_exists(monkeypatch):
     from nebula.api.v2 import sync as sync_api
 
-    async def fake_get_default_user(_db):
+    async def fake_resolve_single_user(_db=None):
         return SimpleNamespace(id=1, graph_max_clusters=8, graph_min_clusters=3)
 
     async def fake_get_active_pipeline(_user_id):
         return SimpleNamespace(id=42, status="running")
 
-    monkeypatch.setattr(sync_api, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(sync_api, "resolve_single_user", fake_resolve_single_user)
     monkeypatch.setattr(
         sync_api,
         "pipeline_service",
@@ -161,6 +167,7 @@ async def test_start_pipeline_sync_rejects_when_active_pipeline_exists(monkeypat
             use_llm=True,
             max_clusters=8,
             min_clusters=3,
+            user=await fake_resolve_single_user(),
             db=object(),
         )
 

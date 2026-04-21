@@ -76,7 +76,9 @@
     "min_clusters": "最小聚类数（越大越细）",
     "recluster": "重新聚类",
     "reclustering": "聚类中...",
-    "recluster_hint": "按当前设置重新生成聚类"
+    "recluster_hint": "按当前设置重新生成聚类",
+    "load_more_edges": "继续加载边",
+    "edge_load_paused": "已加载 {{pages}} 页边数据（约 {{edges}} 条边位）。需要时可继续加载。"
   },
   "data": {
     "repository": "仓库",
@@ -151,7 +153,8 @@
     "load_schedule_error": "加载调度数据失败",
     "update_schedule_error": "更新调度设置失败",
     "update_time_error": "更新时间设置失败",
-    "full_refresh_error": "启动全量刷新失败"
+    "full_refresh_error": "启动全量刷新失败",
+    "full_refresh_partial_phase_detail": "该阶段有 {{count}} 条记录处理失败。"
   },
   "repoDetails": {
     "close": "关闭",
@@ -194,8 +197,10 @@
   "sync": {
     "title": "正在同步数据",
     "completed": "同步完成",
+    "completed_with_warnings": "已完成，但存在告警",
     "failed": "同步失败",
     "allDone": "所有任务已成功完成",
+    "partial_done": "流程已完成，但部分步骤需要关注",
     "steps": "个步骤",
     "overallProgress": "总进度",
     "viewResults": "查看结果",

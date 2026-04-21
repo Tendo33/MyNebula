@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { GraphData, GraphNode, TimelineData } from '../types';
 import { GraphSettingsState, useGraphStore } from '../stores/graphStore';
@@ -67,6 +67,11 @@ interface GraphContextValue extends GraphState {
   setSyncing: (syncing: boolean) => void;
   setSyncStep: (step: string) => void;
   retryEdgeLoading: () => Promise<void>;
+  loadMoreEdges: () => Promise<void>;
+  canLoadMoreEdges: boolean;
+  autoLoadHalted: boolean;
+  loadedEdgePages: number;
+  edgePageSize: number;
 }
 
 const GraphContext = createContext<GraphContextValue | null>(null);
@@ -77,7 +82,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
 }) => {
   const queryClient = useQueryClient();
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const selectedNode = useGraphStore((state) => state.selectedNode);
   const filters = useGraphStore((state) => state.filters);
@@ -124,45 +129,36 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
   const graphFilterIndexes = useMemo(() => buildGraphFilterIndexes(rawData), [rawData]);
   const loading = enabled && (graphQuery.isLoading || timelineQuery.isLoading);
   const edgesLoading = Boolean(
-    graphQuery.data &&
-      (edgesQuery.isLoading || edgesQuery.isFetchingNextPage || edgesQuery.hasNextPage)
+    graphQuery.data && (edgesQuery.isLoading || edgesQuery.isFetchingNextPage)
   );
-
-  useEffect(() => {
-    if (edgesQuery.edgesError) {
-      setError(edgesQuery.edgesError);
-    }
-  }, [edgesQuery.edgesError]);
-
-  useEffect(() => {
+  const error = useMemo(() => {
     const queryError = graphQuery.error ?? timelineQuery.error;
-    if (!queryError) {
-      setError((current) => (current === null ? current : null));
-      return;
+    if (queryError) {
+      return queryError instanceof Error ? queryError.message : 'Failed to load graph data';
     }
-    setError(queryError instanceof Error ? queryError.message : 'Failed to load graph data');
-  }, [graphQuery.error, timelineQuery.error]);
+    return edgesQuery.edgesError ?? localError;
+  }, [edgesQuery.edgesError, graphQuery.error, localError, timelineQuery.error]);
 
   const loadData = useCallback(async () => {
     try {
-      setError(null);
+      setLocalError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [GRAPH_DATA_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [TIMELINE_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [GRAPH_EDGES_QUERY_KEY] }),
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setLocalError(err instanceof Error ? err.message : 'Failed to load data');
     }
   }, [queryClient]);
 
   const refreshData = useCallback(async () => {
     try {
-      setError(null);
+      setLocalError(null);
       setRefreshNonce((current) => current + 1);
       await Promise.all([graphQuery.refetch(), timelineQuery.refetch()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh data');
+      setLocalError(err instanceof Error ? err.message : 'Failed to refresh data');
     }
   }, [graphQuery, timelineQuery]);
 
@@ -180,8 +176,14 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
   const visibleNodeIds = useMemo(() => createVisibleNodeIds(visibleNodes), [visibleNodes]);
 
   const visibleEdges = useMemo(
-    () => (rawData ? filterVisibleEdges(rawData.edges, visibleNodeIds) : []),
-    [rawData, visibleNodeIds]
+    () => {
+      if (!rawData) return [];
+      if (visibleNodeIds.size === rawData.nodes.length) {
+        return rawData.edges;
+      }
+      return filterVisibleEdges(rawData.edges, visibleNodeIds, graphFilterIndexes);
+    },
+    [graphFilterIndexes, rawData, visibleNodeIds]
   );
 
   const visibleClusters = useMemo(
@@ -208,6 +210,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
   }, [rawData, visibleClusters, visibleEdges, visibleNodes]);
 
   const retryEdgeLoading = edgesQuery.retryEdgeLoading;
+  const loadMoreEdges = edgesQuery.loadMoreEdges;
 
   const value: GraphContextValue = useMemo(() => ({
     rawData,
@@ -240,6 +243,11 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     setSyncing,
     setSyncStep,
     retryEdgeLoading,
+    loadMoreEdges,
+    canLoadMoreEdges: edgesQuery.canLoadMoreEdges,
+    autoLoadHalted: edgesQuery.autoLoadHalted,
+    loadedEdgePages: edgesQuery.loadedPages,
+    edgePageSize: edgesQuery.pageSize,
   }), [
     rawData, timelineData, selectedNode, filters, settings,
     loading, edgesLoading, syncing, syncStep, error, filteredData,
@@ -248,6 +256,8 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     clearClusterFilter, toggleStarList, setSelectedStarLists,
     clearStarListFilter, setTimeRange, setMinStars, setSelectedLanguages, toggleLanguage,
     clearFilters, updateSettings, setSyncing, setSyncStep, retryEdgeLoading,
+    loadMoreEdges, edgesQuery.canLoadMoreEdges, edgesQuery.autoLoadHalted,
+    edgesQuery.loadedPages, edgesQuery.pageSize,
   ]);
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>;

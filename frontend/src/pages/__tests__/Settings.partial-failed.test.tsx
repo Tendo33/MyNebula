@@ -50,7 +50,15 @@ vi.mock('../../components/layout/LanguageSwitch', () => ({
 }));
 
 vi.mock('../../components/ui/SyncProgress', () => ({
-  SyncProgress: () => null,
+  SyncProgress: ({ steps }: { steps: Array<{ id: string; status: string }> }) => (
+    <div data-testid="sync-progress">
+      {steps.map((step) => (
+        <div key={step.id} data-testid={`step-${step.id}`}>
+          {step.status}
+        </div>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock('../settings/index', () => ({
@@ -156,5 +164,7 @@ describe('Settings partial failed warning', () => {
         screen.getByText(/Full refresh completed with warnings/i)
       ).toBeInTheDocument();
     });
+    expect(screen.getByTestId('step-stars')).toHaveTextContent('warning');
+    expect(screen.getByTestId('step-embeddings')).toHaveTextContent('completed');
   });
 });

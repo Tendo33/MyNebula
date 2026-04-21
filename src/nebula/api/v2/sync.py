@@ -6,10 +6,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.pipeline_service import SyncPipelineService
-from nebula.application.services.user_service import get_default_user
-from nebula.db import get_db
+from nebula.db import User, get_db
 from nebula.schemas.v2 import PipelineStartResponse, PipelineStatusResponse
 
+from .access import resolve_single_user
 from .auth import require_admin, require_admin_csrf
 from .metadata import build_v2_metadata
 
@@ -34,10 +34,10 @@ async def start_pipeline_sync(
     use_llm: bool = Query(default=True),
     max_clusters: int = Query(default=8, ge=2, le=30),
     min_clusters: int = Query(default=3, ge=2, le=20),
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> PipelineStartResponse:
     """Start sync pipeline in background."""
-    user = await get_default_user(db)
     await _ensure_no_active_pipeline(user.id)
     try:
         run_id = await pipeline_service.create_pipeline_run(user.id)
@@ -65,6 +65,7 @@ async def start_recluster_sync(
     background_tasks: BackgroundTasks,
     max_clusters: int = Query(default=8, ge=2, le=30),
     min_clusters: int = Query(default=3, ge=2, le=30),
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> PipelineStartResponse:
     """Start full recluster phase only, then rebuild graph snapshot."""
@@ -74,7 +75,6 @@ async def start_recluster_sync(
             detail="min_clusters must be less than or equal to max_clusters",
         )
 
-    user = await get_default_user(db)
     await _ensure_no_active_pipeline(user.id)
     try:
         run_id = await pipeline_service.create_pipeline_run(user.id)
@@ -101,10 +101,10 @@ async def start_recluster_sync(
 @router.get("/jobs/{run_id}", response_model=PipelineStatusResponse)
 async def get_pipeline_status(
     run_id: int,
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> PipelineStatusResponse:
     """Get pipeline run status."""
-    user = await get_default_user(db)
     run = await pipeline_service.get_pipeline(run_id)
     if run is None or run.user_id != user.id:
         raise HTTPException(status_code=404, detail="Pipeline run not found")

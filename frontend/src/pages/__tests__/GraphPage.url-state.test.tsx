@@ -56,7 +56,12 @@ const graphState = {
   },
   loadData: vi.fn(),
   retryEdgeLoading: vi.fn(),
+  loadMoreEdges: vi.fn(),
   edgesLoading: false,
+  canLoadMoreEdges: false,
+  autoLoadHalted: false,
+  loadedEdgePages: 0,
+  edgePageSize: 400,
   error: null,
   selectedNode: null as GraphNode | null,
   setSelectedNode: vi.fn(),
@@ -209,5 +214,47 @@ describe('GraphPage URL state', () => {
     await waitFor(() => {
       expect(getByTestId('location')).toHaveTextContent('/graph?node=196');
     });
+  });
+
+  it('does not show loading copy when edge loading is paused', async () => {
+    graphState.autoLoadHalted = true;
+    graphState.canLoadMoreEdges = true;
+    graphState.loadedEdgePages = 4;
+    graphState.edgePageSize = 400;
+    graphState.edgesLoading = false;
+
+    const { queryByText, getAllByText } = render(
+      <MemoryRouter initialEntries={['/graph']} future={routerFuture}>
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(queryByText('Loading edges...')).not.toBeInTheDocument();
+    expect(getAllByText('Load more edges').length).toBeGreaterThan(0);
+
+    graphState.autoLoadHalted = false;
+    graphState.canLoadMoreEdges = false;
+    graphState.loadedEdgePages = 0;
+  });
+
+  it('disables paused edge loading CTA when more edges are blocked', async () => {
+    graphState.autoLoadHalted = true;
+    graphState.canLoadMoreEdges = false;
+
+    const { getAllByRole } = render(
+      <MemoryRouter initialEntries={['/graph']} future={routerFuture}>
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const pausedButtons = getAllByRole('button', { name: 'Load more edges' });
+    expect(pausedButtons).toHaveLength(2);
+    expect(pausedButtons.every((button) => (button as HTMLButtonElement).disabled)).toBe(true);
+
+    graphState.autoLoadHalted = false;
   });
 });

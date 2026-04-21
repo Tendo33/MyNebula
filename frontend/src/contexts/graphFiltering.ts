@@ -12,19 +12,36 @@ export interface GraphFiltersInput {
 
 export interface GraphFilterIndexes {
   nodeSearchText: Map<number, string>;
+  edgeIndexesByNodeId: Map<number, number[]>;
+  totalNodeCount: number;
 }
 
 export const buildGraphFilterIndexes = (rawData: GraphData | null): GraphFilterIndexes => {
   const nodeSearchText = new Map<number, string>();
+  const edgeIndexesByNodeId = new Map<number, number[]>();
   if (!rawData) {
-    return { nodeSearchText };
+    return { nodeSearchText, edgeIndexesByNodeId, totalNodeCount: 0 };
   }
 
   rawData.nodes.forEach((node) => {
     nodeSearchText.set(node.id, buildRepoSearchText(asRepoSearchCandidate(node)));
   });
 
-  return { nodeSearchText };
+  rawData.edges.forEach((edge, edgeIndex) => {
+    const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+    const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+    const sourceIndexes = edgeIndexesByNodeId.get(sourceId) ?? [];
+    sourceIndexes.push(edgeIndex);
+    edgeIndexesByNodeId.set(sourceId, sourceIndexes);
+
+    if (targetId !== sourceId) {
+      const targetIndexes = edgeIndexesByNodeId.get(targetId) ?? [];
+      targetIndexes.push(edgeIndex);
+      edgeIndexesByNodeId.set(targetId, targetIndexes);
+    }
+  });
+
+  return { nodeSearchText, edgeIndexesByNodeId, totalNodeCount: rawData.nodes.length };
 };
 
 export const filterVisibleNodes = ({
@@ -99,13 +116,34 @@ export const createVisibleNodeIds = (nodes: GraphNode[]): Set<number> =>
 
 export const filterVisibleEdges = (
   edges: GraphEdge[],
-  visibleNodeIds: Set<number>
-): GraphEdge[] =>
-  edges.filter((edge) => {
-    const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
-    const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
-    return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+  visibleNodeIds: Set<number>,
+  indexes?: GraphFilterIndexes
+): GraphEdge[] => {
+  if (!indexes || visibleNodeIds.size >= indexes.totalNodeCount / 2) {
+    return edges.filter((edge) => {
+      const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+      const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+    });
+  }
+
+  const matchedEdgeIndexes = new Set<number>();
+  visibleNodeIds.forEach((nodeId) => {
+    const connectedEdgeIndexes = indexes.edgeIndexesByNodeId.get(nodeId) ?? [];
+    connectedEdgeIndexes.forEach((edgeIndex) => {
+      const edge = edges[edgeIndex];
+      const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+      const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+      if (visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId)) {
+        matchedEdgeIndexes.add(edgeIndex);
+      }
+    });
   });
+
+  return Array.from(matchedEdgeIndexes)
+    .sort((left, right) => left - right)
+    .map((edgeIndex) => edges[edgeIndex]);
+};
 
 export const filterVisibleClusters = (
   clusters: ClusterInfo[],

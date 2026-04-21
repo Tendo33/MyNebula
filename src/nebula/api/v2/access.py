@@ -11,6 +11,13 @@ from nebula.db import User, get_db
 from .auth import ADMIN_SESSION_COOKIE
 
 
+async def resolve_single_user(
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+) -> User:
+    """Resolve the single-user deployment scope explicitly at the API boundary."""
+    return await get_default_user(db)
+
+
 async def resolve_read_user(
     request: Request,
     db: AsyncSession = Depends(get_db),  # noqa: B008
@@ -37,4 +44,4 @@ async def resolve_read_user(
                 detail="Authenticated read access requires admin login",
             )
 
-    return await get_default_user(db)
+    return await resolve_single_user(db)

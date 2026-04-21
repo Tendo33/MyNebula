@@ -18,6 +18,16 @@ import { SyncProgress, SyncStepStatus } from '../components/ui/SyncProgress';
 import { useGraph } from '../contexts/GraphContext';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { SettingsLoginForm, SettingsAppearance, SettingsSchedule, SettingsDataSection } from './settings/index';
+import {
+  buildTranslatedSteps,
+  createFullRefreshSteps,
+  createPipelineSyncSteps,
+  finalizeCompletedSteps,
+  mapFullRefreshProgressSteps,
+  mapPipelineProgressSteps,
+  normalizeFullRefreshPhase,
+  normalizePipelinePhase,
+} from './settings/progress';
 import { API_BASE_URL } from '../api/client';
 import {
   getPipelineStatusV2,
@@ -39,21 +49,6 @@ import {
 import { getAdminAuthConfig } from '../api/auth';
 import { pollUntilComplete, type TaskCompletionResult } from './settings/polling';
 import { logClientError } from '../utils/debug';
-
-const createPipelineSyncSteps = (): { id: string; status: SyncStepStatus; progress?: number; error?: string }[] => ([
-  { id: 'stars', status: 'pending', progress: 0 },
-  { id: 'embeddings', status: 'pending', progress: 0 },
-  { id: 'clustering', status: 'pending', progress: 0 },
-  { id: 'snapshot', status: 'pending', progress: 0 },
-]);
-
-const createFullRefreshSteps = (): { id: string; status: SyncStepStatus; progress?: number; error?: string }[] => ([
-  { id: 'reset', status: 'pending', progress: 0 },
-  { id: 'stars', status: 'pending', progress: 0 },
-  { id: 'embeddings', status: 'pending', progress: 0 },
-  { id: 'clustering', status: 'pending', progress: 0 },
-  { id: 'snapshot', status: 'pending', progress: 0 },
-]);
 
 const Settings = () => {
   const { t } = useTranslation();
@@ -92,18 +87,7 @@ const Settings = () => {
   const latestFullRefreshJobRef = useRef<FullRefreshJobStatus | null>(null);
 
   const translatedSteps = useMemo(
-    () =>
-      syncSteps.map((step) => ({
-        ...step,
-        label: t(
-          `sync.step_${step.id}_label`,
-          step.id === 'reset' ? t('settings.confirm_step_fetch') : step.id
-        ),
-        description: t(
-          `sync.step_${step.id}_desc`,
-          step.id === 'reset' ? t('settings.full_refresh_desc') : ''
-        ),
-      })),
+    () => buildTranslatedSteps(syncSteps, t),
     [syncSteps, t]
   );
 
@@ -274,26 +258,6 @@ const Settings = () => {
     setSyncSteps(createFullRefreshSteps());
   };
 
-  const normalizePipelinePhase = (
-    phase: string
-  ): 'stars' | 'embeddings' | 'clustering' | 'snapshot' | null => {
-    switch (phase) {
-      case 'stars':
-      case 'star':
-        return 'stars';
-      case 'embedding':
-      case 'embeddings':
-        return 'embeddings';
-      case 'cluster':
-      case 'clustering':
-        return 'clustering';
-      case 'snapshot':
-        return 'snapshot';
-      default:
-        return null;
-    }
-  };
-
   const updatePipelineProgress = (pipeline: PipelineStatusResponse) => {
     const phaseOrder = ['stars', 'embeddings', 'clustering', 'snapshot'] as const;
     const normalizedPhase = normalizePipelinePhase(pipeline.phase);
@@ -304,70 +268,7 @@ const Settings = () => {
       setSyncStep(t(`sync.step_${phaseOrder[phaseIndex]}_label`, phaseOrder[phaseIndex]));
     }
 
-    setSyncSteps((previous) =>
-      previous.map((step, index) => {
-        if (pipeline.status === 'completed') {
-          return { ...step, status: 'completed', progress: 100, error: undefined };
-        }
-
-        if (pipeline.status === 'failed' || pipeline.status === 'partial_failed') {
-          if (phaseIndex >= 0 && index < phaseIndex) {
-            return { ...step, status: 'completed', progress: 100, error: undefined };
-          }
-          if (
-            step.id === normalizedPhase ||
-            (normalizedPhase === null && index === previous.length - 1)
-          ) {
-            return {
-              ...step,
-              status: 'failed',
-              error: pipeline.last_error || undefined,
-            };
-          }
-          return { ...step, status: 'pending', progress: 0, error: undefined };
-        }
-
-        if (phaseIndex >= 0 && index < phaseIndex) {
-          return { ...step, status: 'completed', progress: 100, error: undefined };
-        }
-        if (phaseIndex >= 0 && index === phaseIndex) {
-          return {
-            ...step,
-            status: 'running',
-            progress: 40,
-            error: undefined,
-          };
-        }
-        return { ...step, status: 'pending', progress: 0, error: undefined };
-      })
-    );
-  };
-
-  const normalizeFullRefreshPhase = (
-    phase: string
-  ): 'reset' | 'stars' | 'embeddings' | 'clustering' | 'snapshot' | null => {
-    switch (phase) {
-      case 'reset':
-        return 'reset';
-      case 'stars':
-      case 'star':
-        return 'stars';
-      case 'embedding':
-      case 'embeddings':
-      case 'summary':
-      case 'summaries':
-        return 'embeddings';
-      case 'cluster':
-      case 'clustering':
-        return 'clustering';
-      case 'snapshot':
-      case 'complete':
-      case 'completed':
-        return 'snapshot';
-      case 'full_refresh':
-      default:
-        return null;
-    }
+    setSyncSteps((previous) => mapPipelineProgressSteps(previous, pipeline));
   };
 
   const updateFullRefreshProgress = (job: FullRefreshJobStatus) => {
@@ -393,51 +294,7 @@ const Settings = () => {
       setSyncStep(t(`sync.step_${phaseOrder[currentIndex]}_label`, phaseOrder[currentIndex]));
     }
 
-    setSyncSteps((previous) =>
-      previous.map((step, index) => {
-        if (job.status === 'completed' || job.status === 'partial_failed') {
-          return { ...step, status: 'completed', progress: 100, error: undefined };
-        }
-
-        if (job.status === 'failed') {
-          if (currentIndex >= 0 && index < currentIndex) {
-            return { ...step, status: 'completed', progress: 100, error: undefined };
-          }
-          if (
-            step.id === normalizedPhase ||
-            (normalizedPhase === null && currentIndex >= 0 && step.id === phaseOrder[currentIndex]) ||
-            (currentIndex < 0 && index === previous.length - 1)
-          ) {
-            return {
-              ...step,
-              status: 'failed',
-              error: job.last_error || undefined,
-            };
-          }
-          return { ...step, status: 'pending', progress: 0, error: undefined };
-        }
-
-        if (currentIndex >= 0 && index < currentIndex) {
-          return { ...step, status: 'completed', progress: 100, error: undefined };
-        }
-        if (currentIndex >= 0 && index === currentIndex) {
-          const perStepProgress = Math.max(
-            0,
-            Math.min(
-              100,
-              ((job.progress_percent - currentIndex * stepProgressSpan) / stepProgressSpan) * 100
-            )
-          );
-          return {
-            ...step,
-            status: 'running',
-            progress: Math.round(perStepProgress),
-            error: undefined,
-          };
-        }
-        return { ...step, status: 'pending', progress: 0, error: undefined };
-      })
-    );
+    setSyncSteps((previous) => mapFullRefreshProgressSteps(previous, job, t));
   };
 
   const handleAdminLogin = async (e: FormEvent) => {
@@ -544,7 +401,11 @@ const Settings = () => {
       }
 
       setSyncSteps((prev) =>
-        prev.map((step) => ({ ...step, status: 'completed', progress: 100, error: undefined }))
+        prev.map((step) =>
+          step.status === 'warning'
+            ? { ...step, progress: 100 }
+            : { ...step, status: 'completed', progress: 100, error: undefined }
+        )
       );
 
       await refreshData();
@@ -639,9 +500,7 @@ const Settings = () => {
         );
       }
 
-      setSyncSteps((prev) =>
-        prev.map((step) => ({ ...step, status: 'completed', progress: 100, error: undefined }))
-      );
+      setSyncSteps((prev) => finalizeCompletedSteps(prev, partialFailures, t));
 
       await refreshData();
       await loadScheduleData();

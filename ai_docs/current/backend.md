@@ -26,6 +26,12 @@
 - 长任务状态通过数据库持久化，不只存在内存里
 - 图谱、Dashboard、Data 等读路径优先走快照或轻量聚合响应
 - 当前运行模型仍以单用户优先，很多读写流程默认按首个用户作用域处理
+- `api/v2/access.py` 现在提供显式的单用户解析入口，Settings/Sync 等写路由优先在 API 边界拿到 `user` 后再传入 service
+- 默认用户自举已带并发保护与冲突恢复，不应再把首次访问视为“天然串行”
+- `Graph` 的历史版本查询对不存在的 `version` 返回显式错误，不再静默回退到 active
+- 同步链路支持通过 `SYNC_README_FETCH_CONCURRENCY`、`SYNC_LLM_ENHANCEMENT_CONCURRENCY`、`SYNC_PROGRESS_COMMIT_INTERVAL` 做性能调优
+- README 抓取、LLM 增强、star list 同步的执行辅助逻辑已从主执行服务中拆到 `application/services/sync_execution_support.py`
+- 图快照构建服务支持显式传入 `user`，并记录 `nodes / edges / timeline / total` 分段耗时，便于定位大图性能瓶颈
 
 ## 当前稳定入口
 

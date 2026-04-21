@@ -38,6 +38,11 @@ const GraphPage = () => {
     setSelectedLanguages,
     clearFilters,
     retryEdgeLoading,
+    loadMoreEdges,
+    canLoadMoreEdges,
+    autoLoadHalted,
+    loadedEdgePages,
+    edgePageSize,
   } = useGraph();
 
   useEffect(() => {
@@ -247,6 +252,18 @@ const GraphPage = () => {
                 {t('sync.loading', 'Loading')} edges...
               </span>
             )}
+            {autoLoadHalted && (
+              <button
+                type="button"
+                onClick={() => {
+                  void loadMoreEdges();
+                }}
+                disabled={!canLoadMoreEdges}
+                className="hidden text-xs text-text-main hover:underline sm:inline"
+              >
+                {t('graph.load_more_edges', 'Load more edges')}
+              </button>
+            )}
             {error && (
               <button
                 type="button"
@@ -331,6 +348,30 @@ const GraphPage = () => {
           )}
 
           <div className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-bg-main/80 dark:bg-dark-bg-main/80">
+            {autoLoadHalted && (
+              <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
+                <span>
+                  {t(
+                    'graph.edge_load_paused',
+                    {
+                      pages: loadedEdgePages,
+                      edges: loadedEdgePages * edgePageSize,
+                      defaultValue: `Loaded ${loadedEdgePages} edge pages (${loadedEdgePages * edgePageSize} edge slots). Continue on demand.`,
+                    }
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void loadMoreEdges();
+                  }}
+                  disabled={!canLoadMoreEdges}
+                  className="header-action min-h-0 shrink-0 px-3 py-1.5 text-xs"
+                >
+                  {t('graph.load_more_edges', 'Load more edges')}
+                </button>
+              </div>
+            )}
             {error && (
               <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 px-3 py-2 text-xs text-red-700">
                 <span>{t('common.load_failed', 'Failed to load data')}</span>

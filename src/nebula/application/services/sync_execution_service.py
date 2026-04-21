@@ -1,6 +1,7 @@
 """Execution primitives for sync, embedding, and clustering."""
 
 from datetime import datetime, timezone
+from time import perf_counter
 
 from sqlalchemy import func, select
 
@@ -8,83 +9,17 @@ from nebula.core.config import get_app_settings, get_sync_settings
 from nebula.core.embedding import get_embedding_service
 from nebula.core.github_client import GitHubClient
 from nebula.core.llm import get_llm_service
-from nebula.db import Cluster, StarList, StarredRepo, SyncTask, User
+from nebula.db import Cluster, StarredRepo, SyncTask, User
 from nebula.utils import compute_content_hash, compute_topics_hash, get_logger
 
+from .sync_execution_support import (
+    fetch_readmes_in_parallel,
+    generate_repo_enhancements_in_parallel,
+    log_task_stage,
+    sync_star_lists,
+)
+
 logger = get_logger(__name__)
-
-
-async def sync_star_lists(
-    user_id: int,
-    github_token: str,
-    db,
-) -> None:
-    """Sync user's GitHub star lists and repo list assignment."""
-    try:
-        async with GitHubClient(access_token=github_token) as client:
-            star_lists = await client.get_star_lists()
-
-        if not star_lists:
-            logger.info(f"No star lists found for user {user_id}")
-            return
-
-        repo_to_list_map: dict[int, int] = {}
-
-        for gh_list in star_lists:
-            result = await db.execute(
-                select(StarList).where(
-                    StarList.user_id == user_id,
-                    StarList.github_list_id == gh_list.id,
-                )
-            )
-            existing_list = result.scalar_one_or_none()
-
-            if existing_list:
-                existing_list.name = gh_list.name
-                existing_list.description = gh_list.description
-                existing_list.is_public = gh_list.is_public
-                existing_list.repo_count = gh_list.repos_count
-                db_list = existing_list
-            else:
-                db_list = StarList(
-                    user_id=user_id,
-                    github_list_id=gh_list.id,
-                    name=gh_list.name,
-                    description=gh_list.description,
-                    is_public=gh_list.is_public,
-                    repo_count=gh_list.repos_count,
-                )
-                db.add(db_list)
-                await db.flush()
-
-            for repo_id in gh_list.repo_ids:
-                repo_to_list_map[repo_id] = db_list.id
-
-        await db.commit()
-
-        if repo_to_list_map:
-            result = await db.execute(
-                select(StarredRepo).where(
-                    StarredRepo.user_id == user_id,
-                    StarredRepo.github_repo_id.in_(list(repo_to_list_map.keys())),
-                )
-            )
-            repos = result.scalars().all()
-
-            for repo in repos:
-                if repo.github_repo_id in repo_to_list_map:
-                    repo.star_list_id = repo_to_list_map[repo.github_repo_id]
-
-            await db.commit()
-
-        logger.info(
-            f"Synced {len(star_lists)} star lists for user {user_id}, "
-            f"{len(repo_to_list_map)} repos assigned to lists"
-        )
-
-    except Exception as exc:
-        logger.warning(f"Failed to sync star lists: {exc}")
-        raise
 
 
 async def sync_stars_task(
@@ -131,6 +66,7 @@ async def sync_stars_task(
             await db.commit()
 
             settings = get_app_settings()
+            sync_settings = get_sync_settings()
             if not settings.github_token:
                 error_msg = (
                     "GitHub token not configured. Please set GITHUB_TOKEN in .env file"
@@ -142,6 +78,7 @@ async def sync_stars_task(
                 return
 
             logger.info("[TASK PROGRESS] GitHub token found, fetching starred repos...")
+            fetch_started = perf_counter()
             try:
                 async with GitHubClient(access_token=settings.github_token) as client:
                     repos, was_truncated = await client.get_starred_repos(
@@ -153,6 +90,14 @@ async def sync_stars_task(
                 task.error_message = f"GitHub API error: {api_error}"
                 await db.commit()
                 return
+            log_task_stage(
+                "sync_stars_task",
+                "fetch_stars",
+                fetch_started,
+                repos=len(repos),
+                was_truncated=was_truncated,
+                mode=effective_mode,
+            )
 
             logger.info(f"[TASK PROGRESS] Fetched {len(repos)} repos from GitHub")
 
@@ -165,13 +110,13 @@ async def sync_stars_task(
             task.total_items = len(repos)
             await db.commit()
 
-            sync_settings = get_sync_settings()
             processed = 0
             failed = 0
             new_count = 0
             updated_count = 0
 
             # Batch-prefetch existing repos to avoid N+1 queries
+            prefetch_started = perf_counter()
             github_ids = [repo.id for repo in repos]
             existing_map: dict[int, StarredRepo] = {}
             batch_size_lookup = 500
@@ -185,101 +130,147 @@ async def sync_stars_task(
                 )
                 for row in batch_result.scalars():
                     existing_map[row.github_repo_id] = row
+            log_task_stage(
+                "sync_stars_task",
+                "prefetch_existing",
+                prefetch_started,
+                github_ids=len(github_ids),
+                existing=len(existing_map),
+            )
 
-            async with GitHubClient(
-                access_token=settings.github_token
-            ) as readme_client:
-                for repo in repos:
-                    try:
-                        existing = existing_map.get(repo.id)
+            readme_targets: list[str] = []
+            repo_hashes: dict[int, tuple[str | None, str | None]] = {}
+            for repo in repos:
+                existing = existing_map.get(repo.id)
+                new_desc_hash = compute_content_hash(repo.description)
+                new_topics_hash = compute_topics_hash(repo.topics)
+                repo_hashes[repo.id] = (new_desc_hash, new_topics_hash)
+                if existing is None:
+                    readme_targets.append(repo.full_name)
+                    continue
+                if (
+                    existing.description_hash != new_desc_hash
+                    or existing.topics_hash != new_topics_hash
+                ):
+                    readme_targets.append(repo.full_name)
 
-                        if existing:
-                            new_desc_hash = compute_content_hash(repo.description)
-                            new_topics_hash = compute_topics_hash(repo.topics)
+            readmes_by_repo: dict[str, str | None] = {}
+            if readme_targets:
+                readme_started = perf_counter()
+                async with GitHubClient(
+                    access_token=settings.github_token
+                ) as readme_client:
+                    readmes_by_repo = await fetch_readmes_in_parallel(
+                        readme_client,
+                        readme_targets,
+                        max_length=sync_settings.readme_max_length,
+                        concurrency=sync_settings.readme_fetch_concurrency,
+                    )
+                log_task_stage(
+                    "sync_stars_task",
+                    "fetch_readmes",
+                    readme_started,
+                    requested=len(readme_targets),
+                    fetched=sum(
+                        1 for content in readmes_by_repo.values() if content is not None
+                    ),
+                    concurrency=sync_settings.readme_fetch_concurrency,
+                )
 
-                            needs_reprocess = (
-                                existing.description_hash != new_desc_hash
-                                or existing.topics_hash != new_topics_hash
-                            )
+            persist_started = perf_counter()
+            for repo in repos:
+                try:
+                    existing = existing_map.get(repo.id)
+                    new_desc_hash, new_topics_hash = repo_hashes[repo.id]
 
-                            if needs_reprocess:
-                                existing.is_embedded = False
-                                existing.is_summarized = False
-                                existing.ai_summary = None
-                                existing.ai_tags = None
-                                existing.embedding = None
-                                latest_readme = await readme_client.get_repo_readme(
-                                    repo.full_name,
-                                    max_length=sync_settings.readme_max_length,
-                                )
-                                if latest_readme is not None:
-                                    existing.readme_content = latest_readme
-                                    existing.is_readme_fetched = True
-                                logger.info(
-                                    f"Repo {repo.full_name} content changed, "
-                                    "marked for reprocessing"
-                                )
+                    if existing:
+                        needs_reprocess = (
+                            existing.description_hash != new_desc_hash
+                            or existing.topics_hash != new_topics_hash
+                        )
 
-                            existing.description = repo.description
-                            existing.language = repo.language
-                            existing.topics = repo.topics
-                            existing.stargazers_count = repo.stargazers_count
-                            existing.forks_count = repo.forks_count
-                            existing.repo_updated_at = repo.updated_at
-                            existing.repo_pushed_at = repo.pushed_at
-                            existing.owner_avatar_url = repo.owner_avatar_url
-                            existing.description_hash = new_desc_hash
-                            existing.topics_hash = new_topics_hash
-                            updated_count += 1
-                        else:
-                            readme_content = await readme_client.get_repo_readme(
-                                repo.full_name,
-                                max_length=sync_settings.readme_max_length,
-                            )
-                            new_repo = StarredRepo(
-                                user_id=user_id,
-                                github_repo_id=repo.id,
-                                full_name=repo.full_name,
-                                owner=repo.owner,
-                                name=repo.name,
-                                description=repo.description,
-                                language=repo.language,
-                                topics=repo.topics,
-                                html_url=repo.html_url,
-                                homepage_url=repo.homepage,
-                                stargazers_count=repo.stargazers_count,
-                                forks_count=repo.forks_count,
-                                watchers_count=repo.watchers_count,
-                                open_issues_count=repo.open_issues_count,
-                                starred_at=repo.starred_at,
-                                repo_created_at=repo.created_at,
-                                repo_updated_at=repo.updated_at,
-                                repo_pushed_at=repo.pushed_at,
-                                owner_avatar_url=repo.owner_avatar_url,
-                                readme_content=readme_content,
-                                is_readme_fetched=readme_content is not None,
-                                description_hash=compute_content_hash(repo.description),
-                                topics_hash=compute_topics_hash(repo.topics),
-                            )
-                            db.add(new_repo)
-                            new_count += 1
-
-                        processed += 1
-                        task.processed_items = processed
-
-                        if processed % sync_settings.batch_size == 0:
-                            await db.commit()
+                        if needs_reprocess:
+                            existing.is_embedded = False
+                            existing.is_summarized = False
+                            existing.ai_summary = None
+                            existing.ai_tags = None
+                            existing.embedding = None
+                            latest_readme = readmes_by_repo.get(repo.full_name)
+                            if latest_readme is not None:
+                                existing.readme_content = latest_readme
+                                existing.is_readme_fetched = True
                             logger.info(
-                                f"Synced {processed}/{len(repos)} repos "
-                                f"for user {user.username}"
+                                f"Repo {repo.full_name} content changed, "
+                                "marked for reprocessing"
                             )
 
-                    except Exception as exc:
-                        logger.warning(f"Failed to sync repo {repo.full_name}: {exc}")
-                        failed += 1
-                        task.failed_items = failed
+                        existing.description = repo.description
+                        existing.language = repo.language
+                        existing.topics = repo.topics
+                        existing.stargazers_count = repo.stargazers_count
+                        existing.forks_count = repo.forks_count
+                        existing.repo_updated_at = repo.updated_at
+                        existing.repo_pushed_at = repo.pushed_at
+                        existing.owner_avatar_url = repo.owner_avatar_url
+                        existing.description_hash = new_desc_hash
+                        existing.topics_hash = new_topics_hash
+                        updated_count += 1
+                    else:
+                        readme_content = readmes_by_repo.get(repo.full_name)
+                        new_repo = StarredRepo(
+                            user_id=user_id,
+                            github_repo_id=repo.id,
+                            full_name=repo.full_name,
+                            owner=repo.owner,
+                            name=repo.name,
+                            description=repo.description,
+                            language=repo.language,
+                            topics=repo.topics,
+                            html_url=repo.html_url,
+                            homepage_url=repo.homepage,
+                            stargazers_count=repo.stargazers_count,
+                            forks_count=repo.forks_count,
+                            watchers_count=repo.watchers_count,
+                            open_issues_count=repo.open_issues_count,
+                            starred_at=repo.starred_at,
+                            repo_created_at=repo.created_at,
+                            repo_updated_at=repo.updated_at,
+                            repo_pushed_at=repo.pushed_at,
+                            owner_avatar_url=repo.owner_avatar_url,
+                            readme_content=readme_content,
+                            is_readme_fetched=readme_content is not None,
+                            description_hash=new_desc_hash,
+                            topics_hash=new_topics_hash,
+                        )
+                        db.add(new_repo)
+                        new_count += 1
+
+                    processed += 1
+                    task.processed_items = processed
+
+                    if processed % sync_settings.progress_commit_interval == 0:
+                        await db.commit()
+                        logger.info(
+                            f"Synced {processed}/{len(repos)} repos "
+                            f"for user {user.username}"
+                        )
+
+                except Exception as exc:
+                    logger.warning(f"Failed to sync repo {repo.full_name}: {exc}")
+                    failed += 1
+                    task.failed_items = failed
 
             await db.commit()
+            log_task_stage(
+                "sync_stars_task",
+                "persist_repos",
+                persist_started,
+                processed=processed,
+                failed=failed,
+                new_repos=new_count,
+                updated_repos=updated_count,
+                commit_interval=sync_settings.progress_commit_interval,
+            )
 
             removed_count = 0
 
@@ -313,6 +304,7 @@ async def sync_stars_task(
                 )
 
             if github_repo_ids_from_api is not None:
+                deletion_started = perf_counter()
                 result = await db.execute(
                     select(StarredRepo).where(
                         StarredRepo.user_id == user_id,
@@ -334,6 +326,13 @@ async def sync_stars_task(
                     logger.info(
                         f"Removed {removed_count} unstarred repos for user {user.username}"
                     )
+                log_task_stage(
+                    "sync_stars_task",
+                    "remove_unstarred",
+                    deletion_started,
+                    removed=removed_count,
+                    compared=len(github_repo_ids_from_api),
+                )
 
             if effective_mode == "incremental":
                 result = await db.execute(
@@ -357,6 +356,7 @@ async def sync_stars_task(
                 "new_repos": new_count,
                 "updated_repos": updated_count,
                 "removed_repos": removed_count,
+                "failed_items": failed,
                 "was_truncated": was_truncated,
             }
             await db.commit()
@@ -367,8 +367,15 @@ async def sync_stars_task(
                 f"{removed_count} removed, {failed} failed"
             )
 
+            star_lists_started = perf_counter()
             try:
                 await sync_star_lists(user_id, settings.github_token, db)
+                log_task_stage(
+                    "sync_stars_task",
+                    "sync_star_lists",
+                    star_lists_started,
+                    user_id=user_id,
+                )
             except Exception as exc:
                 logger.warning(f"Star lists sync failed (non-critical): {exc}")
 
@@ -415,10 +422,12 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 await db.commit()
                 return
 
+            sync_settings = get_sync_settings()
             llm_service = get_llm_service()
             repos_needing_llm = [
                 repo for repo in repos if not repo.ai_summary or not repo.ai_tags
             ]
+            llm_failed = 0
 
             if repos_needing_llm:
                 total_llm_repos = len(repos_needing_llm)
@@ -426,43 +435,54 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                     f"Generating summaries/tags for {total_llm_repos} repos "
                     "before embedding"
                 )
+                llm_started = perf_counter()
+                llm_results = await generate_repo_enhancements_in_parallel(
+                    llm_service,
+                    repos_needing_llm,
+                    concurrency=sync_settings.llm_enhancement_concurrency,
+                )
 
                 for index, repo in enumerate(repos_needing_llm, 1):
-                    try:
-                        (
-                            summary,
-                            tags,
-                        ) = await llm_service.generate_repo_summary_and_tags(
-                            full_name=repo.full_name,
-                            description=repo.description,
-                            topics=repo.topics,
-                            language=repo.language,
-                            readme_content=repo.readme_content,
-                        )
+                    summary, tags, error = llm_results.get(
+                        repo.id, (None, None, RuntimeError("Missing LLM result"))
+                    )
+                    if error is None:
                         repo.ai_summary = summary
                         repo.ai_tags = tags
                         repo.is_summarized = True
-                    except Exception as exc:
+                    else:
+                        llm_failed += 1
                         logger.warning(
-                            f"LLM generation failed for {repo.full_name}: {exc}"
+                            f"LLM generation failed for {repo.full_name}: {error}"
                         )
                         if not repo.ai_tags:
                             repo.ai_tags = (
                                 repo.topics[:5] if repo.topics else ["开源项目"]
                             )
 
-                    if index % 5 == 0:
+                    if index % sync_settings.progress_commit_interval == 0:
                         logger.info(
                             f"Generating summaries progress: {index}/{total_llm_repos}"
                         )
+                        task.processed_items = index
                         await db.commit()
 
                 await db.commit()
+                log_task_stage(
+                    "compute_embeddings_task",
+                    "llm_enhancement",
+                    llm_started,
+                    repos=total_llm_repos,
+                    failed=llm_failed,
+                    concurrency=sync_settings.llm_enhancement_concurrency,
+                )
                 logger.info(f"LLM enhancement complete for {total_llm_repos} repos")
+                task.failed_items = llm_failed
 
             embedding_service = get_embedding_service()
             processed = 0
 
+            text_build_started = perf_counter()
             texts = []
             for repo in repos:
                 text = embedding_service.build_repo_text(
@@ -476,8 +496,15 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 )
                 texts.append(text)
                 repo.embedding_text = text
+            log_task_stage(
+                "compute_embeddings_task",
+                "build_embedding_text",
+                text_build_started,
+                repos=len(repos),
+            )
 
             try:
+                embedding_started = perf_counter()
                 embeddings = await embedding_service.embed_batch(texts, batch_size=32)
                 if len(embeddings) != len(repos):
                     raise ValueError(
@@ -491,7 +518,19 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 
                 task.processed_items = processed
                 task.status = "completed"
+                task.error_details = {
+                    "llm_failed_items": llm_failed,
+                    "embedded_items": processed,
+                }
                 await db.commit()
+                log_task_stage(
+                    "compute_embeddings_task",
+                    "embed_batch",
+                    embedding_started,
+                    repos=len(repos),
+                    embedded=processed,
+                    llm_failed=llm_failed,
+                )
             except Exception as exc:
                 logger.error(f"Batch embedding failed: {exc}")
                 task.failed_items = len(repos)

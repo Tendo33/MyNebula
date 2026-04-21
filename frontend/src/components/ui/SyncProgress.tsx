@@ -19,7 +19,7 @@ import {
 // Types
 // ============================================================================
 
-export type SyncStepStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type SyncStepStatus = 'pending' | 'running' | 'completed' | 'warning' | 'failed';
 
 export interface SyncStep {
   id: string;
@@ -68,6 +68,8 @@ const getStatusIcon = (status: SyncStepStatus): React.ReactNode => {
       return <Loader2 className="w-4 h-4 text-action-primary animate-spin" />;
     case 'failed':
       return <AlertCircle className="w-4 h-4 text-red-500" />;
+    case 'warning':
+      return <AlertCircle className="w-4 h-4 text-amber-500" />;
     default:
       return <Circle className="w-4 h-4 text-text-dim" />;
   }
@@ -89,12 +91,14 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
 
   // Calculate overall progress
   const completedSteps = steps.filter(s => s.status === 'completed').length;
+  const warningSteps = steps.filter(s => s.status === 'warning').length;
   const totalSteps = steps.length;
-  const overallProgress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+  const overallProgress = totalSteps > 0 ? ((completedSteps + warningSteps) / totalSteps) * 100 : 0;
 
   // Check if all done
-  const allCompleted = steps.every(s => s.status === 'completed');
+  const allCompleted = steps.every(s => s.status === 'completed' || s.status === 'warning');
   const hasFailed = steps.some(s => s.status === 'failed');
+  const hasWarnings = steps.some(s => s.status === 'warning');
 
   if (!isOpen) return null;
 
@@ -108,7 +112,11 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-light px-5 py-4 dark:border-dark-border">
           <div className="flex items-center gap-3">
-            {allCompleted ? (
+            {allCompleted && hasWarnings ? (
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              </div>
+            ) : allCompleted ? (
               <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
                 <Check className="w-5 h-5 text-green-600" />
               </div>
@@ -124,14 +132,18 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
             <div>
               <h3 className="text-base font-semibold text-text-main dark:text-dark-text-main">
                 {allCompleted
-                  ? t('sync.completed', 'Sync Completed')
+                  ? hasWarnings
+                    ? t('sync.completed_with_warnings', 'Completed With Warnings')
+                    : t('sync.completed', 'Sync Completed')
                   : hasFailed
                   ? t('sync.failed', 'Sync Failed')
                   : displayTitle}
               </h3>
               <p className="text-sm text-text-muted dark:text-dark-text-main/70">
                 {allCompleted
-                  ? t('sync.allDone', 'All tasks completed successfully')
+                  ? hasWarnings
+                    ? t('sync.partial_done', 'Completed, but some steps need attention')
+                    : t('sync.allDone', 'All tasks completed successfully')
                   : `${completedSteps}/${totalSteps} ${t('sync.steps', 'steps')}`}
               </p>
             </div>
@@ -161,7 +173,13 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
             <div
               className={clsx(
                 'h-full rounded-full transition-all duration-500',
-                hasFailed ? 'bg-red-500' : allCompleted ? 'bg-green-500' : 'bg-action-primary'
+                hasFailed
+                  ? 'bg-red-500'
+                  : hasWarnings
+                  ? 'bg-amber-500'
+                  : allCompleted
+                  ? 'bg-green-500'
+                  : 'bg-action-primary'
               )}
               style={{ width: `${overallProgress}%` }}
             />
@@ -176,6 +194,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
               className={clsx(
                 'relative flex items-start gap-3 rounded-xl p-3 transition-colors',
                 step.status === 'running' && 'bg-action-primary/5 ring-1 ring-action-primary/20',
+                step.status === 'warning' && 'bg-amber-50 ring-1 ring-amber-200',
                 step.status === 'failed' && 'bg-red-50 ring-1 ring-red-200'
               )}
             >
@@ -185,6 +204,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
                   'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
                   step.status === 'completed' && 'bg-green-100 text-green-600',
                   step.status === 'running' && 'bg-action-primary/20 text-action-primary',
+                  step.status === 'warning' && 'bg-amber-100 text-amber-600',
                   step.status === 'failed' && 'bg-red-100 text-red-600',
                   step.status === 'pending' && 'bg-bg-hover text-text-dim dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60'
                 )}
@@ -228,8 +248,10 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
                 )}
 
                 {/* Error message */}
-                {step.status === 'failed' && step.error && (
-                  <p className="text-xs text-red-600 mt-1">{step.error}</p>
+                {(step.status === 'failed' || step.status === 'warning') && step.error && (
+                  <p className={clsx('text-xs mt-1', step.status === 'failed' ? 'text-red-600' : 'text-amber-700')}>
+                    {step.error}
+                  </p>
                 )}
               </div>
 

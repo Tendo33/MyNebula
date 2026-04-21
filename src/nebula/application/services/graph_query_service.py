@@ -21,6 +21,10 @@ logger = get_logger(__name__)
 SNAPSHOT_REBUILD_LOCK_KEY_BASE = 880_000_000
 
 
+class SnapshotVersionNotFoundError(ValueError):
+    """Raised when a requested non-active snapshot version cannot be resolved."""
+
+
 class GraphQueryService:
     """Read model service for graph data endpoints."""
 
@@ -45,7 +49,10 @@ class GraphQueryService:
         if snapshot:
             return snapshot
 
-        version, graph_data, timeline_data = await self.builder.build_payload(db)
+        version, graph_data, timeline_data = await self.builder.build_payload(
+            db,
+            user=user,
+        )
         snapshot = await self.snapshot_repo.save_snapshot_payload(
             db,
             user_id=user.id,
@@ -83,16 +90,25 @@ class GraphQueryService:
         started = perf_counter()
         try:
             snapshot = await self._resolve_snapshot(db, user, version)
+            hydrate_started = perf_counter()
             graph_data = await self.snapshot_repo.hydrate_graph_data(
                 db,
                 snapshot,
                 include_edges=include_edges,
             )
+            logger.info(
+                "Graph snapshot hydrated "
+                f"version={snapshot.version} "
+                f"include_edges={include_edges} "
+                f"nodes={graph_data.total_nodes} "
+                f"edges={graph_data.total_edges} "
+                f"hydrate_ms={((perf_counter() - hydrate_started) * 1000):.1f}"
+            )
         except Exception:
             if not self.settings.snapshot_read_fallback_on_error:
                 raise
             logger.exception("Snapshot read failed, fallback to live graph payload")
-            _, graph_data, _ = await self.builder.build_payload(db)
+            _, graph_data, _ = await self.builder.build_payload(db, user=user)
 
         if not include_edges:
             graph_data.edges = []
@@ -119,6 +135,7 @@ class GraphQueryService:
         started = perf_counter()
         try:
             snapshot = await self._resolve_snapshot(db, user, version)
+            hydrate_started = perf_counter()
             timeline = await self.snapshot_repo.hydrate_timeline_data(db, snapshot.id)
             if timeline is None:
                 timeline = TimelineData(
@@ -130,13 +147,19 @@ class GraphQueryService:
                     if snapshot.created_at
                     else None,
                 )
+            logger.info(
+                "Graph timeline hydrated "
+                f"version={snapshot.version} "
+                f"points={len(timeline.points)} "
+                f"hydrate_ms={((perf_counter() - hydrate_started) * 1000):.1f}"
+            )
         except Exception:
             if not self.settings.snapshot_read_fallback_on_error:
                 raise
             logger.exception(
                 "Snapshot timeline read failed, fallback to live timeline payload"
             )
-            _, _, timeline = await self.builder.build_payload(db)
+            _, _, timeline = await self.builder.build_payload(db, user=user)
 
         timeline.request_id = str(uuid.uuid4())
         self._log_if_slow("get_timeline_data", started, version=version)
@@ -154,6 +177,7 @@ class GraphQueryService:
         started = perf_counter()
         try:
             snapshot = await self._resolve_snapshot(db, user, version)
+            hydrate_started = perf_counter()
             edge_payload, next_cursor = await self.snapshot_repo.get_edges_page(
                 db,
                 snapshot_id=snapshot.id,
@@ -168,11 +192,20 @@ class GraphQueryService:
                 if snapshot.created_at
                 else None,
             )
+            logger.info(
+                "Graph edges page hydrated "
+                f"version={snapshot.version} "
+                f"cursor={cursor} "
+                f"limit={limit} "
+                f"returned_edges={len(page.edges)} "
+                f"next_cursor={page.next_cursor} "
+                f"hydrate_ms={((perf_counter() - hydrate_started) * 1000):.1f}"
+            )
         except Exception:
             if not self.settings.snapshot_read_fallback_on_error:
                 raise
             logger.exception("Snapshot edge read failed, fallback to live edge payload")
-            _, graph_data, _ = await self.builder.build_payload(db)
+            _, graph_data, _ = await self.builder.build_payload(db, user=user)
             sliced_edges = graph_data.edges[cursor : cursor + limit]
             next_cursor = (
                 cursor + limit if cursor + limit < len(graph_data.edges) else None
@@ -197,7 +230,10 @@ class GraphQueryService:
         self, db: AsyncSession, *, user: User
     ) -> GraphData:
         await self._acquire_snapshot_rebuild_lock(db, user.id)
-        version, graph_data, timeline_data = await self.builder.build_payload(db)
+        version, graph_data, timeline_data = await self.builder.build_payload(
+            db,
+            user=user,
+        )
         snapshot = await self.snapshot_repo.save_snapshot_payload(
             db,
             user_id=user.id,
@@ -268,7 +304,7 @@ class GraphQueryService:
             version,
         )
         if snapshot is None:
-            return await self.ensure_active_snapshot(db, user=user)
+            raise SnapshotVersionNotFoundError(f"Snapshot version not found: {version}")
         return snapshot
 
     def _log_if_slow(

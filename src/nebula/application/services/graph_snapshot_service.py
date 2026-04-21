@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from datetime import datetime, timezone
+from time import perf_counter
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,7 @@ from nebula.schemas.graph import (
     TimelineData,
     TimelinePoint,
 )
+from nebula.utils import get_logger
 
 from .graph_edge_service import (
     RepoEdgeInfo,
@@ -43,6 +45,7 @@ CLUSTER_COLORS = [
     "#F8B500",
     "#00CED1",
 ]
+logger = get_logger(__name__)
 
 
 async def _get_default_user(db: AsyncSession):
@@ -56,12 +59,14 @@ class GraphSnapshotBuilderService:
         self,
         db: AsyncSession,
         *,
+        user=None,
         edge_k: int = 8,
         edge_max_nodes: int = 1000,
         adaptive_edges: bool = True,
     ) -> tuple[str, GraphData, TimelineData]:
-        user = await _get_default_user(db)
-        if not user:
+        build_started = perf_counter()
+        resolved_user = user or await _get_default_user(db)
+        if not resolved_user:
             empty_graph = GraphData(
                 nodes=[],
                 edges=[],
@@ -81,9 +86,10 @@ class GraphSnapshotBuilderService:
             empty_timeline.generated_at = generated_at.isoformat()
             return version, empty_graph, empty_timeline
 
+        nodes_started = perf_counter()
         repos_result = await db.execute(
             select(StarredRepo).where(
-                StarredRepo.user_id == user.id,
+                StarredRepo.user_id == resolved_user.id,
                 StarredRepo.is_embedded == True,  # noqa: E712
                 StarredRepo.coord_x.isnot(None),
             )
@@ -91,11 +97,11 @@ class GraphSnapshotBuilderService:
         repos = repos_result.scalars().all()
 
         clusters_result = await db.execute(
-            select(Cluster).where(Cluster.user_id == user.id)
+            select(Cluster).where(Cluster.user_id == resolved_user.id)
         )
         clusters = clusters_result.scalars().all()
         star_lists_result = await db.execute(
-            select(StarList).where(StarList.user_id == user.id)
+            select(StarList).where(StarList.user_id == resolved_user.id)
         )
         star_lists = star_lists_result.scalars().all()
 
@@ -190,7 +196,7 @@ class GraphSnapshotBuilderService:
         edge_repos_result = await db.execute(
             select(StarredRepo)
             .where(
-                StarredRepo.user_id == user.id,
+                StarredRepo.user_id == resolved_user.id,
                 StarredRepo.is_embedded == True,  # noqa: E712
                 StarredRepo.embedding.isnot(None),
             )
@@ -218,6 +224,7 @@ class GraphSnapshotBuilderService:
             if adaptive_edges
             else 0.5
         )
+        edges_started = perf_counter()
         edges = _build_similarity_edges_knn(
             repo_edge_infos,
             min_score=effective_threshold,
@@ -234,11 +241,14 @@ class GraphSnapshotBuilderService:
             total_clusters=len(cluster_infos),
             total_star_lists=len(star_list_infos),
         )
+        nodes_elapsed_ms = (perf_counter() - nodes_started) * 1000
+        edges_elapsed_ms = (perf_counter() - edges_started) * 1000
 
+        timeline_started = perf_counter()
         timeline_result = await db.execute(
             select(StarredRepo)
             .where(
-                StarredRepo.user_id == user.id,
+                StarredRepo.user_id == resolved_user.id,
                 StarredRepo.starred_at.isnot(None),
             )
             .order_by(StarredRepo.starred_at)
@@ -294,6 +304,7 @@ class GraphSnapshotBuilderService:
                 total_stars=len(timeline_repos),
                 date_range=(points[0].date, points[-1].date) if points else ("", ""),
             )
+        timeline_elapsed_ms = (perf_counter() - timeline_started) * 1000
 
         generated_at = datetime.now(timezone.utc)
         version = self._build_version(graph_data, generated_at)
@@ -301,6 +312,17 @@ class GraphSnapshotBuilderService:
         graph_data.generated_at = generated_at.isoformat()
         timeline_data.version = version
         timeline_data.generated_at = generated_at.isoformat()
+        logger.info(
+            "Graph snapshot payload built "
+            f"version={version} "
+            f"nodes={graph_data.total_nodes} "
+            f"edges={graph_data.total_edges} "
+            f"timeline_points={len(timeline_data.points)} "
+            f"timings_ms={{'nodes': {nodes_elapsed_ms:.1f}, "
+            f"'edges': {edges_elapsed_ms:.1f}, "
+            f"'timeline': {timeline_elapsed_ms:.1f}, "
+            f"'total': {((perf_counter() - build_started) * 1000):.1f}}}"
+        )
         return version, graph_data, timeline_data
 
     def _build_version(self, graph_data: GraphData, now: datetime) -> str:
