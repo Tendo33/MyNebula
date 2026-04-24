@@ -38,6 +38,12 @@ async def start_pipeline_sync(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> PipelineStartResponse:
     """Start sync pipeline in background."""
+    if min_clusters > max_clusters:
+        raise HTTPException(
+            status_code=400,
+            detail="min_clusters must be less than or equal to max_clusters",
+        )
+
     await _ensure_no_active_pipeline(user.id)
     try:
         run_id = await pipeline_service.create_pipeline_run(user.id)

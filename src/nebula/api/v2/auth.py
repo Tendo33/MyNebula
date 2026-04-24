@@ -283,7 +283,11 @@ async def login_admin(
 
 
 @router.post("/logout", response_model=AdminSessionResponse)
-async def logout_admin(response: Response):
+async def logout_admin(
+    response: Response,
+    _: str = Depends(require_admin),  # noqa: B008
+    __: None = Depends(require_admin_csrf),  # noqa: B008
+):
     """Logout admin and clear session cookie."""
     response.delete_cookie(
         key=ADMIN_SESSION_COOKIE,

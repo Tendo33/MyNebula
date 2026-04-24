@@ -225,6 +225,24 @@ async def test_login_admin_rate_limits_repeated_failures():
 
 
 @pytest.mark.asyncio
+async def test_logout_admin_requires_csrf_dependency():
+    from nebula.api.v2 import auth as auth_api
+
+    route = next(
+        (route for route in auth_api.router.routes if route.path == "/logout"),
+        None,
+    )
+
+    assert route is not None
+    dependency_calls = {
+        getattr(getattr(dependency, "call", None), "__name__", "")
+        for dependency in route.dependant.dependencies
+    }
+    assert "require_admin" in dependency_calls
+    assert "require_admin_csrf" in dependency_calls
+
+
+@pytest.mark.asyncio
 async def test_repo_search_rejects_demo_mode(monkeypatch):
     from nebula.api.v2 import repos as repos_api
     from nebula.schemas.repo import RepoSearchRequest

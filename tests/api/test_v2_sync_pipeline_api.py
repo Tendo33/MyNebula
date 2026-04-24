@@ -172,3 +172,21 @@ async def test_start_pipeline_sync_rejects_when_active_pipeline_exists(monkeypat
         )
 
     assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_start_pipeline_sync_rejects_invalid_cluster_bounds():
+    from nebula.api.v2 import sync as sync_api
+
+    with pytest.raises(HTTPException) as exc_info:
+        await sync_api.start_pipeline_sync(
+            background_tasks=BackgroundTasks(),
+            mode="incremental",
+            use_llm=True,
+            max_clusters=4,
+            min_clusters=5,
+            user=SimpleNamespace(id=1, graph_max_clusters=8, graph_min_clusters=3),
+            db=object(),
+        )
+
+    assert exc_info.value.status_code == 400
