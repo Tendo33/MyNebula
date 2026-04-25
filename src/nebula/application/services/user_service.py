@@ -31,7 +31,7 @@ async def _acquire_default_user_bootstrap_lock(db: AsyncSession) -> None:
 
 
 async def _get_first_user(db: AsyncSession) -> User | None:
-    result = await db.execute(select(User).limit(1))
+    result = await db.execute(select(User).order_by(User.id.asc()).limit(1))
     return result.scalar_one_or_none()
 
 

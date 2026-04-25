@@ -39,6 +39,24 @@ interface SortConfig {
 const PAGE_SIZES = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
 
+const parseClusterParams = (params: URLSearchParams): number[] => {
+  const clusterIdsParam = params.get('clusters');
+  if (clusterIdsParam) {
+    return clusterIdsParam
+      .split(',')
+      .map((value) => Number.parseInt(value, 10))
+      .filter((value) => Number.isFinite(value));
+  }
+
+  const clusterIdParam = params.get('cluster');
+  if (!clusterIdParam) {
+    return [];
+  }
+
+  const parsedClusterId = Number.parseInt(clusterIdParam, 10);
+  return Number.isFinite(parsedClusterId) ? [parsedClusterId] : [];
+};
+
 interface SortableHeaderProps {
   label: string;
   field: SortField;
@@ -131,6 +149,7 @@ const DataPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const monthFilter = searchParams.get('month');
   const topicFilter = searchParams.get('topic');
+  const urlSearchQuery = searchParams.get('q') ?? '';
 
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: 'starred_at',
@@ -138,8 +157,10 @@ const DataPage = () => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [localSearch, setLocalSearch] = useState('');
-  const [selectedClusters, setSelectedClusters] = useState<Set<number>>(new Set());
+  const [localSearch, setLocalSearch] = useState(urlSearchQuery);
+  const [selectedClusters, setSelectedClusters] = useState<Set<number>>(
+    () => new Set(parseClusterParams(searchParams))
+  );
   const offset = (currentPage - 1) * pageSize;
 
   const { repos, clusters, totalNodes, count, loading, error, retry } = useDataReposQuery({
@@ -165,6 +186,41 @@ const DataPage = () => {
   );
 
   useEffect(() => {
+    const nextClusterIds = parseClusterParams(searchParams);
+    const currentClusterIds = Array.from(selectedClusters).sort((left, right) => left - right);
+    if (localSearch !== urlSearchQuery) {
+      setLocalSearch(urlSearchQuery);
+    }
+    if (currentClusterIds.join(',') !== nextClusterIds.join(',')) {
+      setSelectedClusters(new Set(nextClusterIds));
+    }
+  }, [localSearch, searchParams, selectedClusters, urlSearchQuery]);
+
+  const buildFilterParams = useCallback(
+    (query: string, clusterIds: Set<number> | number[]) => {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('q');
+      nextParams.delete('cluster');
+      nextParams.delete('clusters');
+
+      const trimmedQuery = query.trim();
+      if (trimmedQuery) {
+        nextParams.set('q', trimmedQuery);
+      }
+
+      const normalizedClusterIds = Array.from(clusterIds).sort((left, right) => left - right);
+      if (normalizedClusterIds.length === 1) {
+        nextParams.set('cluster', String(normalizedClusterIds[0]));
+      } else if (normalizedClusterIds.length > 1) {
+        nextParams.set('clusters', normalizedClusterIds.join(','));
+      }
+
+      return nextParams;
+    },
+    [searchParams]
+  );
+
+  useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
@@ -173,7 +229,8 @@ const DataPage = () => {
   const handleSearch = useCallback((query: string) => {
     setLocalSearch(query);
     setCurrentPage(1);
-  }, []);
+    setSearchParams(buildFilterParams(query, selectedClusters), { replace: true });
+  }, [buildFilterParams, selectedClusters, setSearchParams]);
 
   const handleSort = useCallback((field: SortField) => {
     setSortConfig((prev) => ({
@@ -191,10 +248,11 @@ const DataPage = () => {
       } else {
         next.add(clusterId);
       }
+      setSearchParams(buildFilterParams(localSearch, next), { replace: true });
       return next;
     });
     setCurrentPage(1);
-  }, []);
+  }, [buildFilterParams, localSearch, setSearchParams]);
 
   const formatDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '-';

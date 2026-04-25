@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.sql import Select
 
 
 class _FakeResult:
@@ -34,6 +35,15 @@ class _FakeDb:
 
     async def refresh(self, _value):
         return None
+
+
+class _CaptureDb:
+    def __init__(self):
+        self.statement: Select | None = None
+
+    async def execute(self, statement):
+        self.statement = statement
+        return _FakeResult(None)
 
 
 @pytest.mark.asyncio
@@ -87,3 +97,19 @@ async def test_get_default_user_recovers_from_concurrent_insert(monkeypatch):
     assert resolved is existing_user
     assert db.rollback_called is True
     assert db.added
+
+
+@pytest.mark.asyncio
+async def test_get_first_user_orders_by_lowest_id():
+    from nebula.application.services import user_service
+
+    db = _CaptureDb()
+
+    await user_service._get_first_user(db)
+
+    assert db.statement is not None
+    compiled = str(
+        db.statement.compile(compile_kwargs={"literal_binds": True})
+    ).lower()
+    assert "order by" in compiled
+    assert "users.id asc" in compiled

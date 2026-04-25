@@ -12,7 +12,6 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.related_repo_service import get_related_repos
-from nebula.application.services.user_service import get_default_user
 from nebula.core.auth import get_admin_session_username
 from nebula.core.config import AppSettings, get_app_settings
 from nebula.core.embedding import get_embedding_service
@@ -33,7 +32,7 @@ from nebula.schemas.repo import (
 )
 from nebula.utils import get_logger
 
-from .access import resolve_read_user
+from .access import resolve_read_user, resolve_single_user
 from .auth import ADMIN_SESSION_COOKIE, require_admin, require_admin_csrf
 
 logger = get_logger(__name__)
@@ -198,10 +197,10 @@ async def submit_related_feedback(
     request: RelatedFeedbackRequest,
     _: str = Depends(require_admin),  # noqa: B008
     __: None = Depends(require_admin_csrf),  # noqa: B008
+    user: User = Depends(resolve_single_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Record user feedback for related repository recommendations."""
-    user = await get_default_user(db)
     anchor_result = await db.execute(
         select(StarredRepo.id).where(
             StarredRepo.user_id == user.id,

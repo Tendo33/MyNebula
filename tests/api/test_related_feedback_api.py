@@ -48,10 +48,10 @@ async def test_submit_related_feedback_executes_atomic_upsert(monkeypatch):
 
     from nebula.api.v2 import repos as repos_api
 
-    async def fake_get_default_user(_db):
+    async def fake_resolve_single_user(_db=None):
         return SimpleNamespace(id=1)
 
-    monkeypatch.setattr(repos_api, "get_default_user", fake_get_default_user)
+    monkeypatch.setattr(repos_api, "resolve_single_user", fake_resolve_single_user)
 
     class _FakeResult:
         def __init__(self, value):
@@ -87,6 +87,7 @@ async def test_submit_related_feedback_executes_atomic_upsert(monkeypatch):
     response = await repos_api.submit_related_feedback(
         repo_id=10,
         request=payload,
+        user=await fake_resolve_single_user(),
         db=db,
     )
 
