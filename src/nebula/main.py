@@ -122,7 +122,9 @@ def create_app() -> FastAPI:
         "expose_headers": ["*"],
     }
     if cors_origins:
-        cors_kwargs["allow_origins"] = [o.strip() for o in cors_origins.split(",")]
+        cors_kwargs["allow_origins"] = [
+            origin.strip() for origin in cors_origins.split(",") if origin.strip()
+        ]
     else:
         cors_kwargs["allow_origin_regex"] = (
             r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"

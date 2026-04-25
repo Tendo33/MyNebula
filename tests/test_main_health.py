@@ -42,6 +42,31 @@ def test_health_reports_degraded_when_scheduler_not_running(monkeypatch):
     assert response.json()["scheduler"]["status"] == "stopped"
 
 
+def test_create_app_filters_blank_cors_origins(monkeypatch):
+    from nebula import main as main_module
+    from nebula.core.config import AppSettings
+
+    monkeypatch.setattr(
+        main_module,
+        "get_app_settings",
+        lambda: AppSettings(
+            cors_origins="https://app.example.com, ,https://admin.example.com"
+        ),
+    )
+
+    app = main_module.create_app()
+    cors_middleware = next(
+        middleware
+        for middleware in app.user_middleware
+        if middleware.cls.__name__ == "CORSMiddleware"
+    )
+
+    assert cors_middleware.kwargs["allow_origins"] == [
+        "https://app.example.com",
+        "https://admin.example.com",
+    ]
+
+
 def test_setup_logging_redacts_sensitive_extras_without_type_error(tmp_path):
     from nebula.utils import logger_util
 
