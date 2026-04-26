@@ -167,4 +167,30 @@ describe('Settings partial failed warning', () => {
     expect(screen.getByTestId('step-stars')).toHaveTextContent('warning');
     expect(screen.getByTestId('step-embeddings')).toHaveTextContent('completed');
   });
+
+  it('preserves local appearance settings when syncing backend graph defaults', async () => {
+    render(<Settings />);
+
+    await waitFor(() => expect(loadSettings).toHaveBeenCalled());
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      maxClusters: 8,
+      minClusters: 3,
+    });
+    expect(updateSettings).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        relatedMinSemantic: expect.any(Number),
+      })
+    );
+    expect(updateSettings).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        hqRendering: expect.any(Boolean),
+      })
+    );
+    expect(updateSettings).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        showTrajectories: expect.any(Boolean),
+      })
+    );
+  });
 });

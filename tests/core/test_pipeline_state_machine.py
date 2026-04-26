@@ -270,3 +270,39 @@ async def test_create_pipeline_run_rejects_when_full_refresh_task_active(monkeyp
 
     with pytest.raises(ValueError, match="Full refresh already running"):
         await service.create_pipeline_run(user_id=9)
+
+
+@pytest.mark.asyncio
+async def test_create_pipeline_run_leaves_started_at_unset_until_execution(monkeypatch):
+    from nebula.application.services import pipeline_service as pipeline_module
+
+    db_context = _FakeDbContext(SimpleNamespace(id=1, user_id=9))
+    monkeypatch.setattr(pipeline_module, "get_db_context", lambda: db_context)
+
+    service = pipeline_module.SyncPipelineService()
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    async def fake_get_active_pipeline_from_db(*_args, **_kwargs):
+        return None
+
+    async def fake_get_active_full_refresh_task_from_db(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(service, "_acquire_pipeline_creation_lock", noop)
+    monkeypatch.setattr(
+        service, "_get_active_pipeline_from_db", fake_get_active_pipeline_from_db
+    )
+    monkeypatch.setattr(
+        service,
+        "_get_active_full_refresh_task_from_db",
+        fake_get_active_full_refresh_task_from_db,
+    )
+
+    await service.create_pipeline_run(user_id=9)
+
+    created_run = db_context._added[0]
+    assert created_run.status == PipelineStatus.pending.value
+    assert created_run.phase == PipelinePhase.pending.value
+    assert created_run.started_at is None

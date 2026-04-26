@@ -122,9 +122,6 @@ const Settings = () => {
       updateSettings({
         maxClusters: settingsPayload.graph_defaults.max_clusters,
         minClusters: settingsPayload.graph_defaults.min_clusters,
-        relatedMinSemantic: settingsPayload.graph_defaults.related_min_semantic,
-        hqRendering: settingsPayload.graph_defaults.hq_rendering,
-        showTrajectories: settingsPayload.graph_defaults.show_trajectories,
       });
       graphDefaultsRef.current = {
         max: settingsPayload.graph_defaults.max_clusters,

@@ -48,7 +48,7 @@ class SyncPipelineService:
                 user_id=user_id,
                 status=PipelineStatus.pending.value,
                 phase=PipelinePhase.pending.value,
-                started_at=datetime.now(timezone.utc),
+                started_at=None,
             )
             db.add(run)
             await db.commit()
