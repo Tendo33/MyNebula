@@ -108,8 +108,6 @@ async def test_get_first_user_orders_by_lowest_id():
     await user_service._get_first_user(db)
 
     assert db.statement is not None
-    compiled = str(
-        db.statement.compile(compile_kwargs={"literal_binds": True})
-    ).lower()
+    compiled = str(db.statement.compile(compile_kwargs={"literal_binds": True})).lower()
     assert "order by" in compiled
     assert "users.id asc" in compiled

@@ -53,8 +53,8 @@ def _parse_month_window(month: str | None) -> tuple[datetime, datetime] | None:
 
 def _build_topic_filter_condition(topic: str):
     normalized_topic = topic.strip().lower()
-    topic_values = func.unnest(StarredRepo.topics).table_valued("topic").alias(
-        "topic_values"
+    topic_values = (
+        func.unnest(StarredRepo.topics).table_valued("topic").alias("topic_values")
     )
     return (
         select(1)
