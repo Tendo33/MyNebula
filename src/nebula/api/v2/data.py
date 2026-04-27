@@ -1,8 +1,9 @@
 """V2 data/repository routes."""
 
+import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import Text, and_, asc, cast, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,7 @@ from .metadata import build_v2_metadata
 
 router = APIRouter()
 graph_service = GraphQueryService()
+STARS_QUERY_PATTERN = re.compile(r"^stars:\s*>\s*(\d+)$", re.IGNORECASE)
 
 
 def _normalized_query(query: str | None) -> str:
@@ -23,10 +25,44 @@ def _normalized_query(query: str | None) -> str:
 
 def _parse_stars_threshold(query: str | None) -> int | None:
     normalized = _normalized_query(query)
-    if not normalized.startswith("stars:>"):
+    match = STARS_QUERY_PATTERN.match(normalized)
+    if match is None:
         return None
-    raw_value = normalized.split("stars:>", 1)[1].strip()
-    return int(raw_value) if raw_value.isdigit() else None
+    return int(match.group(1))
+
+
+def _parse_month_window(month: str | None) -> tuple[datetime, datetime] | None:
+    if not month:
+        return None
+    try:
+        month_dt = datetime.strptime(month, "%Y-%m")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="month must be a valid calendar month in YYYY-MM format",
+        ) from exc
+
+    next_month_year = month_dt.year + (1 if month_dt.month == 12 else 0)
+    next_month = 1 if month_dt.month == 12 else month_dt.month + 1
+    next_month_dt = month_dt.replace(year=next_month_year, month=next_month)
+    return (
+        month_dt.replace(tzinfo=timezone.utc),
+        next_month_dt.replace(tzinfo=timezone.utc),
+    )
+
+
+def _build_topic_filter_condition(topic: str):
+    normalized_topic = topic.strip().lower()
+    topic_values = func.unnest(StarredRepo.topics).table_valued("topic").alias(
+        "topic_values"
+    )
+    return (
+        select(1)
+        .select_from(topic_values)
+        .where(func.lower(func.trim(topic_values.c.topic)) == normalized_topic)
+        .correlate(StarredRepo)
+        .exists()
+    )
 
 
 @router.get("/repos", response_model=DataReposResponse)
@@ -78,22 +114,13 @@ async def get_data_repos(
                     cast(StarredRepo.topics, Text).ilike(like_q),
                 )
             )
-    if month:
-        try:
-            month_dt = datetime.strptime(month, "%Y-%m")
-            next_month_year = month_dt.year + (1 if month_dt.month == 12 else 0)
-            next_month = 1 if month_dt.month == 12 else month_dt.month + 1
-            next_month_dt = month_dt.replace(year=next_month_year, month=next_month)
-            conditions.append(
-                StarredRepo.starred_at >= month_dt.replace(tzinfo=timezone.utc)
-            )
-            conditions.append(
-                StarredRepo.starred_at < next_month_dt.replace(tzinfo=timezone.utc)
-            )
-        except ValueError:
-            pass
+    month_window = _parse_month_window(month)
+    if month_window is not None:
+        month_start, month_end = month_window
+        conditions.append(StarredRepo.starred_at >= month_start)
+        conditions.append(StarredRepo.starred_at < month_end)
     if topic:
-        conditions.append(StarredRepo.topics.contains([topic]))
+        conditions.append(_build_topic_filter_condition(topic))
 
     sort_column_map = {
         "name": StarredRepo.name,
