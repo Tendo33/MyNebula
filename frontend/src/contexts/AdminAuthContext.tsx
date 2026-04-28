@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { getAdminSession, loginAdmin, logoutAdmin } from '../api/auth';
 import { setUnauthorizedHandler } from '../api/client';
 
@@ -29,8 +30,10 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const session = await getAdminSession();
       setIsAuthenticated(session.authenticated);
       setUsername(session.authenticated ? session.username : null);
-    } catch {
-      clearSession();
+    } catch (error) {
+      if (isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
+        clearSession();
+      }
     } finally {
       setIsChecking(false);
     }

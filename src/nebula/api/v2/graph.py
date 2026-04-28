@@ -51,7 +51,7 @@ async def get_graph(
             graph_service.get_graph_data_with_options(
                 db,
                 user=user,
-                version=version,
+                version=resolved_version,
                 include_edges=include_edges,
             ),
             timeout=settings.api_query_timeout_seconds,
@@ -90,7 +90,7 @@ async def get_graph_edges(
             graph_service.get_edges_page(
                 db,
                 user=user,
-                version=version,
+                version=resolved_version,
                 cursor=cursor,
                 limit=limit,
             ),
@@ -126,7 +126,11 @@ async def get_graph_timeline(
         return Response(status_code=304, headers={"ETag": etag})
     try:
         payload = await asyncio.wait_for(
-            graph_service.get_timeline_data(db, user=user, version=version),
+            graph_service.get_timeline_data(
+                db,
+                user=user,
+                version=resolved_version,
+            ),
             timeout=settings.api_query_timeout_seconds,
         )
     except TimeoutError as exc:
