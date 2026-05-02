@@ -451,6 +451,12 @@ async def trigger_full_refresh(
 ) -> FullRefreshResponse:
     """Trigger a full refresh of all repositories."""
     validate_full_refresh_confirmation(payload.confirm)
+    app_settings = get_app_settings()
+    if not app_settings.github_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GitHub token not configured. Full refresh cannot start.",
+        )
     await _acquire_full_refresh_creation_lock(db, user.id)
     active_pipeline = await _get_active_pipeline_run(db, user.id)
     if active_pipeline is not None:

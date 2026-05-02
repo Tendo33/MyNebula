@@ -7,6 +7,8 @@ const setSyncing = vi.fn();
 const setSyncStep = vi.fn();
 const loadSettings = vi.fn();
 const triggerFullRefreshV2 = vi.fn();
+const startSyncPipelineV2 = vi.fn();
+const startReclusterV2 = vi.fn();
 const pollUntilComplete = vi.fn();
 
 vi.mock('react-i18next', () => ({
@@ -80,8 +82,8 @@ vi.mock('../../api/v2/settings', () => ({
 
 vi.mock('../../api/v2/sync', () => ({
   getPipelineStatusV2: vi.fn(),
-  startReclusterV2: vi.fn(),
-  startSyncPipelineV2: vi.fn(),
+  startReclusterV2: (...args: unknown[]) => startReclusterV2(...args),
+  startSyncPipelineV2: (...args: unknown[]) => startSyncPipelineV2(...args),
 }));
 
 vi.mock('../../api/auth', () => ({
@@ -99,6 +101,8 @@ describe('Settings partial failed warning', () => {
     refreshData.mockReset();
     loadSettings.mockReset();
     triggerFullRefreshV2.mockReset();
+    startSyncPipelineV2.mockReset();
+    startReclusterV2.mockReset();
     pollUntilComplete.mockReset();
     loadSettings.mockResolvedValue({
       schedule: {
@@ -192,5 +196,47 @@ describe('Settings partial failed warning', () => {
         showTrajectories: expect.any(Boolean),
       })
     );
+  });
+
+  it('shows a warning banner when incremental sync completes with partial failures', async () => {
+    startSyncPipelineV2.mockResolvedValue({ pipeline_run_id: 456 });
+    pollUntilComplete.mockResolvedValueOnce({
+      success: false,
+      error: 'Pipeline phase partial failure phase=stars task_id=22 failed_items=2',
+      cancelled: false,
+    });
+
+    render(<Settings />);
+
+    await waitFor(() => expect(loadSettings).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'dashboard.sync_button' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/completed with warnings/i)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('shows a warning banner when recluster completes with partial failures', async () => {
+    startReclusterV2.mockResolvedValue({ pipeline_run_id: 789 });
+    pollUntilComplete.mockResolvedValueOnce({
+      success: false,
+      error: 'Pipeline phase partial failure phase=clustering task_id=33 failed_items=1',
+      cancelled: false,
+    });
+
+    render(<Settings />);
+
+    await waitFor(() => expect(loadSettings).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'graph.recluster' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/completed with warnings/i)
+      ).toBeInTheDocument();
+    });
   });
 });

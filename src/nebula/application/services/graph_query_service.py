@@ -278,8 +278,8 @@ class GraphQueryService:
             if target is None:
                 raise ValueError("No previous snapshot available for rollback")
 
-        await self.snapshot_repo.activate_snapshot(db, user.id, target)
         await self._validate_snapshot_or_raise(db, target)
+        await self.snapshot_repo.activate_snapshot(db, user.id, target)
         graph_data = await self.snapshot_repo.hydrate_graph_data(db, target)
         graph_data.request_id = str(uuid.uuid4())
         return graph_data

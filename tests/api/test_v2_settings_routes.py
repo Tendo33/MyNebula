@@ -182,6 +182,41 @@ async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_trigger_full_refresh_rejects_without_github_token(monkeypatch):
+    from nebula.application.services import sync_ops_service
+    from nebula.schemas.v2.settings import FullRefreshRequest
+
+    user = type("User", (), {"id": 1})()
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(sync_ops_service, "_acquire_full_refresh_creation_lock", noop)
+    monkeypatch.setattr(
+        sync_ops_service,
+        "_get_active_pipeline_run",
+        noop,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sync_ops_service,
+        "get_app_settings",
+        lambda: type("Settings", (), {"github_token": ""})(),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await sync_ops_service.trigger_full_refresh(
+            payload=FullRefreshRequest(confirm=True),
+            background_tasks=BackgroundTasks(),
+            user=user,
+            db=object(),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "GitHub token" in str(exc_info.value.detail)
+
+
+@pytest.mark.asyncio
 async def test_get_full_refresh_job_status_preserves_partial_failed_status(monkeypatch):
     from nebula.api.v2 import settings as settings_api
 

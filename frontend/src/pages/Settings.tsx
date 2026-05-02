@@ -50,6 +50,12 @@ import { getAdminAuthConfig } from '../api/auth';
 import { pollUntilComplete, type TaskCompletionResult } from './settings/polling';
 import { logClientError } from '../utils/debug';
 
+const isPartialFailureResult = (result: TaskCompletionResult): boolean =>
+  !result.success &&
+  !result.cancelled &&
+  typeof result.error === 'string' &&
+  result.error.includes('partial failure');
+
 const Settings = () => {
   const { t } = useTranslation();
   const {
@@ -393,6 +399,17 @@ const Settings = () => {
       if (pipelineResult.cancelled) {
         return;
       }
+      if (isPartialFailureResult(pipelineResult)) {
+        setWarning(
+          t(
+            'sync.partial_failed_warning',
+            'Sync completed with warnings. Check the latest run details before retrying.'
+          )
+        );
+        await refreshData();
+        await loadScheduleData();
+        return;
+      }
       if (!pipelineResult.success) {
         throw new Error(pipelineResult.error || t('errors.sync_failed'));
       }
@@ -433,6 +450,17 @@ const Settings = () => {
       );
       finishPollingOperation(controller);
       if (pipelineResult.cancelled) {
+        return;
+      }
+      if (isPartialFailureResult(pipelineResult)) {
+        setWarning(
+          t(
+            'graph.recluster_partial_failed',
+            'Re-cluster completed with warnings. Review the latest pipeline details.'
+          )
+        );
+        await refreshData();
+        await loadScheduleData();
         return;
       }
       if (!pipelineResult.success) {

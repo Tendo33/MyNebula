@@ -93,6 +93,25 @@ async def test_rollback_active_snapshot_activates_previous():
     assert payload.request_id is not None
 
 
+class _InvalidPreviousSnapshotRepo(_SnapshotRepoStub):
+    async def validate_snapshot_consistency(self, _db, _snapshot):
+        return False, "snapshot edge count mismatch"
+
+
+@pytest.mark.asyncio
+async def test_rollback_active_snapshot_does_not_activate_invalid_snapshot():
+    repo = _InvalidPreviousSnapshotRepo()
+    service = GraphQueryService(snapshot_repo=repo)
+
+    with pytest.raises(ValueError, match="consistency validation failed"):
+        await service.rollback_active_snapshot(
+            db=object(),
+            user=SimpleNamespace(id=1),
+        )
+
+    assert repo.activated_snapshot_id is None
+
+
 @pytest.mark.asyncio
 async def test_get_snapshot_metadata_returns_request_id():
     service = GraphQueryService(snapshot_repo=_SnapshotRepoStub())
