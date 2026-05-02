@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.background import BackgroundTasks
 
-from nebula.schemas.v2.settings import ScheduleResponse, SyncInfoResponse
+from nebula.schemas.v2.settings import ScheduleConfig, ScheduleResponse, SyncInfoResponse
 
 
 @pytest.mark.asyncio
@@ -115,6 +115,13 @@ async def test_update_graph_defaults_rejects_invalid_bounds():
         )
 
     assert exc_info.value.status_code == 400
+
+
+def test_schedule_config_rejects_invalid_timezone():
+    with pytest.raises(ValueError) as exc_info:
+        ScheduleConfig(timezone="Mars/Olympus")
+
+    assert "valid IANA timezone" in str(exc_info.value)
 
 
 @pytest.mark.asyncio

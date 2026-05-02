@@ -23,6 +23,10 @@ def _normalized_query(query: str | None) -> str:
     return (query or "").strip().lower()
 
 
+def _trimmed_query(query: str | None) -> str:
+    return (query or "").strip()
+
+
 def _parse_stars_threshold(query: str | None) -> int | None:
     normalized = _normalized_query(query)
     match = STARS_QUERY_PATTERN.match(normalized)
@@ -97,12 +101,13 @@ async def get_data_repos(
         conditions.append(StarredRepo.language == language)
     if min_stars > 0:
         conditions.append(StarredRepo.stargazers_count >= min_stars)
-    if q:
-        stars_threshold = _parse_stars_threshold(q)
+    trimmed_query = _trimmed_query(q)
+    if trimmed_query:
+        stars_threshold = _parse_stars_threshold(trimmed_query)
         if stars_threshold is not None:
             conditions.append(StarredRepo.stargazers_count > stars_threshold)
         else:
-            like_q = f"%{q.strip()}%"
+            like_q = f"%{trimmed_query}%"
             conditions.append(
                 or_(
                     StarredRepo.name.ilike(like_q),

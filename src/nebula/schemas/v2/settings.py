@@ -1,8 +1,9 @@
 """V2 settings API schemas."""
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ScheduleConfig(BaseModel):
@@ -20,6 +21,16 @@ class ScheduleConfig(BaseModel):
     timezone: str = Field(
         default="Asia/Shanghai", description="Timezone for schedule (IANA format)"
     )
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        """Accept only valid IANA timezone identifiers."""
+        try:
+            ZoneInfo(value)
+        except Exception as exc:
+            raise ValueError("timezone must be a valid IANA timezone") from exc
+        return value
 
 
 class ScheduleResponse(BaseModel):

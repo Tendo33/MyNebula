@@ -6,6 +6,7 @@ from nebula.api.v2.data import (
     _build_topic_filter_condition,
     _parse_month_window,
     _parse_stars_threshold,
+    _trimmed_query,
 )
 from nebula.db import StarredRepo
 
@@ -14,6 +15,12 @@ def test_parse_stars_threshold_accepts_optional_spaces():
     assert _parse_stars_threshold("stars:>42") == 42
     assert _parse_stars_threshold("stars: > 42") == 42
     assert _parse_stars_threshold("  Stars:\t>\t7  ") == 7
+
+
+def test_trimmed_query_collapses_blank_input():
+    assert _trimmed_query(None) == ""
+    assert _trimmed_query("   ") == ""
+    assert _trimmed_query("  graph  ") == "graph"
 
 
 def test_parse_month_window_rejects_invalid_calendar_month():
