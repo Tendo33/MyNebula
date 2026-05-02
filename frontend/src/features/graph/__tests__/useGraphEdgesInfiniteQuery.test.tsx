@@ -193,4 +193,50 @@ describe('useGraphEdgesInfiniteQuery', () => {
     expect(result.current.edgesError).toContain('manual loading halted');
     expect(vi.mocked(getGraphEdgesPageV2)).toHaveBeenCalledTimes(3);
   });
+
+  it('does not consume auto-load budget when a page fetch fails transiently', async () => {
+    vi.mocked(getGraphEdgesPageV2)
+      .mockResolvedValueOnce({
+        edges: [{ source: 1, target: 2, weight: 0.8 }],
+        next_cursor: 5,
+        version: 'snapshot-a',
+      })
+      .mockRejectedValueOnce(new Error('temporary edge failure'))
+      .mockResolvedValueOnce({
+        edges: [{ source: 2, target: 3, weight: 0.7 }],
+        next_cursor: 10,
+        version: 'snapshot-a',
+      })
+      .mockResolvedValueOnce({
+        edges: [{ source: 3, target: 4, weight: 0.6 }],
+        next_cursor: null,
+        version: 'snapshot-a',
+      });
+
+    const { result } = renderHook(
+      () =>
+        useGraphEdgesInfiniteQuery({
+          version: 'snapshot-a',
+          refreshNonce: 0,
+          enabled: true,
+          limit: 200,
+          maxAutoPages: 2,
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(result.current.stagedEdges).toHaveLength(1);
+    });
+    expect(result.current.stagedEdges).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.retryEdgeLoading();
+    });
+
+    await waitFor(() => {
+      expect(result.current.stagedEdges).toHaveLength(3);
+    });
+    expect(result.current.autoLoadHalted).toBe(false);
+  });
 });

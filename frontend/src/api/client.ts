@@ -1,7 +1,10 @@
 import axios, { AxiosHeaders } from 'axios';
 import type { AxiosError } from 'axios';
 
-const getApiBaseUrl = (): string => {
+export const normalizeApiBaseOrigin = (value: string): string =>
+  value.trim().replace(/\/+$/, '').replace(/\/api$/i, '');
+
+export const getApiBaseUrl = (): string => {
 	// 开发环境下始终使用相对路径，以便 Vite proxy 能够接管从而避免跨域和 Cookie 丢失问题
 	if (import.meta.env.DEV) {
 		return "/api";
@@ -10,11 +13,11 @@ const getApiBaseUrl = (): string => {
 	// 首先检查环境变量
 	const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
 	if (envUrl) {
-		return `${envUrl}/api`;
+		return `${normalizeApiBaseOrigin(envUrl)}/api`;
 	}
 	// 默认使用当前页面的 origin + /api，或者 localhost:8071
 	if (typeof window !== "undefined") {
-		return `${window.location.origin}/api`;
+		return `${normalizeApiBaseOrigin(window.location.origin)}/api`;
 	}
 	return "http://localhost:8071/api";
 };

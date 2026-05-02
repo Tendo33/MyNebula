@@ -81,8 +81,13 @@ export const useGraphEdgesInfiniteQuery = ({
       return;
     }
     seenNextCursorsRef.current.add(nextCursor);
-    pagesLoadedRef.current += 1;
-    await fetchNextPage();
+    try {
+      await fetchNextPage();
+      pagesLoadedRef.current += 1;
+    } catch (error) {
+      seenNextCursorsRef.current.delete(nextCursor);
+      throw error;
+    }
   }, [
     autoLoadHalted,
     data?.pages,
@@ -133,7 +138,12 @@ export const useGraphEdgesInfiniteQuery = ({
       return;
     }
     seenNextCursorsRef.current.add(nextCursor);
-    await fetchNextPage();
+    try {
+      await fetchNextPage();
+    } catch (error) {
+      seenNextCursorsRef.current.delete(nextCursor);
+      throw error;
+    }
   }, [data?.pages, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const stagedEdges = useMemo(

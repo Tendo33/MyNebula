@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from collections import deque
 
 import pytest
 from fastapi import HTTPException
@@ -222,6 +223,34 @@ async def test_login_admin_rate_limits_repeated_failures():
     assert second_exc.value.status_code == 429
 
     auth_api._LOGIN_ATTEMPTS.clear()
+
+
+@pytest.mark.asyncio
+async def test_login_rate_limit_prunes_stale_buckets(monkeypatch):
+    from nebula.api.v2 import auth as auth_api
+
+    auth_api._LOGIN_ATTEMPTS.clear()
+    auth_api._LOGIN_ATTEMPTS["ip:stale"] = deque([1.0])
+    auth_api._LOGIN_ATTEMPTS["user:stale"] = deque([1.0])
+
+    settings = AppSettings(
+        admin_username="owner",
+        admin_password="topsecret",
+        admin_session_secret="session-secret",
+        admin_login_rate_limit_window_seconds=60,
+    )
+
+    monkeypatch.setattr(auth_api.time, "monotonic", lambda: 120.0)
+
+    await auth_api.login_admin(
+        payload=auth_api.LoginRequest(username="owner", password="topsecret"),
+        request=_build_request(),
+        response=Response(),
+        settings=settings,
+    )
+
+    assert "ip:stale" not in auth_api._LOGIN_ATTEMPTS
+    assert "user:stale" not in auth_api._LOGIN_ATTEMPTS
 
 
 @pytest.mark.asyncio

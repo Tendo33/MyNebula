@@ -103,7 +103,14 @@ def _prune_login_attempts(key: str, now_ts: float, window_seconds: int) -> deque
     cutoff = now_ts - window_seconds
     while bucket and bucket[0] < cutoff:
         bucket.popleft()
+    if not bucket:
+        _LOGIN_ATTEMPTS.pop(key, None)
     return bucket
+
+
+def _prune_all_login_attempts(now_ts: float, window_seconds: int) -> None:
+    for key in list(_LOGIN_ATTEMPTS):
+        _prune_login_attempts(key, now_ts, window_seconds)
 
 
 def _enforce_login_rate_limit(
@@ -112,6 +119,7 @@ def _enforce_login_rate_limit(
     settings: AppSettings,
 ) -> None:
     now_ts = time.monotonic()
+    _prune_all_login_attempts(now_ts, settings.admin_login_rate_limit_window_seconds)
     keys = _login_rate_limit_keys(request, username, settings)
     for key in keys:
         bucket = _prune_login_attempts(
@@ -138,12 +146,15 @@ def _record_failed_login(
     settings: AppSettings,
 ) -> None:
     now_ts = time.monotonic()
+    _prune_all_login_attempts(now_ts, settings.admin_login_rate_limit_window_seconds)
     for key in _login_rate_limit_keys(request, username, settings):
         bucket = _prune_login_attempts(
             key,
             now_ts,
             settings.admin_login_rate_limit_window_seconds,
         )
+        if key not in _LOGIN_ATTEMPTS:
+            _LOGIN_ATTEMPTS[key] = bucket
         bucket.append(now_ts)
     logger.warning(
         "Admin login failed "
