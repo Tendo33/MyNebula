@@ -52,8 +52,17 @@ vi.mock('../../components/layout/LanguageSwitch', () => ({
 }));
 
 vi.mock('../../components/ui/SyncProgress', () => ({
-  SyncProgress: ({ steps }: { steps: Array<{ id: string; status: string }> }) => (
-    <div data-testid="sync-progress">
+  SyncProgress: ({
+    isOpen,
+    title,
+    steps,
+  }: {
+    isOpen: boolean;
+    title?: string;
+    steps: Array<{ id: string; status: string }>;
+  }) => (
+    <div data-testid="sync-progress" data-open={String(isOpen)}>
+      {title && <div data-testid="sync-progress-title">{title}</div>}
       {steps.map((step) => (
         <div key={step.id} data-testid={`step-${step.id}`}>
           {step.status}
@@ -219,12 +228,21 @@ describe('Settings partial failed warning', () => {
     });
   });
 
-  it('shows a warning banner when recluster completes with partial failures', async () => {
+  it('opens sync progress and updates shared sync state during recluster polling', async () => {
     startReclusterV2.mockResolvedValue({ pipeline_run_id: 789 });
-    pollUntilComplete.mockResolvedValueOnce({
-      success: false,
-      error: 'Pipeline phase partial failure phase=clustering task_id=33 failed_items=1',
-      cancelled: false,
+    pollUntilComplete.mockImplementationOnce(async ({ onProgress }) => {
+      onProgress?.({
+        pipeline_run_id: 789,
+        user_id: 1,
+        status: 'running',
+        phase: 'clustering',
+        last_error: null,
+      });
+      return {
+        success: false,
+        error: 'Pipeline phase partial failure phase=clustering task_id=33 failed_items=1',
+        cancelled: false,
+      };
     });
 
     render(<Settings />);
@@ -234,9 +252,13 @@ describe('Settings partial failed warning', () => {
     fireEvent.click(screen.getByRole('button', { name: 'graph.recluster' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/completed with warnings/i)
-      ).toBeInTheDocument();
+      expect(screen.getByTestId('sync-progress')).toHaveAttribute('data-open', 'true');
+    });
+    expect(setSyncing).toHaveBeenCalledWith(true);
+    expect(setSyncStep).toHaveBeenCalledWith('clustering');
+
+    await waitFor(() => {
+      expect(setSyncing).toHaveBeenLastCalledWith(false);
     });
   });
 });

@@ -110,6 +110,12 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   const [similarError, setSimilarError] = useState<string | null>(null);
   const similarCacheRef = useRef<Map<string, CachedRelatedItem[]>>(new Map());
   const similarInFlightRef = useRef<Map<string, Promise<CachedRelatedItem[]>>>(new Map());
+  const graphCacheVersion = rawData?.request_id ?? rawData?.version ?? 'no-graph-data';
+
+  useEffect(() => {
+    similarCacheRef.current.clear();
+    similarInFlightRef.current.clear();
+  }, [graphCacheVersion]);
 
   useEffect(() => {
     let disposed = false;
@@ -126,7 +132,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       return;
     }
 
-    const cacheKey = `${node.id}:${settings.relatedMinSemantic.toFixed(3)}`;
+    const cacheKey = `${graphCacheVersion}:${node.id}:${settings.relatedMinSemantic.toFixed(3)}`;
     const byId = new Map(rawData.nodes.map((n) => [n.id, n]));
     const mapCachedItems = (items: CachedRelatedItem[]): RelatedGraphNode[] => {
       const mapped: RelatedGraphNode[] = [];
@@ -195,7 +201,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
     return () => {
       disposed = true;
     };
-  }, [activeTab, node.id, rawData, settings.relatedMinSemantic]);
+  }, [activeTab, graphCacheVersion, node.id, rawData, settings.relatedMinSemantic]);
 
 
   // Get related repos by different dimensions
