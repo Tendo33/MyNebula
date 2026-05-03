@@ -400,14 +400,14 @@ const Settings = () => {
         return;
       }
       if (isPartialFailureResult(pipelineResult)) {
+        await refreshData();
+        await loadScheduleData();
         setWarning(
           t(
             'sync.partial_failed_warning',
             'Sync completed with warnings. Check the latest run details before retrying.'
           )
         );
-        await refreshData();
-        await loadScheduleData();
         return;
       }
       if (!pipelineResult.success) {
@@ -435,8 +435,13 @@ const Settings = () => {
   };
 
   const handleRecluster = async () => {
+    setWarning(null);
     setReclusterLoading(true);
     setError(null);
+    setSyncing(true);
+    setShowSyncProgress(true);
+    setProgressTitle(t('graph.recluster'));
+    resetSteps();
 
     try {
       const started = await startReclusterV2({
@@ -446,21 +451,22 @@ const Settings = () => {
       const controller = beginPollingOperation();
       const pipelineResult = await waitForPipelineComplete(
         started.pipeline_run_id,
-        controller.signal
+        controller.signal,
+        updatePipelineProgress
       );
       finishPollingOperation(controller);
       if (pipelineResult.cancelled) {
         return;
       }
       if (isPartialFailureResult(pipelineResult)) {
+        await refreshData();
+        await loadScheduleData();
         setWarning(
           t(
             'graph.recluster_partial_failed',
             'Re-cluster completed with warnings. Review the latest pipeline details.'
           )
         );
-        await refreshData();
-        await loadScheduleData();
         return;
       }
       if (!pipelineResult.success) {
@@ -473,6 +479,9 @@ const Settings = () => {
       setError(t('errors.clustering_failed'));
       logClientError('Re-cluster failed:', err);
     } finally {
+      activePollControllerRef.current?.abort();
+      setSyncing(false);
+      setSyncStep('');
       setReclusterLoading(false);
     }
   };
@@ -517,12 +526,17 @@ const Settings = () => {
           (sum: number, entry) => sum + (entry.failed_items ?? 0),
           0,
         );
-        setWarning(
-          t(
-            'settings.full_refresh_partial_failed',
-            `Full refresh completed with warnings (${partialFailures.length} stages, ${failedItems} failed items).`
-          )
+        const warningMessage = t(
+          'settings.full_refresh_partial_failed',
+          `Full refresh completed with warnings (${partialFailures.length} stages, ${failedItems} failed items).`
         );
+
+        setSyncSteps((prev) => finalizeCompletedSteps(prev, partialFailures, t));
+
+        await refreshData();
+        await loadScheduleData();
+        setWarning(warningMessage);
+        return;
       }
 
       setSyncSteps((prev) => finalizeCompletedSteps(prev, partialFailures, t));

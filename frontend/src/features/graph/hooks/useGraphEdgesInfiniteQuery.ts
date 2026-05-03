@@ -30,12 +30,21 @@ export const useGraphEdgesInfiniteQuery = ({
   const seenNextCursorsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
+    if (!enabled) {
+      autoLoadEnabledRef.current = true;
+      seenNextCursorsRef.current = new Set();
+      pagesLoadedRef.current = 0;
+      setAutoLoadHalted(false);
+      setEdgesError(null);
+      return;
+    }
+
     autoLoadEnabledRef.current = true;
     seenNextCursorsRef.current = new Set();
     pagesLoadedRef.current = 0;
     setAutoLoadHalted(false);
     setEdgesError(null);
-  }, [version, refreshNonce]);
+  }, [enabled, version, refreshNonce]);
 
   const query = useInfiniteQuery({
     queryKey: [GRAPH_EDGES_QUERY_KEY, version, refreshNonce],
