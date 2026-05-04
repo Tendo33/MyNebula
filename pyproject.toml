@@ -8,12 +8,6 @@ version = "1.2.7"
 description = "Transform your GitHub Stars into a semantic knowledge nebula"
 readme = "README.md"
 license = {file = "LICENSE"}
-authors = [
-    {name = "Your Name", email = "your.email@example.com"},
-]
-maintainers = [
-    {name = "Your Name", email = "your.email@example.com"},
-]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -73,11 +67,11 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Tendo33/mynebula"
-Repository = "https://github.com/Tendo33/mynebula"
+Homepage = "https://github.com/Tendo33/MyNebula"
+Repository = "https://github.com/Tendo33/MyNebula"
 Documentation = "https://mynebula.readthedocs.io"
-Changelog = "https://github.com/Tendo33/mynebula/blob/main/CHANGELOG.md"
-"Bug Tracker" = "https://github.com/Tendo33/mynebula/issues"
+Changelog = "https://github.com/Tendo33/MyNebula/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/Tendo33/MyNebula/issues"
 
 [project.scripts]
 mynebula = "nebula.main:run"

@@ -6,7 +6,7 @@ export default defineConfig(function (_a) {
     var mode = _a.mode;
     // Load env file based on `mode` in the current working directory.
     var env = loadEnv(mode, process.cwd(), "");
-    var apiTarget = env.VITE_API_BASE_URL || "http://localhost:8071";
+    var apiTarget = env.VITE_API_BASE_URL || "http://localhost:8000";
     return {
         plugins: [react()],
         server: {

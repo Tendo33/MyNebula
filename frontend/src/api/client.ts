@@ -15,11 +15,11 @@ export const getApiBaseUrl = (): string => {
 	if (envUrl) {
 		return `${normalizeApiBaseOrigin(envUrl)}/api`;
 	}
-	// 默认使用当前页面的 origin + /api，或者 localhost:8071
+	// 默认使用当前页面的 origin + /api，或者 localhost:8000
 	if (typeof window !== "undefined") {
 		return `${normalizeApiBaseOrigin(window.location.origin)}/api`;
 	}
-	return "http://localhost:8071/api";
+	return "http://localhost:8000/api";
 };
 
 export const API_BASE_URL = getApiBaseUrl();

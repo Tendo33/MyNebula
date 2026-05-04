@@ -229,7 +229,7 @@ VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
 
 然后访问 <http://localhost:5173>。
 
-如果没有设置 `VITE_API_BASE_URL`，Vite 开发服务器默认会请求 `http://localhost:8071`。
+如果没有设置 `VITE_API_BASE_URL`，Vite 开发服务器默认会请求 `http://localhost:8000`。
 
 ### 由 FastAPI 直接托管构建后的前端
 

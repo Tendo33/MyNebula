@@ -229,7 +229,7 @@ VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
 
 Then open <http://localhost:5173>.
 
-If `VITE_API_BASE_URL` is not set, the Vite dev server defaults to `http://localhost:8071`.
+If `VITE_API_BASE_URL` is not set, the Vite dev server defaults to `http://localhost:8000`.
 
 ### Serve the built frontend from FastAPI
 
