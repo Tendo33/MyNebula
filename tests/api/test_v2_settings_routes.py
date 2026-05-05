@@ -4,7 +4,11 @@ import pytest
 from fastapi import HTTPException
 from fastapi.background import BackgroundTasks
 
-from nebula.schemas.v2.settings import ScheduleConfig, ScheduleResponse, SyncInfoResponse
+from nebula.schemas.v2.settings import (
+    ScheduleConfig,
+    ScheduleResponse,
+    SyncInfoResponse,
+)
 
 
 @pytest.mark.asyncio
