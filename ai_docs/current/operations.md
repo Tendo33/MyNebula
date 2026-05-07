@@ -26,7 +26,7 @@ MyNebula 当前主要有两种运行方式：
 ### 当前环境变量示例片段
 
 ```bash
-APP_VERSION=1.2.8
+APP_VERSION=1.2.9
 READ_ACCESS_MODE=demo
 API_PORT=8000
 ```

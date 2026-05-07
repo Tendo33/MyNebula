@@ -180,6 +180,11 @@ async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
         fake_get_active_pipeline_run,
         raising=False,
     )
+    monkeypatch.setattr(
+        sync_ops_service,
+        "get_app_settings",
+        lambda: type("Settings", (), {"github_token": "token"})(),
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await sync_ops_service.trigger_full_refresh(
