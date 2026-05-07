@@ -44,6 +44,29 @@ interface GraphUiState {
 
 const STORAGE_KEY_SETTINGS = 'nebula_graph_settings';
 
+const getStorage = (): Storage | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
+const persistSettings = (settings: GraphSettingsState): void => {
+  const storage = getStorage();
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
+  } catch {
+    // Ignore storage failures so local UI state can still update.
+  }
+};
+
 const defaultFilters: GraphFiltersState = {
   selectedClusters: new Set<number>(),
   selectedStarLists: new Set<number>(),
@@ -62,8 +85,10 @@ const defaultSettings: GraphSettingsState = {
 };
 
 const getInitialSettings = (): GraphSettingsState => {
+  const storage = getStorage();
+  if (!storage) return defaultSettings;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
+    const stored = storage.getItem(STORAGE_KEY_SETTINGS);
     if (!stored) return defaultSettings;
     return { ...defaultSettings, ...JSON.parse(stored) };
   } catch {
@@ -81,7 +106,7 @@ export const useGraphStore = create<GraphUiState>((set) => ({
   updateSettings: (settings) =>
     set((state) => {
       const updated = { ...state.settings, ...settings };
-      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(updated));
+      persistSettings(updated);
       return { settings: updated };
     }),
   setSearchQuery: (query) =>

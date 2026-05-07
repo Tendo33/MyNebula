@@ -292,6 +292,13 @@ class SchedulerService:
 
     async def _try_acquire_scheduler_lock(self, db: AsyncSession) -> bool:
         """Acquire cross-process transaction-level advisory lock for scheduler tick."""
+        get_bind = getattr(db, "get_bind", None)
+        if get_bind is None:
+            return False
+        bind = get_bind()
+        dialect_name = bind.dialect.name if bind is not None else ""
+        if dialect_name != "postgresql":
+            return False
         result = await db.execute(
             text("SELECT pg_try_advisory_xact_lock(:lock_key)"),
             {"lock_key": SCHEDULER_ADVISORY_LOCK_KEY},

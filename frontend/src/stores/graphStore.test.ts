@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useGraphStore } from './graphStore';
 
 describe('useGraphStore', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('toggles cluster selection', () => {
     useGraphStore.setState({
       ...useGraphStore.getState(),
@@ -37,5 +41,22 @@ describe('useGraphStore', () => {
     });
 
     expect(useGraphStore.getState().selectedNode?.id).toBe(1);
+  });
+
+  it('keeps updating settings when localStorage writes fail', () => {
+    const setItemSpy = vi
+      .spyOn(window.localStorage.__proto__, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('storage unavailable');
+      });
+
+    expect(() =>
+      useGraphStore.getState().updateSettings({
+        maxClusters: 12,
+      })
+    ).not.toThrow();
+
+    expect(useGraphStore.getState().settings.maxClusters).toBe(12);
+    expect(setItemSpy).toHaveBeenCalled();
   });
 });

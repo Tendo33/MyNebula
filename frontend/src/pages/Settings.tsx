@@ -97,6 +97,24 @@ const Settings = () => {
     [syncSteps, t]
   );
 
+  const resetSteps = useCallback(() => {
+    setSyncSteps(createPipelineSyncSteps());
+  }, []);
+
+  const resetFullRefreshStepState = useCallback(() => {
+    setSyncSteps(createFullRefreshSteps());
+  }, []);
+
+  const resetSyncUi = useCallback(() => {
+    activePollControllerRef.current?.abort();
+    activePollControllerRef.current = null;
+    latestFullRefreshJobRef.current = null;
+    setSyncing(false);
+    setSyncStep('');
+    setShowSyncProgress(false);
+    resetSteps();
+  }, [resetSteps, setSyncStep, setSyncing]);
+
   useEffect(() => {
     setProgressTitle(t('sync.title', 'Syncing Data'));
   }, [t]);
@@ -141,15 +159,14 @@ const Settings = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      activePollControllerRef.current?.abort();
-      activePollControllerRef.current = null;
+      resetSyncUi();
       setSchedule(null);
       setSyncInfo(null);
       return;
     }
 
     loadScheduleData();
-  }, [isAuthenticated, loadScheduleData]);
+  }, [isAuthenticated, loadScheduleData, resetSyncUi]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -253,14 +270,6 @@ const Settings = () => {
     };
   }, []);
 
-  const resetSteps = () => {
-    setSyncSteps(createPipelineSyncSteps());
-  };
-
-  const resetFullRefreshStepState = () => {
-    setSyncSteps(createFullRefreshSteps());
-  };
-
   const updatePipelineProgress = (pipeline: PipelineStatusResponse) => {
     const phaseOrder = ['stars', 'embeddings', 'clustering', 'snapshot'] as const;
     const normalizedPhase = normalizePipelinePhase(pipeline.phase);
@@ -326,8 +335,7 @@ const Settings = () => {
   };
 
   const handleAdminLogout = async () => {
-    activePollControllerRef.current?.abort();
-    activePollControllerRef.current = null;
+    resetSyncUi();
     await logout();
     setSchedule(null);
     setSyncInfo(null);

@@ -130,6 +130,9 @@ async def test_scheduler_uses_transaction_level_advisory_lock():
     executed_sql: list[str] = []
 
     class _FakeLockDb:
+        def get_bind(self):
+            return SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+
         async def execute(self, statement, _params):
             executed_sql.append(str(statement))
             return _FakeResult(True)
@@ -140,6 +143,23 @@ async def test_scheduler_uses_transaction_level_advisory_lock():
     assert acquired is True
     assert any("pg_try_advisory_xact_lock" in sql for sql in executed_sql)
     assert not hasattr(service, "_release_scheduler_lock")
+
+
+@pytest.mark.asyncio
+async def test_scheduler_skips_advisory_lock_on_non_postgres():
+    from nebula.core.scheduler import SchedulerService
+
+    class _FakeLockDb:
+        def get_bind(self):
+            return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+        async def execute(self, _statement, _params):
+            raise AssertionError("non-Postgres lock should not execute SQL")
+
+    service = SchedulerService()
+    acquired = await service._try_acquire_scheduler_lock(_FakeLockDb())
+
+    assert acquired is False
 
 
 @pytest.mark.asyncio
