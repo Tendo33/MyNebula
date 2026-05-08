@@ -10,12 +10,14 @@ from nebula.core.embedding import get_embedding_service
 from nebula.core.github_client import GitHubClient
 from nebula.core.llm import get_llm_service
 from nebula.db import Cluster, StarredRepo, SyncTask, User
-from nebula.utils import compute_content_hash, compute_topics_hash, get_logger
+from nebula.utils import get_logger
 
 from .sync_execution_support import (
+    collect_readme_targets,
     fetch_readmes_in_parallel,
     generate_repo_enhancements_in_parallel,
     log_task_stage,
+    prefetch_existing_repos,
     sync_star_lists,
 )
 
@@ -115,21 +117,13 @@ async def sync_stars_task(
             new_count = 0
             updated_count = 0
 
-            # Batch-prefetch existing repos to avoid N+1 queries
             prefetch_started = perf_counter()
             github_ids = [repo.id for repo in repos]
-            existing_map: dict[int, StarredRepo] = {}
-            batch_size_lookup = 500
-            for i in range(0, len(github_ids), batch_size_lookup):
-                batch_ids = github_ids[i : i + batch_size_lookup]
-                batch_result = await db.execute(
-                    select(StarredRepo).where(
-                        StarredRepo.user_id == user_id,
-                        StarredRepo.github_repo_id.in_(batch_ids),
-                    )
-                )
-                for row in batch_result.scalars():
-                    existing_map[row.github_repo_id] = row
+            existing_map = await prefetch_existing_repos(
+                db,
+                user_id=user_id,
+                github_ids=github_ids,
+            )
             log_task_stage(
                 "sync_stars_task",
                 "prefetch_existing",
@@ -138,21 +132,7 @@ async def sync_stars_task(
                 existing=len(existing_map),
             )
 
-            readme_targets: list[str] = []
-            repo_hashes: dict[int, tuple[str | None, str | None]] = {}
-            for repo in repos:
-                existing = existing_map.get(repo.id)
-                new_desc_hash = compute_content_hash(repo.description)
-                new_topics_hash = compute_topics_hash(repo.topics)
-                repo_hashes[repo.id] = (new_desc_hash, new_topics_hash)
-                if existing is None:
-                    readme_targets.append(repo.full_name)
-                    continue
-                if (
-                    existing.description_hash != new_desc_hash
-                    or existing.topics_hash != new_topics_hash
-                ):
-                    readme_targets.append(repo.full_name)
+            readme_targets, repo_hashes = collect_readme_targets(repos, existing_map)
 
             readmes_by_repo: dict[str, str | None] = {}
             if readme_targets:

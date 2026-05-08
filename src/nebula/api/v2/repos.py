@@ -5,6 +5,9 @@ Handles repository CRUD and semantic search operations.
 
 from __future__ import annotations
 
+import hashlib
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.params import Depends as DependsParam
 from sqlalchemy import func, select
@@ -12,10 +15,10 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.related_repo_service import get_related_repos
-from nebula.core.auth import get_admin_session_username
 from nebula.core.config import AppSettings, get_app_settings
 from nebula.core.embedding import get_embedding_service
 from nebula.db import (
+    GraphSnapshotNode,
     RepoRelatedFeedback,
     StarredRepo,
     User,
@@ -33,10 +36,81 @@ from nebula.schemas.repo import (
 from nebula.utils import get_logger
 
 from .access import resolve_read_user, resolve_single_user
-from .auth import ADMIN_SESSION_COOKIE, require_admin, require_admin_csrf
+from .auth import require_admin, require_admin_csrf
 
 logger = get_logger(__name__)
 router = APIRouter()
+_SEMANTIC_SEARCH_CACHE_TTL_SECONDS = 30.0
+_SEMANTIC_SEARCH_CACHE_MAX_ENTRIES = 128
+_SEMANTIC_SEARCH_CACHE: dict[
+    tuple[int, str, int, str | None, int | None, int | None],
+    tuple[float, list[RepoSearchResponse]],
+] = {}
+
+
+def _normalize_semantic_query(query: str) -> str:
+    normalized = query.strip()
+    if not normalized:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Search query must not be blank",
+        )
+    return normalized
+
+
+def _semantic_search_cache_key(
+    *,
+    user_id: int,
+    query: str,
+    limit: int,
+    language: str | None,
+    cluster_id: int | None,
+    min_stars: int | None,
+) -> tuple[int, str, int, str | None, int | None, int | None]:
+    return (user_id, query.lower(), limit, language, cluster_id, min_stars)
+
+
+def _prune_semantic_search_cache(now_ts: float) -> None:
+    expired_keys = [
+        key
+        for key, (expires_at, _) in _SEMANTIC_SEARCH_CACHE.items()
+        if expires_at <= now_ts
+    ]
+    for key in expired_keys:
+        _SEMANTIC_SEARCH_CACHE.pop(key, None)
+
+
+def _read_semantic_search_cache(
+    key: tuple[int, str, int, str | None, int | None, int | None],
+    now_ts: float,
+) -> list[RepoSearchResponse] | None:
+    _prune_semantic_search_cache(now_ts)
+    cached = _SEMANTIC_SEARCH_CACHE.get(key)
+    if cached is None:
+        return None
+    expires_at, payload = cached
+    if expires_at <= now_ts:
+        _SEMANTIC_SEARCH_CACHE.pop(key, None)
+        return None
+    return payload
+
+
+def _write_semantic_search_cache(
+    key: tuple[int, str, int, str | None, int | None, int | None],
+    payload: list[RepoSearchResponse],
+    now_ts: float,
+) -> None:
+    _prune_semantic_search_cache(now_ts)
+    if len(_SEMANTIC_SEARCH_CACHE) >= _SEMANTIC_SEARCH_CACHE_MAX_ENTRIES:
+        oldest_key = min(
+            _SEMANTIC_SEARCH_CACHE,
+            key=lambda cache_key: _SEMANTIC_SEARCH_CACHE[cache_key][0],
+        )
+        _SEMANTIC_SEARCH_CACHE.pop(oldest_key, None)
+    _SEMANTIC_SEARCH_CACHE[key] = (
+        now_ts + _SEMANTIC_SEARCH_CACHE_TTL_SECONDS,
+        payload,
+    )
 
 
 @router.get("", response_model=RepoListResponse)
@@ -277,22 +351,40 @@ async def search_repos(
     if isinstance(settings, DependsParam):
         settings = get_app_settings()
 
-    session_username = get_admin_session_username(
-        http_request,
-        settings,
-        cookie_name=ADMIN_SESSION_COOKIE,
+    started = time.perf_counter()
+    normalized_query = _normalize_semantic_query(request.query)
+    cache_key = _semantic_search_cache_key(
+        user_id=user.id,
+        query=normalized_query,
+        limit=request.limit,
+        language=request.language,
+        cluster_id=request.cluster_id,
+        min_stars=request.min_stars,
     )
-    is_admin_session = session_username == settings.admin_username
-
-    if settings.effective_read_access_mode() == "demo" and not is_admin_session:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Semantic search requires authenticated read mode",
+    query_hash = hashlib.sha1(normalized_query.encode("utf-8")).hexdigest()[:12]
+    now_ts = time.monotonic()
+    cached_results = _read_semantic_search_cache(cache_key, now_ts)
+    if cached_results is not None:
+        logger.info(
+            "Semantic search cache hit "
+            f"user_id={user.id} query_hash={query_hash} limit={request.limit}"
         )
+        return cached_results
 
-    # Get embedding for query
-    embedding_service = get_embedding_service()
-    query_embedding = await embedding_service.embed_text(request.query)
+    try:
+        embedding_service = get_embedding_service()
+        query_embedding = await embedding_service.embed_text(normalized_query)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception(
+            "Semantic search embedding failed "
+            f"user_id={user.id} query_hash={query_hash}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Semantic search is temporarily unavailable",
+        ) from None
 
     # Build vector similarity query
     # Using pgvector's cosine distance operator <=>
@@ -311,6 +403,18 @@ async def search_repos(
         .limit(request.limit)
     )
 
+    # Keep semantic search aligned with the active graph snapshot when one exists,
+    # so Command Palette results stay selectable inside the current graph view.
+    active_snapshot_id = getattr(user, "active_graph_snapshot_id", None)
+    if active_snapshot_id is not None:
+        query = query.where(
+            StarredRepo.id.in_(
+                select(GraphSnapshotNode.repo_id).where(
+                    GraphSnapshotNode.snapshot_id == active_snapshot_id
+                )
+            )
+        )
+
     # Apply additional filters
     if request.language:
         query = query.where(StarredRepo.language == request.language)
@@ -322,13 +426,20 @@ async def search_repos(
     result = await db.execute(query)
     rows = result.all()
 
-    return [
+    payload = [
         RepoSearchResponse(
             repo=RepoResponse.model_validate(row.StarredRepo),
             score=float(row.similarity) if row.similarity else 0.0,
         )
         for row in rows
     ]
+    _write_semantic_search_cache(cache_key, payload, now_ts)
+    logger.info(
+        "Semantic search completed "
+        f"user_id={user.id} query_hash={query_hash} "
+        f"results={len(payload)} latency_ms={(time.perf_counter() - started) * 1000:.1f}"
+    )
+    return payload
 
 
 @router.get("/languages/stats")

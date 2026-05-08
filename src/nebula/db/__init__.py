@@ -12,6 +12,7 @@ from .database import (
     init_db,
 )
 from .models import (
+    AdminLoginAttempt,
     Base,
     Cluster,
     GraphSnapshot,
@@ -36,6 +37,7 @@ __all__ = [
     "AsyncSessionLocal",
     # Models
     "Base",
+    "AdminLoginAttempt",
     "User",
     "StarredRepo",
     "StarList",

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useGraph } from '../../contexts/GraphContext';
 import { GraphNode, ClusterInfo } from '../../types';
+import { searchRepos } from '../../api/repos';
 import {
   asRepoSearchCandidate,
   matchesClusterSearch,
@@ -50,6 +51,7 @@ interface SearchResultBase {
 interface RepoSearchResult extends SearchResultBase {
   type: 'repo';
   data: GraphNode;
+  source?: 'local' | 'remote';
 }
 
 interface ClusterSearchResult extends SearchResultBase {
@@ -144,6 +146,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [remoteRepoResults, setRemoteRepoResults] = useState<RepoSearchResult[]>([]);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -187,46 +192,149 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       .slice(0, 20);
   }, [rawData]);
 
+  const normalizedQuery = useMemo(() => normalizeSearchQuery(query), [query]);
+  const starsThreshold = useMemo(
+    () => parseStarsThreshold(normalizedQuery),
+    [normalizedQuery]
+  );
+
+  const buildRepoResult = useCallback((node: GraphNode, source: 'local' | 'remote'): RepoSearchResult => ({
+    type: 'repo',
+    id: node.id,
+    title: node.full_name,
+    subtitle: node.ai_summary || node.description,
+    icon: node.owner_avatar_url ? (
+      <img
+        src={node.owner_avatar_url}
+        alt=""
+        className="w-6 h-6 rounded"
+        loading="lazy"
+        decoding="async"
+        width={24}
+        height={24}
+      />
+    ) : (
+      <div className="w-6 h-6 rounded bg-border-light flex items-center justify-center text-xs dark:bg-dark-border">
+        {node.owner?.charAt(0).toUpperCase()}
+      </div>
+    ),
+    meta:
+      `${source === 'remote' ? 'Semantic · ' : ''}⭐ ${node.stargazers_count.toLocaleString()}${
+        node.language ? ` · ${node.language}` : ''
+      }`,
+    data: node,
+    source,
+  }), []);
+
+  const localRepoResults = useMemo((): RepoSearchResult[] => {
+    if (!rawData || !(activeFilter === 'all' || activeFilter === 'repos') || !normalizedQuery) {
+      return [];
+    }
+    return rawData.nodes
+      .filter(node => matchesRepoSearch(asRepoSearchCandidate(node), normalizedQuery))
+      .slice(0, MAX_RESULTS)
+      .map(node => buildRepoResult(node, 'local'));
+  }, [activeFilter, buildRepoResult, normalizedQuery, rawData]);
+
+  useEffect(() => {
+    if (
+      !isOpen ||
+      !rawData ||
+      !(activeFilter === 'all' || activeFilter === 'repos') ||
+      !normalizedQuery ||
+      starsThreshold !== null ||
+      localRepoResults.length > 0
+    ) {
+      setRemoteRepoResults([]);
+      setRemoteLoading(false);
+      setRemoteError(null);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    setRemoteLoading(true);
+    setRemoteError(null);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await searchRepos({
+          query: query.trim(),
+          limit: MAX_RESULTS,
+        }, {
+          signal: controller.signal,
+        });
+        if (cancelled) return;
+
+        const mapped = response.map((item) => {
+          const existingNode = rawData.nodes.find((node) => node.id === item.repo.id);
+          const repoNode: GraphNode =
+            existingNode ?? {
+              id: item.repo.id,
+              github_id: item.repo.github_repo_id,
+              full_name: item.repo.full_name,
+              name: item.repo.name,
+              description: item.repo.description,
+              language: item.repo.language,
+              html_url: item.repo.html_url,
+              owner: item.repo.owner,
+              owner_avatar_url: undefined,
+              x: 0,
+              y: 0,
+              z: 0,
+              cluster_id: item.repo.cluster_id,
+              color: '#6B7280',
+              size: 1,
+              star_list_id: null,
+              stargazers_count: item.repo.stargazers_count,
+              ai_summary: item.repo.ai_summary,
+              topics: item.repo.topics,
+            };
+          return buildRepoResult(repoNode, 'remote');
+        });
+
+        setRemoteRepoResults(mapped);
+      } catch (error) {
+        if (cancelled) return;
+        logClientWarn('Remote semantic repo search failed', error);
+        setRemoteError(t('search.remoteFailed', 'Semantic search is temporarily unavailable'));
+        setRemoteRepoResults([]);
+      } finally {
+        if (!cancelled) {
+          setRemoteLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [
+    activeFilter,
+    buildRepoResult,
+    isOpen,
+    localRepoResults.length,
+    normalizedQuery,
+    query,
+    rawData,
+    starsThreshold,
+    t,
+  ]);
+
   // Search results
   const results = useMemo((): SearchResult[] => {
     if (!rawData) return [];
 
     const searchResults: SearchResult[] = [];
-    const normalizedQuery = normalizeSearchQuery(query);
-    const starsThreshold = parseStarsThreshold(normalizedQuery);
-
-    // Search repos
+    const seenRepoIds = new Set<number>();
     if (activeFilter === 'all' || activeFilter === 'repos') {
-      const matchedRepos = rawData.nodes
-        .filter(node => {
-          if (!normalizedQuery) return false;
-          return matchesRepoSearch(asRepoSearchCandidate(node), normalizedQuery);
-        })
-        .slice(0, MAX_RESULTS)
-        .map(node => ({
-          type: 'repo' as const,
-          id: node.id,
-          title: node.name,
-          subtitle: node.description || node.ai_summary,
-          icon: node.owner_avatar_url ? (
-            <img
-              src={node.owner_avatar_url}
-              alt=""
-              className="w-6 h-6 rounded"
-              loading="lazy"
-              decoding="async"
-              width={24}
-              height={24}
-            />
-          ) : (
-            <div className="w-6 h-6 rounded bg-border-light flex items-center justify-center text-xs dark:bg-dark-border">
-              {node.owner?.charAt(0).toUpperCase()}
-            </div>
-          ),
-          meta: `⭐ ${node.stargazers_count.toLocaleString()}${node.language ? ` · ${node.language}` : ''}`,
-          data: node,
-        }));
-      searchResults.push(...matchedRepos);
+      for (const repoResult of [...localRepoResults, ...remoteRepoResults]) {
+        if (seenRepoIds.has(repoResult.data.id)) continue;
+        seenRepoIds.add(repoResult.data.id);
+        searchResults.push(repoResult);
+      }
     }
 
     // Search clusters
@@ -295,7 +403,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }
 
     return searchResults;
-  }, [rawData, query, activeFilter, languages, allTags]);
+  }, [activeFilter, allTags, languages, localRepoResults, normalizedQuery, rawData, remoteRepoResults, starsThreshold]);
 
   // Quick filters for empty state
   const quickFilters = useMemo(() => {
@@ -565,6 +673,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                 </div>
               </div>
             </div>
+          ) : remoteLoading && results.length === 0 ? (
+            <div className="py-12 text-center">
+              <Search className="w-12 h-12 text-text-dim mx-auto mb-3 animate-pulse" />
+              <p className="text-text-muted">
+                {t('common.loading', 'Loading...')}
+              </p>
+            </div>
           ) : results.length > 0 ? (
             // Search results
             <div className="py-2">
@@ -634,7 +749,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                 {t('search.noResults', 'No results found for')} "{query}"
               </p>
               <p className="text-sm text-text-dim mt-1">
-                {t('search.tryDifferent', 'Try a different search term')}
+                {remoteError ?? t('search.tryDifferent', 'Try a different search term')}
               </p>
             </div>
           )}

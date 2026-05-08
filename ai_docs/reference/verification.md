@@ -94,3 +94,45 @@ if missing:
 - 同时改前后端、脚本或跨层文档时跑 `Full stack`
 - 改 `ai_docs/`、`README*`、`AGENTS.md`、`CLAUDE.md` 或 `doc/*.md` 时，先跑对应任务验证，再额外跑 `Docs and links`
 - 判断自动化门禁时只看 `CI gate`，不要把它和 `Full stack` 混为一组
+
+## Hotspot Regression Matrix
+
+以下检查用于修改热点模块时做最小回归，避免每次都只靠“全量跑完再看”：
+
+### Graph / Search hotspots
+
+适用范围：
+- `frontend/src/components/graph/Graph2D.tsx`
+- `frontend/src/components/ui/CommandPalette.tsx`
+- `frontend/src/contexts/GraphContext.tsx`
+- `frontend/src/utils/search.ts`
+- `src/nebula/api/v2/repos.py` 中的语义搜索
+
+建议最小验证：
+
+```bash
+uv run pytest -q tests/api/test_v2_auth_access.py -k "repo_search"
+npm --prefix frontend run test -- src/components/ui/__tests__/CommandPalette.test.tsx
+npm --prefix frontend run test -- src/pages/__tests__/GraphPage.url-state.test.tsx
+npm --prefix frontend run test -- src/features/data/hooks/useDataReposQuery.test.tsx
+npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json
+```
+
+### Sync / Scheduler hotspots
+
+适用范围：
+- `src/nebula/application/services/sync_execution_service.py`
+- `src/nebula/application/services/pipeline_service.py`
+- `src/nebula/application/services/sync_ops_service.py`
+- `src/nebula/core/scheduler.py`
+- `frontend/src/pages/Settings.tsx`
+
+建议最小验证：
+
+```bash
+uv run pytest -q tests/core/test_scheduler_service.py
+uv run pytest -q tests/core/test_pipeline_state_machine.py
+uv run pytest -q tests/api/test_v2_sync_pipeline_api.py tests/api/test_v2_settings_routes.py
+npm --prefix frontend run test -- src/pages/__tests__/Settings.partial-failed.test.tsx src/pages/__tests__/settings.polling.test.tsx
+npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json
+```

@@ -1,12 +1,12 @@
 """Admin authentication API routes."""
 
 import hmac
-import time
-from collections import deque
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
+from sqlalchemy import delete, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.core.auth import (
     create_signed_session_token,
@@ -18,6 +18,7 @@ from nebula.core.auth import (
     verify_signed_session_token,
 )
 from nebula.core.config import AppSettings, get_app_settings
+from nebula.db import AdminLoginAttempt, get_db
 from nebula.utils import get_logger
 
 router = APIRouter()
@@ -26,7 +27,6 @@ logger = get_logger(__name__)
 ADMIN_SESSION_COOKIE = "nebula_admin_session"
 ADMIN_CSRF_COOKIE = "nebula_admin_csrf"
 ADMIN_CSRF_HEADER = "x-csrf-token"
-_LOGIN_ATTEMPTS: dict[str, deque[float]] = {}
 
 
 class LoginRequest(BaseModel):
@@ -98,36 +98,75 @@ def _login_rate_limit_keys(
     )
 
 
-def _prune_login_attempts(key: str, now_ts: float, window_seconds: int) -> deque[float]:
-    bucket = _LOGIN_ATTEMPTS.setdefault(key, deque())
-    cutoff = now_ts - window_seconds
-    while bucket and bucket[0] < cutoff:
-        bucket.popleft()
-    if not bucket:
-        _LOGIN_ATTEMPTS.pop(key, None)
-    return bucket
+async def _delete_stale_login_attempts(
+    db: AsyncSession,
+    *,
+    cutoff: datetime,
+) -> None:
+    await db.execute(
+        delete(AdminLoginAttempt).where(AdminLoginAttempt.attempted_at < cutoff)
+    )
+    await db.commit()
 
 
-def _prune_all_login_attempts(now_ts: float, window_seconds: int) -> None:
-    for key in list(_LOGIN_ATTEMPTS):
-        _prune_login_attempts(key, now_ts, window_seconds)
+async def _count_recent_login_attempts(
+    db: AsyncSession,
+    *,
+    bucket_key: str,
+    cutoff: datetime,
+) -> int:
+    result = await db.execute(
+        select(func.count(AdminLoginAttempt.id)).where(
+            AdminLoginAttempt.bucket_key == bucket_key,
+            AdminLoginAttempt.attempted_at >= cutoff,
+        )
+    )
+    return int(result.scalar() or 0)
 
 
-def _enforce_login_rate_limit(
+async def _store_login_attempts(
+    db: AsyncSession,
+    *,
+    keys: tuple[str, str],
+    attempted_at: datetime,
+) -> None:
+    db.add_all(
+        [
+            AdminLoginAttempt(bucket_key=keys[0], attempted_at=attempted_at),
+            AdminLoginAttempt(bucket_key=keys[1], attempted_at=attempted_at),
+        ]
+    )
+    await db.commit()
+
+
+async def _clear_login_attempts(
+    db: AsyncSession,
+    *,
+    keys: tuple[str, str],
+) -> None:
+    await db.execute(
+        delete(AdminLoginAttempt).where(AdminLoginAttempt.bucket_key.in_(keys))
+    )
+    await db.commit()
+
+
+async def _enforce_login_rate_limit(
+    db: AsyncSession,
     request: Request,
     username: str,
     settings: AppSettings,
 ) -> None:
-    now_ts = time.monotonic()
-    _prune_all_login_attempts(now_ts, settings.admin_login_rate_limit_window_seconds)
+    now_utc = datetime.now(timezone.utc)
+    cutoff = now_utc - timedelta(seconds=settings.admin_login_rate_limit_window_seconds)
+    await _delete_stale_login_attempts(db, cutoff=cutoff)
     keys = _login_rate_limit_keys(request, username, settings)
     for key in keys:
-        bucket = _prune_login_attempts(
-            key,
-            now_ts,
-            settings.admin_login_rate_limit_window_seconds,
+        attempt_count = await _count_recent_login_attempts(
+            db,
+            bucket_key=key,
+            cutoff=cutoff,
         )
-        if len(bucket) >= settings.admin_login_rate_limit_max_attempts:
+        if attempt_count >= settings.admin_login_rate_limit_max_attempts:
             logger.warning(
                 "Admin login rate limit exceeded "
                 f"bucket={key.split(':', 1)[0]} "
@@ -140,22 +179,19 @@ def _enforce_login_rate_limit(
             )
 
 
-def _record_failed_login(
+async def _record_failed_login(
+    db: AsyncSession,
     request: Request,
     username: str,
     settings: AppSettings,
 ) -> None:
-    now_ts = time.monotonic()
-    _prune_all_login_attempts(now_ts, settings.admin_login_rate_limit_window_seconds)
-    for key in _login_rate_limit_keys(request, username, settings):
-        bucket = _prune_login_attempts(
-            key,
-            now_ts,
-            settings.admin_login_rate_limit_window_seconds,
-        )
-        if key not in _LOGIN_ATTEMPTS:
-            _LOGIN_ATTEMPTS[key] = bucket
-        bucket.append(now_ts)
+    attempted_at = datetime.now(timezone.utc)
+    keys = _login_rate_limit_keys(request, username, settings)
+    cutoff = attempted_at - timedelta(
+        seconds=settings.admin_login_rate_limit_window_seconds
+    )
+    await _delete_stale_login_attempts(db, cutoff=cutoff)
+    await _store_login_attempts(db, keys=keys, attempted_at=attempted_at)
     logger.warning(
         "Admin login failed "
         f"username={_mask_username(username)} "
@@ -163,13 +199,16 @@ def _record_failed_login(
     )
 
 
-def _clear_login_failures(
+async def _clear_login_failures(
+    db: AsyncSession,
     request: Request,
     username: str,
     settings: AppSettings,
 ) -> None:
-    for key in _login_rate_limit_keys(request, username, settings):
-        _LOGIN_ATTEMPTS.pop(key, None)
+    await _clear_login_attempts(
+        db,
+        keys=_login_rate_limit_keys(request, username, settings),
+    )
 
 
 def _request_is_secure(request: Request, settings: AppSettings) -> bool:
@@ -235,6 +274,7 @@ async def login_admin(
     request: Request,
     response: Response,
     settings: AppSettings = Depends(get_app_settings),  # noqa: B008
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Login as admin and set signed session cookie."""
     if not is_admin_auth_enabled(settings):
@@ -243,14 +283,14 @@ async def login_admin(
             detail="Admin auth is not configured",
         )
 
-    _enforce_login_rate_limit(request, payload.username, settings)
+    await _enforce_login_rate_limit(db, request, payload.username, settings)
     if not verify_admin_credentials(payload.username, payload.password, settings):
-        _record_failed_login(request, payload.username, settings)
+        await _record_failed_login(db, request, payload.username, settings)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
         )
-    _clear_login_failures(request, payload.username, settings)
+    await _clear_login_failures(db, request, payload.username, settings)
 
     expires_delta = timedelta(hours=settings.admin_session_ttl_hours)
     token = create_signed_session_token(

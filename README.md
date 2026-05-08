@@ -295,7 +295,7 @@ Current API contract notes:
 
 - `/api/v2/data/repos` now returns lightweight cluster metadata and `total_repos`, so the Data page no longer needs an extra graph snapshot request.
 - `/api/v2/dashboard` now carries summary, top languages, top topics, and top clusters directly; only timeline data is fetched separately for activity charts.
-- Data, Graph, and Command Palette share the same literal search fields and `stars:>N` search syntax.
+- Data and Graph share the same literal search fields and `stars:>N` search syntax; Command Palette keeps those local filters and falls back to semantic repo search when local repo matches are insufficient.
 
 ## Project Structure
 

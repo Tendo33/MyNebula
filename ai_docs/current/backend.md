@@ -27,11 +27,15 @@
 - 图谱、Dashboard、Data 等读路径优先走快照或轻量聚合响应
 - 当前运行模型仍以单用户优先，很多读写流程默认按首个用户作用域处理
 - `api/v2/access.py` 现在提供显式的单用户解析入口，Settings/Sync 等写路由优先在 API 边界拿到 `user` 后再传入 service
+- `READ_ACCESS_MODE=demo` 现在允许匿名读路径继续访问 Data / Graph / 语义搜索，`authenticated` 模式下读接口仍要求有效管理员会话
 - 默认用户自举已带并发保护与冲突恢复，不应再把首次访问视为“天然串行”
 - `Graph` 的历史版本查询对不存在的 `version` 返回显式错误，不再静默回退到 active
 - 同步链路支持通过 `SYNC_README_FETCH_CONCURRENCY`、`SYNC_LLM_ENHANCEMENT_CONCURRENCY`、`SYNC_PROGRESS_COMMIT_INTERVAL` 做性能调优
 - README 抓取、LLM 增强、star list 同步的执行辅助逻辑已从主执行服务中拆到 `application/services/sync_execution_support.py`
 - 图快照构建服务支持显式传入 `user`，并记录 `nodes / edges / timeline / total` 分段耗时，便于定位大图性能瓶颈
+- scheduler 的 advisory lock 现在仅在 PostgreSQL 下启用，避免非 PostgreSQL 运行环境持续报错
+- Settings 页的鉴权丢失会主动中止轮询、关闭进度弹层并清理共享同步状态，不再遗留假“同步中”UI
+- 图谱偏好设置的本地持久化已经对 `window/localStorage` 不可用场景做容错，不再因为存储失败打断设置更新
 
 ## 当前稳定入口
 

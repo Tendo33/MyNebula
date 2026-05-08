@@ -468,6 +468,26 @@ class RepoRelatedCache(Base):
         )
 
 
+class AdminLoginAttempt(Base):
+    """Shared login-attempt bucket for admin auth rate limiting."""
+
+    __tablename__ = "admin_login_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bucket_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_admin_login_attempts_bucket_attempted_at",
+            "bucket_key",
+            "attempted_at",
+        ),
+    )
+
+
 class GraphSnapshot(Base):
     """Versioned immutable graph snapshot."""
 

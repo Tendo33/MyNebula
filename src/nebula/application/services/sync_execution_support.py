@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from nebula.core.github_client import GitHubClient
 from nebula.db import StarList, StarredRepo
-from nebula.utils import get_logger
+from nebula.utils import compute_content_hash, compute_topics_hash, get_logger
 
 logger = get_logger(__name__)
 
@@ -76,6 +76,55 @@ async def generate_repo_enhancements_in_parallel(
 
     await asyncio.gather(*(enhance(repo) for repo in repos))
     return results
+
+
+async def prefetch_existing_repos(
+    db,
+    *,
+    user_id: int,
+    github_ids: list[int],
+    batch_size: int = 500,
+) -> dict[int, StarredRepo]:
+    """Fetch existing repos in batches and index them by GitHub repo id."""
+    existing_map: dict[int, StarredRepo] = {}
+    for index in range(0, len(github_ids), batch_size):
+        batch_ids = github_ids[index : index + batch_size]
+        batch_result = await db.execute(
+            select(StarredRepo).where(
+                StarredRepo.user_id == user_id,
+                StarredRepo.github_repo_id.in_(batch_ids),
+            )
+        )
+        for row in batch_result.scalars().all():
+            existing_map[row.github_repo_id] = row
+    return existing_map
+
+
+def collect_readme_targets(
+    repos: list,
+    existing_map: dict[int, StarredRepo],
+) -> tuple[list[str], dict[int, tuple[str | None, str | None]]]:
+    """Compute content hashes and decide which repos need README refresh."""
+    readme_targets: list[str] = []
+    repo_hashes: dict[int, tuple[str | None, str | None]] = {}
+
+    for repo in repos:
+        existing = existing_map.get(repo.id)
+        new_desc_hash = compute_content_hash(repo.description)
+        new_topics_hash = compute_topics_hash(repo.topics)
+        repo_hashes[repo.id] = (new_desc_hash, new_topics_hash)
+
+        if existing is None:
+            readme_targets.append(repo.full_name)
+            continue
+
+        if (
+            existing.description_hash != new_desc_hash
+            or existing.topics_hash != new_topics_hash
+        ):
+            readme_targets.append(repo.full_name)
+
+    return readme_targets, repo_hashes
 
 
 async def sync_star_lists(

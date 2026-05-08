@@ -6,6 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
 import { ClusterInfo } from '../../types';
 import { GraphSkeleton } from '../ui/Skeleton';
+import {
+  calculateNodeRadius,
+  computeConvexHull,
+  getNodeId,
+  GRAPH_2D_COLORS as COLORS,
+} from './graph2dUtils';
 
 // ============================================================================
 // Types
@@ -62,22 +68,6 @@ type RegisteredForce = NonNullable<Parameters<ForceGraphMethods['d3Force']>[1]>;
 // Constants
 // ============================================================================
 
-const COLORS = {
-  NODE_DEFAULT: '#6B7280',      // Gray
-  NODE_HOVER: '#8B5CF6',        // Purple
-  NODE_SELECTED: '#3B82F6',     // Blue
-  NODE_NEIGHBOR: '#60A5FA',     // Light Blue
-  NODE_DIM: 'rgba(107, 114, 128, 0.3)',
-  LINK_DEFAULT: 'rgba(156, 163, 175, 0.4)',
-  LINK_ACTIVE: 'rgba(139, 92, 246, 0.6)',
-  LINK_DIM: 'rgba(156, 163, 175, 0.1)',
-  CLUSTER_BG: 'rgba(0, 0, 0, 0.03)',
-  LABEL_BG: 'rgba(255, 255, 255, 0.9)',
-  LABEL_TEXT: '#1F2937',
-};
-
-const NODE_BASE_SIZE = 5;
-const NODE_MAX_SIZE = 30;
 const ZOOM_TO_FIT_PADDING = 80;
 
 // Layout tuning: larger = more spaced out initial view
@@ -88,66 +78,6 @@ const CENTER_PULL_STRENGTH = 0.01;
 // ============================================================================
 // Utility Functions
 // ============================================================================
-
-/** Get node ID from either number or node object (force-graph mutates links) */
-const getNodeId = (node: number | ProcessedNode): number => {
-  return typeof node === 'object' ? node.id : node;
-};
-
-/** Calculate node radius based on stars (logarithmic scale) */
-const calculateNodeRadius = (stars: number): number => {
-  const base = Math.log10(Math.max(stars, 1) + 1) * NODE_BASE_SIZE;
-  return Math.min(Math.max(base, NODE_BASE_SIZE), NODE_MAX_SIZE);
-};
-
-/** Compute convex hull of points using Graham scan */
-const computeConvexHull = (points: { x: number; y: number }[]): { x: number; y: number }[] => {
-  if (points.length < 3) return points;
-
-  // Find the bottom-most point (or left most point in case of tie)
-  let start = 0;
-  for (let i = 1; i < points.length; i++) {
-    if (points[i].y < points[start].y ||
-        (points[i].y === points[start].y && points[i].x < points[start].x)) {
-      start = i;
-    }
-  }
-
-  // Swap start to first position
-  [points[0], points[start]] = [points[start], points[0]];
-  const pivot = points[0];
-
-  // Sort by polar angle
-  points.sort((a, b) => {
-    if (a === pivot) return -1;
-    if (b === pivot) return 1;
-
-    const angleA = Math.atan2(a.y - pivot.y, a.x - pivot.x);
-    const angleB = Math.atan2(b.y - pivot.y, b.x - pivot.x);
-
-    if (angleA !== angleB) return angleA - angleB;
-
-    // If angles are same, sort by distance
-    const distA = (a.x - pivot.x) ** 2 + (a.y - pivot.y) ** 2;
-    const distB = (b.x - pivot.x) ** 2 + (b.y - pivot.y) ** 2;
-    return distA - distB;
-  });
-
-  // Build hull
-  const hull: { x: number; y: number }[] = [];
-  for (const p of points) {
-    while (hull.length >= 2) {
-      const a = hull[hull.length - 2];
-      const b = hull[hull.length - 1];
-      const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
-      if (cross <= 0) hull.pop();
-      else break;
-    }
-    hull.push(p);
-  }
-
-  return hull;
-};
 
 // ============================================================================
 // Component

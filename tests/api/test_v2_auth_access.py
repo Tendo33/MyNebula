@@ -1,4 +1,4 @@
-from collections import deque
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +8,46 @@ from starlette.responses import Response
 
 from nebula.core.auth import create_signed_session_token
 from nebula.core.config import AppSettings
+
+
+class _FakeRateLimitDb:
+    def __init__(self):
+        self.attempts: list[tuple[str, datetime]] = []
+
+
+def _install_fake_rate_limit_helpers(monkeypatch, auth_api):
+    fake_db = _FakeRateLimitDb()
+
+    async def fake_delete_stale(db, *, cutoff):
+        db.attempts = [
+            (bucket_key, attempted_at)
+            for bucket_key, attempted_at in db.attempts
+            if attempted_at >= cutoff
+        ]
+
+    async def fake_count_recent(db, *, bucket_key, cutoff):
+        return sum(
+            1
+            for current_key, attempted_at in db.attempts
+            if current_key == bucket_key and attempted_at >= cutoff
+        )
+
+    async def fake_store(db, *, keys, attempted_at):
+        for key in keys:
+            db.attempts.append((key, attempted_at))
+
+    async def fake_clear(db, *, keys):
+        db.attempts = [
+            (bucket_key, attempted_at)
+            for bucket_key, attempted_at in db.attempts
+            if bucket_key not in keys
+        ]
+
+    monkeypatch.setattr(auth_api, "_delete_stale_login_attempts", fake_delete_stale)
+    monkeypatch.setattr(auth_api, "_count_recent_login_attempts", fake_count_recent)
+    monkeypatch.setattr(auth_api, "_store_login_attempts", fake_store)
+    monkeypatch.setattr(auth_api, "_clear_login_attempts", fake_clear)
+    return fake_db
 
 
 def _build_request(
@@ -110,10 +150,10 @@ async def test_resolve_read_user_accepts_authenticated_mode_with_valid_session(
 
 
 @pytest.mark.asyncio
-async def test_login_admin_uses_secure_cookie_behind_trusted_proxy():
+async def test_login_admin_uses_secure_cookie_behind_trusted_proxy(monkeypatch):
     from nebula.api.v2 import auth as auth_api
 
-    auth_api._LOGIN_ATTEMPTS.clear()
+    fake_db = _install_fake_rate_limit_helpers(monkeypatch, auth_api)
     settings = AppSettings(
         admin_username="owner",
         admin_password="topsecret",
@@ -129,6 +169,7 @@ async def test_login_admin_uses_secure_cookie_behind_trusted_proxy():
         request=_build_request(forwarded_proto="https"),
         response=response,
         settings=settings,
+        db=fake_db,
     )
 
     set_cookie_headers = response.headers.getlist("set-cookie")
@@ -137,10 +178,12 @@ async def test_login_admin_uses_secure_cookie_behind_trusted_proxy():
 
 
 @pytest.mark.asyncio
-async def test_login_admin_ignores_forwarded_proto_when_proxy_trust_disabled():
+async def test_login_admin_ignores_forwarded_proto_when_proxy_trust_disabled(
+    monkeypatch,
+):
     from nebula.api.v2 import auth as auth_api
 
-    auth_api._LOGIN_ATTEMPTS.clear()
+    fake_db = _install_fake_rate_limit_helpers(monkeypatch, auth_api)
     settings = AppSettings(
         admin_username="owner",
         admin_password="topsecret",
@@ -156,6 +199,7 @@ async def test_login_admin_ignores_forwarded_proto_when_proxy_trust_disabled():
         request=_build_request(forwarded_proto="https"),
         response=response,
         settings=settings,
+        db=fake_db,
     )
 
     set_cookie_headers = response.headers.getlist("set-cookie")
@@ -164,10 +208,10 @@ async def test_login_admin_ignores_forwarded_proto_when_proxy_trust_disabled():
 
 
 @pytest.mark.asyncio
-async def test_login_admin_ignores_forwarded_proto_from_untrusted_proxy():
+async def test_login_admin_ignores_forwarded_proto_from_untrusted_proxy(monkeypatch):
     from nebula.api.v2 import auth as auth_api
 
-    auth_api._LOGIN_ATTEMPTS.clear()
+    fake_db = _install_fake_rate_limit_helpers(monkeypatch, auth_api)
     settings = AppSettings(
         admin_username="owner",
         admin_password="topsecret",
@@ -183,6 +227,7 @@ async def test_login_admin_ignores_forwarded_proto_from_untrusted_proxy():
         request=_build_request(forwarded_proto="https"),
         response=response,
         settings=settings,
+        db=fake_db,
     )
 
     set_cookie_headers = response.headers.getlist("set-cookie")
@@ -191,10 +236,10 @@ async def test_login_admin_ignores_forwarded_proto_from_untrusted_proxy():
 
 
 @pytest.mark.asyncio
-async def test_login_admin_rate_limits_repeated_failures():
+async def test_login_admin_rate_limits_repeated_failures(monkeypatch):
     from nebula.api.v2 import auth as auth_api
 
-    auth_api._LOGIN_ATTEMPTS.clear()
+    fake_db = _install_fake_rate_limit_helpers(monkeypatch, auth_api)
     settings = AppSettings(
         admin_username="owner",
         admin_password="topsecret",
@@ -210,6 +255,7 @@ async def test_login_admin_rate_limits_repeated_failures():
             request=request,
             response=response,
             settings=settings,
+            db=fake_db,
         )
     assert first_exc.value.status_code == 401
 
@@ -219,19 +265,20 @@ async def test_login_admin_rate_limits_repeated_failures():
             request=request,
             response=Response(),
             settings=settings,
+            db=fake_db,
         )
     assert second_exc.value.status_code == 429
-
-    auth_api._LOGIN_ATTEMPTS.clear()
 
 
 @pytest.mark.asyncio
 async def test_login_rate_limit_prunes_stale_buckets(monkeypatch):
     from nebula.api.v2 import auth as auth_api
 
-    auth_api._LOGIN_ATTEMPTS.clear()
-    auth_api._LOGIN_ATTEMPTS["ip:stale"] = deque([1.0])
-    auth_api._LOGIN_ATTEMPTS["user:stale"] = deque([1.0])
+    fake_db = _install_fake_rate_limit_helpers(monkeypatch, auth_api)
+    fake_db.attempts = [
+        ("ip:stale", datetime(2026, 1, 1, tzinfo=timezone.utc)),
+        ("user:stale", datetime(2026, 1, 1, tzinfo=timezone.utc)),
+    ]
 
     settings = AppSettings(
         admin_username="owner",
@@ -240,17 +287,29 @@ async def test_login_rate_limit_prunes_stale_buckets(monkeypatch):
         admin_login_rate_limit_window_seconds=60,
     )
 
-    monkeypatch.setattr(auth_api.time, "monotonic", lambda: 120.0)
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 1, 1, 0, 2, 0, tzinfo=tz or timezone.utc)
+
+    monkeypatch.setattr(auth_api, "datetime", _FrozenDateTime)
 
     await auth_api.login_admin(
         payload=auth_api.LoginRequest(username="owner", password="topsecret"),
         request=_build_request(),
         response=Response(),
         settings=settings,
+        db=fake_db,
     )
 
-    assert "ip:stale" not in auth_api._LOGIN_ATTEMPTS
-    assert "user:stale" not in auth_api._LOGIN_ATTEMPTS
+    assert (
+        "ip:stale",
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+    ) not in fake_db.attempts
+    assert (
+        "user:stale",
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+    ) not in fake_db.attempts
 
 
 @pytest.mark.asyncio
@@ -272,12 +331,16 @@ async def test_logout_admin_requires_csrf_dependency():
 
 
 @pytest.mark.asyncio
-async def test_repo_search_rejects_demo_mode(monkeypatch):
+async def test_repo_search_allows_demo_mode_without_admin_session(monkeypatch):
     from nebula.api.v2 import repos as repos_api
     from nebula.schemas.repo import RepoSearchRequest
 
     class _FakeEmbeddingService:
+        def __init__(self):
+            self.calls = 0
+
         async def embed_text(self, _query: str):
+            self.calls += 1
             return [0.1, 0.2, 0.3]
 
     class _FakeResult:
@@ -288,25 +351,25 @@ async def test_repo_search_rejects_demo_mode(monkeypatch):
         async def execute(self, _statement):
             return _FakeResult()
 
+    embedding_service = _FakeEmbeddingService()
     monkeypatch.setattr(
         repos_api,
         "get_app_settings",
         lambda: AppSettings(read_access_mode="demo"),
         raising=False,
     )
-    monkeypatch.setattr(
-        repos_api, "get_embedding_service", lambda: _FakeEmbeddingService()
+    monkeypatch.setattr(repos_api, "get_embedding_service", lambda: embedding_service)
+    repos_api._SEMANTIC_SEARCH_CACHE.clear()
+
+    results = await repos_api.search_repos(
+        request=RepoSearchRequest(query="vector search"),
+        http_request=_build_request(),
+        user=SimpleNamespace(id=1, active_graph_snapshot_id=None),
+        db=_FakeDb(),
     )
 
-    with pytest.raises(HTTPException) as exc_info:
-        await repos_api.search_repos(
-            request=RepoSearchRequest(query="vector search"),
-            http_request=_build_request(),
-            user=SimpleNamespace(id=1),
-            db=_FakeDb(),
-        )
-
-    assert exc_info.value.status_code == 403
+    assert results == []
+    assert embedding_service.calls == 1
 
 
 @pytest.mark.asyncio
@@ -341,13 +404,137 @@ async def test_repo_search_allows_demo_mode_with_valid_admin_session(monkeypatch
     monkeypatch.setattr(
         repos_api, "get_embedding_service", lambda: _FakeEmbeddingService()
     )
+    repos_api._SEMANTIC_SEARCH_CACHE.clear()
 
     results = await repos_api.search_repos(
         request=RepoSearchRequest(query="vector search"),
-        user=SimpleNamespace(id=1),
+        user=SimpleNamespace(id=1, active_graph_snapshot_id=None),
         db=_FakeDb(),
         settings=settings,
         http_request=_build_request(session_cookie=session_cookie),
     )
 
     assert results == []
+
+
+@pytest.mark.asyncio
+async def test_repo_search_rejects_blank_query_after_trimming(monkeypatch):
+    from nebula.api.v2 import repos as repos_api
+    from nebula.schemas.repo import RepoSearchRequest
+
+    class _FakeEmbeddingService:
+        async def embed_text(self, _query: str):
+            raise AssertionError("blank query should fail before embedding")
+
+    class _FakeDb:
+        async def execute(self, _statement):
+            raise AssertionError("blank query should fail before DB access")
+
+    monkeypatch.setattr(
+        repos_api,
+        "get_app_settings",
+        lambda: AppSettings(read_access_mode="demo"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        repos_api, "get_embedding_service", lambda: _FakeEmbeddingService()
+    )
+    repos_api._SEMANTIC_SEARCH_CACHE.clear()
+
+    with pytest.raises(HTTPException) as exc_info:
+            await repos_api.search_repos(
+                request=RepoSearchRequest(query="   "),
+                http_request=_build_request(),
+                user=SimpleNamespace(id=1, active_graph_snapshot_id=None),
+                db=_FakeDb(),
+            )
+
+    assert exc_info.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_repo_search_wraps_embedding_failures(monkeypatch):
+    from nebula.api.v2 import repos as repos_api
+    from nebula.schemas.repo import RepoSearchRequest
+
+    class _FakeEmbeddingService:
+        async def embed_text(self, _query: str):
+            raise RuntimeError("provider boom")
+
+    class _FakeDb:
+        async def execute(self, _statement):
+            raise AssertionError("provider failures should fail before DB access")
+
+    monkeypatch.setattr(
+        repos_api,
+        "get_app_settings",
+        lambda: AppSettings(read_access_mode="demo"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        repos_api, "get_embedding_service", lambda: _FakeEmbeddingService()
+    )
+    repos_api._SEMANTIC_SEARCH_CACHE.clear()
+
+    with pytest.raises(HTTPException) as exc_info:
+            await repos_api.search_repos(
+                request=RepoSearchRequest(query="vector search"),
+                http_request=_build_request(),
+                user=SimpleNamespace(id=1, active_graph_snapshot_id=None),
+                db=_FakeDb(),
+            )
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == "Semantic search is temporarily unavailable"
+
+
+@pytest.mark.asyncio
+async def test_repo_search_caches_identical_requests(monkeypatch):
+    from nebula.api.v2 import repos as repos_api
+    from nebula.schemas.repo import RepoSearchRequest
+
+    class _FakeEmbeddingService:
+        def __init__(self):
+            self.calls = 0
+
+        async def embed_text(self, _query: str):
+            self.calls += 1
+            return [0.1, 0.2, 0.3]
+
+    class _FakeResult:
+        def all(self):
+            return []
+
+    class _FakeDb:
+        def __init__(self):
+            self.calls = 0
+
+        async def execute(self, _statement):
+            self.calls += 1
+            return _FakeResult()
+
+    embedding_service = _FakeEmbeddingService()
+    fake_db = _FakeDb()
+    monkeypatch.setattr(
+        repos_api,
+        "get_app_settings",
+        lambda: AppSettings(read_access_mode="demo"),
+        raising=False,
+    )
+    monkeypatch.setattr(repos_api, "get_embedding_service", lambda: embedding_service)
+    repos_api._SEMANTIC_SEARCH_CACHE.clear()
+
+    request = RepoSearchRequest(query="vector search", limit=10, min_stars=5)
+    kwargs = {
+        "request": request,
+        "http_request": _build_request(),
+        "user": SimpleNamespace(id=1, active_graph_snapshot_id=None),
+        "db": fake_db,
+    }
+    first = await repos_api.search_repos(**kwargs)
+    second = await repos_api.search_repos(**kwargs)
+
+    assert first == []
+    assert second == []
+    assert embedding_service.calls == 1
+    assert fake_db.calls == 1
