@@ -538,3 +538,59 @@ async def test_repo_search_caches_identical_requests(monkeypatch):
     assert second == []
     assert embedding_service.calls == 1
     assert fake_db.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_repo_search_cache_is_scoped_to_active_snapshot(monkeypatch):
+    from nebula.api.v2 import repos as repos_api
+    from nebula.schemas.repo import RepoSearchRequest
+
+    class _FakeEmbeddingService:
+        def __init__(self):
+            self.calls = 0
+
+        async def embed_text(self, _query: str):
+            self.calls += 1
+            return [0.1, 0.2, 0.3]
+
+    class _FakeResult:
+        def all(self):
+            return []
+
+    class _FakeDb:
+        def __init__(self):
+            self.calls = 0
+
+        async def execute(self, _statement):
+            self.calls += 1
+            return _FakeResult()
+
+    embedding_service = _FakeEmbeddingService()
+    fake_db = _FakeDb()
+    monkeypatch.setattr(
+        repos_api,
+        "get_app_settings",
+        lambda: AppSettings(read_access_mode="demo"),
+        raising=False,
+    )
+    monkeypatch.setattr(repos_api, "get_embedding_service", lambda: embedding_service)
+    repos_api._SEMANTIC_SEARCH_CACHE.clear()
+
+    request = RepoSearchRequest(query="vector search", limit=10, min_stars=5)
+    first = await repos_api.search_repos(
+        request=request,
+        http_request=_build_request(),
+        user=SimpleNamespace(id=1, active_graph_snapshot_id=10),
+        db=fake_db,
+    )
+    second = await repos_api.search_repos(
+        request=request,
+        http_request=_build_request(),
+        user=SimpleNamespace(id=1, active_graph_snapshot_id=11),
+        db=fake_db,
+    )
+
+    assert first == []
+    assert second == []
+    assert embedding_service.calls == 2
+    assert fake_db.calls == 2

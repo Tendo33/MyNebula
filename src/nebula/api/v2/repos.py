@@ -43,7 +43,7 @@ router = APIRouter()
 _SEMANTIC_SEARCH_CACHE_TTL_SECONDS = 30.0
 _SEMANTIC_SEARCH_CACHE_MAX_ENTRIES = 128
 _SEMANTIC_SEARCH_CACHE: dict[
-    tuple[int, str, int, str | None, int | None, int | None],
+    tuple[int, int | None, str, int, str | None, int | None, int | None],
     tuple[float, list[RepoSearchResponse]],
 ] = {}
 
@@ -61,13 +61,22 @@ def _normalize_semantic_query(query: str) -> str:
 def _semantic_search_cache_key(
     *,
     user_id: int,
+    active_snapshot_id: int | None,
     query: str,
     limit: int,
     language: str | None,
     cluster_id: int | None,
     min_stars: int | None,
-) -> tuple[int, str, int, str | None, int | None, int | None]:
-    return (user_id, query.lower(), limit, language, cluster_id, min_stars)
+) -> tuple[int, int | None, str, int, str | None, int | None, int | None]:
+    return (
+        user_id,
+        active_snapshot_id,
+        query.lower(),
+        limit,
+        language,
+        cluster_id,
+        min_stars,
+    )
 
 
 def _prune_semantic_search_cache(now_ts: float) -> None:
@@ -81,7 +90,7 @@ def _prune_semantic_search_cache(now_ts: float) -> None:
 
 
 def _read_semantic_search_cache(
-    key: tuple[int, str, int, str | None, int | None, int | None],
+    key: tuple[int, int | None, str, int, str | None, int | None, int | None],
     now_ts: float,
 ) -> list[RepoSearchResponse] | None:
     _prune_semantic_search_cache(now_ts)
@@ -96,7 +105,7 @@ def _read_semantic_search_cache(
 
 
 def _write_semantic_search_cache(
-    key: tuple[int, str, int, str | None, int | None, int | None],
+    key: tuple[int, int | None, str, int, str | None, int | None, int | None],
     payload: list[RepoSearchResponse],
     now_ts: float,
 ) -> None:
@@ -355,6 +364,7 @@ async def search_repos(
     normalized_query = _normalize_semantic_query(request.query)
     cache_key = _semantic_search_cache_key(
         user_id=user.id,
+        active_snapshot_id=getattr(user, "active_graph_snapshot_id", None),
         query=normalized_query,
         limit=request.limit,
         language=request.language,
