@@ -442,12 +442,12 @@ async def test_repo_search_rejects_blank_query_after_trimming(monkeypatch):
     repos_api._SEMANTIC_SEARCH_CACHE.clear()
 
     with pytest.raises(HTTPException) as exc_info:
-            await repos_api.search_repos(
-                request=RepoSearchRequest(query="   "),
-                http_request=_build_request(),
-                user=SimpleNamespace(id=1, active_graph_snapshot_id=None),
-                db=_FakeDb(),
-            )
+        await repos_api.search_repos(
+            request=RepoSearchRequest(query="   "),
+            http_request=_build_request(),
+            user=SimpleNamespace(id=1, active_graph_snapshot_id=None),
+            db=_FakeDb(),
+        )
 
     assert exc_info.value.status_code == 422
 
@@ -477,12 +477,12 @@ async def test_repo_search_wraps_embedding_failures(monkeypatch):
     repos_api._SEMANTIC_SEARCH_CACHE.clear()
 
     with pytest.raises(HTTPException) as exc_info:
-            await repos_api.search_repos(
-                request=RepoSearchRequest(query="vector search"),
-                http_request=_build_request(),
-                user=SimpleNamespace(id=1, active_graph_snapshot_id=None),
-                db=_FakeDb(),
-            )
+        await repos_api.search_repos(
+            request=RepoSearchRequest(query="vector search"),
+            http_request=_build_request(),
+            user=SimpleNamespace(id=1, active_graph_snapshot_id=None),
+            db=_FakeDb(),
+        )
 
     assert exc_info.value.status_code == 503
     assert exc_info.value.detail == "Semantic search is temporarily unavailable"

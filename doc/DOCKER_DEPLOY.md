@@ -4,5 +4,5 @@
 
 请改看：
 
-- Docker Compose、代理、登录边界：[../ai_docs/current/operations.md](../ai_docs/current/operations.md)
-- 验证命令：[../ai_docs/reference/verification.md](../ai_docs/reference/verification.md)
+- Docker Compose、代理、登录边界：[../.trellis/spec/backend/database-when-added.md](../.trellis/spec/backend/database-when-added.md)
+- 验证命令：[../.trellis/spec/shared/verification.md](../.trellis/spec/shared/verification.md)

@@ -4,5 +4,5 @@
 
 请改看：
 
-- 环境变量、认证、代理、重置：[../ai_docs/current/operations.md](../ai_docs/current/operations.md)
-- 路径与导入规则：[../ai_docs/reference/naming-and-paths.md](../ai_docs/reference/naming-and-paths.md)
+- 环境变量、认证、代理、重置：[../.trellis/spec/backend/database-when-added.md](../.trellis/spec/backend/database-when-added.md)
+- 路径与导入规则：[../.trellis/spec/shared/index.md](../.trellis/spec/shared/index.md)

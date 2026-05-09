@@ -4,5 +4,5 @@
 
 请改看：
 
-- 验证命令与 CI 门禁：[../ai_docs/reference/verification.md](../ai_docs/reference/verification.md)
-- 评估与脚本概览：[../ai_docs/current/scripts.md](../ai_docs/current/scripts.md)
+- 验证命令与 CI 门禁：[../.trellis/spec/shared/verification.md](../.trellis/spec/shared/verification.md)
+- 评估与脚本概览：[../.trellis/spec/shared/verification.md](../.trellis/spec/shared/verification.md)

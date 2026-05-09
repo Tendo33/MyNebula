@@ -6,7 +6,7 @@ This script updates the version number across all relevant files in the project:
 - src/nebula/__init__.py
 - src/nebula/core/config.py
 - frontend/package.json
-- ai_docs/current/operations.md
+- .trellis/spec/backend/database-when-added.md
 
 该脚本用于更新项目中所有相关文件的版本号。
 
@@ -81,12 +81,16 @@ class VersionUpdater:
                 r"\g<1>{version}",
             ),
             (
-                project_root / "ai_docs" / "current" / "operations.md",
+                project_root
+                / ".trellis"
+                / "spec"
+                / "backend"
+                / "database-when-added.md",
                 r"(APP_VERSION=)(\d+\.\d+\.\d+)",
                 r"\g<1>{version}",
             ),
             (
-                project_root / "ai_docs" / "current" / "scripts.md",
+                project_root / ".trellis" / "spec" / "shared" / "verification.md",
                 r"(当前版本示例：`)(\d+\.\d+\.\d+)(`)",
                 r"\g<1>{version}\g<3>",
             ),

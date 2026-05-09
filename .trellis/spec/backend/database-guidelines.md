@@ -26,7 +26,8 @@ The project uses SQLAlchemy 2 async ORM with Alembic migrations and PostgreSQL e
 
 ## Naming Conventions
 
-- Table/index/constraint naming follows the SQLAlchemy naming convention in [`src/nebula/db/models.py`](/Users/simonsun/.codex/worktrees/bcde/MyNebula/src/nebula/db/models.py).
+- Table/index/constraint naming follows the SQLAlchemy naming convention in
+  `src/nebula/db/models.py`.
 - Composite user scoping indexes should start with `ix_<table>_user_...`.
 - ANN indexes should include the embedding column and distance family in the name, for example `ix_starred_repos_embedding_cosine_ann`.
 

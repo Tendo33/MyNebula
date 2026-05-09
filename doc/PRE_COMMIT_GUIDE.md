@@ -4,5 +4,5 @@
 
 请改看：
 
-- 脚本与维护工具：[../ai_docs/current/scripts.md](../ai_docs/current/scripts.md)
-- 验证命令：[../ai_docs/reference/verification.md](../ai_docs/reference/verification.md)
+- 脚本与维护工具：[../.trellis/spec/shared/verification.md](../.trellis/spec/shared/verification.md)
+- 验证命令：[../.trellis/spec/shared/verification.md](../.trellis/spec/shared/verification.md)

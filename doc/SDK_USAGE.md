@@ -4,5 +4,5 @@
 
 请改看：
 
-- 后端程序化入口与服务边界：[../ai_docs/current/backend.md](../ai_docs/current/backend.md)
-- 路径与导入规则：[../ai_docs/reference/naming-and-paths.md](../ai_docs/reference/naming-and-paths.md)
+- 后端程序化入口与服务边界：[../.trellis/spec/backend/index.md](../.trellis/spec/backend/index.md)
+- 路径与导入规则：[../.trellis/spec/shared/index.md](../.trellis/spec/shared/index.md)

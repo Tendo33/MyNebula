@@ -4,5 +4,5 @@
 
 请改看：
 
-- 重置、恢复、Full Refresh 和 Docker 运行方式：[../ai_docs/current/operations.md](../ai_docs/current/operations.md)
-- 验证命令：[../ai_docs/reference/verification.md](../ai_docs/reference/verification.md)
+- 重置、恢复、Full Refresh 和 Docker 运行方式：[../.trellis/spec/backend/database-when-added.md](../.trellis/spec/backend/database-when-added.md)
+- 验证命令：[../.trellis/spec/shared/verification.md](../.trellis/spec/shared/verification.md)
