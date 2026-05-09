@@ -151,7 +151,7 @@ flowchart LR
 
 - **Backend**: FastAPI, SQLAlchemy (async), asyncpg, Alembic, APScheduler
 - **Data and ML**: pgvector, NumPy, scikit-learn, custom relevance scoring
-- **Frontend**: React 18, TypeScript, Vite, React Query, react-force-graph-2d, Tailwind CSS
+- **Frontend**: React 18, TypeScript, Vite, React Query, react-force-graph-2d, Tailwind CSS 4
 - **Tooling**: Docker Compose, uv, Ruff, Pytest, Vitest, Playwright
 
 ## Quick Start

@@ -66,6 +66,7 @@ Thinking and handoff guides:
 - OpenAI-compatible embedding and LLM providers
 - GitHub API / GraphQL
 - React + TypeScript + Vite
+- Tailwind CSS 4
 - React Query
 - react-force-graph-2d
 - Zustand

@@ -15,7 +15,7 @@ Use this when adding or updating MyNebula dependencies.
 | AI and data processing | OpenAI-compatible clients, NumPy, scikit-learn |
 | GitHub integration | GitHub API / GraphQL |
 | Frontend package manager | npm with `frontend/package-lock.json` |
-| Frontend runtime | React, TypeScript, Vite |
+| Frontend runtime | React, TypeScript, Vite, Tailwind CSS 4 |
 | Frontend data/graph | React Query, react-force-graph-2d, Zustand |
 | Frontend testing | Vitest, Testing Library, Playwright |
 

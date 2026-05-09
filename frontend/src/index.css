@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 :root {
   font-family: "Avenir Next", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
@@ -243,7 +242,8 @@ button,
   }
 
   .status-banner {
-    @apply panel-surface flex items-start gap-3 p-4 text-sm;
+    @apply flex items-start gap-3 rounded-3xl border border-border-light bg-bg-main p-4 text-sm backdrop-blur-md dark:border-dark-border dark:bg-dark-bg-main;
+    box-shadow: var(--surface-shadow-soft);
   }
 
   .status-banner[data-tone="error"] {
