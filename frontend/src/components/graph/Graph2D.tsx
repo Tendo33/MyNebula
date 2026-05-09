@@ -122,6 +122,12 @@ const Graph2D: React.FC = () => {
     }, 200);
   }, []);
 
+  useEffect(() => () => {
+    if (avatarFlushTimerRef.current) {
+      clearTimeout(avatarFlushTimerRef.current);
+    }
+  }, []);
+
   // Get neighbors of hovered node for highlighting
   const hoverNeighbors = useNodeNeighbors(activeHoverNode?.id);
 
@@ -155,8 +161,8 @@ const Graph2D: React.FC = () => {
         ai_summary: n.ai_summary,
         ai_tags: n.ai_tags,
         // Use pre-computed positions if available (from clustering)
-        x: n.x * POSITION_SCALE,
-        y: n.y * POSITION_SCALE,
+        x: Number.isFinite(n.x) ? n.x * POSITION_SCALE : undefined,
+        y: Number.isFinite(n.y) ? n.y * POSITION_SCALE : undefined,
       })),
       links: rawData.edges.map(e => ({
         source: typeof e.source === 'object' ? e.source.id : e.source,

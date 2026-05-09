@@ -4,6 +4,7 @@ from sqlalchemy.dialects import postgresql
 
 from nebula.api.v2.data import (
     _build_topic_filter_condition,
+    _data_repo_order_by,
     _parse_month_window,
     _parse_stars_threshold,
     _trimmed_query,
@@ -46,3 +47,17 @@ def test_topic_filter_condition_normalizes_case_for_dashboard_links():
     assert "unnest" in compiled
     assert "lower(trim(" in compiled
     assert "= 'ai'" in compiled
+
+
+def test_data_repo_order_by_adds_stable_id_tiebreaker():
+    order_by = _data_repo_order_by("starred_at", "desc")
+    statement = select(StarredRepo.id).order_by(*order_by)
+    compiled = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+
+    assert "starred_repos.starred_at DESC" in compiled
+    assert "starred_repos.id DESC" in compiled

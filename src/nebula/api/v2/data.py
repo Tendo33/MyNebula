@@ -69,6 +69,21 @@ def _build_topic_filter_condition(topic: str):
     )
 
 
+def _data_repo_order_by(sort_field: str, sort_direction: str):
+    sort_column_map = {
+        "name": StarredRepo.name,
+        "language": StarredRepo.language,
+        "stargazers_count": StarredRepo.stargazers_count,
+        "starred_at": StarredRepo.starred_at,
+        "cluster": StarredRepo.cluster_id,
+        "summary": StarredRepo.ai_summary,
+        "last_commit_time": StarredRepo.repo_pushed_at,
+    }
+    sort_column = sort_column_map.get(sort_field, StarredRepo.starred_at)
+    order_factory = asc if sort_direction == "asc" else desc
+    return (order_factory(sort_column), order_factory(StarredRepo.id))
+
+
 @router.get("/repos", response_model=DataReposResponse)
 async def get_data_repos(
     cluster_id: int | None = Query(default=None),
@@ -127,17 +142,7 @@ async def get_data_repos(
     if topic:
         conditions.append(_build_topic_filter_condition(topic))
 
-    sort_column_map = {
-        "name": StarredRepo.name,
-        "language": StarredRepo.language,
-        "stargazers_count": StarredRepo.stargazers_count,
-        "starred_at": StarredRepo.starred_at,
-        "cluster": StarredRepo.cluster_id,
-        "summary": StarredRepo.ai_summary,
-        "last_commit_time": StarredRepo.repo_pushed_at,
-    }
-    sort_column = sort_column_map.get(sort_field, StarredRepo.starred_at)
-    order_by = asc(sort_column) if sort_direction == "asc" else desc(sort_column)
+    order_by = _data_repo_order_by(sort_field, sort_direction)
 
     total_result = await db.execute(
         select(func.count(StarredRepo.id)).where(and_(*conditions))
@@ -150,7 +155,7 @@ async def get_data_repos(
     result = await db.execute(
         select(StarredRepo)
         .where(and_(*conditions))
-        .order_by(order_by)
+        .order_by(*order_by)
         .offset(offset)
         .limit(limit)
     )
