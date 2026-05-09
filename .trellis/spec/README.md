@@ -71,7 +71,7 @@ Thinking and handoff guides:
 - react-force-graph-2d
 - Zustand
 - i18n
-- Frontend package manager: npm with `frontend/package-lock.json`
+- Frontend package manager: pnpm with `frontend/pnpm-lock.yaml`
 
 ## Project Bias
 
@@ -83,4 +83,3 @@ Thinking and handoff guides:
   requires a valid admin session.
 - Do not trust forwarded headers unless `TRUST_PROXY_HEADERS=true` and the
   request source matches `TRUSTED_PROXY_IPS`.
-- Do not migrate frontend package management to pnpm in this docs migration.

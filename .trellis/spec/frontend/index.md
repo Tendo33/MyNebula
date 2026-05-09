@@ -39,7 +39,7 @@ shape has four important data surfaces:
 - Settings full refresh `partial_failed` must preserve warning semantics; do not
   render it as a complete success.
 - Settings step mapping belongs in `frontend/src/pages/settings/progress.ts`.
-- Frontend package management is npm with `frontend/package-lock.json`.
+- Frontend package management is pnpm with `frontend/pnpm-lock.yaml`.
 
 ## Non-Negotiable Rules
 

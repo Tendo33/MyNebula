@@ -16,10 +16,10 @@ uv run pytest -q
 ## Frontend
 
 ```bash
-npm --prefix frontend run lint
-npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json
-npm --prefix frontend run test
-npm --prefix frontend run build
+pnpm --prefix frontend run lint
+pnpm --prefix frontend exec tsc --noEmit -p tsconfig.json
+pnpm --prefix frontend run test
+pnpm --prefix frontend run build
 ```
 
 ## Full Stack
@@ -29,10 +29,10 @@ uv sync --all-extras
 uv run ruff check src tests scripts alembic
 uv run ruff format --check src tests scripts alembic
 uv run pytest -q
-npm --prefix frontend run lint
-npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json
-npm --prefix frontend run test
-npm --prefix frontend run build
+pnpm --prefix frontend run lint
+pnpm --prefix frontend exec tsc --noEmit -p tsconfig.json
+pnpm --prefix frontend run test
+pnpm --prefix frontend run build
 ```
 
 ## CI Gate
@@ -45,10 +45,10 @@ uv run ruff check src/
 uv run ruff format --check src/
 uv sync --frozen --all-extras
 uv run pytest -q
-npx --prefix frontend tsc --noEmit
-npm --prefix frontend run lint
-npm --prefix frontend run test
-npm --prefix frontend run build
+pnpm --prefix frontend exec tsc --noEmit
+pnpm --prefix frontend run lint
+pnpm --prefix frontend run test
+pnpm --prefix frontend run build
 ```
 
 ## Documentation and Link Checks
@@ -93,10 +93,10 @@ Graph / Search hotspots:
 
 ```bash
 uv run pytest -q tests/api/test_v2_auth_access.py -k "repo_search"
-npm --prefix frontend run test -- src/components/ui/__tests__/CommandPalette.test.tsx
-npm --prefix frontend run test -- src/pages/__tests__/GraphPage.url-state.test.tsx
-npm --prefix frontend run test -- src/features/data/hooks/useDataReposQuery.test.tsx
-npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json
+pnpm --prefix frontend run test -- src/components/ui/__tests__/CommandPalette.test.tsx
+pnpm --prefix frontend run test -- src/pages/__tests__/GraphPage.url-state.test.tsx
+pnpm --prefix frontend run test -- src/features/data/hooks/useDataReposQuery.test.tsx
+pnpm --prefix frontend exec tsc --noEmit -p tsconfig.json
 ```
 
 Sync / Scheduler hotspots:
@@ -105,8 +105,8 @@ Sync / Scheduler hotspots:
 uv run pytest -q tests/core/test_scheduler_service.py
 uv run pytest -q tests/core/test_pipeline_state_machine.py
 uv run pytest -q tests/api/test_v2_sync_pipeline_api.py tests/api/test_v2_settings_routes.py
-npm --prefix frontend run test -- src/pages/__tests__/Settings.partial-failed.test.tsx src/pages/__tests__/settings.polling.test.tsx
-npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json
+pnpm --prefix frontend run test -- src/pages/__tests__/Settings.partial-failed.test.tsx src/pages/__tests__/settings.polling.test.tsx
+pnpm --prefix frontend exec tsc --noEmit -p tsconfig.json
 ```
 
 ## Rule

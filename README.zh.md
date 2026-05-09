@@ -223,8 +223,8 @@ uv run uvicorn nebula.main:app --reload --port 8000
 ### 前端
 
 ```bash
-npm --prefix frontend install
-VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
+pnpm --prefix frontend install
+VITE_API_BASE_URL=http://localhost:8000 pnpm --prefix frontend run dev
 ```
 
 然后访问 <http://localhost:5173>。
@@ -234,7 +234,7 @@ VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
 ### 由 FastAPI 直接托管构建后的前端
 
 ```bash
-npm --prefix frontend run build
+pnpm --prefix frontend run build
 uv run uvicorn nebula.main:app --reload --port 8000
 ```
 
@@ -336,15 +336,15 @@ UV_CACHE_DIR=.uv-cache uv run pytest
 ### 前端
 
 ```bash
-npm --prefix frontend run lint
-npm --prefix frontend run test
-npm --prefix frontend run build
+pnpm --prefix frontend run lint
+pnpm --prefix frontend run test
+pnpm --prefix frontend run build
 ```
 
 ### E2E
 
 ```bash
-RUN_E2E=1 npm --prefix frontend run test:e2e
+RUN_E2E=1 pnpm --prefix frontend run test:e2e
 ```
 
 ### 离线质量检查

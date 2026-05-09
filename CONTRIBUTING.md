@@ -31,8 +31,8 @@ uv run uvicorn nebula.main:app --reload --port 8000
 ### 前端
 
 ```bash
-npm --prefix frontend install
-VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
+pnpm --prefix frontend install
+VITE_API_BASE_URL=http://localhost:8000 pnpm --prefix frontend run dev
 ```
 
 ### Git hooks
@@ -77,10 +77,10 @@ uv run ruff check
 - 提交前至少运行 lint、单测和 build
 
 ```bash
-npm --prefix frontend run lint
-npx --prefix frontend tsc --noEmit
-npm --prefix frontend run test
-npm --prefix frontend run build
+pnpm --prefix frontend run lint
+pnpm --prefix frontend exec tsc --noEmit
+pnpm --prefix frontend run test
+pnpm --prefix frontend run build
 ```
 
 ## 测试基线
@@ -96,14 +96,14 @@ uv run pytest
 ### 前端改动
 
 ```bash
-npm --prefix frontend run test
-npm --prefix frontend run build
+pnpm --prefix frontend run test
+pnpm --prefix frontend run build
 ```
 
 ### 路由、页面流或交互改动
 
 ```bash
-npm --prefix frontend run test:e2e
+pnpm --prefix frontend run test:e2e
 ```
 
 ### 相关推荐/聚类质量相关改动

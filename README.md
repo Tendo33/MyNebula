@@ -223,8 +223,8 @@ uv run uvicorn nebula.main:app --reload --port 8000
 ### Frontend
 
 ```bash
-npm --prefix frontend install
-VITE_API_BASE_URL=http://localhost:8000 npm --prefix frontend run dev
+pnpm --prefix frontend install
+VITE_API_BASE_URL=http://localhost:8000 pnpm --prefix frontend run dev
 ```
 
 Then open <http://localhost:5173>.
@@ -234,7 +234,7 @@ If `VITE_API_BASE_URL` is not set, the Vite dev server defaults to `http://local
 ### Serve the built frontend from FastAPI
 
 ```bash
-npm --prefix frontend run build
+pnpm --prefix frontend run build
 uv run uvicorn nebula.main:app --reload --port 8000
 ```
 
@@ -333,15 +333,15 @@ If your environment cannot write to the default uv cache, use
 ### Frontend
 
 ```bash
-npm --prefix frontend run lint
-npm --prefix frontend run test
-npm --prefix frontend run build
+pnpm --prefix frontend run lint
+pnpm --prefix frontend run test
+pnpm --prefix frontend run build
 ```
 
 ### E2E
 
 ```bash
-RUN_E2E=1 npm --prefix frontend run test:e2e
+RUN_E2E=1 pnpm --prefix frontend run test:e2e
 ```
 
 ### Offline quality checks

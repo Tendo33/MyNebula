@@ -5,17 +5,17 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # 复制前端依赖文件
-COPY frontend/package*.json ./
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
 
 # 安装前端依赖
-RUN npm ci
+RUN corepack enable && pnpm install --frozen-lockfile
 
 # 复制前端源代码
 COPY frontend/ ./
 
 # 构建前端（生成静态文件）
 ARG VITE_API_BASE_URL
-RUN VITE_API_BASE_URL=${VITE_API_BASE_URL} npm run build
+RUN VITE_API_BASE_URL=${VITE_API_BASE_URL} pnpm run build
 
 # ==================== Stage 2: Backend with Frontend ====================
 FROM python:3.12-slim

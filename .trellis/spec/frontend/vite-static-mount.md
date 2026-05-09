@@ -5,7 +5,7 @@ MyNebula deployment serves frontend build assets through the API image.
 ## Build Boundary
 
 - Source lives in `frontend/src`.
-- Production assets are produced by `npm --prefix frontend run build`.
+- Production assets are produced by `pnpm --prefix frontend run build`.
 - The backend may serve `frontend/dist` as static files.
 - Do not make Python import frontend source files.
 - Do not make frontend code depend on backend internals.

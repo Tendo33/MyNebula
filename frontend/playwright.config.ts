@@ -16,7 +16,7 @@ export default defineConfig({
   webServer: hasE2EBaseUrl
     ? undefined
     : {
-        command: 'npm run dev -- --host 127.0.0.1 --port 4173',
+        command: 'pnpm run dev -- --host 127.0.0.1 --port 4173',
         port: 4173,
         reuseExistingServer: true,
       },

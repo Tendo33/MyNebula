@@ -61,16 +61,6 @@ class VersionUpdater:
                 '"version": "{version}"',
             ),
             (
-                project_root / "frontend" / "package-lock.json",
-                r'(^  "version": ")([^"]+)(",$)',
-                r"\g<1>{version}\g<3>",
-            ),
-            (
-                project_root / "frontend" / "package-lock.json",
-                r'("": \{\n\s*"name": "mynebula-frontend",\n\s*"version": ")([^"]+)(",)',
-                r"\g<1>{version}\g<3>",
-            ),
-            (
                 project_root / "uv.lock",
                 r'(name = "mynebula"\nversion = ")([^"]+)("\nsource = \{ editable = "\." \})',
                 r"\g<1>{version}\g<3>",

@@ -29,7 +29,7 @@ alembic/                # Database migrations
   current implementation.
 - Keep frontend and backend contracts explicit. If the frontend calls a backend
   endpoint, document request, response, error, auth, and cache assumptions.
-- Frontend uses npm and `frontend/package-lock.json`.
+- Frontend uses pnpm and `frontend/pnpm-lock.yaml`.
 
 ## Documentation Files
 

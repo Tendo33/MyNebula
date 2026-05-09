@@ -23,7 +23,7 @@ Documented pitfalls for MyNebula.
 ### Frontend Build Works But Backend Serves Old UI
 
 1. Check whether `frontend/dist/` is generated and ignored.
-2. Confirm deploy/build step runs `npm --prefix frontend run build`.
+2. Confirm deploy/build step runs `pnpm --prefix frontend run build`.
 3. Confirm backend static path points to the generated output.
 
 ### API Requests Return HTML

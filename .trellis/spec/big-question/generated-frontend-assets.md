@@ -8,12 +8,12 @@ missing assets, or mismatched hashed filenames.
 ## Root Cause
 
 Vite production output is generated. The source of truth remains
-`frontend/src` plus the npm build command.
+`frontend/src` plus the pnpm build command.
 
 ## Solution
 
 - Keep `frontend/dist/` out of git unless explicitly documented.
-- Make deployment or container build run `npm --prefix frontend run build`.
+- Make deployment or container build run `pnpm --prefix frontend run build`.
 - Keep backend static path configurable or clearly documented.
 - Test that the backend serves the built asset directory when static serving is
   part of the app.

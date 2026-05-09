@@ -33,8 +33,7 @@ AGENTS.md, but keep detailed project facts in `.trellis/spec/`.
 - Frontend work must preserve Dashboard, Data, Graph, and Settings flows,
   including React Query, GraphContext, shared search utilities, progressive
   edge loading, and Settings polling lifecycle.
-- Frontend package management is currently npm with `frontend/package-lock.json`;
-  do not document or migrate it to pnpm in this docs migration.
+- Frontend package management is pnpm with `frontend/pnpm-lock.yaml`.
 
 ## Claude execution style
 
