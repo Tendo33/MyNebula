@@ -81,7 +81,7 @@ class VersionUpdater:
             ),
             (
                 project_root / ".trellis" / "spec" / "shared" / "verification.md",
-                r"(当前版本示例：`)(\d+\.\d+\.\d+)(`)",
+                r"(Current version example: `)(\d+\.\d+\.\d+)(`\.)",
                 r"\g<1>{version}\g<3>",
             ),
         ]

@@ -10,7 +10,7 @@ Alembic migrations.
 - Local development usually runs backend and frontend separately while the
   database comes from Docker.
 - `frontend/dist` exists in deploy images and FastAPI serves static resources.
-- Current version example: `APP_VERSION=1.2.9`.
+- Current version example: `APP_VERSION=1.2.10`.
 
 ## Key Environment Groups
 
