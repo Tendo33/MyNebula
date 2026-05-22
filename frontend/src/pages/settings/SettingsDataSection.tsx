@@ -132,7 +132,7 @@ export const SettingsDataSection = ({
       </section>
 
       {showConfirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40">
           <div
             ref={dialogRef}
             className="panel-surface-strong mx-4 w-full max-w-md p-6"

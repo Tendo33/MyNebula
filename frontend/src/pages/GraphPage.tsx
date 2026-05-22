@@ -306,7 +306,7 @@ const GraphPage = () => {
           {isMobile && showFilters && (
             <button
               type="button"
-              className="absolute inset-0 z-20 bg-slate-950/34 backdrop-blur-[2px]"
+              className="absolute inset-0 z-20 bg-slate-950/50"
               onClick={() => setShowFilters(false)}
               aria-label={t('common.close')}
             />
@@ -317,7 +317,7 @@ const GraphPage = () => {
               id="graph-filters-panel"
               className={`${
                 isMobile ? 'absolute inset-y-0 left-0 w-[85vw] max-w-sm' : 'w-72 flex-shrink-0'
-              } relative z-30 space-y-4 overflow-y-auto border-r border-border-light/85 bg-bg-sidebar/88 p-4 backdrop-blur-xl dark:border-dark-border/90 dark:bg-dark-bg-sidebar/88`}
+              } relative z-30 space-y-4 overflow-y-auto border-r border-border-light bg-bg-sidebar p-4 dark:border-dark-border dark:bg-dark-bg-sidebar`}
             >
               {hasActiveFilters && (
                 <button
@@ -394,7 +394,7 @@ const GraphPage = () => {
             {selectedNode && <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />}
 
             {!filteredData && !error && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg-main/82 backdrop-blur-sm dark:bg-dark-bg-main/82">
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg-main dark:bg-dark-bg-main">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-action-primary border-t-transparent" />
                 <p className="text-sm text-text-muted">{t('common.loading', 'Loading...')}</p>
               </div>

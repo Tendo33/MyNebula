@@ -71,7 +71,7 @@ export const SettingsSchedule = ({
                   value={schedule.schedule_hour}
                   onChange={(e) => onTimeChange(Number(e.target.value), schedule.schedule_minute)}
                   disabled={scheduleLoading}
-                  className="field-surface h-10 px-3 py-1.5 text-sm"
+                  className="field-surface h-11 px-3 py-1.5 text-sm"
                 >
                   {Array.from({ length: 24 }, (_, i) => (
                     <option key={i} value={i}>
@@ -84,7 +84,7 @@ export const SettingsSchedule = ({
                   value={schedule.schedule_minute}
                   onChange={(e) => onTimeChange(schedule.schedule_hour, Number(e.target.value))}
                   disabled={scheduleLoading}
-                  className="field-surface h-10 px-3 py-1.5 text-sm"
+                  className="field-surface h-11 px-3 py-1.5 text-sm"
                 >
                   {[0, 15, 30, 45].map((m) => (
                     <option key={m} value={m}>

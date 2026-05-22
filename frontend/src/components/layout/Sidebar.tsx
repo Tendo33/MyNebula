@@ -114,7 +114,7 @@ export const Sidebar = () => {
       {isMobile && mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-[55] bg-slate-950/34 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[55] bg-slate-950/50"
           onClick={() => setMobileOpen(false)}
           aria-label={t('common.close')}
         />
@@ -122,7 +122,7 @@ export const Sidebar = () => {
 
       <aside
         className={clsx(
-          'fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border-light/85 bg-bg-sidebar/88 backdrop-blur-xl shadow-[0_24px_64px_-36px_rgba(28,34,46,0.28)] transition-transform duration-200 dark:border-dark-border/90 dark:bg-dark-bg-sidebar/88',
+          'fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border-light bg-bg-sidebar shadow-[0_24px_64px_-36px_rgba(28,34,46,0.12)] transition-transform duration-200 dark:border-dark-border dark:bg-dark-bg-sidebar',
           isMobile ? (mobileOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
         )}
         style={{ width: `${isMobile ? Math.min(sidebarWidth, 300) : sidebarWidth}px` }}

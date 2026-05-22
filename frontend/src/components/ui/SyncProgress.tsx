@@ -104,8 +104,8 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-[90] flex items-center justify-center px-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-slate-950/42 backdrop-blur-sm" />
+      {/* Backdrop overlay */}
+      <div className="absolute inset-0 bg-slate-950/60" />
 
       {/* Modal */}
       <div className="panel-surface-strong relative w-full max-w-md overflow-hidden rounded-[1.35rem] animate-in fade-in zoom-in-95 duration-200">

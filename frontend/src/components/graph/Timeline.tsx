@@ -174,7 +174,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
 
   return (
     <div className={clsx(
-      'bg-bg-main/90 border border-border-light rounded-xl shadow-sm p-4 backdrop-blur-sm dark:bg-dark-bg-main/90 dark:border-dark-border',
+      'bg-bg-main border border-border-light rounded-xl shadow-sm p-4 dark:bg-dark-bg-main dark:border-dark-border',
       className
     )}>
       {/* Header */}
@@ -222,7 +222,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
 
           return (
             <div
-              key={idx}
+              key={point.date}
               className="flex-1 flex flex-col justify-end items-center group relative"
             >
               {/* Bar */}

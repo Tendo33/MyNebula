@@ -833,7 +833,7 @@ const Graph2D: React.FC = () => {
 
       {/* Hover info overlay - Enhanced with full info */}
       {activeHoverNode && (
-        <div className="absolute top-4 right-4 z-10 bg-bg-main/98 backdrop-blur-sm px-4 py-3 rounded-lg border border-border-light shadow-lg max-w-sm pointer-events-none dark:bg-dark-bg-main/95 dark:border-dark-border">
+        <div className="absolute top-4 right-4 z-10 bg-bg-main px-4 py-3 rounded-lg border border-border-light shadow-lg max-w-sm pointer-events-none dark:bg-dark-bg-main dark:border-dark-border">
           {/* Header with Avatar */}
           <div className="flex items-start gap-3">
             {/* Owner Avatar */}
@@ -882,9 +882,9 @@ const Graph2D: React.FC = () => {
           {/* AI Tags Preview */}
           {activeHoverNode.ai_tags && activeHoverNode.ai_tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
-              {activeHoverNode.ai_tags.slice(0, 4).map((tag: string, idx: number) => (
+              {activeHoverNode.ai_tags.slice(0, 4).map((tag: string) => (
                 <span
-                  key={idx}
+                  key={tag}
                   className="text-[10px] px-1.5 py-0.5 bg-action-primary/10 text-action-primary rounded"
                 >
                   {tag}

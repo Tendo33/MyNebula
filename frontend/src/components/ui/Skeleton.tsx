@@ -78,7 +78,7 @@ export const GraphSkeleton: React.FC = () => {
 
       {/* Center loading text */}
       <div className="relative z-10 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-bg-main/80 backdrop-blur-sm rounded-lg shadow-sm border border-border-light dark:bg-dark-bg-main/80 dark:border-dark-border">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-bg-main rounded-lg shadow-sm border border-border-light dark:bg-dark-bg-main dark:border-dark-border">
           <Loader2 className="w-4 h-4 animate-spin text-action-primary" />
           <span className="text-sm text-text-muted dark:text-dark-text-main/70">{t('graph.loading_data')}</span>
         </div>

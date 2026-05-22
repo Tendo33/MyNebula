@@ -586,7 +586,7 @@ const Settings = () => {
             {isAuthenticated && (
               <button
                 onClick={handleAdminLogout}
-                className="header-action min-h-0 px-3 text-xs"
+                className="header-action min-h-11 px-4 text-xs"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 {t('app.logout')}

@@ -272,7 +272,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   };
 
   return (
-    <div className="absolute inset-y-0 right-0 w-full max-w-full sm:static sm:w-[25rem] h-full bg-bg-main/95 backdrop-blur-sm border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20 dark:bg-dark-bg-main/95 dark:border-dark-border">
+    <div className="absolute inset-y-0 right-0 w-full max-w-full sm:static sm:w-[25rem] h-full bg-bg-main border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20 dark:bg-dark-bg-main dark:border-dark-border">
       {/* Header with Avatar */}
       <div className="relative p-5 border-b border-border-light bg-gradient-to-b from-bg-sidebar to-bg-main dark:from-dark-bg-sidebar dark:to-dark-bg-main dark:border-dark-border">
         <div className="flex items-start gap-3 pr-8">
@@ -414,9 +414,9 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                   <span>{t('repoDetails.aiTags', 'AI Tags')}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {node.ai_tags.map((tag, idx) => (
+                {node.ai_tags.map((tag) => (
                   <span
-                    key={idx}
+                    key={tag}
                     className="text-xs px-2 py-1 bg-action-primary/10 text-action-primary rounded-full"
                   >
                     {tag}
@@ -433,9 +433,9 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                   {t('repoDetails.topics', 'Topics')}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {node.topics.slice(0, 8).map((topic, idx) => (
+                {node.topics.slice(0, 8).map((topic) => (
                   <span
-                    key={idx}
+                    key={topic}
                     className="text-xs px-2 py-1 bg-bg-hover text-text-muted rounded-full dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
                   >
                     {topic}

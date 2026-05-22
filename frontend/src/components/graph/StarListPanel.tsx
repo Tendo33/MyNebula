@@ -120,9 +120,9 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
 
   return (
     <div className={clsx(
-      'bg-bg-main/90 border border-border-light rounded-xl shadow-sm overflow-hidden backdrop-blur-sm',
+      'bg-bg-main border border-border-light rounded-xl shadow-sm overflow-hidden',
       'transition-all duration-300',
-      'dark:bg-dark-bg-main/90 dark:border-dark-border',
+      'dark:bg-dark-bg-main dark:border-dark-border',
       className
     )}>
       {/* Header */}

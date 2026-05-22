@@ -675,7 +675,7 @@ const DataPage = () => {
                         setPageSize(Number(event.target.value));
                         setCurrentPage(1);
                       }}
-                      className="field-surface h-10 px-3 text-sm"
+                      className="field-surface h-11 px-3 text-sm"
                     >
                       {PAGE_SIZES.map((size) => (
                         <option key={size} value={size}>
@@ -699,7 +699,7 @@ const DataPage = () => {
                         type="button"
                         onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                         disabled={currentPage === 1}
-                        className="header-action h-10 min-h-0 w-10 px-0 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="header-action h-11 w-11 px-0 disabled:cursor-not-allowed disabled:opacity-30"
                         aria-label={t('data.previous_page', 'Previous page')}
                       >
                         <ChevronLeft className="h-4 w-4" />
@@ -713,7 +713,7 @@ const DataPage = () => {
                         type="button"
                         onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                         disabled={currentPage === totalPages || totalPages === 0}
-                        className="header-action h-10 min-h-0 w-10 px-0 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="header-action h-11 w-11 px-0 disabled:cursor-not-allowed disabled:opacity-30"
                         aria-label={t('data.next_page', 'Next page')}
                       >
                         <ChevronRight className="h-4 w-4" />

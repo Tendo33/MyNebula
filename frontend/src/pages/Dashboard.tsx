@@ -121,9 +121,9 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
         </p>
         {keywords.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {keywords.slice(0, 4).map((keyword, idx) => (
+            {keywords.slice(0, 4).map((keyword) => (
               <span
-                key={idx}
+                key={keyword}
                 className="rounded-full bg-bg-hover px-2 py-1 text-[10px] font-semibold text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
               >
                 {keyword}
@@ -257,9 +257,9 @@ const Dashboard = () => {
                   </div>
 
                   <div className="space-y-4">
-                    {stats?.topLanguages?.map((lang, idx) => (
+                    {stats?.topLanguages?.map((lang) => (
                       <LanguageBar
-                        key={idx}
+                        key={lang.language}
                         language={lang.language}
                         count={lang.count}
                         percentage={lang.percentage}
@@ -300,7 +300,7 @@ const Dashboard = () => {
                       const isRecent = idx >= activityData.length - 3;
                       return (
                         <div
-                          key={idx}
+                          key={data.date}
                           className="flex-1 flex flex-col items-center justify-end group h-full relative"
                         >
                           {/* Hover tooltip */}
@@ -317,8 +317,8 @@ const Dashboard = () => {
                             type="button"
                             className={`w-full rounded-t transition-all duration-300 cursor-pointer hover:opacity-90 ${
                               isRecent
-                                ? 'bg-gradient-to-t from-action-primary to-action-hover shadow-sm'
-                                : 'bg-gradient-to-t from-action-primary/45 to-action-primary/20'
+                                ? 'bg-action-primary shadow-sm'
+                                : 'bg-action-primary/45'
                             } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/50`}
                             style={{ height: `${Math.max(height, 8)}%` }}
                             onClick={() => navigate(`/data?month=${data.date}`)}
@@ -363,19 +363,16 @@ const Dashboard = () => {
 
                   {/* Topics cloud */}
                   <div className="flex flex-wrap gap-2">
-                    {stats?.topTopics?.map((item, idx) => {
-                      // Color intensity based on count ranking
-                      const totalTopics = stats?.topTopics?.length || 1;
-                      const intensity = 1 - (idx / (totalTopics - 1 || 1)) * 0.6;
+                    {stats?.topTopics?.map((item) => {
                       return (
                         <button
                           key={item.topic}
                           onClick={() => navigate(`/data?topic=${encodeURIComponent(item.topic)}`)}
-                          className="group rounded-full px-3 py-1.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
+                          className="group rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
                           style={{
-                            backgroundColor: `rgba(45, 89, 200, ${intensity * 0.11})`,
-                            color: `rgba(35, 71, 163, ${0.76 + intensity * 0.2})`,
-                            border: `1px solid rgba(45, 89, 200, ${intensity * 0.22})`,
+                            backgroundColor: `rgba(45, 89, 200, 0.08)`,
+                            color: `rgba(35, 71, 163, 1)`,
+                            border: `1px solid rgba(45, 89, 200, 0.22)`,
                           }}
                         >
                           <span>{item.topic}</span>
@@ -406,7 +403,7 @@ const Dashboard = () => {
                   <button
                     type="button"
                     onClick={() => navigate('/graph')}
-                    className="header-action-ghost min-h-0 px-0 text-xs text-action-primary hover:bg-transparent hover:text-action-hover"
+                    className="header-action-ghost min-h-11 px-3 text-xs text-action-primary hover:bg-transparent hover:text-action-hover"
                   >
                     {t('common.view_all')}
                     <ArrowRight className="w-3 h-3" />

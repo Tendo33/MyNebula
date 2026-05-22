@@ -501,7 +501,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60"
         onClick={onClose}
       />
 
@@ -593,9 +593,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {recentSearches.map((search, idx) => (
+                    {recentSearches.map((search) => (
                       <button
-                        key={idx}
+                        key={search}
                         onClick={() => setQuery(search)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-bg-sidebar hover:bg-bg-hover rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                       >

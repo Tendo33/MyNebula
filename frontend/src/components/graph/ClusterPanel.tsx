@@ -67,9 +67,9 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
         {/* Keywords */}
         {cluster.keywords && cluster.keywords.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
-            {cluster.keywords.slice(0, 3).map((keyword, idx) => (
+            {cluster.keywords.slice(0, 3).map((keyword) => (
               <span
-                key={idx}
+                key={keyword}
                 className="text-[10px] px-1.5 py-0.5 bg-bg-hover text-text-muted rounded-full dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
               >
                 {keyword}
@@ -148,9 +148,9 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
 
   return (
     <div className={clsx(
-      'bg-bg-main/90 border border-border-light rounded-xl shadow-sm overflow-hidden backdrop-blur-sm',
+      'bg-bg-main border border-border-light rounded-xl shadow-sm overflow-hidden',
       'transition-all duration-300',
-      'dark:bg-dark-bg-main/90 dark:border-dark-border',
+      'dark:bg-dark-bg-main dark:border-dark-border',
       className
     )}>
       {/* Header */}
