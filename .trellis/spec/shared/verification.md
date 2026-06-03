@@ -2,7 +2,7 @@
 
 This file is MyNebula's canonical verification reference.
 
-Current version example: `1.2.10`.
+Current version example: `1.2.11`.
 
 ## Backend
 

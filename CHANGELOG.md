@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.11] - 2026-06-03
+
+### Fixed
+- Restored readable styling for the GitHub quick-action button in the repository details panel so it matches the neighboring external-link buttons.
+
+### Changed
+- Synchronized version metadata to `1.2.11` across backend package metadata, frontend package metadata, runtime config, environment template, lockfiles, and verification docs.
+
 ## [1.2.10] - 2026-05-15
 
 ### Changed
@@ -207,7 +215,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.10...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.11...HEAD
+[1.2.11]: https://github.com/Tendo33/mynebula/compare/v1.2.10...v1.2.11
 [1.2.10]: https://github.com/Tendo33/mynebula/compare/v1.2.9...v1.2.10
 [1.2.7]: https://github.com/Tendo33/mynebula/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/Tendo33/mynebula/compare/v1.2.5...v1.2.6

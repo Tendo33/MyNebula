@@ -327,7 +327,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               href={node.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-text-main hover:bg-text-main/90 text-bg-main text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-bg-hover hover:bg-bg-sidebar text-text-main text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md border border-border-light dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-bg-sidebar dark:text-dark-text-main dark:border-dark-border"
             >
               <ExternalLink className="w-4 h-4" />
               <span>GitHub</span>
