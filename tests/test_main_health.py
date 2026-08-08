@@ -9,6 +9,7 @@ def test_health_reports_degraded_when_scheduler_not_running(monkeypatch):
 
     monkeypatch.setattr(main_module, "setup_logging", lambda **_kwargs: None)
     monkeypatch.setattr(main_module, "init_db", _noop_async)
+    monkeypatch.setattr(main_module, "reconcile_orphaned_jobs", _noop_async)
     monkeypatch.setattr(main_module, "close_db", _noop_async)
     monkeypatch.setattr(main_module, "close_scheduler_service", _noop_async)
     monkeypatch.setattr(main_module, "close_embedding_service", _noop_async)
@@ -40,6 +41,10 @@ def test_health_reports_degraded_when_scheduler_not_running(monkeypatch):
     assert response.status_code == 200
     assert response.json()["status"] == "degraded"
     assert response.json()["scheduler"]["status"] == "stopped"
+    assert "last_error" not in response.json()["scheduler"]
+    assert "boot failed" not in response.text
+    assert response.headers["content-security-policy"].startswith("default-src 'self'")
+    assert response.headers["x-frame-options"] == "DENY"
 
 
 def test_create_app_filters_blank_cors_origins(monkeypatch):

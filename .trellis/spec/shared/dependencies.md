@@ -27,6 +27,12 @@ Use this when adding or updating MyNebula dependencies.
 - Do not expose backend-only secrets through `VITE_*` variables.
 - Update specs and verification commands when a dependency changes project
   setup, build, or runtime behavior.
+- CI audits the fully resolved Python export and frontend production lockfile;
+  vulnerability exceptions must be narrow, documented, and time-bounded rather
+  than globally ignored.
+- `httpx2` is a dev-only indirect compatibility dependency for the current
+  Starlette `TestClient`. Do not remove it as "unused" while the backend test
+  suite emits Starlette's `httpx` deprecation warning without it.
 
 ## Search Before Adding
 

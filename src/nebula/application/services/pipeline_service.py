@@ -14,6 +14,15 @@ from nebula.utils import get_logger
 
 from . import sync_execution_service
 from .graph_query_service import GraphQueryService
+from .job_lifecycle_service import (
+    JobLeaseHeartbeat,
+    JobLeaseLostError,
+    active_lease_condition,
+    apply_job_lease,
+    clear_job_lease,
+    interrupt_expired_job,
+    interrupt_expired_jobs_for_user,
+)
 
 logger = get_logger(__name__)
 PARTIAL_FAILURE_SEPARATOR = "; "
@@ -29,6 +38,7 @@ class SyncPipelineService:
         """Create a pipeline run record and return run id."""
         async with get_db_context() as db:
             await self._acquire_pipeline_creation_lock(db, user_id)
+            await interrupt_expired_jobs_for_user(db, user_id)
             active_run = await self._get_active_pipeline_from_db(db, user_id)
             if active_run is not None:
                 raise ValueError(
@@ -50,6 +60,7 @@ class SyncPipelineService:
                 phase=PipelinePhase.pending.value,
                 started_at=None,
             )
+            apply_job_lease(run)
             db.add(run)
             await db.commit()
             await db.refresh(run)
@@ -70,15 +81,28 @@ class SyncPipelineService:
             if run is None:
                 raise ValueError(f"Pipeline run {run_id} not found")
             user_id = run.user_id
+            worker_id = run.worker_id
+            if not worker_id:
+                raise JobLeaseLostError(f"Pipeline run {run_id} has no execution token")
 
+        heartbeat = JobLeaseHeartbeat(
+            "pipeline", run_id, worker_id, session_factory=get_db_context
+        )
+        await heartbeat.start()
         try:
             partial_errors: list[str] = []
 
-            await self._update_run(run_id, PipelineStatus.running, PipelinePhase.stars)
+            await self._update_run(
+                run_id,
+                PipelineStatus.running,
+                PipelinePhase.stars,
+                worker_id=worker_id,
+            )
             stars_task_id = await self._create_task(
                 user_id, run_id, "stars", PipelinePhase.stars
             )
             await sync_execution_service.sync_stars_task(user_id, stars_task_id, mode)
+            heartbeat.ensure_owned()
             stars_partial_error = self._normalize_partial_error(
                 await self._inspect_task_outcome(
                     stars_task_id,
@@ -92,7 +116,10 @@ class SyncPipelineService:
                 partial_errors.append(stars_partial_error)
 
             await self._update_run(
-                run_id, PipelineStatus.running, PipelinePhase.embedding
+                run_id,
+                PipelineStatus.running,
+                PipelinePhase.embedding,
+                worker_id=worker_id,
             )
             embedding_task_id = await self._create_task(
                 user_id, run_id, "embedding", PipelinePhase.embedding
@@ -100,6 +127,7 @@ class SyncPipelineService:
             await sync_execution_service.compute_embeddings_task(
                 user_id, embedding_task_id
             )
+            heartbeat.ensure_owned()
             embedding_partial_error = self._normalize_partial_error(
                 await self._inspect_task_outcome(
                     embedding_task_id,
@@ -116,7 +144,10 @@ class SyncPipelineService:
                 user_id, stars_task_id
             )
             await self._update_run(
-                run_id, PipelineStatus.running, PipelinePhase.clustering
+                run_id,
+                PipelineStatus.running,
+                PipelinePhase.clustering,
+                worker_id=worker_id,
             )
             clustering_task_id = await self._create_task(
                 user_id, run_id, "cluster", PipelinePhase.clustering
@@ -129,6 +160,7 @@ class SyncPipelineService:
                 min_clusters=min_clusters,
                 incremental=not force_full_recluster,
             )
+            heartbeat.ensure_owned()
             clustering_partial_error = self._normalize_partial_error(
                 await self._inspect_task_outcome(
                     clustering_task_id,
@@ -142,13 +174,17 @@ class SyncPipelineService:
                 partial_errors.append(clustering_partial_error)
 
             await self._update_run(
-                run_id, PipelineStatus.running, PipelinePhase.snapshot
+                run_id,
+                PipelineStatus.running,
+                PipelinePhase.snapshot,
+                worker_id=worker_id,
             )
             async with get_db_context() as db:
                 user = await db.get(User, user_id)
                 if user is None:
                     raise ValueError(f"Pipeline user not found: {user_id}")
                 await self.graph_service.rebuild_active_snapshot(db, user=user)
+            heartbeat.ensure_owned()
 
             final_status = (
                 PipelineStatus.partial_failed
@@ -165,17 +201,29 @@ class SyncPipelineService:
                 final_status,
                 PipelinePhase.completed,
                 error=final_error,
+                worker_id=worker_id,
             )
+            return run_id
+        except JobLeaseLostError as exc:
+            logger.warning(f"Pipeline {run_id} stopped after lease loss: {exc}")
             return run_id
         except Exception as exc:
             logger.exception(f"Pipeline {run_id} failed: {exc}")
-            await self._update_run(
-                run_id,
-                PipelineStatus.failed,
-                PipelinePhase.completed,
-                error=str(exc),
-            )
+            try:
+                await self._update_run(
+                    run_id,
+                    PipelineStatus.failed,
+                    PipelinePhase.completed,
+                    error=str(exc),
+                    worker_id=worker_id,
+                )
+            except JobLeaseLostError:
+                logger.warning(
+                    f"Pipeline {run_id} failure was not persisted because ownership was lost"
+                )
             return run_id
+        finally:
+            await heartbeat.stop()
 
     async def start_pipeline(
         self,
@@ -208,10 +256,20 @@ class SyncPipelineService:
             if run is None:
                 raise ValueError(f"Pipeline run {run_id} not found")
             user_id = run.user_id
+            worker_id = run.worker_id
+            if not worker_id:
+                raise JobLeaseLostError(f"Pipeline run {run_id} has no execution token")
 
+        heartbeat = JobLeaseHeartbeat(
+            "pipeline", run_id, worker_id, session_factory=get_db_context
+        )
+        await heartbeat.start()
         try:
             await self._update_run(
-                run_id, PipelineStatus.running, PipelinePhase.clustering
+                run_id,
+                PipelineStatus.running,
+                PipelinePhase.clustering,
+                worker_id=worker_id,
             )
             clustering_task_id = await self._create_task(
                 user_id, run_id, "cluster", PipelinePhase.clustering
@@ -224,6 +282,7 @@ class SyncPipelineService:
                 min_clusters=min_clusters,
                 incremental=False,
             )
+            heartbeat.ensure_owned()
             partial_error = self._normalize_partial_error(
                 await self._inspect_task_outcome(
                     clustering_task_id,
@@ -235,13 +294,17 @@ class SyncPipelineService:
             )
 
             await self._update_run(
-                run_id, PipelineStatus.running, PipelinePhase.snapshot
+                run_id,
+                PipelineStatus.running,
+                PipelinePhase.snapshot,
+                worker_id=worker_id,
             )
             async with get_db_context() as db:
                 user = await db.get(User, user_id)
                 if user is None:
                     raise ValueError(f"Pipeline user not found: {user_id}")
                 await self.graph_service.rebuild_active_snapshot(db, user=user)
+            heartbeat.ensure_owned()
 
             final_status = (
                 PipelineStatus.partial_failed
@@ -253,17 +316,31 @@ class SyncPipelineService:
                 final_status,
                 PipelinePhase.completed,
                 error=partial_error,
+                worker_id=worker_id,
+            )
+            return run_id
+        except JobLeaseLostError as exc:
+            logger.warning(
+                f"Recluster pipeline {run_id} stopped after lease loss: {exc}"
             )
             return run_id
         except Exception as exc:
             logger.exception(f"Recluster pipeline {run_id} failed: {exc}")
-            await self._update_run(
-                run_id,
-                PipelineStatus.failed,
-                PipelinePhase.completed,
-                error=str(exc),
-            )
+            try:
+                await self._update_run(
+                    run_id,
+                    PipelineStatus.failed,
+                    PipelinePhase.completed,
+                    error=str(exc),
+                    worker_id=worker_id,
+                )
+            except JobLeaseLostError:
+                logger.warning(
+                    f"Recluster pipeline {run_id} failure was not persisted because ownership was lost"
+                )
             return run_id
+        finally:
+            await heartbeat.stop()
 
     async def _create_task(
         self,
@@ -291,11 +368,29 @@ class SyncPipelineService:
         status: PipelineStatus,
         phase: PipelinePhase,
         error: str | None = None,
+        *,
+        worker_id: str,
     ) -> None:
         async with get_db_context() as db:
-            run = await db.get(PipelineRun, run_id)
+            run = await db.get(PipelineRun, run_id, with_for_update=True)
             if run is None:
-                return
+                raise JobLeaseLostError(f"Pipeline run {run_id} no longer exists")
+            now = datetime.now(timezone.utc)
+            if (
+                run.worker_id != worker_id
+                or run.status
+                not in {
+                    PipelineStatus.pending.value,
+                    PipelineStatus.running.value,
+                }
+                or run.lease_expires_at is None
+                or run.lease_expires_at <= now
+            ):
+                await interrupt_expired_job(db, "pipeline", run_id, user_id=run.user_id)
+                await db.commit()
+                raise JobLeaseLostError(
+                    f"Pipeline run {run_id} execution lease was lost"
+                )
             run.status = status.value
             run.phase = phase.value
             if error:
@@ -306,8 +401,10 @@ class SyncPipelineService:
                 PipelineStatus.completed,
                 PipelineStatus.partial_failed,
                 PipelineStatus.failed,
+                PipelineStatus.interrupted,
             }:
                 run.completed_at = datetime.now(timezone.utc)
+                clear_job_lease(run)
             await db.commit()
 
     async def _should_force_full_recluster(
@@ -331,10 +428,14 @@ class SyncPipelineService:
 
     async def get_pipeline(self, run_id: int) -> PipelineRun | None:
         async with get_db_context() as db:
+            if await interrupt_expired_job(db, "pipeline", run_id):
+                await db.commit()
             return await db.get(PipelineRun, run_id)
 
     async def get_latest_pipeline(self, user_id: int) -> PipelineRun | None:
         async with get_db_context() as db:
+            await interrupt_expired_jobs_for_user(db, user_id)
+            await db.commit()
             result = await db.execute(
                 select(PipelineRun)
                 .where(PipelineRun.user_id == user_id)
@@ -345,6 +446,8 @@ class SyncPipelineService:
 
     async def get_active_pipeline(self, user_id: int) -> PipelineRun | None:
         async with get_db_context() as db:
+            await interrupt_expired_jobs_for_user(db, user_id)
+            await db.commit()
             return await self._get_active_pipeline_from_db(db, user_id)
 
     async def _inspect_task_outcome(
@@ -435,9 +538,7 @@ class SyncPipelineService:
             select(PipelineRun)
             .where(
                 PipelineRun.user_id == user_id,
-                PipelineRun.status.in_(
-                    [PipelineStatus.pending.value, PipelineStatus.running.value]
-                ),
+                *active_lease_condition(PipelineRun),
             )
             .order_by(PipelineRun.id.desc())
             .limit(1)
@@ -454,9 +555,7 @@ class SyncPipelineService:
             .where(
                 SyncTask.user_id == user_id,
                 SyncTask.task_type == "full_refresh",
-                SyncTask.status.in_(
-                    [PipelineStatus.pending.value, PipelineStatus.running.value]
-                ),
+                *active_lease_condition(SyncTask),
             )
             .order_by(SyncTask.id.desc())
             .limit(1)

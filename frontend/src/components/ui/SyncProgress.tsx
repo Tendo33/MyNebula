@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -87,7 +87,50 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
   canClose = false,
 }) => {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  const canCloseRef = useRef(canClose);
+  const titleId = useId();
   const displayTitle = title || t('sync.title', 'Syncing Data');
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    canCloseRef.current = canClose;
+  }, [canClose, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && canCloseRef.current) onCloseRef.current?.();
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [isOpen]);
 
   // Calculate overall progress
   const completedSteps = steps.filter(s => s.status === 'completed').length;
@@ -108,7 +151,14 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
       <div className="absolute inset-0 bg-slate-950/60" />
 
       {/* Modal */}
-      <div className="panel-surface-strong relative w-full max-w-md overflow-hidden rounded-[1.35rem] animate-in fade-in zoom-in-95 duration-200">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="panel-surface-strong relative w-full max-w-md overflow-hidden overscroll-contain rounded-[1.35rem] animate-in fade-in zoom-in-95 duration-200 focus:outline-none motion-reduce:animate-none"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-light px-5 py-4 dark:border-dark-border">
           <div className="flex items-center gap-3">
@@ -130,7 +180,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
               </div>
             )}
             <div>
-              <h3 className="text-base font-semibold text-text-main dark:text-dark-text-main">
+              <h3 id={titleId} className="text-base font-semibold text-text-main dark:text-dark-text-main">
                 {allCompleted
                   ? hasWarnings
                     ? t('sync.completed_with_warnings', 'Completed With Warnings')
@@ -151,7 +201,9 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
 
           {canClose && (
             <button
+              type="button"
               onClick={onClose}
+              aria-label={t('common.close', 'Close')}
               className="rounded-xl p-2 transition-colors hover:bg-bg-hover dark:hover:bg-dark-bg-sidebar/70"
             >
               <X className="w-5 h-5 text-text-muted dark:text-dark-text-main/70" />
@@ -169,10 +221,17 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
               {Math.round(overallProgress)}%
             </span>
           </div>
-          <div className="h-2 bg-border-light rounded-full overflow-hidden dark:bg-dark-border">
+          <div
+            role="progressbar"
+            aria-label={t('sync.overallProgress', 'Overall Progress')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(overallProgress)}
+            className="h-2 bg-border-light rounded-full overflow-hidden dark:bg-dark-border"
+          >
             <div
               className={clsx(
-                'h-full rounded-full transition-all duration-500',
+                'h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none',
                 hasFailed
                   ? 'bg-red-500'
                   : hasWarnings
@@ -187,7 +246,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
         </div>
 
         {/* Steps List */}
-        <div className="px-5 py-4 space-y-3">
+        <div className="px-5 py-4 space-y-3" aria-live="polite">
           {steps.map((step, index) => (
             <div
               key={step.id}
@@ -237,7 +296,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
                   <div className="mt-2">
                     <div className="h-1.5 bg-border-light rounded-full overflow-hidden dark:bg-dark-border">
                       <div
-                        className="h-full bg-action-primary rounded-full transition-all duration-300"
+                        className="h-full bg-action-primary rounded-full transition-[width] duration-300 motion-reduce:transition-none"
                         style={{ width: `${step.progress}%` }}
                       />
                     </div>
@@ -267,6 +326,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
         {(allCompleted || hasFailed) && (
           <div className="border-t border-border-light bg-bg-sidebar/30 px-5 py-4 dark:border-dark-border dark:bg-dark-bg-sidebar/60">
             <button
+              type="button"
               onClick={onClose}
               className={clsx(
                 'w-full py-2.5 rounded-lg text-sm font-medium transition-colors',

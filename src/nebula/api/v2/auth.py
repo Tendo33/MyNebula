@@ -1,11 +1,12 @@
 """Admin authentication API routes."""
 
+import hashlib
 import hmac
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.core.auth import (
@@ -18,7 +19,7 @@ from nebula.core.auth import (
     verify_signed_session_token,
 )
 from nebula.core.config import AppSettings, get_app_settings
-from nebula.db import AdminLoginAttempt, get_db
+from nebula.db import AdminAuthState, AdminLoginAttempt, get_db
 from nebula.utils import get_logger
 
 router = APIRouter()
@@ -57,20 +58,27 @@ def _get_csrf_secret(settings: AppSettings) -> str:
     return f"{settings.admin_session_secret}:csrf"
 
 
-def _read_session_username(request: Request, settings: AppSettings) -> str | None:
+def _read_session_username(
+    request: Request, settings: AppSettings, *, session_version: int = 0
+) -> str | None:
     return get_admin_session_username(
         request,
         settings,
         cookie_name=ADMIN_SESSION_COOKIE,
+        expected_session_version=session_version,
     )
 
 
-def _read_csrf_token(request: Request, settings: AppSettings) -> str | None:
+def _read_csrf_token(
+    request: Request, settings: AppSettings, *, session_version: int = 0
+) -> str | None:
     csrf_token = request.cookies.get(ADMIN_CSRF_COOKIE)
     if not csrf_token:
         return None
     payload = verify_signed_session_token(csrf_token, _get_csrf_secret(settings))
     if not payload:
+        return None
+    if payload.get("sv") != session_version:
         return None
     username = payload.get("u")
     if not isinstance(username, str):
@@ -84,6 +92,35 @@ def _mask_username(username: str) -> str:
     if len(username) <= 2:
         return "*" * len(username)
     return f"{username[:2]}***"
+
+
+async def get_admin_session_version(db: AsyncSession) -> int:
+    """Return the singleton revocation version, creating it when necessary."""
+    get = getattr(db, "get", None)
+    if get is None:
+        return 0
+    state = await get(AdminAuthState, 1)
+    if state is not None:
+        return int(state.session_version)
+    state = AdminAuthState(id=1, session_version=0)
+    db.add(state)
+    await db.commit()
+    return 0
+
+
+async def increment_admin_session_version(db: AsyncSession) -> int:
+    """Revoke every previously issued admin session token."""
+    get = getattr(db, "get", None)
+    if get is None:
+        return 1
+    state = await get(AdminAuthState, 1)
+    if state is None:
+        state = AdminAuthState(id=1, session_version=1)
+        db.add(state)
+    else:
+        state.session_version += 1
+    await db.commit()
+    return int(state.session_version)
 
 
 def _login_rate_limit_keys(
@@ -101,12 +138,15 @@ def _login_rate_limit_keys(
 async def _delete_stale_login_attempts(
     db: AsyncSession,
     *,
+    keys: tuple[str, str],
     cutoff: datetime,
 ) -> None:
     await db.execute(
-        delete(AdminLoginAttempt).where(AdminLoginAttempt.attempted_at < cutoff)
+        delete(AdminLoginAttempt).where(
+            AdminLoginAttempt.bucket_key.in_(keys),
+            AdminLoginAttempt.attempted_at < cutoff,
+        )
     )
-    await db.commit()
 
 
 async def _count_recent_login_attempts(
@@ -136,7 +176,6 @@ async def _store_login_attempts(
             AdminLoginAttempt(bucket_key=keys[1], attempted_at=attempted_at),
         ]
     )
-    await db.commit()
 
 
 async def _clear_login_attempts(
@@ -150,7 +189,34 @@ async def _clear_login_attempts(
     await db.commit()
 
 
-async def _enforce_login_rate_limit(
+async def _commit_if_supported(db: AsyncSession) -> None:
+    commit = getattr(db, "commit", None)
+    if commit is not None:
+        await commit()
+
+
+async def _acquire_login_bucket_locks(
+    db: AsyncSession,
+    *,
+    keys: tuple[str, str],
+) -> None:
+    """Serialize rate-limit reservations across application processes."""
+    get_bind = getattr(db, "get_bind", None)
+    if get_bind is None:
+        return
+    bind = get_bind()
+    if bind is None or bind.dialect.name != "postgresql":
+        return
+    for key in sorted(keys):
+        digest = hashlib.sha256(key.encode("utf-8")).digest()[:8]
+        lock_key = int.from_bytes(digest, byteorder="big", signed=True)
+        await db.execute(
+            text("SELECT pg_advisory_xact_lock(:lock_key)"),
+            {"lock_key": lock_key},
+        )
+
+
+async def _reserve_login_attempt(
     db: AsyncSession,
     request: Request,
     username: str,
@@ -158,8 +224,9 @@ async def _enforce_login_rate_limit(
 ) -> None:
     now_utc = datetime.now(timezone.utc)
     cutoff = now_utc - timedelta(seconds=settings.admin_login_rate_limit_window_seconds)
-    await _delete_stale_login_attempts(db, cutoff=cutoff)
     keys = _login_rate_limit_keys(request, username, settings)
+    await _acquire_login_bucket_locks(db, keys=keys)
+    await _delete_stale_login_attempts(db, keys=keys, cutoff=cutoff)
     for key in keys:
         attempt_count = await _count_recent_login_attempts(
             db,
@@ -176,22 +243,15 @@ async def _enforce_login_rate_limit(
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many login attempts. Please try again later.",
+                headers={
+                    "Retry-After": str(settings.admin_login_rate_limit_window_seconds)
+                },
             )
+    await _store_login_attempts(db, keys=keys, attempted_at=now_utc)
+    await _commit_if_supported(db)
 
 
-async def _record_failed_login(
-    db: AsyncSession,
-    request: Request,
-    username: str,
-    settings: AppSettings,
-) -> None:
-    attempted_at = datetime.now(timezone.utc)
-    keys = _login_rate_limit_keys(request, username, settings)
-    cutoff = attempted_at - timedelta(
-        seconds=settings.admin_login_rate_limit_window_seconds
-    )
-    await _delete_stale_login_attempts(db, cutoff=cutoff)
-    await _store_login_attempts(db, keys=keys, attempted_at=attempted_at)
+def _log_failed_login(request: Request, username: str, settings: AppSettings) -> None:
     logger.warning(
         "Admin login failed "
         f"username={_mask_username(username)} "
@@ -223,9 +283,10 @@ def _request_is_secure(request: Request, settings: AppSettings) -> bool:
     return False
 
 
-def require_admin(
+async def require_admin(
     request: Request,
     settings: AppSettings = Depends(get_app_settings),  # noqa: B008
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> str:
     """Dependency that enforces admin authentication."""
     if not is_admin_auth_enabled(settings):
@@ -234,7 +295,10 @@ def require_admin(
             detail="Admin auth is not configured",
         )
 
-    username = _read_session_username(request, settings)
+    session_version = await get_admin_session_version(db)
+    username = _read_session_username(
+        request, settings, session_version=session_version
+    )
     if username != settings.admin_username:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -244,16 +308,18 @@ def require_admin(
     return username
 
 
-def require_admin_csrf(
+async def require_admin_csrf(
     request: Request,
     settings: AppSettings = Depends(get_app_settings),  # noqa: B008
     _: str = Depends(require_admin),  # noqa: B008
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> None:
     """Dependency that enforces CSRF checks on mutating admin endpoints."""
     if request.method.upper() in {"GET", "HEAD", "OPTIONS", "TRACE"}:
         return
 
-    cookie_token = _read_csrf_token(request, settings)
+    session_version = await get_admin_session_version(db)
+    cookie_token = _read_csrf_token(request, settings, session_version=session_version)
     header_token = request.headers.get(ADMIN_CSRF_HEADER)
 
     if not cookie_token or not header_token:
@@ -283,9 +349,9 @@ async def login_admin(
             detail="Admin auth is not configured",
         )
 
-    await _enforce_login_rate_limit(db, request, payload.username, settings)
+    await _reserve_login_attempt(db, request, payload.username, settings)
     if not verify_admin_credentials(payload.username, payload.password, settings):
-        await _record_failed_login(db, request, payload.username, settings)
+        _log_failed_login(request, payload.username, settings)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -293,15 +359,18 @@ async def login_admin(
     await _clear_login_failures(db, request, payload.username, settings)
 
     expires_delta = timedelta(hours=settings.admin_session_ttl_hours)
+    session_version = await get_admin_session_version(db)
     token = create_signed_session_token(
         username=settings.admin_username,
         secret=_get_session_secret(settings),
         expires_in_seconds=int(expires_delta.total_seconds()),
+        session_version=session_version,
     )
     csrf_token = create_signed_session_token(
         username=settings.admin_username,
         secret=_get_csrf_secret(settings),
         expires_in_seconds=int(expires_delta.total_seconds()),
+        session_version=session_version,
     )
     secure_cookie = _request_is_secure(request, settings)
     logger.info(
@@ -338,8 +407,10 @@ async def logout_admin(
     response: Response,
     _: str = Depends(require_admin),  # noqa: B008
     __: None = Depends(require_admin_csrf),  # noqa: B008
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ):
     """Logout admin and clear session cookie."""
+    await increment_admin_session_version(db)
     response.delete_cookie(
         key=ADMIN_SESSION_COOKIE,
         path="/",

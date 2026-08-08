@@ -182,6 +182,7 @@ cp .env.example .env
 - `ADMIN_SESSION_SECRET`
 - 如果你不想使用默认值 `admin`，还需要修改 `ADMIN_USERNAME`
 - `READ_ACCESS_MODE`
+- `MYNEBULA_IMAGE`，必须指向由待部署源码版本构建并已发布的不可变标签或 digest
 
 推荐配置：
 
@@ -214,6 +215,7 @@ docker compose up -d
 
 ```bash
 cp .env.example .env
+# 请先在 .env 中替换 DATABASE_PASSWORD，并配置必需的 API 凭据。
 uv sync --all-extras
 docker compose up -d db
 uv run alembic upgrade head
@@ -275,32 +277,36 @@ uv run uvicorn nebula.main:app --reload --port 8000
 - `GET /api/v2/graph/edges?version=active&cursor=0&limit=1000`
 - `GET /api/v2/graph/timeline?version=active`
 - `GET /api/v2/data/repos`
-- `GET /api/repos/{repo_id}/related`
-- `POST /api/repos/search`
+- `GET /api/v2/repos/{repo_id}/related`
+- `POST /api/v2/repos/search`
 
 ### 管理接口
 
-- `POST /api/auth/login`
+- `POST /api/v2/auth/login`
 - `POST /api/v2/sync/start?mode=incremental|full`
 - `GET /api/v2/sync/jobs/{run_id}`
 - `POST /api/v2/settings/schedule`
 - `POST /api/v2/settings/full-refresh`
 - `POST /api/v2/graph/rebuild`
 
-`/api/sync` 下的旧接口目前仍保留以兼容旧版本。
+当前应用接口仅保留 v2。未知或已退役的旧 `/api/*` 路径会返回 API 错误，
+不会落入 SPA 页面。
 
 当前接口契约补充说明：
 
 - `/api/v2/data/repos` 现在会直接返回轻量 cluster 元数据和 `total_repos`，Data 页不再额外请求 graph snapshot。
 - `/api/v2/dashboard` 现在直接返回 summary、top languages、top topics 和 top clusters；活动图仍单独读取 timeline。
 - Data、Graph 和 Command Palette 已统一使用同一套字面搜索字段与 `stars:>N` 语法。
+- 活跃同步任务使用持久化 lease 与 heartbeat；进程退出后遗留的任务会在下次启动时转为可重试的 `interrupted` 状态。
+- 图谱读取始终以快照为准；快照加载失败会返回带 request ID 的有限 `503`，不会隐式触发实时全量重建。
+- 快照清理始终保留活动快照与最新 30 个成功快照，并且只删除其他超过 90 天的快照。
 
 ## 项目结构
 
 ```text
 MyNebula/
 |-- src/nebula/
-|   |-- api/                   # v1 + v2 路由层
+|   |-- api/                   # v2 路由层
 |   |-- application/services/  # 同步流水线与快照查询服务
 |   |-- core/                  # 配置、认证、embedding、llm、聚类、调度
 |   |-- db/                    # SQLAlchemy 模型与 session 生命周期

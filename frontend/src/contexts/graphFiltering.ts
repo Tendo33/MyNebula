@@ -16,18 +16,21 @@ export interface GraphFilterIndexes {
   totalNodeCount: number;
 }
 
-export const buildGraphFilterIndexes = (rawData: GraphData | null): GraphFilterIndexes => {
+export const buildGraphNodeSearchIndex = (
+  nodes: GraphNode[]
+): Pick<GraphFilterIndexes, 'nodeSearchText' | 'totalNodeCount'> => {
   const nodeSearchText = new Map<number, string>();
-  const edgeIndexesByNodeId = new Map<number, number[]>();
-  if (!rawData) {
-    return { nodeSearchText, edgeIndexesByNodeId, totalNodeCount: 0 };
-  }
-
-  rawData.nodes.forEach((node) => {
+  nodes.forEach((node) => {
     nodeSearchText.set(node.id, buildRepoSearchText(asRepoSearchCandidate(node)));
   });
+  return { nodeSearchText, totalNodeCount: nodes.length };
+};
 
-  rawData.edges.forEach((edge, edgeIndex) => {
+export const buildGraphEdgeIndex = (
+  edges: GraphEdge[]
+): Pick<GraphFilterIndexes, 'edgeIndexesByNodeId'> => {
+  const edgeIndexesByNodeId = new Map<number, number[]>();
+  edges.forEach((edge, edgeIndex) => {
     const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
     const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
     const sourceIndexes = edgeIndexesByNodeId.get(sourceId) ?? [];
@@ -40,8 +43,21 @@ export const buildGraphFilterIndexes = (rawData: GraphData | null): GraphFilterI
       edgeIndexesByNodeId.set(targetId, targetIndexes);
     }
   });
+  return { edgeIndexesByNodeId };
+};
 
-  return { nodeSearchText, edgeIndexesByNodeId, totalNodeCount: rawData.nodes.length };
+export const buildGraphFilterIndexes = (rawData: GraphData | null): GraphFilterIndexes => {
+  if (!rawData) {
+    return {
+      nodeSearchText: new Map<number, string>(),
+      edgeIndexesByNodeId: new Map<number, number[]>(),
+      totalNodeCount: 0,
+    };
+  }
+  return {
+    ...buildGraphNodeSearchIndex(rawData.nodes),
+    ...buildGraphEdgeIndex(rawData.edges),
+  };
 };
 
 export const filterVisibleNodes = ({

@@ -39,6 +39,7 @@ def get_admin_session_username(
     settings: AppSettings,
     *,
     cookie_name: str,
+    expected_session_version: int = 0,
 ) -> str | None:
     """Read the signed admin session cookie and return the username when valid."""
     token = request.cookies.get(cookie_name)
@@ -47,6 +48,8 @@ def get_admin_session_username(
 
     payload = verify_signed_session_token(token, settings.admin_session_secret)
     if not payload:
+        return None
+    if payload.get("sv") != expected_session_version:
         return None
 
     username = payload.get("u")
@@ -143,10 +146,11 @@ def create_signed_session_token(
     username: str,
     secret: str,
     expires_in_seconds: int,
+    session_version: int = 0,
 ) -> str:
     """Create signed session token for admin user."""
     exp = int(time.time()) + expires_in_seconds
-    payload = {"u": username, "exp": exp}
+    payload = {"u": username, "exp": exp, "sv": session_version}
     payload_b64 = _urlsafe_b64encode(
         json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     )

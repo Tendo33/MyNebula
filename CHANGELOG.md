@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-09
+
+### Added
+- Added database-backed orchestration leases with unique execution fencing
+  tokens, conditional heartbeats, startup/online recovery, and the retryable
+  `interrupted` state for pipeline and full-refresh jobs.
+- Added immutable graph snapshot retention with bounded bulk persistence,
+  consistency validation, safe rollback candidates, and active/latest-history
+  protection.
+- Added keyboard-accessible graph alternatives, modal focus management,
+  timeline/sidebar keyboard controls, skip navigation, and unknown-route
+  recovery.
+
+### Changed
+- Moved graph, dashboard, timeline, and data reads onto bounded snapshot/error
+  contracts and database-native aggregation paths.
+- Added concurrent `pg_trgm` search indexes and user-scoped active-job indexes
+  through additive Alembic migrations.
+- Upgraded compatible Python and frontend dependencies, expanded CI with
+  migration/container/audit gates, and synchronized version metadata to
+  `1.3.0`.
+- Docker Compose now requires an explicit published application image tag or
+  digest instead of silently deploying an outdated default image.
+
+### Fixed
+- Prevented stale workers from renewing or writing terminal state after losing
+  job ownership, and prevented expired jobs from blocking future syncs.
+- Prevented snapshot version collisions, historical payload overwrite, live
+  rebuild fallback on corrupted reads, and rollback to failed/building
+  snapshots.
+- Fixed login-throttle races and unscoped stale-attempt cleanup, session
+  revocation, scheduler error disclosure, and trusted-proxy cookie handling.
+- Reduced repeated graph conversion/render work and fixed focus resets caused
+  by changing modal callbacks.
+
+### Security
+- Hardened admin login throttling, CSRF/session revocation, CSP defaults,
+  container privileges, database exposure, health responses, and dependency
+  vulnerability checks.
+
 ## [1.2.11] - 2026-06-03
 
 ### Fixed
@@ -215,7 +255,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.2.11...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Tendo33/mynebula/compare/v1.2.11...v1.3.0
 [1.2.11]: https://github.com/Tendo33/mynebula/compare/v1.2.10...v1.2.11
 [1.2.10]: https://github.com/Tendo33/mynebula/compare/v1.2.9...v1.2.10
 [1.2.7]: https://github.com/Tendo33/mynebula/compare/v1.2.6...v1.2.7

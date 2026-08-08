@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Filter, X } from 'lucide-react';
+import { Filter, List, X } from 'lucide-react';
 
 import { Sidebar } from '../components/layout/Sidebar';
 import Graph2D from '../components/graph/Graph2D';
@@ -198,6 +198,7 @@ const GraphPage = () => {
   const [showFilters, setShowFilters] = useState(
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
+  const [showNodeList, setShowNodeList] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -230,12 +231,12 @@ const GraphPage = () => {
     <div className="page-shell h-screen overflow-hidden">
       <Sidebar />
 
-      <main className="page-main">
+      <main id="main-content" className="page-main">
         <header className="page-header sm:px-6">
           <div className="page-header-inner select-none">
             <div>
               <div className="section-kicker mb-1 px-0">{t('common.explore')}</div>
-              <h2 className="page-title">{t('sidebar.graph')}</h2>
+              <h1 className="page-title">{t('sidebar.graph')}</h1>
             </div>
             <span className="hidden page-subtitle sm:inline">
               {filteredData?.total_nodes !== undefined
@@ -249,7 +250,7 @@ const GraphPage = () => {
             )}
             {edgesLoading && (
               <span className="hidden toolbar-badge sm:inline-flex">
-                {t('sync.loading', 'Loading')} edges...
+                {t('sync.loading', 'Loading')} edges…
               </span>
             )}
             {autoLoadHalted && (
@@ -280,7 +281,7 @@ const GraphPage = () => {
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitch />
 
-            <div className="w-40 transition-all sm:w-56 sm:focus-within:w-64">
+            <div className="w-40 transition-[width] sm:w-56 sm:focus-within:w-64 motion-reduce:transition-none">
               <SearchInput onSearch={handleSearch} value={filters.searchQuery} />
             </div>
 
@@ -298,6 +299,19 @@ const GraphPage = () => {
             >
               <Filter className="h-4 w-4" />
               {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-action-primary" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowNodeList((current) => !current)}
+              aria-expanded={showNodeList}
+              aria-controls="graph-accessible-node-list"
+              className="header-action min-h-0 px-3"
+            >
+              <List aria-hidden="true" className="h-4 w-4" />
+              <span className="sr-only sm:not-sr-only">
+                {t('graph.browse_as_list', 'Browse as list')}
+              </span>
             </button>
           </div>
         </header>
@@ -348,6 +362,60 @@ const GraphPage = () => {
           )}
 
           <div className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-bg-main/80 dark:bg-dark-bg-main/80">
+            {showNodeList && (
+              <section
+                id="graph-accessible-node-list"
+                aria-label={t('graph.repository_list', 'Repository list')}
+                className="panel-surface-strong absolute bottom-3 right-3 top-3 z-40 flex w-[min(92%,24rem)] flex-col overflow-hidden"
+              >
+                <div className="flex items-center justify-between border-b border-border-light px-4 py-3 dark:border-dark-border">
+                  <div>
+                    <h2 className="text-sm font-semibold text-text-main dark:text-dark-text-main">
+                      {t('graph.repository_list', 'Repository list')}
+                    </h2>
+                    <p className="text-xs text-text-muted">
+                      {t('graph.repository_list_count', {
+                        count: filteredData?.nodes.length ?? 0,
+                        defaultValue: `${filteredData?.nodes.length ?? 0} matching repositories`,
+                      })}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowNodeList(false)}
+                    aria-label={t('common.close', 'Close')}
+                    className="header-action h-10 w-10 px-0"
+                  >
+                    <X aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                  {(filteredData?.nodes ?? []).slice(0, 50).map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      onClick={() => setSelectedNode(node)}
+                      className="w-full rounded-xl px-3 py-2 text-left hover:bg-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary dark:hover:bg-dark-bg-sidebar/70"
+                    >
+                      <span className="block truncate text-sm font-medium text-text-main dark:text-dark-text-main">
+                        {node.full_name}
+                      </span>
+                      <span className="block truncate text-xs text-text-muted">
+                        {node.description || node.ai_summary || t('common.no_description', 'No description')}
+                      </span>
+                    </button>
+                  ))}
+                  {filteredData && filteredData.nodes.length > 50 && (
+                    <p className="px-3 py-2 text-xs text-text-muted">
+                      {t(
+                        'graph.repository_list_limited',
+                        'Showing the first 50 matches. Refine your search to narrow the list.'
+                      )}
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
             {autoLoadHalted && (
               <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
                 <span>
@@ -395,8 +463,8 @@ const GraphPage = () => {
 
             {!filteredData && !error && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg-main dark:bg-dark-bg-main">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-action-primary border-t-transparent" />
-                <p className="text-sm text-text-muted">{t('common.loading', 'Loading...')}</p>
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-action-primary border-t-transparent motion-reduce:animate-none" />
+                <p className="text-sm text-text-muted">{t('common.loading', 'Loading…')}</p>
               </div>
             )}
           </div>

@@ -2,8 +2,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
-
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
@@ -58,7 +56,7 @@ import DataPage from '../DataPage';
 describe('Data page v2 smoke', () => {
   it('renders repository rows from v2 data query', () => {
     const { container } = render(
-      <MemoryRouter future={routerFuture}>
+      <MemoryRouter>
         <DataPage />
       </MemoryRouter>
     );

@@ -30,13 +30,13 @@ export const SettingsLoginForm = ({
     <section className="flex flex-1 items-center justify-center px-6 py-10">
       <div className="panel-surface-strong w-full max-w-lg p-7 sm:p-8">
         <div className="mb-6 flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-sidebar text-text-main shadow-sm">
-            <Shield className="w-5 h-5 text-text-main" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-sidebar text-text-main shadow-sm dark:bg-dark-bg-sidebar dark:text-dark-text-main">
+            <Shield className="w-5 h-5 text-text-main dark:text-dark-text-main" />
           </div>
           <div>
             <div className="section-kicker mb-2 px-0">{t('settings.title')}</div>
-            <h2 className="font-heading text-xl font-semibold text-text-main">{t('settings.admin_access')}</h2>
-            <p className="mt-1 text-sm text-text-muted">{t('settings.login_required_desc')}</p>
+            <h2 className="font-heading text-xl font-semibold text-text-main dark:text-dark-text-main">{t('settings.admin_access')}</h2>
+            <p className="mt-1 text-sm text-text-muted dark:text-dark-text-main/70">{t('settings.login_required_desc')}</p>
           </div>
         </div>
 
@@ -48,11 +48,11 @@ export const SettingsLoginForm = ({
           )}
 
           <div>
-            <label htmlFor="admin-username" className="block text-xs text-text-muted mb-1">
+            <label htmlFor="admin-username" className="block text-xs text-text-muted mb-1 dark:text-dark-text-main/70">
               {t('settings.username')}
             </label>
             <div className="relative">
-              <User className="w-4 h-4 text-text-dim absolute left-3 top-1/2 -translate-y-1/2" />
+              <User className="w-4 h-4 text-text-dim absolute left-3 top-1/2 -translate-y-1/2 dark:text-dark-text-main/60" />
               <input
                 id="admin-username"
                 type="text"
@@ -66,7 +66,7 @@ export const SettingsLoginForm = ({
           </div>
 
           <div>
-            <label htmlFor="admin-password" className="block text-xs text-text-muted mb-1">
+            <label htmlFor="admin-password" className="block text-xs text-text-muted mb-1 dark:text-dark-text-main/70">
               {t('settings.password')}
             </label>
             <input
@@ -93,7 +93,7 @@ export const SettingsLoginForm = ({
               'flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-colors',
               loginLoading || adminAuthConfigured === false
                 ? 'bg-bg-hover text-text-dim border border-border-light cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60 dark:border-dark-border'
-                : 'bg-text-main text-bg-main shadow-sm hover:-translate-y-px hover:bg-text-main/92'
+                : 'bg-text-main text-bg-main shadow-sm hover:-translate-y-px hover:bg-text-main/92 dark:bg-dark-text-main dark:text-dark-bg-main'
             )}
           >
             {loginLoading && <Loader2 className="w-4 h-4 animate-spin" />}

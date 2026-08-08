@@ -8,7 +8,7 @@ from nebula.core.auth import get_admin_session_username, is_admin_auth_enabled
 from nebula.core.config import AppSettings, get_app_settings
 from nebula.db import User, get_db
 
-from .auth import ADMIN_SESSION_COOKIE
+from .auth import ADMIN_SESSION_COOKIE, get_admin_session_version
 
 
 async def resolve_single_user(
@@ -33,10 +33,12 @@ async def resolve_read_user(
                 detail="Authenticated read mode requires admin auth configuration",
             )
 
+        session_version = await get_admin_session_version(db)
         username = get_admin_session_username(
             request,
             settings,
             cookie_name=ADMIN_SESSION_COOKIE,
+            expected_session_version=session_version,
         )
         if username != settings.admin_username:
             raise HTTPException(

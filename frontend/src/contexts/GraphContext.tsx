@@ -15,7 +15,8 @@ import {
   useTimelineQuery,
 } from '../features/graph/hooks/useTimelineQuery';
 import {
-  buildGraphFilterIndexes,
+  buildGraphEdgeIndex,
+  buildGraphNodeSearchIndex,
   createVisibleNodeIds,
   filterVisibleClusters,
   filterVisibleEdges,
@@ -126,7 +127,15 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     };
   }, [graphQuery.data, stagedEdges]);
   const timelineData = timelineQuery.data ?? null;
-  const graphFilterIndexes = useMemo(() => buildGraphFilterIndexes(rawData), [rawData]);
+  const nodeFilterIndexes = useMemo(
+    () => buildGraphNodeSearchIndex(graphQuery.data?.nodes ?? []),
+    [graphQuery.data?.nodes]
+  );
+  const edgeFilterIndexes = useMemo(() => buildGraphEdgeIndex(stagedEdges), [stagedEdges]);
+  const graphFilterIndexes = useMemo(
+    () => ({ ...nodeFilterIndexes, ...edgeFilterIndexes }),
+    [edgeFilterIndexes, nodeFilterIndexes]
+  );
   const loading = enabled && (graphQuery.isLoading || timelineQuery.isLoading);
   const edgesLoading = Boolean(
     graphQuery.data && (edgesQuery.isLoading || edgesQuery.isFetchingNextPage)

@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -17,12 +18,15 @@ class _FakeDbContext:
     async def __aexit__(self, exc_type, exc, _tb):
         return False
 
-    async def get(self, model, _id):
+    async def get(self, model, _id, **_kwargs):
         if model.__name__ == "PipelineRun":
             return self._run
         if model.__name__ == "User":
             return self._user
         return None
+
+    async def execute(self, _statement, *_args, **_kwargs):
+        return SimpleNamespace(rowcount=1)
 
     def add(self, obj):
         self._added.append(obj)
@@ -39,7 +43,12 @@ class _FakeDbContext:
 async def test_pipeline_marks_partial_failed_when_phase_has_failed_items(monkeypatch):
     from nebula.application.services import pipeline_service as pipeline_module
 
-    run = SimpleNamespace(id=1, user_id=9)
+    run = SimpleNamespace(
+        id=1,
+        user_id=9,
+        worker_id="worker:test",
+        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    )
     monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
 
     async def noop(*_args, **_kwargs):
@@ -67,7 +76,7 @@ async def test_pipeline_marks_partial_failed_when_phase_has_failed_items(monkeyp
     async def fake_inspect(*_args, **_kwargs):
         return outcomes.pop(0)
 
-    async def fake_update(_run_id, status, phase, error=None):
+    async def fake_update(_run_id, status, phase, error=None, **_kwargs):
         status_updates.append((status, phase))
 
     monkeypatch.setattr(service, "_create_task", fake_create_task)
@@ -87,7 +96,12 @@ async def test_pipeline_marks_partial_failed_when_phase_has_failed_items(monkeyp
 async def test_pipeline_records_last_error_for_partial_failure(monkeypatch):
     from nebula.application.services import pipeline_service as pipeline_module
 
-    run = SimpleNamespace(id=1, user_id=9)
+    run = SimpleNamespace(
+        id=1,
+        user_id=9,
+        worker_id="worker:test",
+        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    )
     monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
 
     async def noop(*_args, **_kwargs):
@@ -116,7 +130,7 @@ async def test_pipeline_records_last_error_for_partial_failure(monkeypatch):
 
     status_updates: list[tuple[PipelineStatus, PipelinePhase, str | None]] = []
 
-    async def fake_update(_run_id, status, phase, error=None):
+    async def fake_update(_run_id, status, phase, error=None, **_kwargs):
         status_updates.append((status, phase, error))
 
     monkeypatch.setattr(service, "_create_task", fake_create_task)
@@ -137,7 +151,12 @@ async def test_pipeline_records_last_error_for_partial_failure(monkeypatch):
 async def test_pipeline_marks_failed_when_phase_raises(monkeypatch):
     from nebula.application.services import pipeline_service as pipeline_module
 
-    run = SimpleNamespace(id=1, user_id=9)
+    run = SimpleNamespace(
+        id=1,
+        user_id=9,
+        worker_id="worker:test",
+        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    )
     monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
 
     async def failing_sync(*_args, **_kwargs):
@@ -165,7 +184,7 @@ async def test_pipeline_marks_failed_when_phase_raises(monkeypatch):
     async def fake_create_task(*_args, **_kwargs):
         return 1
 
-    async def fake_update(_run_id, status, phase, error=None):
+    async def fake_update(_run_id, status, phase, error=None, **_kwargs):
         status_updates.append((status, phase, error))
 
     monkeypatch.setattr(service, "_create_task", fake_create_task)
@@ -181,7 +200,12 @@ async def test_pipeline_marks_failed_when_phase_raises(monkeypatch):
 async def test_recluster_pipeline_runs_clustering_then_snapshot(monkeypatch):
     from nebula.application.services import pipeline_service as pipeline_module
 
-    run = SimpleNamespace(id=7, user_id=9)
+    run = SimpleNamespace(
+        id=7,
+        user_id=9,
+        worker_id="worker:test",
+        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    )
     monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
 
     clustering_calls: list[dict[str, object]] = []
@@ -212,7 +236,7 @@ async def test_recluster_pipeline_runs_clustering_then_snapshot(monkeypatch):
     async def fake_create_task(*_args, **_kwargs):
         return 42
 
-    async def fake_update(_run_id, status, phase, error=None):
+    async def fake_update(_run_id, status, phase, error=None, **_kwargs):
         status_updates.append((status, phase))
 
     async def noop(*_args, **_kwargs):

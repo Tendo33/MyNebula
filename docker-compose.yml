@@ -5,10 +5,10 @@ services:
     container_name: mynebula-db
     environment:
       POSTGRES_USER: ${DATABASE_USER:-mynebula}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-mynebula_secret}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set}
       POSTGRES_DB: ${DATABASE_NAME:-mynebula}
     ports:
-      - "${DATABASE_PORT:-5432}:5432"
+      - "127.0.0.1:${DATABASE_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,12 +17,14 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - mynebula-net
 
   # ==================== Backend API + Frontend ====================
   api:
-    image: simonsun3/mynebula:latest
+    image: ${MYNEBULA_IMAGE:?MYNEBULA_IMAGE must name a published immutable tag or digest}
     container_name: mynebula-api
     env_file:
       - .env
@@ -38,6 +40,8 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - mynebula-net
     healthcheck:

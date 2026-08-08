@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import datetime, timedelta, timezone
+from itertools import islice
+from typing import TypeVar
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.db import (
@@ -15,6 +18,15 @@ from nebula.db import (
     User,
 )
 from nebula.schemas.graph import GraphData, TimelineData
+
+SNAPSHOT_INSERT_BATCH_SIZE = 1000
+T = TypeVar("T")
+
+
+def _batched(values: Iterable[T], size: int = SNAPSHOT_INSERT_BATCH_SIZE):
+    iterator = iter(values)
+    while batch := list(islice(iterator, size)):
+        yield batch
 
 
 class SnapshotStoreRepository:
@@ -48,25 +60,15 @@ class SnapshotStoreRepository:
         timeline_data: TimelineData,
         status: str = "ready",
     ) -> GraphSnapshot:
-        snapshot = await self.get_snapshot_by_version(db, user_id, version)
-        if snapshot:
-            await db.execute(
-                delete(GraphSnapshotNode).where(
-                    GraphSnapshotNode.snapshot_id == snapshot.id
-                )
-            )
-            await db.execute(
-                delete(GraphSnapshotEdge).where(
-                    GraphSnapshotEdge.snapshot_id == snapshot.id
-                )
-            )
-            await db.execute(
-                delete(GraphSnapshotTimeline).where(
-                    GraphSnapshotTimeline.snapshot_id == snapshot.id
-                )
-            )
-            snapshot.status = status
-            snapshot.meta = {
+        existing = await self.get_snapshot_by_version(db, user_id, version)
+        if existing is not None:
+            raise ValueError(f"Snapshot version already exists: {version}")
+
+        snapshot = GraphSnapshot(
+            user_id=user_id,
+            version=version,
+            status=status,
+            meta={
                 "total_nodes": graph_data.total_nodes,
                 "total_edges": graph_data.total_edges,
                 "total_clusters": graph_data.total_clusters,
@@ -75,50 +77,35 @@ class SnapshotStoreRepository:
                 "star_lists": [
                     star_list.model_dump() for star_list in graph_data.star_lists
                 ],
-            }
-        else:
-            snapshot = GraphSnapshot(
-                user_id=user_id,
-                version=version,
-                status=status,
-                meta={
-                    "total_nodes": graph_data.total_nodes,
-                    "total_edges": graph_data.total_edges,
-                    "total_clusters": graph_data.total_clusters,
-                    "total_star_lists": graph_data.total_star_lists,
-                    "clusters": [
-                        cluster.model_dump() for cluster in graph_data.clusters
-                    ],
-                    "star_lists": [
-                        star_list.model_dump() for star_list in graph_data.star_lists
-                    ],
-                },
-            )
-            db.add(snapshot)
-            await db.flush()
+            },
+        )
+        db.add(snapshot)
+        await db.flush()
 
-        db.add_all(
-            [
-                GraphSnapshotNode(
-                    snapshot_id=snapshot.id,
-                    repo_id=node.id,
-                    payload=node.model_dump(),
-                )
-                for node in graph_data.nodes
-            ]
+        node_rows = (
+            {
+                "snapshot_id": snapshot.id,
+                "repo_id": node.id,
+                "payload": node.model_dump(),
+            }
+            for node in graph_data.nodes
         )
-        db.add_all(
-            [
-                GraphSnapshotEdge(
-                    snapshot_id=snapshot.id,
-                    edge_index=index,
-                    source=edge.source,
-                    target=edge.target,
-                    weight=edge.weight,
-                )
-                for index, edge in enumerate(graph_data.edges)
-            ]
+        for batch in _batched(node_rows):
+            await db.execute(insert(GraphSnapshotNode), batch)
+
+        edge_rows = (
+            {
+                "snapshot_id": snapshot.id,
+                "edge_index": index,
+                "source": edge.source,
+                "target": edge.target,
+                "weight": edge.weight,
+            }
+            for index, edge in enumerate(graph_data.edges)
         )
+        for batch in _batched(edge_rows):
+            await db.execute(insert(GraphSnapshotEdge), batch)
+
         db.add(
             GraphSnapshotTimeline(
                 snapshot_id=snapshot.id,
@@ -129,10 +116,76 @@ class SnapshotStoreRepository:
         await db.refresh(snapshot)
         return snapshot
 
+    async def prune_snapshots(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        keep_latest: int = 30,
+        max_age_days: int = 90,
+        now: datetime | None = None,
+    ) -> int:
+        """Delete only old, non-active snapshots outside the approved window."""
+        # Activation and retention share this row lock as their ordering owner.
+        user = await db.get(User, user_id, with_for_update=True)
+        active_id = user.active_graph_snapshot_id if user else None
+        protected_result = await db.execute(
+            select(GraphSnapshot.id)
+            .where(
+                GraphSnapshot.user_id == user_id,
+                GraphSnapshot.status.in_(["active", "ready"]),
+            )
+            .order_by(GraphSnapshot.created_at.desc(), GraphSnapshot.id.desc())
+            .limit(keep_latest)
+        )
+        protected_ids = set(protected_result.scalars().all())
+        if active_id is not None:
+            protected_ids.add(active_id)
+
+        cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=max_age_days)
+        candidate_query = select(GraphSnapshot.id).where(
+            GraphSnapshot.user_id == user_id,
+            GraphSnapshot.created_at < cutoff,
+        )
+        if protected_ids:
+            candidate_query = candidate_query.where(
+                GraphSnapshot.id.not_in(protected_ids)
+            )
+        candidate_result = await db.execute(candidate_query)
+        snapshot_ids = list(candidate_result.scalars().all())
+        if not snapshot_ids:
+            await db.commit()
+            return 0
+
+        await db.execute(
+            delete(GraphSnapshotTimeline).where(
+                GraphSnapshotTimeline.snapshot_id.in_(snapshot_ids)
+            )
+        )
+        await db.execute(
+            delete(GraphSnapshotEdge).where(
+                GraphSnapshotEdge.snapshot_id.in_(snapshot_ids)
+            )
+        )
+        await db.execute(
+            delete(GraphSnapshotNode).where(
+                GraphSnapshotNode.snapshot_id.in_(snapshot_ids)
+            )
+        )
+        await db.execute(
+            delete(GraphSnapshot).where(
+                GraphSnapshot.user_id == user_id,
+                GraphSnapshot.id.in_(snapshot_ids),
+            )
+        )
+        await db.commit()
+        return len(snapshot_ids)
+
     async def activate_snapshot(
         self, db: AsyncSession, user_id: int, snapshot: GraphSnapshot
     ) -> None:
-        user = await db.get(User, user_id)
+        # Activation and retention share this row lock as their ordering owner.
+        user = await db.get(User, user_id, with_for_update=True)
         if not user:
             return
         await db.execute(
@@ -229,7 +282,10 @@ class SnapshotStoreRepository:
     ) -> GraphSnapshot | None:
         query = (
             select(GraphSnapshot)
-            .where(GraphSnapshot.user_id == user_id)
+            .where(
+                GraphSnapshot.user_id == user_id,
+                GraphSnapshot.status.in_(("active", "ready")),
+            )
             .order_by(
                 GraphSnapshot.activated_at.desc().nullslast(),
                 GraphSnapshot.id.desc(),

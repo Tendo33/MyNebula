@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import (
     GraphQueryService,
+    SnapshotUnavailableError,
     SnapshotVersionNotFoundError,
 )
 from nebula.core.config import get_app_settings
@@ -20,6 +21,17 @@ from .auth import require_admin, require_admin_csrf
 router = APIRouter()
 graph_service = GraphQueryService()
 settings = get_app_settings()
+
+
+def _snapshot_unavailable_http(exc: SnapshotUnavailableError) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail={
+            "message": "Graph snapshot is temporarily unavailable",
+            "request_id": exc.request_id,
+        },
+        headers={"Retry-After": "30"},
+    )
 
 
 @router.get("", response_model=GraphData)
@@ -43,6 +55,8 @@ async def get_graph(
         )
     except SnapshotVersionNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc
     etag = f'W/"graph:{resolved_version}:edges:{int(include_edges)}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
@@ -58,6 +72,8 @@ async def get_graph(
         )
     except TimeoutError as exc:
         raise HTTPException(status_code=504, detail="Graph query timed out") from exc
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc
     response.headers["ETag"] = etag
     return payload
 
@@ -81,6 +97,8 @@ async def get_graph_edges(
         )
     except SnapshotVersionNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc
     etag = f'W/"graph-edges:{resolved_version}:cursor:{cursor}:limit:{limit}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
@@ -100,6 +118,8 @@ async def get_graph_edges(
         raise HTTPException(
             status_code=504, detail="Graph edges query timed out"
         ) from exc
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc
     response.headers["ETag"] = etag
     return page
 
@@ -121,6 +141,8 @@ async def get_graph_timeline(
         )
     except SnapshotVersionNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc
     etag = f'W/"graph-timeline:{resolved_version}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
@@ -137,6 +159,8 @@ async def get_graph_timeline(
         raise HTTPException(
             status_code=504, detail="Graph timeline query timed out"
         ) from exc
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc
     response.headers["ETag"] = etag
     return payload
 
@@ -149,4 +173,7 @@ async def rebuild_graph_snapshot(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> GraphData:
     """Rebuild and activate a new snapshot version."""
-    return await graph_service.rebuild_active_snapshot(db, user=user)
+    try:
+        return await graph_service.rebuild_active_snapshot(db, user=user)
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc

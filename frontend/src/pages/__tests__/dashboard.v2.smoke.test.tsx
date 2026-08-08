@@ -2,8 +2,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
-
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -44,7 +42,7 @@ import Dashboard from '../Dashboard';
 describe('Dashboard v2 smoke', () => {
   it('renders v2 dashboard summary cards', () => {
     render(
-      <MemoryRouter future={routerFuture}>
+      <MemoryRouter>
         <Dashboard />
       </MemoryRouter>
     );

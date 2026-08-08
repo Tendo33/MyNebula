@@ -28,6 +28,7 @@ class PipelineStatusResponse(BaseModel):
     created_at: datetime | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    retryable: bool = Field(False, description="Whether the run may be started again")
     version: str | None = Field(None, description="Pipeline version token")
     generated_at: str | None = Field(None, description="Response generation timestamp")
     request_id: str | None = Field(None, description="Request correlation ID")

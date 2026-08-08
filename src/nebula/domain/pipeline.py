@@ -16,6 +16,7 @@ class PipelineStatus(StrEnum):
     partial_failed = "partial_failed"
     completed = "completed"
     failed = "failed"
+    interrupted = "interrupted"
 
 
 class PipelinePhase(StrEnum):

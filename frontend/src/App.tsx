@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Link, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import { GraphProvider, useGraph } from './contexts/GraphContext';
@@ -13,6 +13,17 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const GraphPage = lazy(() => import('./pages/GraphPage'));
 const DataPage = lazy(() => import('./pages/DataPage'));
 const Settings = lazy(() => import('./pages/Settings'));
+
+const NotFound = () => {
+  const { t } = useTranslation();
+  return (
+    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+      <h1 className="page-title">404</h1>
+      <p className="text-text-muted">{t('errors.not_found', 'This page does not exist.')}</p>
+      <Link className="button-primary" to="/">{t('sidebar.dashboard', 'Dashboard')}</Link>
+    </main>
+  );
+};
 
 // Inner component that uses router hooks
 function GraphAppContent({
@@ -50,10 +61,16 @@ function GraphAppContent({
   return (
     <>
       <div className="min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main font-sans selection:bg-action-primary/20">
+        <a
+          href="#main-content"
+          className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-action-primary px-4 py-2 text-white transition-transform focus:translate-y-0"
+        >
+          {t('common.skip_to_content', 'Skip to content')}
+        </a>
         <ErrorBoundary FallbackComponent={ErrorFallback}>
           <Suspense fallback={
             <div className="flex min-h-screen items-center justify-center text-sm text-text-muted">
-              {t('common.loading', 'Loading...')}
+              {t('common.loading', 'Loading…')}
             </div>
           }>
             <Routes>
@@ -61,6 +78,7 @@ function GraphAppContent({
               <Route path="/graph" element={<GraphPage />} />
               <Route path="/data" element={<DataPage />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>
@@ -92,7 +110,7 @@ function AppContent() {
 function App() {
   return (
     <AdminAuthProvider>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Router>
         <AppContent />
       </Router>
     </AdminAuthProvider>

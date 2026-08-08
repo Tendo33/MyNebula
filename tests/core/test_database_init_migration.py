@@ -105,3 +105,21 @@ def test_repo_related_cache_migration_creates_related_repo_tables():
 
     assert '"repo_related_feedbacks"' in migration_source
     assert '"repo_related_caches"' in migration_source
+
+
+def test_search_indexes_use_a_dedicated_concurrent_migration():
+    lease_migration = (
+        ALEMBIC_VERSIONS_DIR / "20260808_1715_add_job_leases.py"
+    ).read_text(encoding="utf-8")
+    matching_files = sorted(ALEMBIC_VERSIONS_DIR.glob("*_add_search_indexes.py"))
+
+    assert matching_files, "Search indexes need an independently deployable migration"
+    search_migration = matching_files[-1].read_text(encoding="utf-8")
+    assert (
+        'down_revision: str | Sequence[str] | None = "8a51c7d2e4f9"' in search_migration
+    )
+    assert "autocommit_block" in search_migration
+    assert "postgresql_concurrently=True" in search_migration
+    assert "gin_trgm_ops" in search_migration
+    assert "topics_gin" not in lease_migration + search_migration
+    assert "ai_tags_gin" not in lease_migration + search_migration

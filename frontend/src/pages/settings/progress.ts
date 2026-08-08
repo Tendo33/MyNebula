@@ -115,7 +115,11 @@ export const mapPipelineProgressSteps = (
       return { ...step, status: 'completed', progress: 100, error: undefined };
     }
 
-    if (pipeline.status === 'failed' || pipeline.status === 'partial_failed') {
+    if (
+      pipeline.status === 'failed' ||
+      pipeline.status === 'partial_failed' ||
+      pipeline.status === 'interrupted'
+    ) {
       if (phaseIndex >= 0 && index < phaseIndex) {
         return { ...step, status: 'completed', progress: 100, error: undefined };
       }
@@ -187,7 +191,7 @@ export const mapFullRefreshProgressSteps = (
       return { ...step, status: 'completed', progress: 100, error: undefined };
     }
 
-    if (job.status === 'failed') {
+    if (job.status === 'failed' || job.status === 'interrupted') {
       if (currentIndex >= 0 && index < currentIndex) {
         return { ...step, status: 'completed', progress: 100, error: undefined };
       }

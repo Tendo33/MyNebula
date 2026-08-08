@@ -8,6 +8,15 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
+from nebula.application.services.job_lifecycle_service import (
+    JobLeaseHeartbeat,
+    JobLeaseLostError,
+    active_lease_condition,
+    apply_job_lease,
+    clear_job_lease,
+    interrupt_expired_job,
+    interrupt_expired_jobs_for_user,
+)
 from nebula.application.services.sync_execution_service import (
     compute_embeddings_task,
     run_clustering_task,
@@ -157,6 +166,13 @@ async def get_job_status(
     user: User,
 ) -> JobStatusResponse:
     """Get aggregated job status for richer progress UI."""
+    if await interrupt_expired_job(
+        db,
+        "sync_task",
+        task_id,
+        user_id=user.id,
+    ):
+        await db.commit()
     result = await db.execute(
         select(SyncTask).where(
             SyncTask.id == task_id,
@@ -189,7 +205,7 @@ async def get_job_status(
         progress_percent=progress_percent,
         eta_seconds=eta_seconds,
         last_error=task.error_message,
-        retryable=task.status == "failed",
+        retryable=task.status in {"failed", PipelineStatus.interrupted.value},
         started_at=task.started_at,
         completed_at=task.completed_at,
         error_details=task.error_details,
@@ -279,13 +295,51 @@ async def update_schedule(
 async def full_refresh_task(user_id: int, task_id: int):
     """Background task to perform full refresh of all repositories."""
 
+    async with get_db_context() as db:
+        main_task = await db.get(SyncTask, task_id)
+        if main_task is None or main_task.user_id != user_id:
+            raise ValueError(f"Full refresh task not found: {task_id}")
+        worker_id = main_task.worker_id
+        if not worker_id:
+            raise JobLeaseLostError(
+                f"Full refresh task {task_id} has no execution token"
+            )
+
     async def _update_main_task(**fields) -> bool:
         async with get_db_context() as db:
-            task = await db.get(SyncTask, task_id)
+            task = await db.get(SyncTask, task_id, with_for_update=True)
             if not task:
-                return False
+                raise JobLeaseLostError(f"Full refresh task {task_id} no longer exists")
+            now = datetime.now(timezone.utc)
+            if (
+                task.worker_id != worker_id
+                or task.status
+                not in {
+                    PipelineStatus.pending.value,
+                    PipelineStatus.running.value,
+                }
+                or task.lease_expires_at is None
+                or task.lease_expires_at <= now
+            ):
+                await interrupt_expired_job(
+                    db,
+                    "sync_task",
+                    task_id,
+                    user_id=user_id,
+                )
+                await db.commit()
+                raise JobLeaseLostError(
+                    f"Full refresh task {task_id} execution lease was lost"
+                )
             for key, value in fields.items():
                 setattr(task, key, value)
+            if fields.get("status") in {
+                PipelineStatus.completed.value,
+                PipelineStatus.partial_failed.value,
+                PipelineStatus.failed.value,
+                PipelineStatus.interrupted.value,
+            }:
+                clear_job_lease(task)
             await db.commit()
             return True
 
@@ -325,6 +379,13 @@ async def full_refresh_task(user_id: int, task_id: int):
                 }
             return None
 
+    heartbeat = JobLeaseHeartbeat(
+        "sync_task",
+        task_id,
+        worker_id,
+        session_factory=get_db_context,
+    )
+    await heartbeat.start()
     try:
         partial_failures: list[dict] = []
         task_exists = await _update_main_task(
@@ -356,6 +417,7 @@ async def full_refresh_task(user_id: int, task_id: int):
             reset_count = result.rowcount
             await db.commit()
         logger.info(f"Full refresh: Reset {reset_count} repos")
+        heartbeat.ensure_owned()
 
         await _update_main_task(
             error_details={"phase": "reset", "reset_count": reset_count},
@@ -365,6 +427,7 @@ async def full_refresh_task(user_id: int, task_id: int):
         logger.info(f"Full refresh: Starting full star sync for user {user_id}")
         stars_task_id = await _create_sub_task("stars")
         await sync_stars_task(user_id, stars_task_id, "full")
+        heartbeat.ensure_owned()
         stars_partial = await _validate_sub_task(stars_task_id, "stars")
         if stars_partial is not None:
             partial_failures.append(stars_partial)
@@ -376,6 +439,7 @@ async def full_refresh_task(user_id: int, task_id: int):
         logger.info(f"Full refresh: Computing embeddings for user {user_id}")
         embed_task_id = await _create_sub_task("embedding")
         await compute_embeddings_task(user_id, embed_task_id)
+        heartbeat.ensure_owned()
         embedding_partial = await _validate_sub_task(embed_task_id, "embeddings")
         if embedding_partial is not None:
             partial_failures.append(embedding_partial)
@@ -391,6 +455,7 @@ async def full_refresh_task(user_id: int, task_id: int):
         )
         cluster_task_id = await _create_sub_task("cluster")
         await run_clustering_task(user_id, cluster_task_id, use_llm=True)
+        heartbeat.ensure_owned()
         clustering_partial = await _validate_sub_task(cluster_task_id, "clustering")
         if clustering_partial is not None:
             partial_failures.append(clustering_partial)
@@ -405,6 +470,7 @@ async def full_refresh_task(user_id: int, task_id: int):
             if user is None:
                 raise ValueError(f"Full refresh user not found: {user_id}")
             await graph_service.rebuild_active_snapshot(db, user=user)
+        heartbeat.ensure_owned()
 
         terminal_status = (
             PipelineStatus.partial_failed.value
@@ -429,17 +495,26 @@ async def full_refresh_task(user_id: int, task_id: int):
             },
         )
         logger.info(f"Full refresh completed for user {user_id}")
+    except JobLeaseLostError as exc:
+        logger.warning(f"Full refresh {task_id} stopped after lease loss: {exc}")
     except Exception as exc:
         logger.exception(f"Full refresh failed for user {user_id}: {exc}")
         failed_phase = (
             exc.phase if isinstance(exc, FullRefreshSubTaskError) else "full_refresh"
         )
-        await _update_main_task(
-            status="failed",
-            error_message=str(exc),
-            completed_at=datetime.now(timezone.utc),
-            error_details={"phase": failed_phase},
-        )
+        try:
+            await _update_main_task(
+                status="failed",
+                error_message=str(exc),
+                completed_at=datetime.now(timezone.utc),
+                error_details={"phase": failed_phase},
+            )
+        except JobLeaseLostError:
+            logger.warning(
+                f"Full refresh {task_id} failure was not persisted because ownership was lost"
+            )
+    finally:
+        await heartbeat.stop()
 
 
 async def trigger_full_refresh(
@@ -458,6 +533,7 @@ async def trigger_full_refresh(
             detail="GitHub token not configured. Full refresh cannot start.",
         )
     await _acquire_full_refresh_creation_lock(db, user.id)
+    await interrupt_expired_jobs_for_user(db, user.id)
     active_pipeline = await _get_active_pipeline_run(db, user.id)
     if active_pipeline is not None:
         raise HTTPException(
@@ -469,7 +545,7 @@ async def trigger_full_refresh(
         select(SyncTask).where(
             SyncTask.user_id == user.id,
             SyncTask.task_type == "full_refresh",
-            SyncTask.status.in_(["pending", "running"]),
+            *active_lease_condition(SyncTask),
         )
     )
     existing = result.scalar_one_or_none()
@@ -490,6 +566,7 @@ async def trigger_full_refresh(
         task_type="full_refresh",
         status="pending",
     )
+    apply_job_lease(task)
     db.add(task)
     await db.commit()
     await db.refresh(task)
@@ -532,9 +609,7 @@ async def _get_active_pipeline_run(
         select(PipelineRun)
         .where(
             PipelineRun.user_id == user_id,
-            PipelineRun.status.in_(
-                [PipelineStatus.pending.value, PipelineStatus.running.value]
-            ),
+            *active_lease_condition(PipelineRun),
         )
         .order_by(PipelineRun.id.desc())
         .limit(1)

@@ -2,8 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
-const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
-
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => fallback ?? key,
@@ -59,7 +57,7 @@ const LocationProbe = () => {
 describe('DataPage URL state', () => {
   it('restores query and cluster filters from the URL and keeps them shareable', async () => {
     render(
-      <MemoryRouter initialEntries={['/data?q=nebula&cluster=1']} future={routerFuture}>
+      <MemoryRouter initialEntries={['/data?q=nebula&cluster=1']}>
         <LocationProbe />
         <Routes>
           <Route path="/data" element={<DataPage />} />

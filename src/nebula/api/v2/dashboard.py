@@ -56,37 +56,25 @@ async def get_dashboard_data(
     topic_stats_result = await db.execute(
         text(
             """
-            SELECT lower(trim(topic)) AS topic, count(*) AS count
-            FROM starred_repos
-            CROSS JOIN LATERAL unnest(topics) AS topic
-            WHERE user_id = :user_id
-              AND topic IS NOT NULL
-              AND trim(topic) <> ''
-            GROUP BY lower(trim(topic))
-            ORDER BY count(*) DESC, lower(trim(topic)) ASC
+            WITH topic_counts AS (
+                SELECT lower(trim(topic)) AS topic, count(*) AS count
+                FROM starred_repos
+                CROSS JOIN LATERAL unnest(topics) AS topic
+                WHERE user_id = :user_id
+                  AND topic IS NOT NULL
+                  AND trim(topic) <> ''
+                GROUP BY lower(trim(topic))
+            )
+            SELECT topic, count, count(*) OVER () AS total_topics
+            FROM topic_counts
+            ORDER BY count DESC, topic ASC
             LIMIT 12
             """
         ),
         {"user_id": user.id},
     )
     topic_rows = topic_stats_result.all()
-    total_topics_result = await db.execute(
-        text(
-            """
-            SELECT count(*) AS total_topics
-            FROM (
-                SELECT DISTINCT lower(trim(topic)) AS topic
-                FROM starred_repos
-                CROSS JOIN LATERAL unnest(topics) AS topic
-                WHERE user_id = :user_id
-                  AND topic IS NOT NULL
-                  AND trim(topic) <> ''
-            ) AS distinct_topics
-            """
-        ),
-        {"user_id": user.id},
-    )
-    total_topics = int(total_topics_result.scalar() or 0)
+    total_topics = int(topic_rows[0].total_topics) if topic_rows else 0
 
     clusters_result = await db.execute(
         select(Cluster)

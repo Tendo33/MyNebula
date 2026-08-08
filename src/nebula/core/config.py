@@ -10,6 +10,13 @@ from typing import Literal
 from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; "
+    "connect-src 'self'; font-src 'self' data:; object-src 'none'; "
+    "base-uri 'self'; frame-ancestors 'none'"
+)
+
 
 class DatabaseSettings(BaseSettings):
     """Database configuration settings."""
@@ -17,7 +24,7 @@ class DatabaseSettings(BaseSettings):
     host: str = Field(default="localhost", description="Database host")
     port: int = Field(default=5432, description="Database port")
     user: str = Field(default="mynebula", description="Database user")
-    password: str = Field(default="mynebula_secret", description="Database password")
+    password: str = Field(default="", description="Database password")
     name: str = Field(default="mynebula", description="Database name")
     url: str | None = Field(
         default=None, description="Full database URL (overrides other settings)"
@@ -193,7 +200,7 @@ class AppSettings(BaseSettings):
 
     # Basic settings
     app_name: str = Field(default="mynebula", description="Application name")
-    app_version: str = Field(default="1.2.11", description="Application version")
+    app_version: str = Field(default="1.3.0", description="Application version")
     debug: bool = Field(
         default=False, description="Debug mode (also controls environment)"
     )
@@ -209,12 +216,6 @@ class AppSettings(BaseSettings):
             "Explicit read access mode. 'demo' allows anonymous reads against the "
             "single-user dataset, while 'authenticated' requires an authenticated "
             "admin session for read APIs."
-        ),
-    )
-    snapshot_read_fallback_on_error: bool = Field(
-        default=False,
-        description=(
-            "Fallback to live payload build when snapshot read fails unexpectedly"
         ),
     )
     slow_query_log_ms: int = Field(
@@ -306,7 +307,7 @@ class AppSettings(BaseSettings):
         description="Redirect HTTP requests to HTTPS",
     )
     content_security_policy: str = Field(
-        default="",
+        default=DEFAULT_CONTENT_SECURITY_POLICY,
         description="Optional Content-Security-Policy header value",
     )
 

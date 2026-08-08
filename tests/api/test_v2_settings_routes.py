@@ -141,6 +141,7 @@ async def test_trigger_full_refresh_rejects_when_pipeline_active(monkeypatch):
     class _FakeResult:
         def __init__(self, scalar_value):
             self._scalar_value = scalar_value
+            self.rowcount = 0
 
         def scalar_one_or_none(self):
             return self._scalar_value

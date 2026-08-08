@@ -193,13 +193,32 @@ export const Sidebar = () => {
       {!isMobile && (
         <div
           role="separator"
+          tabIndex={0}
           aria-orientation="vertical"
           aria-label="Resize sidebar"
+          aria-valuemin={SIDEBAR_MIN_WIDTH}
+          aria-valuemax={SIDEBAR_MAX_WIDTH}
+          aria-valuenow={sidebarWidth}
+          onKeyDown={(event) => {
+            const increment = event.shiftKey ? 40 : 10;
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+              event.preventDefault();
+              setSidebarWidth((current) =>
+                clampSidebarWidth(current + (event.key === 'ArrowRight' ? increment : -increment))
+              );
+            } else if (event.key === 'Home') {
+              event.preventDefault();
+              setSidebarWidth(SIDEBAR_MIN_WIDTH);
+            } else if (event.key === 'End') {
+              event.preventDefault();
+              setSidebarWidth(SIDEBAR_MAX_WIDTH);
+            }
+          }}
           onPointerDown={(event) => {
             event.preventDefault();
             setIsResizing(true);
           }}
-          className="group absolute right-0 top-0 h-full w-2 cursor-col-resize"
+          className="group absolute right-0 top-0 h-full w-2 cursor-col-resize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
         >
           <div
             className={clsx(

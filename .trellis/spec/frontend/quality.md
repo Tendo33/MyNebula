@@ -7,6 +7,15 @@
 - No `any`, non-null assertions, or ignored TypeScript errors in new code.
 - Components must be responsive and accessible.
 - Visible focus styles must remain visible.
+- Every page has one `h1`, a `main#main-content` skip target, and language
+  changes synchronize `<html lang>`.
+- Modal progress surfaces manage focus entry/return, allow Escape only when
+  closable, and expose live/progress semantics.
+- Modal focus lifecycle effects depend only on open/closed state. Changing an
+  `onClose` callback or closeability while open must use current-value refs and
+  must not restore/re-enter focus mid-interaction.
+- Pointer-driven timeline and resize controls require equivalent keyboard and
+  value semantics.
 - Styling should use semantic tokens.
 - Theme or visual-system changes should update the project design docs.
 

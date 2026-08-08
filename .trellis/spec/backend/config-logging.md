@@ -9,6 +9,8 @@
   to change environment variables.
 - Add validation only for values that can actually be invalid in the current
   project.
+- Keep the default CSP enabled unless an operator supplies a complete compatible
+  replacement. Never document an empty value that silently disables it.
 
 ## Logging
 
@@ -17,6 +19,8 @@
   operation names.
 - Do not log secrets, API tokens, passwords, raw auth headers, or sensitive
   personal data.
+- Public health responses contain only coarse status; operational error text is
+  log-only.
 - When a frontend request crosses into backend code, preserve or generate a
   request identifier and include it in backend logs.
 

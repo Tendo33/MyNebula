@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
-RUN pip install uv
+RUN pip install uv==0.10.0
 
 # Set working directory
 WORKDIR /app

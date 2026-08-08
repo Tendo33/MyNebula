@@ -138,13 +138,11 @@ const Graph2D: React.FC = () => {
   }, [filteredData]);
 
   // Process data for force-graph (from rawData to keep layout stable!)
-  const processedData = useMemo((): ProcessedData => {
-    if (!rawData || rawData.nodes.length === 0) {
-      return { nodes: [], links: [] };
-    }
-
-    return {
-      nodes: rawData.nodes.map(n => ({
+  const rawNodes = rawData?.nodes;
+  const rawEdges = rawData?.edges;
+  const processedNodes = useMemo((): ProcessedNode[] => {
+    if (!rawNodes?.length) return [];
+    return rawNodes.map(n => ({
         id: n.id,
         name: n.name,
         full_name: n.full_name,
@@ -163,18 +161,26 @@ const Graph2D: React.FC = () => {
         // Use pre-computed positions if available (from clustering)
         x: Number.isFinite(n.x) ? n.x * POSITION_SCALE : undefined,
         y: Number.isFinite(n.y) ? n.y * POSITION_SCALE : undefined,
-      })),
-      links: rawData.edges.map(e => ({
+      }));
+  }, [rawNodes]);
+
+  const processedLinks = useMemo((): ProcessedLink[] => {
+    if (!rawEdges) return [];
+    return rawEdges.map(e => ({
         source: typeof e.source === 'object' ? e.source.id : e.source,
         target: typeof e.target === 'object' ? e.target.id : e.target,
         weight: e.weight,
-      })),
-    };
-  }, [rawData]);
+      }));
+  }, [rawEdges]);
+
+  const processedData = useMemo<ProcessedData>(
+    () => ({ nodes: processedNodes, links: processedLinks }),
+    [processedLinks, processedNodes]
+  );
 
   const layoutKey = useMemo(
-    () => `${processedData.nodes.length}:${processedData.links.length}`,
-    [processedData.nodes.length, processedData.links.length]
+    () => rawData?.version ?? processedNodes.map((node) => node.id).join(':'),
+    [processedNodes, rawData?.version]
   );
 
   const clusterLayoutData = useMemo((): ClusterLayoutData => {

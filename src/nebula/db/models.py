@@ -13,6 +13,7 @@ from typing import Optional
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -22,6 +23,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -488,6 +490,22 @@ class AdminLoginAttempt(Base):
     )
 
 
+class AdminAuthState(Base):
+    """Singleton server-side version used to revoke signed admin sessions."""
+
+    __tablename__ = "admin_auth_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    session_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (CheckConstraint("id = 1", name="singleton"),)
+
+
 class GraphSnapshot(Base):
     """Versioned immutable graph snapshot."""
 
@@ -630,11 +648,27 @@ class PipelineRun(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    heartbeat_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    worker_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="pipeline_runs")
     tasks: Mapped[list["SyncTask"]] = relationship(
         "SyncTask",
         back_populates="pipeline_run",
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_pipeline_runs_user_active",
+            "user_id",
+            "lease_expires_at",
+            postgresql_where=text("status IN ('pending', 'running')"),
+        ),
     )
 
 
@@ -679,11 +713,28 @@ class SyncTask(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    heartbeat_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    worker_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="sync_tasks")
     pipeline_run: Mapped[Optional["PipelineRun"]] = relationship(
         "PipelineRun", back_populates="tasks"
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_sync_tasks_user_type_active",
+            "user_id",
+            "task_type",
+            "lease_expires_at",
+            postgresql_where=text("status IN ('pending', 'running')"),
+        ),
     )
 
     def __repr__(self) -> str:

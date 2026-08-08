@@ -182,6 +182,8 @@ At minimum, update these values in `.env`:
 - `ADMIN_SESSION_SECRET`
 - `ADMIN_USERNAME` if you do not want the default `admin`
 - `READ_ACCESS_MODE`
+- `MYNEBULA_IMAGE`, set to a published immutable tag or digest built from the
+  source revision you intend to deploy
 
 Recommended defaults by deployment style:
 
@@ -214,6 +216,7 @@ docker compose up -d
 
 ```bash
 cp .env.example .env
+# Replace DATABASE_PASSWORD and configure the required API credentials in .env.
 uv sync --all-extras
 docker compose up -d db
 uv run alembic upgrade head
@@ -275,32 +278,39 @@ Base prefix: `/api`
 - `GET /api/v2/graph/edges?version=active&cursor=0&limit=1000`
 - `GET /api/v2/graph/timeline?version=active`
 - `GET /api/v2/data/repos`
-- `GET /api/repos/{repo_id}/related`
-- `POST /api/repos/search`
+- `GET /api/v2/repos/{repo_id}/related`
+- `POST /api/v2/repos/search`
 
 ### Admin endpoints
 
-- `POST /api/auth/login`
+- `POST /api/v2/auth/login`
 - `POST /api/v2/sync/start?mode=incremental|full`
 - `GET /api/v2/sync/jobs/{run_id}`
 - `POST /api/v2/settings/schedule`
 - `POST /api/v2/settings/full-refresh`
 - `POST /api/v2/graph/rebuild`
 
-Legacy compatibility routes under `/api/sync` are still available.
+The public application API is v2-only. Unknown and retired legacy `/api/*`
+paths return API errors and never fall through to the SPA.
 
 Current API contract notes:
 
 - `/api/v2/data/repos` now returns lightweight cluster metadata and `total_repos`, so the Data page no longer needs an extra graph snapshot request.
 - `/api/v2/dashboard` now carries summary, top languages, top topics, and top clusters directly; only timeline data is fetched separately for activity charts.
 - Data and Graph share the same literal search fields and `stars:>N` search syntax; Command Palette keeps those local filters and falls back to semantic repo search when local repo matches are insufficient.
+- Active sync jobs use persisted leases and heartbeats. Work left behind by a
+  stopped process becomes retryable `interrupted` state on the next startup.
+- Graph reads remain snapshot-backed. Snapshot hydration failures return a
+  bounded `503` with a request ID; they do not trigger an implicit live rebuild.
+- Snapshot cleanup always preserves the active snapshot and newest 30 successful
+  snapshots, and only removes other snapshots older than 90 days.
 
 ## Project Structure
 
 ```text
 MyNebula/
 |-- src/nebula/
-|   |-- api/                   # v1 + v2 route layers
+|   |-- api/                   # v2 route layer
 |   |-- application/services/  # sync pipeline and snapshot query services
 |   |-- core/                  # config, auth, embedding, llm, clustering, scheduler
 |   |-- db/                    # SQLAlchemy models and session lifecycle

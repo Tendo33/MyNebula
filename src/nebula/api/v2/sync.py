@@ -123,6 +123,7 @@ async def get_pipeline_status(
         created_at=run.created_at,
         started_at=run.started_at,
         completed_at=run.completed_at,
+        retryable=run.status in {"failed", "interrupted"},
         **build_v2_metadata(
             version=f"pipeline-{run.id}",
             generated_at=datetime.now(timezone.utc).isoformat(),

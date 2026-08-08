@@ -28,6 +28,25 @@ def test_build_version_contains_counts():
     assert "e34" in version
 
 
+def test_build_version_is_unique_for_same_second_and_graph_size():
+    service = GraphSnapshotBuilderService()
+    now = datetime(2026, 3, 3, 12, 30, tzinfo=timezone.utc)
+    graph_data = GraphData(
+        nodes=[],
+        edges=[],
+        clusters=[],
+        star_lists=[],
+        total_nodes=12,
+        total_edges=34,
+        total_clusters=2,
+        total_star_lists=1,
+    )
+
+    assert service._build_version(graph_data, now) != service._build_version(
+        graph_data, now
+    )
+
+
 def test_domain_status_values_are_stable():
     assert SnapshotStatus.ready.value == "ready"
     assert PipelineStatus.completed.value == "completed"

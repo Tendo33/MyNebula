@@ -23,10 +23,15 @@
 
 ## Graph Filtering
 
-- Build graph filter indexes only when raw snapshot data changes.
+- Build node search indexes only when snapshot nodes change. Build edge indexes
+  independently as progressive edge pages arrive; edge arrival must not
+  normalize every node again.
 - Derive filtered graph state in stages:
   - visible nodes
   - visible node id set
   - visible edges
   - visible clusters
 - Preserve ghost-node behavior and existing URL-driven node/cluster selection semantics while optimizing internals.
+- Keep a bounded keyboard-accessible repository-list alternative alongside the
+  canvas. Selecting a list item uses the same selected-node owner as canvas
+  selection.

@@ -25,6 +25,14 @@ class SnapshotVersionNotFoundError(ValueError):
     """Raised when a requested non-active snapshot version cannot be resolved."""
 
 
+class SnapshotUnavailableError(RuntimeError):
+    """Raised when snapshot storage cannot serve a bounded read."""
+
+    def __init__(self, request_id: str) -> None:
+        super().__init__("Graph snapshot is temporarily unavailable")
+        self.request_id = request_id
+
+
 class GraphQueryService:
     """Read model service for graph data endpoints."""
 
@@ -62,6 +70,9 @@ class GraphQueryService:
         )
         await self._validate_snapshot_or_raise(db, snapshot)
         await self.snapshot_repo.activate_snapshot(db, user.id, snapshot)
+        pruned = await self.snapshot_repo.prune_snapshots(db, user_id=user.id)
+        if pruned:
+            logger.info(f"Pruned old graph snapshots user_id={user.id} count={pruned}")
         logger.info(f"Built and activated initial graph snapshot: {version}")
         return snapshot
 
@@ -104,11 +115,10 @@ class GraphQueryService:
                 f"edges={graph_data.total_edges} "
                 f"hydrate_ms={((perf_counter() - hydrate_started) * 1000):.1f}"
             )
-        except Exception:
-            if not self.settings.snapshot_read_fallback_on_error:
-                raise
-            logger.exception("Snapshot read failed, fallback to live graph payload")
-            _, graph_data, _ = await self.builder.build_payload(db, user=user)
+        except SnapshotVersionNotFoundError:
+            raise
+        except Exception as exc:
+            raise self._unavailable("graph", exc) from exc
 
         if not include_edges:
             graph_data.edges = []
@@ -124,8 +134,13 @@ class GraphQueryService:
         user: User,
         version: str = "active",
     ) -> dict[str, int | str | None]:
-        snapshot = await self._resolve_snapshot(db, user, version)
-        metadata = await self.snapshot_repo.get_snapshot_metadata(db, snapshot)
+        try:
+            snapshot = await self._resolve_snapshot(db, user, version)
+            metadata = await self.snapshot_repo.get_snapshot_metadata(db, snapshot)
+        except SnapshotVersionNotFoundError:
+            raise
+        except Exception as exc:
+            raise self._unavailable("graph metadata", exc) from exc
         metadata["request_id"] = str(uuid.uuid4())
         return metadata
 
@@ -138,14 +153,8 @@ class GraphQueryService:
             hydrate_started = perf_counter()
             timeline = await self.snapshot_repo.hydrate_timeline_data(db, snapshot.id)
             if timeline is None:
-                timeline = TimelineData(
-                    points=[],
-                    total_stars=0,
-                    date_range=("", ""),
-                    version=snapshot.version,
-                    generated_at=snapshot.created_at.isoformat()
-                    if snapshot.created_at
-                    else None,
+                raise ValueError(
+                    f"Snapshot timeline payload missing for version={snapshot.version}"
                 )
             logger.info(
                 "Graph timeline hydrated "
@@ -153,13 +162,10 @@ class GraphQueryService:
                 f"points={len(timeline.points)} "
                 f"hydrate_ms={((perf_counter() - hydrate_started) * 1000):.1f}"
             )
-        except Exception:
-            if not self.settings.snapshot_read_fallback_on_error:
-                raise
-            logger.exception(
-                "Snapshot timeline read failed, fallback to live timeline payload"
-            )
-            _, _, timeline = await self.builder.build_payload(db, user=user)
+        except SnapshotVersionNotFoundError:
+            raise
+        except Exception as exc:
+            raise self._unavailable("timeline", exc) from exc
 
         timeline.request_id = str(uuid.uuid4())
         self._log_if_slow("get_timeline_data", started, version=version)
@@ -201,21 +207,10 @@ class GraphQueryService:
                 f"next_cursor={page.next_cursor} "
                 f"hydrate_ms={((perf_counter() - hydrate_started) * 1000):.1f}"
             )
-        except Exception:
-            if not self.settings.snapshot_read_fallback_on_error:
-                raise
-            logger.exception("Snapshot edge read failed, fallback to live edge payload")
-            _, graph_data, _ = await self.builder.build_payload(db, user=user)
-            sliced_edges = graph_data.edges[cursor : cursor + limit]
-            next_cursor = (
-                cursor + limit if cursor + limit < len(graph_data.edges) else None
-            )
-            page = GraphEdgesPage(
-                edges=sliced_edges,
-                next_cursor=next_cursor,
-                version=graph_data.version or "live-fallback",
-                generated_at=graph_data.generated_at,
-            )
+        except SnapshotVersionNotFoundError:
+            raise
+        except Exception as exc:
+            raise self._unavailable("edges", exc) from exc
         page.request_id = str(uuid.uuid4())
         self._log_if_slow(
             "get_edges_page",
@@ -243,6 +238,9 @@ class GraphQueryService:
         )
         await self._validate_snapshot_or_raise(db, snapshot)
         await self.snapshot_repo.activate_snapshot(db, user.id, snapshot)
+        pruned = await self.snapshot_repo.prune_snapshots(db, user_id=user.id)
+        if pruned:
+            logger.info(f"Pruned old graph snapshots user_id={user.id} count={pruned}")
         graph_data.version = version
         graph_data.generated_at = (
             snapshot.created_at.isoformat() if snapshot.created_at else None
@@ -287,8 +285,21 @@ class GraphQueryService:
     async def resolve_snapshot_version(
         self, db: AsyncSession, *, user: User, version: str = "active"
     ) -> str:
-        snapshot = await self._resolve_snapshot(db, user, version)
+        try:
+            snapshot = await self._resolve_snapshot(db, user, version)
+        except SnapshotVersionNotFoundError:
+            raise
+        except Exception as exc:
+            raise self._unavailable("resolve", exc) from exc
         return snapshot.version
+
+    def _unavailable(self, operation: str, exc: Exception) -> SnapshotUnavailableError:
+        request_id = str(uuid.uuid4())
+        logger.exception(
+            "Graph snapshot operation failed "
+            f"operation={operation} request_id={request_id}: {exc}"
+        )
+        return SnapshotUnavailableError(request_id)
 
     async def _resolve_snapshot(
         self,

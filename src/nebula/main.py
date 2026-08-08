@@ -16,7 +16,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from nebula.api import api_router
-from nebula.core.config import get_app_settings
+from nebula.application.services.job_lifecycle_service import reconcile_orphaned_jobs
+from nebula.core.config import DEFAULT_CONTENT_SECURITY_POLICY, get_app_settings
 from nebula.core.embedding import close_embedding_service
 from nebula.core.llm import close_llm_service
 from nebula.core.scheduler import close_scheduler_service, get_scheduler_service
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
     # Initialize database
     try:
         await init_db()
+        await reconcile_orphaned_jobs()
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
@@ -139,11 +141,10 @@ def create_app() -> FastAPI:
         response.headers.setdefault(
             "Referrer-Policy", "strict-origin-when-cross-origin"
         )
-        if settings.content_security_policy:
-            response.headers.setdefault(
-                "Content-Security-Policy",
-                settings.content_security_policy,
-            )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            settings.content_security_policy.strip() or DEFAULT_CONTENT_SECURITY_POLICY,
+        )
         return response
 
     @app.exception_handler(Exception)
@@ -173,7 +174,6 @@ def create_app() -> FastAPI:
             "database": "connected" if db_healthy else "disconnected",
             "scheduler": {
                 "status": scheduler_status,
-                "last_error": scheduler.last_error,
             },
             "version": settings.app_version,
         }

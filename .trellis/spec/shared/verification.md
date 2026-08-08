@@ -2,7 +2,7 @@
 
 This file is MyNebula's canonical verification reference.
 
-Current version example: `1.2.11`.
+Current version example: `1.3.0`.
 
 ## Backend
 
@@ -11,6 +11,8 @@ uv sync --all-extras
 uv run ruff check src tests scripts alembic
 uv run ruff format --check src tests scripts alembic
 uv run pytest -q
+uv export --frozen --all-extras --no-hashes --no-emit-project --format requirements-txt --output-file /tmp/mynebula-requirements.txt
+uvx pip-audit -r /tmp/mynebula-requirements.txt --disable-pip --no-deps
 ```
 
 ## Frontend
@@ -20,6 +22,7 @@ pnpm --prefix frontend run lint
 pnpm --prefix frontend exec tsc --noEmit -p tsconfig.json
 pnpm --prefix frontend run test
 pnpm --prefix frontend run build
+pnpm --prefix frontend audit --prod
 ```
 
 ## Full Stack
@@ -29,10 +32,13 @@ uv sync --all-extras
 uv run ruff check src tests scripts alembic
 uv run ruff format --check src tests scripts alembic
 uv run pytest -q
+uv export --frozen --all-extras --no-hashes --no-emit-project --format requirements-txt --output-file /tmp/mynebula-requirements.txt
+uvx pip-audit -r /tmp/mynebula-requirements.txt --disable-pip --no-deps
 pnpm --prefix frontend run lint
 pnpm --prefix frontend exec tsc --noEmit -p tsconfig.json
 pnpm --prefix frontend run test
 pnpm --prefix frontend run build
+pnpm --prefix frontend audit --prod
 ```
 
 ## CI Gate
@@ -44,9 +50,13 @@ uv sync --frozen --extra dev
 uv run ruff check src/
 uv run ruff format --check src/
 uv sync --frozen --all-extras
+uv run alembic upgrade head
 uv run pytest -q
+uv export --frozen --all-extras --no-hashes --no-emit-project --format requirements-txt --output-file /tmp/mynebula-requirements.txt
+uvx pip-audit -r /tmp/mynebula-requirements.txt --disable-pip --no-deps
 pnpm --prefix frontend exec tsc --noEmit
 pnpm --prefix frontend run lint
+pnpm --prefix frontend audit --prod
 pnpm --prefix frontend run test
 pnpm --prefix frontend run build
 ```

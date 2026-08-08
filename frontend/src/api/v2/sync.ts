@@ -13,12 +13,13 @@ export interface PipelineStartResponse {
 export interface PipelineStatusResponse {
   pipeline_run_id: number;
   user_id: number;
-  status: string;
+  status: 'pending' | 'running' | 'completed' | 'partial_failed' | 'failed' | 'interrupted';
   phase: string;
   last_error?: string | null;
   created_at?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
+  retryable: boolean;
   version?: string;
   generated_at?: string;
   request_id?: string;

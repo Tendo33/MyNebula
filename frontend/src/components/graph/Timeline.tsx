@@ -24,7 +24,7 @@ const BAR_MAX_HEIGHT = 48;
 // ============================================================================
 
 const Timeline: React.FC<TimelineProps> = ({ className }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     timelineData,
     filters,
@@ -65,12 +65,19 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
   }, [currentRange]);
 
   // Format date for display
-  const formatDate = (dateStr: string): string => {
-    const [year, month] = dateStr.split('-');
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${monthNames[parseInt(month) - 1]} ${year}`;
-  };
+  const monthFormatter = useMemo(
+    () => new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }),
+    [i18n.language, i18n.resolvedLanguage]
+  );
+
+  const formatDate = useCallback(
+    (dateStr: string): string => monthFormatter.format(new Date(`${dateStr}-01T00:00:00Z`)),
+    [monthFormatter]
+  );
 
   // Handle pointer down on bar
   const handleBarPointerDown = useCallback((index: number, e: React.PointerEvent) => {
@@ -221,9 +228,28 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
           const isRangeEnd = currentRange && idx === currentRange[1];
 
           return (
-            <div
+            <button
+              type="button"
               key={point.date}
-              className="flex-1 flex flex-col justify-end items-center group relative"
+              aria-pressed={Boolean(currentRange && idx >= currentRange[0] && idx <= currentRange[1])}
+              aria-label={`${formatDate(point.date)}: ${point.count} repos`}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setTimeRange([idx, idx]);
+                } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                  event.preventDefault();
+                  const nextIndex = Math.max(
+                    0,
+                    Math.min(points.length - 1, idx + (event.key === 'ArrowRight' ? 1 : -1))
+                  );
+                  const nextBar = containerRef.current?.children[nextIndex] as HTMLElement | undefined;
+                  nextBar?.focus();
+                } else if (event.key === 'Escape') {
+                  handleClearSelection();
+                }
+              }}
+              className="flex-1 flex flex-col justify-end items-center group relative rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary focus-visible:ring-offset-1"
             >
               {/* Bar */}
               <div
@@ -238,7 +264,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
               />
 
               {/* Tooltip */}
-              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-50">
                 <div className="bg-text-main text-bg-main px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap shadow-lg">
                   <div className="font-semibold">{point.count} repos</div>
                   <div className="text-bg-main/70">{formatDate(point.date)}</div>
@@ -253,7 +279,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
                   <div className="border-4 border-transparent border-t-text-main" />
                 </div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

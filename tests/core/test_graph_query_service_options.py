@@ -3,7 +3,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from nebula.application.services.graph_query_service import GraphQueryService
+from nebula.application.services.graph_query_service import (
+    GraphQueryService,
+    SnapshotUnavailableError,
+)
 from nebula.schemas.graph import GraphData, GraphEdge
 
 
@@ -125,3 +128,72 @@ async def test_get_snapshot_metadata_returns_request_id():
     assert payload["version"] == "snapshot-active"
     assert payload["total_edges"] == 1
     assert payload["request_id"]
+
+
+class _BrokenSnapshotRepo(_SnapshotRepoStub):
+    async def hydrate_graph_data(self, _db, snapshot, *, include_edges=True):
+        raise RuntimeError("corrupt payload")
+
+
+class _BrokenSnapshotMetadataRepo(_SnapshotRepoStub):
+    async def get_snapshot_metadata(self, _db, snapshot):
+        raise RuntimeError("metadata unavailable")
+
+
+class _MissingTimelineSnapshotRepo(_SnapshotRepoStub):
+    async def hydrate_timeline_data(self, _db, _snapshot_id):
+        return None
+
+
+class _BuilderMustNotRun:
+    async def build_payload(self, *_args, **_kwargs):
+        raise AssertionError("live graph fallback must not run")
+
+
+@pytest.mark.asyncio
+async def test_snapshot_hydration_failure_is_bounded_without_live_rebuild():
+    service = GraphQueryService(
+        snapshot_repo=_BrokenSnapshotRepo(),
+        builder=_BuilderMustNotRun(),
+    )
+
+    with pytest.raises(SnapshotUnavailableError) as exc_info:
+        await service.get_graph_data_with_options(
+            db=object(),
+            user=SimpleNamespace(id=1),
+            version="active",
+            include_edges=False,
+        )
+
+    assert exc_info.value.request_id
+
+
+@pytest.mark.asyncio
+async def test_snapshot_metadata_failure_is_bounded_without_live_rebuild():
+    service = GraphQueryService(snapshot_repo=_BrokenSnapshotMetadataRepo())
+
+    with pytest.raises(SnapshotUnavailableError) as exc_info:
+        await service.get_snapshot_metadata(
+            db=object(),
+            user=SimpleNamespace(id=1),
+            version="active",
+        )
+
+    assert exc_info.value.request_id
+
+
+@pytest.mark.asyncio
+async def test_missing_timeline_payload_is_unavailable_without_live_rebuild():
+    service = GraphQueryService(
+        snapshot_repo=_MissingTimelineSnapshotRepo(),
+        builder=_BuilderMustNotRun(),
+    )
+
+    with pytest.raises(SnapshotUnavailableError) as exc_info:
+        await service.get_timeline_data(
+            db=object(),
+            user=SimpleNamespace(id=1),
+            version="active",
+        )
+
+    assert exc_info.value.request_id

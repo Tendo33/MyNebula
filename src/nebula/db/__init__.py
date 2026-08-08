@@ -12,6 +12,7 @@ from .database import (
     init_db,
 )
 from .models import (
+    AdminAuthState,
     AdminLoginAttempt,
     Base,
     Cluster,
@@ -38,6 +39,7 @@ __all__ = [
     # Models
     "Base",
     "AdminLoginAttempt",
+    "AdminAuthState",
     "User",
     "StarredRepo",
     "StarList",

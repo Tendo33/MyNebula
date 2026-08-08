@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
 
 
 class _FakeResult:
@@ -22,6 +24,34 @@ class _FakeResult:
 
     def __iter__(self):
         return iter(self._rows)
+
+
+def test_data_array_search_uses_native_unnest_without_text_cast():
+    from nebula.api.v2 import data as data_api
+    from nebula.db import StarredRepo
+
+    condition = data_api._build_array_fragment_condition(
+        StarredRepo.topics, "graph", "topic_search_values"
+    )
+    sql = str(
+        select(StarredRepo.id).where(condition).compile(dialect=postgresql.dialect())
+    ).lower()
+
+    assert "unnest(starred_repos.topics) as topic_search_values(value)" in sql
+    assert "ilike" in sql
+    assert "cast(starred_repos.topics as text)" not in sql
+
+
+def test_exact_topic_filter_renders_derived_unnest_column():
+    from nebula.api.v2 import data as data_api
+    from nebula.db import StarredRepo
+
+    condition = data_api._build_topic_filter_condition("graph")
+    sql = str(
+        select(StarredRepo.id).where(condition).compile(dialect=postgresql.dialect())
+    ).lower()
+
+    assert "unnest(starred_repos.topics) as topic_values(topic)" in sql
 
 
 @pytest.mark.asyncio
@@ -57,9 +87,9 @@ async def test_dashboard_uses_snapshot_metadata_instead_of_hydrating_graph(monke
                     rows=[SimpleNamespace(language="TypeScript", count=6)]
                 )
             if self.calls == 3:
-                return _FakeResult(rows=[SimpleNamespace(topic="graph", count=4)])
-            if self.calls == 4:
-                return _FakeResult(scalar=17)
+                return _FakeResult(
+                    rows=[SimpleNamespace(topic="graph", count=4, total_topics=17)]
+                )
             return _FakeResult(
                 rows=[
                     SimpleNamespace(
@@ -146,10 +176,8 @@ async def test_data_repos_uses_snapshot_metadata_instead_of_hydrating_graph(
         async def execute(self, _statement, _params=None):
             self.calls += 1
             if self.calls == 1:
-                return _FakeResult(scalar=1)
+                return _FakeResult(scalar=SimpleNamespace(filtered=1, total=3))
             if self.calls == 2:
-                return _FakeResult(scalar=3)
-            if self.calls == 3:
                 return _FakeResult(rows=[repo])
             return _FakeResult(rows=[cluster])
 

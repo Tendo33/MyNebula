@@ -227,7 +227,9 @@ const Settings = () => {
       onProgress,
       isSuccess: (pipeline) => pipeline.status === 'completed',
       isFailure: (pipeline) =>
-        pipeline.status === 'failed' || pipeline.status === 'partial_failed',
+        pipeline.status === 'failed' ||
+        pipeline.status === 'partial_failed' ||
+        pipeline.status === 'interrupted',
       getFailureError: (pipeline) => pipeline.last_error || null,
       getPollError: (err) =>
         err instanceof Error ? err.message : 'poll_pipeline_status_failed',
@@ -244,7 +246,7 @@ const Settings = () => {
       poll: async () => (await getFullRefreshJobStatusV2(taskId)).job,
       onProgress,
       isSuccess: (job) => job.status === 'completed' || job.status === 'partial_failed',
-      isFailure: (job) => job.status === 'failed',
+      isFailure: (job) => job.status === 'failed' || job.status === 'interrupted',
       getFailureError: (job) => job.last_error,
       getPollError: (err) => (err instanceof Error ? err.message : 'poll_job_status_failed'),
     });
@@ -573,7 +575,7 @@ const Settings = () => {
   return (
     <div className="page-shell">
       <Sidebar />
-      <main className="page-main">
+      <main id="main-content" className="page-main">
         <header className="page-header">
           <div className="page-header-inner">
             <div>
@@ -645,7 +647,7 @@ const Settings = () => {
                     onClick={handleSyncStars}
                     disabled={syncing || refreshLoading || reclusterLoading}
                     className={clsx(
-                      'inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl px-4 text-sm font-medium transition-all',
+                      'inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors',
                       syncing || refreshLoading || reclusterLoading
                         ? 'bg-bg-hover text-text-dim cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60'
                         : 'bg-text-main text-bg-main hover:bg-text-main/90 shadow-sm'
@@ -665,10 +667,11 @@ const Settings = () => {
 
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-text-muted">{t('graph.max_clusters')}</span>
+                      <label htmlFor="settings-max-clusters" className="text-xs text-text-muted">{t('graph.max_clusters')}</label>
                       <span className="text-xs font-mono tabular-nums text-text-dim">{settings.maxClusters}</span>
                     </div>
                     <input
+                      id="settings-max-clusters"
                       type="range"
                       min={2}
                       max={20}
@@ -688,10 +691,11 @@ const Settings = () => {
 
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-text-muted">{t('graph.min_clusters')}</span>
+                      <label htmlFor="settings-min-clusters" className="text-xs text-text-muted">{t('graph.min_clusters')}</label>
                       <span className="text-xs font-mono tabular-nums text-text-dim">{settings.minClusters}</span>
                     </div>
                     <input
+                      id="settings-min-clusters"
                       type="range"
                       min={2}
                       max={20}
@@ -737,9 +741,10 @@ const Settings = () => {
                 <div className="panel-subtle p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Server className="w-4 h-4 text-text-muted" />
-                    <label className="text-sm font-medium text-text-main">{t('settings.api_endpoint')}</label>
+                    <label htmlFor="settings-api-endpoint" className="text-sm font-medium text-text-main">{t('settings.api_endpoint')}</label>
                   </div>
                   <input
+                    id="settings-api-endpoint"
                     type="text"
                     value={API_BASE_URL}
                     readOnly
@@ -750,7 +755,7 @@ const Settings = () => {
                 <div className="panel-subtle flex items-center justify-between p-4 transition-colors">
                   <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-text-muted" />
-                    <label className="text-sm font-medium text-text-main">{t('settings.github_token_status')}</label>
+                    <span className="text-sm font-medium text-text-main">{t('settings.github_token_status')}</span>
                   </div>
                   <div
                     className={clsx(

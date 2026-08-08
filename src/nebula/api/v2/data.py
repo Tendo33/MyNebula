@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import Text, and_, asc, cast, desc, func, or_, select
+from sqlalchemy import and_, asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nebula.application.services.graph_query_service import GraphQueryService
@@ -58,12 +58,27 @@ def _parse_month_window(month: str | None) -> tuple[datetime, datetime] | None:
 def _build_topic_filter_condition(topic: str):
     normalized_topic = topic.strip().lower()
     topic_values = (
-        func.unnest(StarredRepo.topics).table_valued("topic").alias("topic_values")
+        func.unnest(StarredRepo.topics)
+        .table_valued("topic")
+        .render_derived(name="topic_values")
     )
     return (
         select(1)
         .select_from(topic_values)
         .where(func.lower(func.trim(topic_values.c.topic)) == normalized_topic)
+        .correlate(StarredRepo)
+        .exists()
+    )
+
+
+def _build_array_fragment_condition(array_column, query: str, alias_name: str):
+    values = (
+        func.unnest(array_column).table_valued("value").render_derived(name=alias_name)
+    )
+    return (
+        select(1)
+        .select_from(values)
+        .where(values.c.value.ilike(f"%{query}%"))
         .correlate(StarredRepo)
         .exists()
     )
@@ -130,8 +145,12 @@ async def get_data_repos(
                     StarredRepo.description.ilike(like_q),
                     StarredRepo.ai_summary.ilike(like_q),
                     StarredRepo.language.ilike(like_q),
-                    cast(StarredRepo.ai_tags, Text).ilike(like_q),
-                    cast(StarredRepo.topics, Text).ilike(like_q),
+                    _build_array_fragment_condition(
+                        StarredRepo.ai_tags, trimmed_query, "ai_tag_values"
+                    ),
+                    _build_array_fragment_condition(
+                        StarredRepo.topics, trimmed_query, "topic_search_values"
+                    ),
                 )
             )
     month_window = _parse_month_window(month)
@@ -144,14 +163,20 @@ async def get_data_repos(
 
     order_by = _data_repo_order_by(sort_field, sort_direction)
 
-    total_result = await db.execute(
-        select(func.count(StarredRepo.id)).where(and_(*conditions))
+    total_repos_query = (
+        select(func.count(StarredRepo.id))
+        .where(StarredRepo.user_id == user.id)
+        .scalar_subquery()
     )
-    total_count = int(total_result.scalar() or 0)
-    total_repos_result = await db.execute(
-        select(func.count(StarredRepo.id)).where(StarredRepo.user_id == user.id)
+    counts_result = await db.execute(
+        select(
+            func.count(StarredRepo.id).label("filtered"),
+            total_repos_query.label("total"),
+        ).where(and_(*conditions))
     )
-    total_repos = int(total_repos_result.scalar() or 0)
+    counts = counts_result.one()
+    total_count = int(counts.filtered or 0)
+    total_repos = int(counts.total or 0)
     result = await db.execute(
         select(StarredRepo)
         .where(and_(*conditions))

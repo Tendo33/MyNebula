@@ -26,6 +26,11 @@ html {
   scroll-behavior: smooth;
 }
 
+html.dark {
+  color-scheme: dark;
+  background-color: #171a22;
+}
+
 body {
   margin: 0;
   min-width: 320px;

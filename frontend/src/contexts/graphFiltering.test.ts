@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { GraphData, TimelineData } from '../types';
 import {
   buildGraphFilterIndexes,
+  buildGraphEdgeIndex,
+  buildGraphNodeSearchIndex,
   createVisibleNodeIds,
   filterVisibleClusters,
   filterVisibleEdges,
@@ -129,5 +131,14 @@ describe('graph filtering', () => {
     const visibleNodeIds = new Set([1]);
 
     expect(filterVisibleEdges(rawData.edges, visibleNodeIds, indexes)).toEqual([]);
+  });
+
+  it('builds node and edge indexes independently for paginated edges', () => {
+    const nodeIndexes = buildGraphNodeSearchIndex(rawData.nodes);
+    const edgeIndexes = buildGraphEdgeIndex(rawData.edges);
+
+    expect(nodeIndexes.totalNodeCount).toBe(2);
+    expect(nodeIndexes.nodeSearchText.get(1)).toContain('nebula');
+    expect(edgeIndexes.edgeIndexesByNodeId.get(1)).toEqual([0]);
   });
 });

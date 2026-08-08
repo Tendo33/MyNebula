@@ -6,6 +6,7 @@ import math
 from collections import defaultdict
 from datetime import datetime, timezone
 from time import perf_counter
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -326,7 +327,8 @@ class GraphSnapshotBuilderService:
         return version, graph_data, timeline_data
 
     def _build_version(self, graph_data: GraphData, now: datetime) -> str:
+        timestamp = now.strftime("%Y%m%d%H%M%S")
         return (
-            f"snapshot-{now.strftime('%Y%m%d%H%M%S')}-"
-            f"n{graph_data.total_nodes}-e{graph_data.total_edges}"
+            f"snapshot-{timestamp}-n{graph_data.total_nodes}-"
+            f"e{graph_data.total_edges}-{uuid4().hex[:12]}"
         )

@@ -63,7 +63,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
       <button
         type="button"
         onClick={onClick}
-        className="panel-surface-strong flex items-start justify-between p-6 text-left transition-all hover:-translate-y-0.5"
+        className="panel-surface-strong flex items-start justify-between p-6 text-left transition-transform hover:-translate-y-0.5 motion-reduce:transition-none"
       >
         {content}
       </button>
@@ -71,7 +71,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
   }
 
   return (
-    <div className="panel-surface-strong flex items-start justify-between p-6 transition-all">
+    <div className="panel-surface-strong flex items-start justify-between p-6">
       {content}
     </div>
   );
@@ -95,7 +95,7 @@ const LanguageBar: React.FC<LanguageBarProps> = ({ language, count, percentage, 
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-bg-hover/90 dark:bg-dark-bg-sidebar">
         <div
-          className="h-full rounded-full transition-all duration-500 group-hover:opacity-90"
+          className="h-full rounded-full transition-[width,opacity] duration-500 group-hover:opacity-90 motion-reduce:transition-none"
           style={{
             width: `${percentage}%`,
             backgroundColor: color,
@@ -140,7 +140,7 @@ const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywo
       <button
         type="button"
         onClick={onClick}
-        className="panel-surface p-5 text-left transition-all hover:-translate-y-px"
+        className="panel-surface p-5 text-left transition-transform hover:-translate-y-px motion-reduce:transition-none"
       >
         {content}
       </button>
@@ -172,14 +172,14 @@ const Dashboard = () => {
     <div className="page-shell">
       <Sidebar />
 
-      <main className="page-main">
+      <main id="main-content" className="page-main">
         <header className="page-header">
           <div className="page-header-inner select-none">
             <div>
               <div className="section-kicker mb-1 px-0">{t('common.overview')}</div>
-              <h2 className="page-title">
+              <h1 className="page-title">
               {t('sidebar.dashboard')}
-              </h2>
+              </h1>
             </div>
           </div>
 
@@ -315,7 +315,7 @@ const Dashboard = () => {
                           {/* Bar */}
                           <button
                             type="button"
-                            className={`w-full rounded-t transition-all duration-300 cursor-pointer hover:opacity-90 ${
+                            className={`w-full rounded-t transition-[height,opacity] duration-300 cursor-pointer hover:opacity-90 motion-reduce:transition-none ${
                               isRecent
                                 ? 'bg-action-primary shadow-sm'
                                 : 'bg-action-primary/45'
@@ -368,7 +368,7 @@ const Dashboard = () => {
                         <button
                           key={item.topic}
                           onClick={() => navigate(`/data?topic=${encodeURIComponent(item.topic)}`)}
-                          className="group rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
+                          className="group rounded-full px-4 py-2 text-sm font-semibold transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-sm motion-reduce:transition-none"
                           style={{
                             backgroundColor: `rgba(45, 89, 200, 0.08)`,
                             color: `rgba(35, 71, 163, 1)`,

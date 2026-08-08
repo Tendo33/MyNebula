@@ -267,12 +267,12 @@ const DataPage = () => {
     <div className="page-shell">
       <Sidebar />
 
-      <main className="page-main">
+      <main id="main-content" className="page-main">
         <header className="page-header">
           <div className="page-header-inner select-none">
             <div>
               <div className="section-kicker mb-1 px-0">{t('common.repositories')}</div>
-              <h2 className="page-title">{t('sidebar.data')}</h2>
+              <h1 className="page-title">{t('sidebar.data')}</h1>
             </div>
             <span className="toolbar-badge">
               {count} / {totalNodes} {t('common.repositories')}
@@ -291,8 +291,9 @@ const DataPage = () => {
             </div>
 
             <div className="flex items-center gap-2 sm:hidden">
-              <label className="text-xs text-text-muted">{t('data.sort', 'Sort')}:</label>
+              <label htmlFor="data-mobile-sort" className="text-xs text-text-muted">{t('data.sort', 'Sort')}:</label>
               <select
+                id="data-mobile-sort"
                 value={sortConfig.field}
                 onChange={(event) => {
                   setSortConfig((prev) => ({
@@ -668,8 +669,9 @@ const DataPage = () => {
               {count > 0 && (
                 <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2 text-text-muted">
-                    <span>{t('data.rows_per_page')}:</span>
+                    <label htmlFor="data-page-size">{t('data.rows_per_page')}:</label>
                     <select
+                      id="data-page-size"
                       value={pageSize}
                       onChange={(event) => {
                         setPageSize(Number(event.target.value));

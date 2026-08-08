@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -20,7 +20,7 @@ class _FakeDb:
     async def __aexit__(self, exc_type, exc, _tb):
         return False
 
-    async def get(self, model, obj_id):
+    async def get(self, model, obj_id, **_kwargs):
         if model.__name__ == "SyncTask":
             return self.state.tasks.get(obj_id)
         if model.__name__ == "User":
@@ -67,6 +67,9 @@ class _FakeState:
                 total_items=0,
                 processed_items=0,
                 failed_items=0,
+                worker_id="worker:full-refresh",
+                heartbeat_at=datetime.now(timezone.utc),
+                lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
             )
         }
         self.next_task_id = 2
@@ -150,6 +153,8 @@ async def test_full_refresh_marks_parent_failed_when_subtask_sets_failed_status(
     assert expected_message in main_task.error_message
     assert main_task.completed_at is not None
     assert main_task.error_details["phase"] == failed_phase
+    assert main_task.worker_id is None
+    assert main_task.lease_expires_at is None
     assert state.snapshot_calls == []
 
 
@@ -196,6 +201,8 @@ async def test_full_refresh_marks_parent_partial_failed_when_subtask_has_failed_
 
     main_task = state.tasks[1]
     assert main_task.status == "partial_failed"
+    assert main_task.worker_id is None
+    assert main_task.lease_expires_at is None
     assert main_task.error_details["phase"] == "complete"
     assert main_task.error_details["partial_failures"] == [
         {"phase": "stars", "task_id": 2, "failed_items": 2}

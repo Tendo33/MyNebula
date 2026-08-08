@@ -1,9 +1,8 @@
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { GraphNode } from '../../types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
 const sampleNode: GraphNode = {
   id: 1,
   github_id: 1,
@@ -36,7 +35,7 @@ const otherNode: GraphNode = {
 const graphState = {
   filteredData: {
     total_nodes: 1,
-    nodes: [{ id: 1 }],
+    nodes: [sampleNode],
   },
   rawData: {
     nodes: [
@@ -159,7 +158,6 @@ describe('GraphPage URL state', () => {
     render(
       <MemoryRouter
         initialEntries={['/graph?node=1&cluster=2&language=TypeScript&q=nebula']}
-        future={routerFuture}
       >
         <Routes>
           <Route path="/graph" element={<GraphPage />} />
@@ -181,7 +179,7 @@ describe('GraphPage URL state', () => {
     graphState.selectedNode = graphState.rawData.nodes[0];
 
     render(
-      <MemoryRouter initialEntries={['/graph']} future={routerFuture}>
+      <MemoryRouter initialEntries={['/graph']}>
         <Routes>
           <Route path="/graph" element={<GraphPage />} />
         </Routes>
@@ -197,7 +195,7 @@ describe('GraphPage URL state', () => {
     graphState.selectedNode = sampleNode;
 
     const { getByTestId } = render(
-      <MemoryRouter initialEntries={['/graph?node=196']} future={routerFuture}>
+      <MemoryRouter initialEntries={['/graph?node=196']}>
         <LocationProbe />
         <Routes>
           <Route path="/graph" element={<GraphPage />} />
@@ -224,7 +222,7 @@ describe('GraphPage URL state', () => {
     graphState.edgesLoading = false;
 
     const { queryByText, getAllByText } = render(
-      <MemoryRouter initialEntries={['/graph']} future={routerFuture}>
+      <MemoryRouter initialEntries={['/graph']}>
         <Routes>
           <Route path="/graph" element={<GraphPage />} />
         </Routes>
@@ -244,7 +242,7 @@ describe('GraphPage URL state', () => {
     graphState.canLoadMoreEdges = false;
 
     const { getAllByRole } = render(
-      <MemoryRouter initialEntries={['/graph']} future={routerFuture}>
+      <MemoryRouter initialEntries={['/graph']}>
         <Routes>
           <Route path="/graph" element={<GraphPage />} />
         </Routes>
@@ -256,5 +254,20 @@ describe('GraphPage URL state', () => {
     expect(pausedButtons.every((button) => (button as HTMLButtonElement).disabled)).toBe(true);
 
     graphState.autoLoadHalted = false;
+  });
+
+  it('offers a keyboard-accessible repository list alternative', () => {
+    const { getByRole } = render(
+      <MemoryRouter initialEntries={['/graph']}>
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(getByRole('button', { name: 'Browse as list' }));
+    fireEvent.click(getByRole('button', { name: /octo\/nebula/i }));
+
+    expect(graphState.setSelectedNode).toHaveBeenCalledWith(sampleNode);
   });
 });

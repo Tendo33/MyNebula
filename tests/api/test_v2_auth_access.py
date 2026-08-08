@@ -18,11 +18,11 @@ class _FakeRateLimitDb:
 def _install_fake_rate_limit_helpers(monkeypatch, auth_api):
     fake_db = _FakeRateLimitDb()
 
-    async def fake_delete_stale(db, *, cutoff):
+    async def fake_delete_stale(db, *, keys, cutoff):
         db.attempts = [
             (bucket_key, attempted_at)
             for bucket_key, attempted_at in db.attempts
-            if attempted_at >= cutoff
+            if bucket_key not in keys or attempted_at >= cutoff
         ]
 
     async def fake_count_recent(db, *, bucket_key, cutoff):
@@ -268,6 +268,68 @@ async def test_login_admin_rate_limits_repeated_failures(monkeypatch):
             db=fake_db,
         )
     assert second_exc.value.status_code == 429
+    assert second_exc.value.headers == {
+        "Retry-After": str(settings.admin_login_rate_limit_window_seconds)
+    }
+
+
+@pytest.mark.asyncio
+async def test_require_admin_rejects_token_from_revoked_session_version():
+    from nebula.api.v2 import auth as auth_api
+
+    settings = AppSettings(
+        admin_username="owner",
+        admin_password="topsecret",
+        admin_session_secret="session-secret",
+    )
+    stale_token = create_signed_session_token(
+        username="owner",
+        secret=settings.admin_session_secret,
+        expires_in_seconds=60,
+        session_version=3,
+    )
+
+    class _FakeDb:
+        async def get(self, _model, _identifier):
+            return SimpleNamespace(session_version=4)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth_api.require_admin(
+            request=_build_request(session_cookie=stale_token),
+            settings=settings,
+            db=_FakeDb(),
+        )
+
+    assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_increments_session_version_before_clearing_cookies():
+    from nebula.api.v2 import auth as auth_api
+
+    state = SimpleNamespace(session_version=7)
+
+    class _FakeDb:
+        committed = False
+
+        async def get(self, _model, _identifier):
+            return state
+
+        async def commit(self):
+            self.committed = True
+
+    db = _FakeDb()
+    response = Response()
+    result = await auth_api.logout_admin(
+        response=response,
+        _="owner",
+        __=None,
+        db=db,
+    )
+
+    assert state.session_version == 8
+    assert db.committed is True
+    assert result.authenticated is False
 
 
 @pytest.mark.asyncio
@@ -276,8 +338,9 @@ async def test_login_rate_limit_prunes_stale_buckets(monkeypatch):
 
     fake_db = _install_fake_rate_limit_helpers(monkeypatch, auth_api)
     fake_db.attempts = [
-        ("ip:stale", datetime(2026, 1, 1, tzinfo=timezone.utc)),
-        ("user:stale", datetime(2026, 1, 1, tzinfo=timezone.utc)),
+        ("ip:127.0.0.1", datetime(2026, 1, 1, tzinfo=timezone.utc)),
+        ("user:owner", datetime(2026, 1, 1, tzinfo=timezone.utc)),
+        ("user:unrelated", datetime(2026, 1, 1, tzinfo=timezone.utc)),
     ]
 
     settings = AppSettings(
@@ -303,13 +366,17 @@ async def test_login_rate_limit_prunes_stale_buckets(monkeypatch):
     )
 
     assert (
-        "ip:stale",
+        "ip:127.0.0.1",
         datetime(2026, 1, 1, tzinfo=timezone.utc),
     ) not in fake_db.attempts
     assert (
-        "user:stale",
+        "user:owner",
         datetime(2026, 1, 1, tzinfo=timezone.utc),
     ) not in fake_db.attempts
+    assert (
+        "user:unrelated",
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+    ) in fake_db.attempts
 
 
 @pytest.mark.asyncio

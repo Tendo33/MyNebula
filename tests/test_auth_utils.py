@@ -107,7 +107,8 @@ def _build_post_request(csrf_cookie: str | None, csrf_header: str | None) -> Req
     return Request(scope)
 
 
-def test_require_admin_csrf_rejects_missing_token():
+@pytest.mark.asyncio
+async def test_require_admin_csrf_rejects_missing_token():
     settings = AppSettings(
         admin_username="owner",
         admin_password="topsecret",
@@ -116,12 +117,15 @@ def test_require_admin_csrf_rejects_missing_token():
     request = _build_post_request(csrf_cookie=None, csrf_header=None)
 
     with pytest.raises(HTTPException) as exc_info:
-        require_admin_csrf(request=request, settings=settings, _="owner")
+        await require_admin_csrf(
+            request=request, settings=settings, _="owner", db=object()
+        )
 
     assert exc_info.value.status_code == 403
 
 
-def test_require_admin_csrf_accepts_valid_token():
+@pytest.mark.asyncio
+async def test_require_admin_csrf_accepts_valid_token():
     settings = AppSettings(
         admin_username="owner",
         admin_password="topsecret",
@@ -134,7 +138,7 @@ def test_require_admin_csrf_accepts_valid_token():
     )
     request = _build_post_request(csrf_cookie=csrf_token, csrf_header=csrf_token)
 
-    require_admin_csrf(request=request, settings=settings, _="owner")
+    await require_admin_csrf(request=request, settings=settings, _="owner", db=object())
 
 
 def test_get_client_ip_ignores_forwarded_for_by_default():
