@@ -1,132 +1,54 @@
 import React, { useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import ForceGraph2D, { ForceGraphMethods, NodeObject, LinkObject } from 'react-force-graph-2d';
-import { forceCollide, forceX, forceY } from 'd3-force';
-import { useResizeObserver } from '../../hooks/useResizeObserver';
+import ForceGraph2D, { ForceGraphMethods, NodeObject } from 'react-force-graph-2d';
 import { useTranslation } from 'react-i18next';
+
+import { useResizeObserver } from '../../hooks/useResizeObserver';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
-import { ClusterInfo } from '../../types';
 import { GraphSkeleton } from '../ui/Skeleton';
+import { GraphHoverCard } from './GraphHoverCard';
+import type {
+  HullCache,
+  ProcessedData,
+  ProcessedLink,
+  ProcessedNode,
+} from './graph2dTypes';
 import {
-  calculateNodeRadius,
-  computeConvexHull,
-  getNodeId,
-  GRAPH_2D_COLORS as COLORS,
-} from './graph2dUtils';
+  buildClusterGroups,
+  buildClusterLayoutData,
+  toProcessedLinks,
+  toProcessedNodes,
+} from './graph2dLayout';
+import { resolveLinkColor, resolveLinkWidth, resolveNodeColor } from './graph2dStyles';
+import {
+  drawClusterHulls,
+  paintNodeOnCanvas,
+  paintNodePointerArea,
+} from './graph2dPainters';
+import { useAvatarImageCache } from './hooks/useAvatarImageCache';
+import { useGraphForces } from './hooks/useGraphForces';
+import { useFocusSelectedNode, useGraphViewport } from './hooks/useGraphViewport';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-interface ProcessedNode extends NodeObject {
-  id: number;
-  name: string;
-  full_name: string;
-  description?: string;
-  language?: string;
-  cluster_id: number | null;
-  color: string;
-  size: number;
-  stargazers_count: number;
-  // Owner info for avatar display
-  owner?: string;
-  owner_avatar_url?: string;
-  // AI-generated content
-  ai_summary?: string;
-  ai_tags?: string[];
-  // Force-graph will add x, y, vx, vy
-  x?: number;
-  y?: number;
-  fx?: number; // Fixed position
-  fy?: number;
-}
-
-interface ProcessedLink extends LinkObject {
-  source: number | ProcessedNode;
-  target: number | ProcessedNode;
-  weight: number;
-}
-
-interface ProcessedData {
-  nodes: ProcessedNode[];
-  links: ProcessedLink[];
-}
-
-interface ClusterCenter {
-  x: number;
-  y: number;
-  count: number;
-}
-
-interface ClusterLayoutData {
-  centers: Map<number, ClusterCenter>;
-  clusterNodes: Map<number, ProcessedNode[]>;
-}
-
-type RegisteredForce = NonNullable<Parameters<ForceGraphMethods['d3Force']>[1]>;
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const ZOOM_TO_FIT_PADDING = 80;
-
-// Layout tuning: larger = more spaced out initial view
-const POSITION_SCALE = 22;
-const MIN_CLUSTER_DISTANCE = 85;
-const CENTER_PULL_STRENGTH = 0.01;
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-// ============================================================================
-// Component
-// ============================================================================
-
+/**
+ * Force-graph canvas.
+ *
+ * This component owns wiring only. Pure layout derivation lives in
+ * `graph2dLayout`, colour rules in `graph2dStyles`, canvas painting in
+ * `graph2dPainters`, and stateful concerns in `./hooks/*`.
+ */
 const Graph2D: React.FC = () => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const { width, height } = useResizeObserver(containerRef);
 
-  // Image cache for avatars
-  const imageCache = useRef<Map<string, HTMLImageElement | 'loading' | 'error'>>(new Map());
-  const hullCacheRef = useRef<Map<number, { signature: string; hull: { x: number; y: number }[] }>>(new Map());
+  const hullCacheRef = useRef<HullCache>(new Map());
+  const { imageCacheRef, triggerAvatarRedraw } = useAvatarImageCache();
 
   // Global state
-  const {
-    filteredData,
-    rawData,
-    selectedNode,
-    setSelectedNode,
-    settings,
-    loading,
-  } = useGraph();
+  const { filteredData, rawData, selectedNode, setSelectedNode, settings, loading } = useGraph();
 
   // Local state for graph-specific interactions
   const [activeHoverNode, setActiveHoverNode] = useState<ProcessedNode | null>(null);
-  const autoFitKeyRef = useRef<string | null>(null);
-  const userInteractedRef = useRef<boolean>(false);
-  const skipNextFocusRef = useRef<boolean>(false);
-
-  // Debounced re-render trigger for avatar image loading.
-  // Instead of calling forceUpdate per image (which causes a render storm),
-  // we batch updates and flush once after a short idle period.
-  const [, forceUpdate] = useState(0);
-  const avatarFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerAvatarRedraw = useCallback(() => {
-    if (avatarFlushTimerRef.current) clearTimeout(avatarFlushTimerRef.current);
-    avatarFlushTimerRef.current = setTimeout(() => {
-      forceUpdate(n => n + 1);
-      avatarFlushTimerRef.current = null;
-    }, 200);
-  }, []);
-
-  useEffect(() => () => {
-    if (avatarFlushTimerRef.current) {
-      clearTimeout(avatarFlushTimerRef.current);
-    }
-  }, []);
 
   // Get neighbors of hovered node for highlighting
   const hoverNeighbors = useNodeNeighbors(activeHoverNode?.id);
@@ -134,44 +56,14 @@ const Graph2D: React.FC = () => {
   // Visibility set
   const visibleNodeIds = useMemo(() => {
     if (!filteredData) return new Set<number>();
-    return new Set(filteredData.nodes.map(n => n.id));
+    return new Set(filteredData.nodes.map((n) => n.id));
   }, [filteredData]);
 
   // Process data for force-graph (from rawData to keep layout stable!)
   const rawNodes = rawData?.nodes;
   const rawEdges = rawData?.edges;
-  const processedNodes = useMemo((): ProcessedNode[] => {
-    if (!rawNodes?.length) return [];
-    return rawNodes.map(n => ({
-        id: n.id,
-        name: n.name,
-        full_name: n.full_name,
-        description: n.description,
-        language: n.language,
-        cluster_id: n.cluster_id,
-        color: n.color || COLORS.NODE_DEFAULT,
-        size: n.size,
-        stargazers_count: n.stargazers_count,
-        // Owner info for avatar display
-        owner: n.owner,
-        owner_avatar_url: n.owner_avatar_url,
-        // AI-generated content
-        ai_summary: n.ai_summary,
-        ai_tags: n.ai_tags,
-        // Use pre-computed positions if available (from clustering)
-        x: Number.isFinite(n.x) ? n.x * POSITION_SCALE : undefined,
-        y: Number.isFinite(n.y) ? n.y * POSITION_SCALE : undefined,
-      }));
-  }, [rawNodes]);
-
-  const processedLinks = useMemo((): ProcessedLink[] => {
-    if (!rawEdges) return [];
-    return rawEdges.map(e => ({
-        source: typeof e.source === 'object' ? e.source.id : e.source,
-        target: typeof e.target === 'object' ? e.target.id : e.target,
-        weight: e.weight,
-      }));
-  }, [rawEdges]);
+  const processedNodes = useMemo(() => toProcessedNodes(rawNodes), [rawNodes]);
+  const processedLinks = useMemo(() => toProcessedLinks(rawEdges), [rawEdges]);
 
   const processedData = useMemo<ProcessedData>(
     () => ({ nodes: processedNodes, links: processedLinks }),
@@ -183,568 +75,136 @@ const Graph2D: React.FC = () => {
     [processedNodes, rawData?.version]
   );
 
-  const clusterLayoutData = useMemo((): ClusterLayoutData => {
-    const centers = new Map<number, ClusterCenter>();
-    const clusterNodes = new Map<number, ProcessedNode[]>();
+  const clusterLayoutData = useMemo(
+    () => buildClusterLayoutData(processedData.nodes),
+    [processedData.nodes]
+  );
 
-    processedData.nodes.forEach((node) => {
-      if (node.cluster_id == null || node.x === undefined || node.y === undefined) {
-        return;
-      }
+  // Group clusters by id for hull drawing
+  const clusterGroups = useMemo(() => buildClusterGroups(rawData), [rawData]);
 
-      const clusterMembers = clusterNodes.get(node.cluster_id) ?? [];
-      clusterMembers.push(node);
-      clusterNodes.set(node.cluster_id, clusterMembers);
+  useGraphForces({ graphRef, clusterLayoutData });
 
-      const currentCenter = centers.get(node.cluster_id) ?? { x: 0, y: 0, count: 0 };
-      currentCenter.x += node.x;
-      currentCenter.y += node.y;
-      currentCenter.count += 1;
-      centers.set(node.cluster_id, currentCenter);
+  const { tryAutoFit, getLiveNodeById, focusNodeById, markUserInteracted, skipNextFocusRef } =
+    useGraphViewport({
+      graphRef,
+      hullCacheRef,
+      layoutKey,
+      nodeCount: processedData.nodes.length,
+      width,
+      height,
     });
-
-    centers.forEach((center) => {
-      center.x /= center.count;
-      center.y /= center.count;
-    });
-
-    return { centers, clusterNodes };
-  }, [processedData.nodes]);
-
-  // Group nodes by cluster for hull drawing
-  const clusterGroups = useMemo(() => {
-    if (!rawData) return new Map<number, ClusterInfo>();
-
-    const groups = new Map<number, ClusterInfo>();
-    rawData.clusters.forEach(cluster => {
-      groups.set(cluster.id, cluster);
-    });
-    return groups;
-  }, [rawData]);
-
-  // Configure forces after graph is created
-  useEffect(() => {
-    if (!graphRef.current) return;
-
-    const fg = graphRef.current;
-
-    // Configure link force - increased distance for cross-cluster links
-    fg.d3Force('link')
-      ?.distance((link: LinkObject<NodeObject, LinkObject<NodeObject>>) => {
-        const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
-        const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : null;
-        // Same cluster: moderate distance, Different cluster: larger separation
-        return sourceCluster === targetCluster ? 38 : 75;
-      })
-      .strength((link: LinkObject<NodeObject, LinkObject<NodeObject>>) => {
-        const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
-        const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : null;
-        // Stronger links within same cluster, very weak for cross-cluster
-        return sourceCluster === targetCluster ? 0.7 : 0.05;
-      });
-
-    // Configure charge force (repulsion) - increased for more spacing
-    fg.d3Force('charge')
-      ?.strength(-150)
-      .distanceMax(250);
-
-    // Gentle pull toward the origin to avoid disconnected groups drifting far apart
-    fg.d3Force(
-      'x',
-      forceX(0).strength(CENTER_PULL_STRENGTH) as unknown as RegisteredForce,
-    );
-    fg.d3Force(
-      'y',
-      forceY(0).strength(CENTER_PULL_STRENGTH) as unknown as RegisteredForce,
-    );
-
-    // Add collision force to prevent overlap
-    fg.d3Force(
-      'collide',
-      forceCollide<ProcessedNode>()
-        .radius(
-          (node: ProcessedNode) =>
-            calculateNodeRadius(node.stargazers_count) * 1.5 + 3,
-        )
-        .strength(0.9)
-        .iterations(2) as unknown as RegisteredForce,
-    );
-
-    // Cluster force keeps members compact while preventing cluster centers from collapsing together.
-    const clusterForce = (alpha: number) => {
-      if (alpha < 0.015) {
-        return;
-      }
-
-      const centersArray = Array.from(clusterLayoutData.centers.entries());
-
-      // Apply repulsion between cluster centers
-      for (let i = 0; i < centersArray.length; i++) {
-        for (let j = i + 1; j < centersArray.length; j++) {
-          const [clusterId1, center1] = centersArray[i];
-          const [clusterId2, center2] = centersArray[j];
-
-          const dx = center2.x - center1.x;
-          const dy = center2.y - center1.y;
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-
-          // If clusters are too close, push them apart
-          if (dist < MIN_CLUSTER_DISTANCE) {
-            const force = ((MIN_CLUSTER_DISTANCE - dist) / dist) * alpha * 2;
-            const fx = dx * force;
-            const fy = dy * force;
-            const cluster1Nodes = clusterLayoutData.clusterNodes.get(clusterId1) ?? [];
-            const cluster2Nodes = clusterLayoutData.clusterNodes.get(clusterId2) ?? [];
-
-            cluster1Nodes.forEach((node) => {
-              node.vx = (node.vx || 0) - fx;
-              node.vy = (node.vy || 0) - fy;
-            });
-            cluster2Nodes.forEach((node) => {
-              node.vx = (node.vx || 0) + fx;
-              node.vy = (node.vy || 0) + fy;
-            });
-          }
-        }
-      }
-
-      clusterLayoutData.clusterNodes.forEach((clusterNodes, clusterId) => {
-        const center = clusterLayoutData.centers.get(clusterId);
-        if (!center) {
-          return;
-        }
-
-        clusterNodes.forEach((node) => {
-          if (node.x === undefined || node.y === undefined) {
-            return;
-          }
-
-          const k = alpha * 0.2;
-          node.vx = (node.vx || 0) + (center.x - node.x) * k;
-          node.vy = (node.vy || 0) + (center.y - node.y) * k;
-        });
-      });
-    };
-
-    // Register custom force
-    fg.d3Force('cluster', clusterForce);
-
-  }, [clusterLayoutData]);
-
-  const tryAutoFit = useCallback(() => {
-    if (!graphRef.current || processedData.nodes.length === 0) return;
-    if (autoFitKeyRef.current === layoutKey) return;
-    if (userInteractedRef.current) return;
-
-    graphRef.current.zoomToFit(400, ZOOM_TO_FIT_PADDING);
-    autoFitKeyRef.current = layoutKey;
-  }, [layoutKey, processedData.nodes.length]);
-
-  // Reset auto-fit state when layout shape changes
-  useEffect(() => {
-    autoFitKeyRef.current = null;
-    hullCacheRef.current.clear();
-  }, [layoutKey]);
-
-  // Fallback auto-fit after initial render in case engine-stop callback is delayed
-  useEffect(() => {
-    if (processedData.nodes.length === 0) return;
-
-    const timer = setTimeout(() => {
-      tryAutoFit();
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [processedData.nodes.length, tryAutoFit]);
-
-  // Get node color based on state
-  const getNodeColor = useCallback((node: ProcessedNode): string => {
-    // Selected node ALWAYS visible
-    if (selectedNode && selectedNode.id === node.id) {
-      return COLORS.NODE_SELECTED;
-    }
-
-    // Hovered node
-    if (activeHoverNode && node.id === activeHoverNode.id) {
-      return COLORS.NODE_HOVER;
-    }
-
-    // Ghost mode for filtered out nodes
-    if (!visibleNodeIds.has(node.id)) {
-      // Dim gray if it doesn't have an avatar. If it has an avatar,
-      // the transparency will be handled by globalAlpha in paintNode.
-      return 'rgba(200, 200, 200, 0.4)';
-    }
-
-    // No hover - use cluster color
-    if (!activeHoverNode) {
-      return node.color || COLORS.NODE_DEFAULT;
-    }
-
-    // Neighbor of hovered node
-    if (hoverNeighbors.has(node.id)) {
-      return COLORS.NODE_NEIGHBOR;
-    }
-
-    // Same cluster as hovered
-    if (activeHoverNode.cluster_id != null &&
-        node.cluster_id === activeHoverNode.cluster_id) {
-      return node.color || COLORS.NODE_DEFAULT;
-    }
-
-    // Dim other nodes
-    return COLORS.NODE_DIM;
-  }, [selectedNode, activeHoverNode, hoverNeighbors, visibleNodeIds]);
-
-  // Get link color based on state
-  const getLinkColor = useCallback((link: ProcessedLink): string => {
-    if (!settings.showTrajectories) return 'rgba(0,0,0,0)';
-
-    const sourceId = getNodeId(link.source);
-    const targetId = getNodeId(link.target);
-
-    const sourceVisible = visibleNodeIds.has(sourceId) || selectedNode?.id === sourceId;
-    const targetVisible = visibleNodeIds.has(targetId) || selectedNode?.id === targetId;
-
-    if (!sourceVisible || !targetVisible) {
-      return 'rgba(200, 200, 200, 0.05)';
-    }
-
-    if (!activeHoverNode) return COLORS.LINK_DEFAULT;
-
-    // Highlight links connected to hovered node
-    if (sourceId === activeHoverNode?.id || targetId === activeHoverNode?.id) {
-      return COLORS.LINK_ACTIVE;
-    }
-
-    return COLORS.LINK_DIM;
-  }, [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]);
-
-  // Get link width based on state
-  const getLinkWidth = useCallback((link: ProcessedLink): number => {
-    if (!settings.showTrajectories) return 0;
-
-    const sourceId = getNodeId(link.source);
-    const targetId = getNodeId(link.target);
-
-    const sourceVisible = visibleNodeIds.has(sourceId) || selectedNode?.id === sourceId;
-    const targetVisible = visibleNodeIds.has(targetId) || selectedNode?.id === targetId;
-
-    if (!sourceVisible || !targetVisible) {
-      return 0.2;
-    }
-
-    if (!activeHoverNode) return 1;
-
-    if (sourceId === activeHoverNode.id || targetId === activeHoverNode.id) {
-      return 2;
-    }
-
-    return 0.5;
-  }, [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]);
-
-  // Custom node painting
-  const paintNode = useCallback((nodeObject: NodeObject<NodeObject>, ctx: CanvasRenderingContext2D, globalScale: number) => {
-    const node = nodeObject as ProcessedNode;
-    const { x, y, name, stargazers_count, owner_avatar_url } = node;
-    if (x === undefined || y === undefined) return;
-
-    const isVisible = visibleNodeIds.has(node.id);
-    const isSelected = selectedNode?.id === node.id;
-    const isHovered = activeHoverNode?.id === node.id;
-
-    const radius = calculateNodeRadius(stargazers_count);
-    const color = getNodeColor(node);
-
-    ctx.save();
-
-    // Apply transparency for filtered out ghost nodes
-    if (!isVisible && !isSelected && !isHovered) {
-      ctx.globalAlpha = 0.25;
-    }
-
-    // Try to draw avatar image
-    let avatarDrawn = false;
-    if (owner_avatar_url) {
-      const cached = imageCache.current.get(owner_avatar_url);
-
-      if (cached === undefined) {
-        // Start loading image
-        imageCache.current.set(owner_avatar_url, 'loading');
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.decoding = 'async';
-        img.onload = () => {
-          imageCache.current.set(owner_avatar_url, img);
-          // Trigger re-render by updating state
-          triggerAvatarRedraw();
-        };
-        img.onerror = () => {
-          imageCache.current.set(owner_avatar_url, 'error');
-        };
-        img.src = owner_avatar_url;
-      } else if (cached instanceof HTMLImageElement) {
-        // Draw cached image in circular clip
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, 2 * Math.PI);
-        ctx.clip();
-
-        // Draw image to fill the circle
-        ctx.drawImage(
-          cached,
-          x - radius,
-          y - radius,
-          radius * 2,
-          radius * 2
-        );
-        ctx.restore();
-        avatarDrawn = true;
-      }
-    }
-
-    // Fallback: Draw solid color circle if no avatar
-    if (!avatarDrawn) {
-      ctx.beginPath();
-      // Make it slightly smaller if it's not visible to mimic the older ghost style if wanted,
-      // but standard radius is fine when transparent.
-      ctx.arc(x, y, (!isVisible && !isSelected && !isHovered) ? radius * 0.8 : radius, 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
-    } else if (color === COLORS.NODE_DIM && (isVisible || isSelected)) {
-      // Keep avatar nodes visually dimmed when not in focus.
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // Draw border for selected/hovered nodes
-    if (isHovered || isSelected) {
-      ctx.strokeStyle = isSelected ? COLORS.NODE_SELECTED : COLORS.NODE_HOVER;
-      ctx.lineWidth = 2 / globalScale;
-      ctx.stroke();
-
-      // Draw outer glow if HQ rendering is enabled
-      if (settings.hqRendering) {
-        ctx.beginPath();
-        ctx.arc(x, y, radius + 4 / globalScale, 0, 2 * Math.PI);
-        ctx.strokeStyle = isSelected
-          ? 'rgba(59, 130, 246, 0.3)'
-          : 'rgba(139, 92, 246, 0.3)';
-        ctx.lineWidth = 3 / globalScale;
-        ctx.stroke();
-      }
-    }
-
-    // Draw label
-    const fontSize = Math.max(10 / globalScale, 8);
-    // Hide label for ghost nodes unless hovered
-    const showLabel = isHovered || isSelected || (isVisible && (globalScale > 2 || radius > 15));
-
-    if (showLabel) {
-      const label = name;
-      ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
-      const textMetrics = ctx.measureText(label);
-      const textWidth = textMetrics.width;
-      const textHeight = fontSize;
-      const padding = 3 / globalScale;
-      const labelY = y + radius + fontSize + 2 / globalScale;
-
-      // Background
-      ctx.fillStyle = COLORS.LABEL_BG;
-      ctx.fillRect(
-        x - textWidth / 2 - padding,
-        labelY - textHeight + 2 / globalScale,
-        textWidth + padding * 2,
-        textHeight + padding
-      );
-
-      // Text
-      ctx.fillStyle = COLORS.LABEL_TEXT;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(label, x, labelY - textHeight / 2 + padding);
-    }
-
-    ctx.restore();
-  }, [getNodeColor, activeHoverNode, selectedNode, settings.hqRendering, triggerAvatarRedraw, visibleNodeIds]);
-
-  // Node pointer area for click detection
-  const paintNodeArea = useCallback((nodeObject: NodeObject<NodeObject>, color: string, ctx: CanvasRenderingContext2D) => {
-    const node = nodeObject as ProcessedNode;
-    const { x, y, stargazers_count } = node;
-    if (x === undefined || y === undefined) return;
-
-    const radius = calculateNodeRadius(stargazers_count);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, radius + 5, 0, 2 * Math.PI); // Slightly larger for easier clicking
-    ctx.fill();
-  }, []);
-
-  // Draw cluster hulls in the background
-  const drawClusterHulls = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
-    if (!graphRef.current) return;
-
-    // Get nodes from processed data instead of graphRef.graphData()
-    const nodes = processedData.nodes;
-
-    // Group nodes by cluster
-    const nodesByCluster = new Map<number, ProcessedNode[]>();
-    nodes.forEach(node => {
-      // Only draw hull for visible nodes
-      if (!visibleNodeIds.has(node.id)) return;
-
-      if (node.cluster_id != null && node.x !== undefined && node.y !== undefined) {
-        const group = nodesByCluster.get(node.cluster_id) || [];
-        group.push(node);
-        nodesByCluster.set(node.cluster_id, group);
-      }
-    });
-
-    // Draw hull for each cluster with enough nodes
-    nodesByCluster.forEach((clusterNodes, clusterId) => {
-      if (clusterNodes.length < 3) return;
-
-      const cluster = clusterGroups.get(clusterId);
-      if (!cluster) return;
-
-      // Get node positions with padding
-      const points = clusterNodes.map(n => ({
-        x: n.x!,
-        y: n.y!,
-      }));
-
-      const signature = points
-        .map((point) => `${Math.round(point.x)}:${Math.round(point.y)}`)
-        .join('|');
-      const cached = hullCacheRef.current.get(clusterId);
-      const hull = cached?.signature === signature
-        ? cached.hull
-        : computeConvexHull([...points]);
-      if (!cached || cached.signature !== signature) {
-        hullCacheRef.current.set(clusterId, { signature, hull });
-      }
-      if (hull.length < 3) return;
-
-      // Draw filled hull with cluster color
-      ctx.beginPath();
-      ctx.moveTo(hull[0].x, hull[0].y);
-      for (let i = 1; i < hull.length; i++) {
-        ctx.lineTo(hull[i].x, hull[i].y);
-      }
-      ctx.closePath();
-
-      // Parse cluster color and add transparency
-      const baseColor = cluster.color || '#808080';
-      ctx.fillStyle = baseColor + '10'; // Very transparent
-      ctx.fill();
-
-      ctx.strokeStyle = baseColor + '30'; // Slightly more visible border
-      ctx.lineWidth = 1 / globalScale;
-      ctx.stroke();
-
-      // Draw cluster label at center
-      const centerX = clusterNodes.reduce((sum, n) => sum + n.x!, 0) / clusterNodes.length;
-      const centerY = clusterNodes.reduce((sum, n) => sum + n.y!, 0) / clusterNodes.length;
-
-      if (globalScale > 0.5 && cluster.name) {
-        const fontSize = Math.max(14 / globalScale, 10);
-        ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
-        ctx.fillStyle = baseColor + '60';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(cluster.name, centerX, centerY);
-      }
-    });
-  }, [clusterGroups, processedData.nodes, visibleNodeIds]);
-
-  const getLiveNodeById = useCallback((nodeId: number): ProcessedNode | null => {
-    if (!graphRef.current) return null;
-
-    // `graphData()` exists at runtime, but some react-force-graph type versions
-    // don't expose it on ForceGraphMethods.
-    const maybeWithGraphData = graphRef.current as ForceGraphMethods & {
-      graphData?: () => { nodes: NodeObject[] };
-    };
-    const graphData = maybeWithGraphData.graphData?.();
-    if (!graphData) return null;
-
-    return (graphData.nodes as ProcessedNode[]).find((n) => n.id === nodeId) ?? null;
-  }, []);
-
-  const focusNodeById = useCallback((nodeId: number, duration = 1200) => {
-    if (!graphRef.current || !width || !height) return;
-
-    // Fixed zoom target to ensure an obvious, but reasonable magnification on select
-    const targetZoom = 1.05;
-
-    // zoomToFit's scale calculation for a single point is:
-    // scale = Math.min(width, height) / (padding * 2)
-    // Thus padding = Math.min(width, height) / (2 * targetZoom)
-    const padding = Math.min(width, height) / (2 * targetZoom);
-
-    // Use built-in zoomToFit to perfectly animate pan and zoom simultaneously
-    // without D3 transitions cancelling each other out.
-    graphRef.current.zoomToFit(duration, padding, (n) => n.id === nodeId);
-  }, [width, height]);
 
   const selectedNodeId = selectedNode?.id;
+  useFocusSelectedNode({
+    selectedNodeId,
+    graphRef,
+    skipNextFocusRef,
+    getLiveNodeById,
+    focusNodeById,
+  });
 
-  useEffect(() => {
-    if (!selectedNodeId) return;
+  const getNodeColor = useCallback(
+    (node: ProcessedNode): string =>
+      resolveNodeColor(node, {
+        selectedNodeId: selectedNode?.id,
+        activeHoverNode,
+        hoverNeighbors,
+        visibleNodeIds,
+      }),
+    [selectedNode, activeHoverNode, hoverNeighbors, visibleNodeIds]
+  );
 
-    if (skipNextFocusRef.current) {
-      skipNextFocusRef.current = false;
-      return;
-    }
+  const getLinkColor = useCallback(
+    (link: ProcessedLink): string =>
+      resolveLinkColor(link, {
+        showTrajectories: settings.showTrajectories,
+        activeHoverNodeId: activeHoverNode?.id,
+        visibleNodeIds,
+        selectedNodeId: selectedNode?.id,
+      }),
+    [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]
+  );
 
-    // Wait two frames so the force graph has ingested the (possibly new) graphData
-    // and has valid x/y on the node before we try to center on it.
-    let frame1 = 0;
-    let frame2 = 0;
-    let retryTimer = 0;
+  const getLinkWidth = useCallback(
+    (link: ProcessedLink): number =>
+      resolveLinkWidth(link, {
+        showTrajectories: settings.showTrajectories,
+        activeHoverNodeId: activeHoverNode?.id,
+        visibleNodeIds,
+        selectedNodeId: selectedNode?.id,
+      }),
+    [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]
+  );
 
-    const tryFocus = () => {
+  const paintNode = useCallback(
+    (nodeObject: NodeObject<NodeObject>, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const node = nodeObject as ProcessedNode;
+      paintNodeOnCanvas({
+        node,
+        ctx,
+        globalScale,
+        color: getNodeColor(node),
+        isVisible: visibleNodeIds.has(node.id),
+        isSelected: selectedNode?.id === node.id,
+        isHovered: activeHoverNode?.id === node.id,
+        hqRendering: settings.hqRendering,
+        imageCache: imageCacheRef.current,
+        onAvatarLoaded: triggerAvatarRedraw,
+      });
+    },
+    [
+      getNodeColor,
+      activeHoverNode,
+      selectedNode,
+      settings.hqRendering,
+      triggerAvatarRedraw,
+      visibleNodeIds,
+      imageCacheRef,
+    ]
+  );
+
+  const paintNodeArea = useCallback(
+    (nodeObject: NodeObject<NodeObject>, color: string, ctx: CanvasRenderingContext2D) => {
+      paintNodePointerArea(nodeObject as ProcessedNode, color, ctx);
+    },
+    []
+  );
+
+  const paintClusterHulls = useCallback(
+    (ctx: CanvasRenderingContext2D, globalScale: number) => {
       if (!graphRef.current) return;
-      const node = getLiveNodeById(selectedNodeId);
-      if (node?.x !== undefined && node?.y !== undefined) {
-        focusNodeById(selectedNodeId, 800);
-      } else {
-        // Node positions not ready yet — retry after the simulation warms up
-        retryTimer = window.setTimeout(() => focusNodeById(selectedNodeId, 800), 600);
-      }
-    };
-
-    frame1 = window.requestAnimationFrame(() => {
-      frame2 = window.requestAnimationFrame(tryFocus);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame1);
-      window.cancelAnimationFrame(frame2);
-      window.clearTimeout(retryTimer);
-    };
-  }, [selectedNodeId, focusNodeById, getLiveNodeById]);
+      drawClusterHulls({
+        nodes: processedData.nodes,
+        ctx,
+        globalScale,
+        visibleNodeIds,
+        clusterGroups,
+        hullCache: hullCacheRef.current,
+      });
+    },
+    [clusterGroups, processedData.nodes, visibleNodeIds]
+  );
 
   // Handle node click
-  const handleNodeClick = useCallback((nodeObject: NodeObject<NodeObject>) => {
-    const processedNode = nodeObject as ProcessedNode;
+  const handleNodeClick = useCallback(
+    (nodeObject: NodeObject<NodeObject>) => {
+      const processedNode = nodeObject as ProcessedNode;
 
-    // Find the full node data from raw data
-    const fullNode = rawData?.nodes.find(n => n.id === processedNode.id);
-    if (fullNode) {
-      if (selectedNode?.id !== fullNode.id) {
-        skipNextFocusRef.current = true;
-        setSelectedNode(fullNode);
+      // Find the full node data from raw data
+      const fullNode = rawData?.nodes.find((n) => n.id === processedNode.id);
+      if (fullNode) {
+        if (selectedNode?.id !== fullNode.id) {
+          skipNextFocusRef.current = true;
+          setSelectedNode(fullNode);
+        }
       }
-    }
 
-    // Always focus the node when explicitly clicked on the graph canvas
-    focusNodeById(processedNode.id, 1000);
-  }, [rawData, selectedNode, setSelectedNode, focusNodeById]);
+      // Always focus the node when explicitly clicked on the graph canvas
+      focusNodeById(processedNode.id, 1000);
+    },
+    [rawData, selectedNode, setSelectedNode, focusNodeById, skipNextFocusRef]
+  );
 
   // Handle node hover
   const handleNodeHover = useCallback((nodeObject: NodeObject<NodeObject> | null) => {
@@ -757,8 +217,6 @@ const Graph2D: React.FC = () => {
   useEffect(() => {
     return () => {
       document.body.style.cursor = '';
-      // Clean up debounce timer for avatar redraws
-      if (avatarFlushTimerRef.current) clearTimeout(avatarFlushTimerRef.current);
     };
   }, []);
 
@@ -779,15 +237,16 @@ const Graph2D: React.FC = () => {
   // Empty state
   if (!filteredData || filteredData.nodes.length === 0) {
     return (
-      <div ref={containerRef} className="w-full h-full relative flex items-center justify-center bg-bg-hover/50 dark:bg-dark-bg-sidebar/60">
+      <div
+        ref={containerRef}
+        className="w-full h-full relative flex items-center justify-center bg-bg-hover/50 dark:bg-dark-bg-sidebar/60"
+      >
         <div className="text-center p-8 opacity-50">
           <div className="text-6xl mb-4 grayscale">🕸️</div>
           <h3 className="font-semibold text-lg text-text-main">
             {t('dashboard.subtitle_infinite')}
           </h3>
-          <p className="text-sm text-text-muted mt-2">
-            {t('graph.empty_hint')}
-          </p>
+          <p className="text-sm text-text-muted mt-2">{t('graph.empty_hint')}</p>
         </div>
       </div>
     );
@@ -800,7 +259,6 @@ const Graph2D: React.FC = () => {
         width={width}
         height={height}
         graphData={processedData}
-
         // Interaction
         onNodeClick={handleNodeClick}
         onNodeHover={handleNodeHover}
@@ -808,101 +266,29 @@ const Graph2D: React.FC = () => {
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
-        onZoom={() => { userInteractedRef.current = true; }}
-        onNodeDragEnd={() => { userInteractedRef.current = true; }}
-
+        onZoom={markUserInteracted}
+        onNodeDragEnd={markUserInteracted}
         // Node rendering
         nodeCanvasObject={paintNode}
         nodePointerAreaPaint={paintNodeArea}
         nodeCanvasObjectMode={() => 'replace'}
-
         // Link rendering
         linkColor={getLinkColor}
         linkWidth={getLinkWidth}
         linkCurvature={0.1}
         linkDirectionalParticles={0}
-
         // Pre-render callback for cluster hulls
-        onRenderFramePre={(ctx, globalScale) => {
-          drawClusterHulls(ctx, globalScale);
-        }}
-
+        onRenderFramePre={paintClusterHulls}
         // Physics
         d3AlphaDecay={0.02}
         d3VelocityDecay={0.3}
         cooldownTicks={120}
         warmupTicks={60}
-
         // After engine stops
         onEngineStop={tryAutoFit}
       />
 
-      {/* Hover info overlay - Enhanced with full info */}
-      {activeHoverNode && (
-        <div className="absolute top-4 right-4 z-10 bg-bg-main px-4 py-3 rounded-lg border border-border-light shadow-lg max-w-sm pointer-events-none dark:bg-dark-bg-main dark:border-dark-border">
-          {/* Header with Avatar */}
-          <div className="flex items-start gap-3">
-            {/* Owner Avatar */}
-            {activeHoverNode.owner_avatar_url ? (
-              <img
-                src={activeHoverNode.owner_avatar_url}
-                alt={activeHoverNode.owner || activeHoverNode.name}
-                className="w-10 h-10 rounded-md border border-border-light flex-shrink-0"
-                loading="lazy"
-                decoding="async"
-                width={40}
-                height={40}
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-md bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
-                <span className="text-text-dim text-sm font-medium dark:text-dark-text-main/60">
-                  {(activeHoverNode.owner || activeHoverNode.name)?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
-
-            <div className="flex-1 min-w-0">
-              <h3 className="text-text-main font-semibold text-sm truncate">
-                {activeHoverNode.name}
-              </h3>
-              <div className="flex items-center gap-2 mt-0.5">
-                {activeHoverNode.language && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-action-primary/10 rounded text-action-primary">
-                    {activeHoverNode.language}
-                  </span>
-                )}
-                <span className="text-xs text-action-primary font-medium">
-                  ⭐ {activeHoverNode.stargazers_count.toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Full Description - Not truncated */}
-          {(activeHoverNode.description || activeHoverNode.ai_summary) && (
-            <p className="text-xs text-text-muted mt-2 leading-relaxed">
-              {activeHoverNode.description || activeHoverNode.ai_summary}
-            </p>
-          )}
-
-          {/* AI Tags Preview */}
-          {activeHoverNode.ai_tags && activeHoverNode.ai_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {activeHoverNode.ai_tags.slice(0, 4).map((tag: string) => (
-                <span
-                  key={tag}
-                  className="text-[10px] px-1.5 py-0.5 bg-action-primary/10 text-action-primary rounded"
-                >
-                  {tag}
-                </span>
-              ))}
-              {activeHoverNode.ai_tags.length > 4 && (
-                <span className="text-[10px] text-text-dim">+{activeHoverNode.ai_tags.length - 4}</span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      {activeHoverNode && <GraphHoverCard node={activeHoverNode} />}
     </div>
   );
 };

@@ -50,6 +50,42 @@ shape has four important data surfaces:
   components; keep it in memoized context helpers or pure utility modules.
 - Do not change `GraphContext` public shape casually. Optimize internals first
   to avoid wide component churn.
+- Derived graph indexes are built **once in `GraphProvider`** and read from
+  context. Do not rebuild an O(E) structure inside a consuming component: with
+  progressive edge loading that is one full pass per consumer per edge page.
+  `buildAdjacencyIndex` is memoized on `stagedEdges`, not on `rawData`, because
+  adjacency does not depend on node payloads.
+- Edge endpoint access must handle both shapes:
+  `typeof edge.source === 'object' ? edge.source.id : edge.source`.
+  `react-force-graph` rewrites ids into node objects once the simulation runs.
+
+## Internationalization
+
+- Every key passed to `t()` must exist in **both** `locales/en` and
+  `locales/zh`. The inline `t('key', 'Fallback')` default hides a missing key in
+  English while silently rendering English text in the Chinese UI.
+- `frontend/src/locales/zh/translation.test.ts` enforces this: bundle key-set
+  parity, and every key the source actually calls being present in both bundles.
+  It is a static scan of `src/`, so a new key with only a fallback fails the
+  build.
+
+## Accessibility Baseline
+
+Enforced by `frontend/src/__tests__/accessibility.baseline.test.ts`:
+
+- Every `<button>` has an accessible name — visible text, or `aria-label` when
+  icon-only.
+- Every surface declaring `aria-modal` also has `role="dialog"`, an accessible
+  name, Escape-to-dismiss, and a Tab focus trap. A dialog owns its own dismissal:
+  keep Escape handling in the same component as the focus trap, not in the
+  parent page.
+- Async status regions announce via `aria-live` (`SyncProgress`) or
+  `role="alert"` (`ErrorFallback`).
+
+Deliberately out of scope, so the passing check is not misread as a guarantee:
+colour-contrast auditing, screen-reader transcript testing, and the
+`react-force-graph` canvas, which exposes no accessible node tree. Automated
+rules catch only part of real accessibility problems.
 
 ## Source Of Truth
 

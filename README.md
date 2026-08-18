@@ -252,7 +252,7 @@ If `frontend/dist` exists, FastAPI will serve the SPA and static assets directly
 | LLM | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_OUTPUT_LANGUAGE` | Optional | Used for summaries, tags, and cluster naming |
 | Admin auth | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `ADMIN_SESSION_TTL_HOURS` | Recommended | If password or session secret is empty, admin-protected APIs are disabled |
 | Database | `DATABASE_*`, `DATABASE_URL` | Yes | `DATABASE_URL` overrides split database fields |
-| Sync | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | Optional | Controls throughput and cost |
+| Sync | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | Optional | Controls throughput and cost. `SYNC_BATCH_SIZE` (10–500, default 100) sets both the embedding chunk committed per transaction and the texts per provider request |
 | Runtime | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | Optional | Debugging and observability settings |
 
 For the full environment and operations reference, see `.trellis/spec/backend/database-when-added.md`.

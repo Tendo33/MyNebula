@@ -310,7 +310,9 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             </div>
         </div>
         <button
+          type="button"
           onClick={onClose}
+          aria-label={t('repoDetails.close')}
           className="absolute top-4 right-4 p-1.5 rounded-md text-text-dim hover:bg-bg-hover hover:text-text-main transition-colors"
         >
           <X className="w-5 h-5" />

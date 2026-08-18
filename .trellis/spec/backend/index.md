@@ -46,9 +46,50 @@ end-to-end.
 - Sync pipeline lifecycle: `src/nebula/application/services/pipeline_service.py`
 - Full refresh orchestration: `src/nebula/application/services/sync_ops_service.py`
 - Sync execution helpers: `src/nebula/application/services/sync_execution_support.py`
+- Sync stage execution: `src/nebula/application/services/sync_execution_service.py`
 - Scheduler behavior: `src/nebula/core/scheduler.py`
 - Admin auth boundary: `src/nebula/api/v2/auth.py`, `src/nebula/core/auth.py`
 - ORM model and naming conventions: `src/nebula/db/models.py`
+
+## Pipeline Stage Contracts
+
+These are behavioral contracts, not implementation details. Changing them
+changes what a user loses when something fails mid-run.
+
+### Embedding stage is chunked and resumable
+
+- `compute_embeddings_task` processes repos in `SYNC_BATCH_SIZE` chunks and
+  commits each chunk before starting the next.
+- `StarredRepo.is_embedded` is the durable resume marker. A re-run must embed
+  only repos still marked `False`.
+- Chunk iteration uses a keyset cursor on `StarredRepo.id` and advances the
+  cursor **before** processing. A chunk that keeps failing must not be
+  re-selected within the same pass, or the loop never terminates.
+- A failing chunk is rolled back, added to `failed_items`, and skipped. It must
+  not abort the remaining chunks.
+- Status matrix: any chunk succeeded → `completed` with `failed_items` carrying
+  the partial failure; zero chunks succeeded with at least one failure →
+  `failed`; nothing to embed → `completed`.
+- `EmbeddingService.embed_batch` retries each provider request individually.
+  Do not wrap it in an outer retry: that re-sends every slice that already
+  succeeded and re-bills a metered API.
+
+### Cluster swap is atomic
+
+- `run_clustering_task` must complete all expensive side-effect-free work —
+  clustering, projection, LLM naming, deduplication — **before** any
+  destructive statement.
+- Delete-old, insert-new, and reassign land in a single transaction. An
+  interrupted run must leave the previous clusters intact.
+- Detach repos (`UPDATE starred_repos SET cluster_id = NULL`) before deleting
+  clusters, so the `starred_repos.cluster_id → clusters.id` foreign key stays
+  satisfied.
+- The bulk `UPDATE` bypasses the identity map. Realign loaded ORM objects
+  (`repo.cluster_id = None`) before assigning new ids, or an assignment that
+  matches the stale in-session value emits no `UPDATE` and silently leaves the
+  row `NULL`.
+- Both statements are set-based. Do not reintroduce per-row ORM deletes: each
+  one issues its own child-nullification query.
 
 ## Non-Negotiable Rules
 

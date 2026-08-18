@@ -4,28 +4,32 @@
 
 Use `src/nebula/` for importable Python code and `tests/` for tests.
 
-Keep modules boring and discoverable:
+Keep modules boring and discoverable. The actual layout is:
 
 ```text
 src/nebula/
-├── config/
-├── contracts/
+├── api/
+├── application/
 ├── core/
-├── models/
-├── observability/
+├── db/
+├── domain/
+├── infrastructure/
+├── jobs/
+├── schemas/
 └── utils/
 ```
 
-`api/`, `application/`, `core/`, `db/`, `domain/`, `infrastructure/`, and
-`schemas/` already exist. Place new code by the current boundary instead of
-creating parallel layers.
+Place new code by the current boundary instead of creating parallel layers. See
+[directory-structure.md](./directory-structure.md) for what belongs where.
 
 ## Typing
 
-- Keep `py.typed` for typed package distribution.
 - Prefer explicit return types on public functions.
 - Avoid `Any` unless the boundary is genuinely dynamic and documented.
 - Use `Protocol` for behavior contracts when it avoids coupling.
+- There is no `py.typed` marker. MyNebula ships as an application, not a typed
+  library, so downstream type distribution is not a current concern. Add the
+  marker only alongside a real decision to publish the package for import.
 
 ## Public API Changes
 

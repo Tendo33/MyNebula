@@ -33,7 +33,10 @@
     "confirm": "确认",
     "retry": "重试",
     "load_failed": "加载数据失败",
-    "n_a": "暂无"
+    "n_a": "暂无",
+    "filter": "筛选",
+    "no_description": "暂无描述",
+    "skip_to_content": "跳到主要内容"
   },
   "dashboard": {
     "title": "星云概览",
@@ -78,7 +81,12 @@
     "reclustering": "聚类中...",
     "recluster_hint": "按当前设置重新生成聚类",
     "load_more_edges": "继续加载边",
-    "edge_load_paused": "已加载 {{pages}} 页边数据（约 {{edges}} 条边位）。需要时可继续加载。"
+    "edge_load_paused": "已加载 {{pages}} 页边数据（约 {{edges}} 条边位）。需要时可继续加载。",
+    "browse_as_list": "以列表浏览",
+    "recluster_partial_failed": "重新聚类已完成，但存在警告。请查看最近一次流水线详情。",
+    "repository_list": "仓库列表",
+    "repository_list_count": "匹配到 {{count}} 个仓库",
+    "repository_list_limited": "仅显示前 50 条匹配结果，请细化搜索条件。"
   },
   "data": {
     "repository": "仓库",
@@ -99,7 +107,11 @@
     "filter_label": "筛选",
     "unclustered": "未聚类",
     "no_summary": "暂无摘要",
-    "no_description": "暂无描述"
+    "no_description": "暂无描述",
+    "next_page": "下一页",
+    "previous_page": "上一页",
+    "sort": "排序",
+    "sort_direction": "切换排序方向"
   },
   "settings": {
     "title": "设置",
@@ -154,7 +166,8 @@
     "update_schedule_error": "更新调度设置失败",
     "update_time_error": "更新时间设置失败",
     "full_refresh_error": "启动全量刷新失败",
-    "full_refresh_partial_phase_detail": "该阶段有 {{count}} 条记录处理失败。"
+    "full_refresh_partial_phase_detail": "该阶段有 {{count}} 条记录处理失败。",
+    "full_refresh_partial_failed": "全量刷新已完成，但存在警告。请查看最近一次运行详情。"
   },
   "repoDetails": {
     "close": "关闭",
@@ -169,7 +182,14 @@
     "aiTags": "AI 标签",
     "topics": "主题",
     "aiInsight": "AI 洞察",
-    "similar": "相似"
+    "similar": "相似",
+    "noSameLang": "没有相同语言的仓库",
+    "noSameTags": "没有相同标签的仓库",
+    "noSimilar": "未找到相似仓库",
+    "relatedRepos": "相关仓库",
+    "sameLang": "语言",
+    "sameTags": "标签",
+    "similarLoadFailed": "加载相似仓库失败"
   },
   "search": {
     "placeholder": "搜索仓库、聚类、语言或标签...",
@@ -186,13 +206,16 @@
     "navigate": "导航",
     "select": "选择",
     "close": "关闭",
-    "results": "条结果"
+    "results": "条结果",
+    "command_palette": "命令面板",
+    "remoteFailed": "语义搜索暂时不可用"
   },
   "errors": {
     "sync_failed": "同步失败，请检查是否已配置 GITHUB_TOKEN",
     "sync_stars_failed": "同步星标失败",
     "embedding_failed": "计算向量失败",
-    "clustering_failed": "聚类失败"
+    "clustering_failed": "聚类失败",
+    "not_found": "该页面不存在。"
   },
   "sync": {
     "title": "正在同步数据",
@@ -215,7 +238,9 @@
     "step_clustering_label": "执行聚类分析",
     "step_clustering_desc": "按知识领域自动分组",
     "step_snapshot_label": "重建图谱快照",
-    "step_snapshot_desc": "发布最新图谱数据"
+    "step_snapshot_desc": "发布最新图谱数据",
+    "loading": "加载中",
+    "partial_failed_warning": "同步已完成，但存在警告。重试前请先查看最近一次运行详情。"
   },
   "time": {
     "never_run": "从未运行",

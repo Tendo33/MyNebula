@@ -41,6 +41,14 @@ export const SettingsDataSection = ({
     }, 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // The dialog owns its own dismissal: Escape handling used to live in the
+      // parent page while the focus trap lived here, splitting one behaviour
+      // across two files.
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onHideConfirm();
+        return;
+      }
       if (event.key !== 'Tab' || !dialogRef.current) return;
       const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -64,7 +72,7 @@ export const SettingsDataSection = ({
       window.removeEventListener('keydown', handleKeyDown);
       previouslyFocusedRef.current?.focus();
     };
-  }, [showConfirmDialog]);
+  }, [showConfirmDialog, onHideConfirm]);
 
   return (
     <>

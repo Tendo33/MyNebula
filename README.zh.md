@@ -251,7 +251,7 @@ uv run uvicorn nebula.main:app --reload --port 8000
 | LLM | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_OUTPUT_LANGUAGE` | 可选 | 用于摘要、标签与聚类命名 |
 | 管理员认证 | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `ADMIN_SESSION_TTL_HOURS` | 推荐 | 如果密码或 session secret 为空，受保护接口会被禁用 |
 | 数据库 | `DATABASE_*`, `DATABASE_URL` | 是 | `DATABASE_URL` 会覆盖拆分配置 |
-| 同步 | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | 可选 | 控制吞吐量与成本 |
+| 同步 | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | 可选 | 控制吞吐量与成本。`SYNC_BATCH_SIZE`（10–500，默认 100）同时决定每次事务提交的 embedding 分块大小和每次供应商请求的文本数 |
 | 运行时 | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | 可选 | 调试、日志与可观测性相关配置 |
 
 完整环境变量与运维说明见 `.trellis/spec/backend/database-when-added.md`。

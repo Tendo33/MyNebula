@@ -12,7 +12,11 @@ OpenAI-compatible APIs, supporting providers like:
 
 from openai import AsyncOpenAI
 
-from nebula.core.config import EmbeddingSettings, get_embedding_settings
+from nebula.core.config import (
+    EmbeddingSettings,
+    get_embedding_settings,
+    get_sync_settings,
+)
 from nebula.utils import get_logger
 from nebula.utils.decorator_utils import async_retry_decorator
 
@@ -97,16 +101,54 @@ class EmbeddingService:
         return response.data[0].embedding
 
     @async_retry_decorator(max_retries=3, delay=1.0, backoff=2.0)
+    async def _embed_one_batch(self, batch: list[str]) -> list[list[float]]:
+        """Compute embeddings for one provider request.
+
+        Retry lives here, not on `embed_batch`, so that a transient provider
+        failure replays only the failing request. Retrying at the loop level
+        would re-send every slice that already succeeded, which costs real money
+        against a metered API.
+
+        Args:
+            batch: Texts for a single provider request
+
+        Returns:
+            Embedding vectors in the same order as `batch`
+        """
+        # Replace empty strings with placeholder
+        processed_batch = [t if t.strip() else " " for t in batch]
+
+        response = await self.client.embeddings.create(
+            model=self.settings.model,
+            input=processed_batch,
+        )
+
+        # Sort by index to maintain order
+        sorted_data = sorted(response.data, key=lambda x: x.index)
+        batch_embeddings = [d.embedding for d in sorted_data]
+
+        # Replace placeholder embeddings with zero vectors
+        for j, text in enumerate(batch):
+            if not text.strip():
+                batch_embeddings[j] = [0.0] * self.settings.dimensions
+
+        return batch_embeddings
+
     async def embed_batch(
         self,
         texts: list[str],
-        batch_size: int = 32,
+        batch_size: int | None = None,
     ) -> list[list[float]]:
         """Compute embeddings for multiple texts.
 
+        Each provider request is retried independently by `_embed_one_batch`.
+        Callers must not wrap this method in another retry layer: doing so
+        reintroduces the re-billing behaviour the split exists to prevent.
+
         Args:
             texts: List of texts to embed
-            batch_size: Number of texts per API call
+            batch_size: Texts per provider request. Defaults to
+                `SYNC_BATCH_SIZE`.
 
         Returns:
             List of embedding vectors
@@ -114,32 +156,16 @@ class EmbeddingService:
         if not texts:
             return []
 
+        resolved_batch_size = batch_size or get_sync_settings().batch_size
         all_embeddings: list[list[float]] = []
 
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-
-            # Replace empty strings with placeholder
-            processed_batch = [t if t.strip() else " " for t in batch]
-
-            response = await self.client.embeddings.create(
-                model=self.settings.model,
-                input=processed_batch,
-            )
-
-            # Sort by index to maintain order
-            sorted_data = sorted(response.data, key=lambda x: x.index)
-            batch_embeddings = [d.embedding for d in sorted_data]
-
-            # Replace placeholder embeddings with zero vectors
-            for j, text in enumerate(batch):
-                if not text.strip():
-                    batch_embeddings[j] = [0.0] * self.settings.dimensions
-
-            all_embeddings.extend(batch_embeddings)
+        for i in range(0, len(texts), resolved_batch_size):
+            batch = texts[i : i + resolved_batch_size]
+            all_embeddings.extend(await self._embed_one_batch(batch))
 
             logger.debug(
-                f"Embedded batch {i // batch_size + 1}, total: {len(all_embeddings)}/{len(texts)}"
+                f"Embedded batch {i // resolved_batch_size + 1}, "
+                f"total: {len(all_embeddings)}/{len(texts)}"
             )
 
         return all_embeddings

@@ -15,6 +15,7 @@ import {
   useTimelineQuery,
 } from '../features/graph/hooks/useTimelineQuery';
 import {
+  buildAdjacencyIndex,
   buildGraphEdgeIndex,
   buildGraphNodeSearchIndex,
   createVisibleNodeIds,
@@ -49,6 +50,7 @@ interface GraphState {
 
 interface GraphContextValue extends GraphState {
   filteredData: GraphData | null;
+  adjacencyIndex: Map<number, Set<number>>;
   loadData: () => Promise<void>;
   refreshData: () => Promise<void>;
   setSelectedNode: (node: GraphNode | null) => void;
@@ -132,6 +134,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     [graphQuery.data?.nodes]
   );
   const edgeFilterIndexes = useMemo(() => buildGraphEdgeIndex(stagedEdges), [stagedEdges]);
+  // Built once here rather than inside each consumer of `useNodeNeighbors`.
+  // Keyed on edges only: adjacency does not depend on node payloads.
+  const adjacencyIndex = useMemo(() => buildAdjacencyIndex(stagedEdges), [stagedEdges]);
   const graphFilterIndexes = useMemo(
     () => ({ ...nodeFilterIndexes, ...edgeFilterIndexes }),
     [edgeFilterIndexes, nodeFilterIndexes]
@@ -233,6 +238,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     syncStep,
     error,
     filteredData,
+    adjacencyIndex,
     loadData,
     refreshData,
     setSelectedNode,
@@ -260,6 +266,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
   }), [
     rawData, timelineData, selectedNode, filters, settings,
     loading, edgesLoading, syncing, syncStep, error, filteredData,
+    adjacencyIndex,
     loadData, refreshData,
     setSelectedNode, setSearchQuery, toggleCluster, setSelectedClusters,
     clearClusterFilter, toggleStarList, setSelectedStarLists,
@@ -283,26 +290,7 @@ export const useGraph = (): GraphContextValue => {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useNodeNeighbors = (nodeId: number | undefined): Set<number> => {
-  const { rawData } = useGraph();
-  const adjacencyIndex = useMemo(() => {
-    const index = new Map<number, Set<number>>();
-    if (!rawData) {
-      return index;
-    }
-    rawData.edges.forEach((edge) => {
-      const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
-      const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
-      if (!index.has(sourceId)) {
-        index.set(sourceId, new Set());
-      }
-      if (!index.has(targetId)) {
-        index.set(targetId, new Set());
-      }
-      index.get(sourceId)?.add(targetId);
-      index.get(targetId)?.add(sourceId);
-    });
-    return index;
-  }, [rawData]);
+  const { adjacencyIndex } = useGraph();
 
   return useMemo(() => {
     if (nodeId === undefined) {

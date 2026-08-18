@@ -1,6 +1,5 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams, Link } from 'react-router-dom';
 import {
   Calendar,
   ChevronDown,
@@ -9,7 +8,6 @@ import {
   ChevronUp,
   Layers,
   Loader2,
-  Star,
   Tag,
   X,
 } from 'lucide-react';
@@ -19,148 +17,33 @@ import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { SearchInput } from '../components/ui/SearchInput';
 import type { DataClusterInfo } from '../api/v2/data';
 import { useDataReposQuery } from '../features/data/hooks/useDataReposQuery';
+import { useDataPageUrlState } from './data/hooks/useDataPageUrlState';
 import { getClusterAccent } from '../utils/clusterAccent';
-
-type SortField =
-  | 'name'
-  | 'language'
-  | 'stargazers_count'
-  | 'starred_at'
-  | 'cluster'
-  | 'summary'
-  | 'last_commit_time';
-type SortDirection = 'asc' | 'desc';
-
-interface SortConfig {
-  field: SortField;
-  direction: SortDirection;
-}
-
-const PAGE_SIZES = [25, 50, 100];
-const DEFAULT_PAGE_SIZE = 25;
-
-const parseClusterParams = (params: URLSearchParams): number[] => {
-  const clusterIdsParam = params.get('clusters');
-  if (clusterIdsParam) {
-    return clusterIdsParam
-      .split(',')
-      .map((value) => Number.parseInt(value, 10))
-      .filter((value) => Number.isFinite(value));
-  }
-
-  const clusterIdParam = params.get('cluster');
-  if (!clusterIdParam) {
-    return [];
-  }
-
-  const parsedClusterId = Number.parseInt(clusterIdParam, 10);
-  return Number.isFinite(parsedClusterId) ? [parsedClusterId] : [];
-};
-
-interface SortableHeaderProps {
-  label: string;
-  field: SortField;
-  currentSort: SortConfig;
-  onSort: (field: SortField) => void;
-  className?: string;
-  align?: 'left' | 'center' | 'right';
-}
-
-const SortableHeader: React.FC<SortableHeaderProps> = ({
-  label,
-  field,
-  currentSort,
-  onSort,
-  className = '',
-  align = 'left',
-}) => {
-  const isActive = currentSort.field === field;
-  const justifyClass =
-    align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
-  const ariaSort: React.AriaAttributes['aria-sort'] = isActive
-    ? currentSort.direction === 'asc'
-      ? 'ascending'
-      : 'descending'
-    : 'none';
-
-  return (
-    <th className={`px-4 py-3 whitespace-nowrap ${className}`} scope="col" aria-sort={ariaSort}>
-      <button
-        type="button"
-        onClick={() => onSort(field)}
-        className={`flex w-full items-center gap-1 rounded-lg px-1 py-0.5 transition-colors hover:bg-bg-hover ${justifyClass} dark:hover:bg-dark-bg-sidebar/70`}
-      >
-        <span>{label}</span>
-        <span className="flex flex-col">
-          <ChevronUp
-            className={`-mb-1 h-3 w-3 ${
-              isActive && currentSort.direction === 'asc' ? 'text-action-primary' : 'text-text-dim'
-            }`}
-          />
-          <ChevronDown
-            className={`h-3 w-3 ${
-              isActive && currentSort.direction === 'desc'
-                ? 'text-action-primary'
-                : 'text-text-dim'
-            }`}
-          />
-        </span>
-      </button>
-    </th>
-  );
-};
-
-interface ClusterBadgeProps {
-  cluster: DataClusterInfo | undefined;
-  onClick?: () => void;
-}
-
-const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) => {
-  const { t } = useTranslation();
-
-  if (!cluster) {
-    return <span className="text-xs italic text-text-dim">{t('data.unclustered')}</span>;
-  }
-
-  const accent = getClusterAccent({ id: cluster.id, color: cluster.color });
-
-  return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick?.();
-      }}
-      className="chip-button"
-      style={{
-        backgroundColor: accent.softBackground,
-        borderColor: accent.softBorder,
-        color: accent.text,
-      }}
-    >
-      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: accent.dot }} />
-      {cluster.name || `Cluster ${cluster.id}`}
-    </button>
-  );
-};
+import { PAGE_SIZES, type SortField } from './data/dataPageFilters';
+import { DataRepoTable } from './data/DataRepoTable';
 
 const DataPage = () => {
   const { t } = useTranslation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const monthFilter = searchParams.get('month');
-  const topicFilter = searchParams.get('topic');
-  const urlSearchQuery = searchParams.get('q') ?? '';
+  const {
+    monthFilter,
+    topicFilter,
+    sortConfig,
+    setSortConfig,
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    localSearch,
+    selectedClusters,
+    handleSearch,
+    handleSort,
+    handleClusterFilter,
+    clampPage,
+    clearFilters,
+    searchParams,
+    setSearchParams,
+  } = useDataPageUrlState();
 
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    field: 'starred_at',
-    direction: 'desc',
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [localSearch, setLocalSearch] = useState(urlSearchQuery);
-  const [selectedClusters, setSelectedClusters] = useState<Set<number>>(
-    () => new Set(parseClusterParams(searchParams))
-  );
   const offset = (currentPage - 1) * pageSize;
 
   const { repos, clusters, totalNodes, count, loading, error, retry } = useDataReposQuery({
@@ -186,82 +69,8 @@ const DataPage = () => {
   );
 
   useEffect(() => {
-    const nextClusterIds = parseClusterParams(searchParams);
-    const currentClusterIds = Array.from(selectedClusters).sort((left, right) => left - right);
-    if (localSearch !== urlSearchQuery) {
-      setLocalSearch(urlSearchQuery);
-    }
-    if (currentClusterIds.join(',') !== nextClusterIds.join(',')) {
-      setSelectedClusters(new Set(nextClusterIds));
-    }
-  }, [localSearch, searchParams, selectedClusters, urlSearchQuery]);
-
-  const buildFilterParams = useCallback(
-    (query: string, clusterIds: Set<number> | number[]) => {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('q');
-      nextParams.delete('cluster');
-      nextParams.delete('clusters');
-
-      const trimmedQuery = query.trim();
-      if (trimmedQuery) {
-        nextParams.set('q', trimmedQuery);
-      }
-
-      const normalizedClusterIds = Array.from(clusterIds).sort((left, right) => left - right);
-      if (normalizedClusterIds.length === 1) {
-        nextParams.set('cluster', String(normalizedClusterIds[0]));
-      } else if (normalizedClusterIds.length > 1) {
-        nextParams.set('clusters', normalizedClusterIds.join(','));
-      }
-
-      return nextParams;
-    },
-    [searchParams]
-  );
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const handleSearch = useCallback((query: string) => {
-    setLocalSearch(query);
-    setCurrentPage(1);
-    setSearchParams(buildFilterParams(query, selectedClusters), { replace: true });
-  }, [buildFilterParams, selectedClusters, setSearchParams]);
-
-  const handleSort = useCallback((field: SortField) => {
-    setSortConfig((prev) => ({
-      field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
-    setCurrentPage(1);
-  }, []);
-
-  const handleClusterFilter = useCallback((clusterId: number) => {
-    setSelectedClusters((current) => {
-      const next = new Set(current);
-      if (next.has(clusterId)) {
-        next.delete(clusterId);
-      } else {
-        next.add(clusterId);
-      }
-      setSearchParams(buildFilterParams(localSearch, next), { replace: true });
-      return next;
-    });
-    setCurrentPage(1);
-  }, [buildFilterParams, localSearch, setSearchParams]);
-
-  const formatDate = (dateStr: string | null | undefined): string => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <div className="page-shell">
@@ -335,12 +144,7 @@ const DataPage = () => {
             {hasActiveFilters && (
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedClusters(new Set());
-                  setLocalSearch('');
-                  setSearchParams({});
-                  setCurrentPage(1);
-                }}
+                onClick={clearFilters}
                 className="header-action-ghost self-start sm:self-auto"
               >
                 <X className="h-4 w-4" />
@@ -459,212 +263,14 @@ const DataPage = () => {
                 </div>
               )}
 
-              <div className="panel-surface hidden w-full overflow-hidden sm:block">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="border-b border-border-light bg-bg-hover font-medium text-text-muted dark:border-dark-border dark:bg-dark-bg-sidebar/60 dark:text-dark-text-main/70">
-                      <tr>
-                        <th className="w-14 px-2 py-3 text-center text-xs text-text-muted/50">#</th>
-                        <SortableHeader
-                          label={t('data.repository')}
-                          field="name"
-                          currentSort={sortConfig}
-                          onSort={handleSort}
-                        />
-                        <SortableHeader
-                          label={t('data.summary')}
-                          field="summary"
-                          currentSort={sortConfig}
-                          onSort={handleSort}
-                        />
-                        <SortableHeader
-                          label={t('data.language')}
-                          field="language"
-                          currentSort={sortConfig}
-                          onSort={handleSort}
-                          align="center"
-                        />
-                        <SortableHeader
-                          label={t('data.stars')}
-                          field="stargazers_count"
-                          currentSort={sortConfig}
-                          onSort={handleSort}
-                          align="center"
-                        />
-                        <SortableHeader
-                          label={t('data.cluster')}
-                          field="cluster"
-                          currentSort={sortConfig}
-                          onSort={handleSort}
-                          align="center"
-                        />
-                        <SortableHeader
-                          label={t('data.starred_date')}
-                          field="starred_at"
-                          currentSort={sortConfig}
-                          onSort={handleSort}
-                          align="center"
-                        />
-                        <SortableHeader
-                          label={t('data.last_commit')}
-                          field="last_commit_time"
-                          currentSort={sortConfig}
-                          onSort={handleSort}
-                          align="center"
-                        />
-                        <th className="hidden w-20 px-4 py-3">{t('data.description')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-light dark:divide-dark-border">
-                      {repos.map((repo) => (
-                        <tr
-                          key={repo.id}
-                          className="transition-colors hover:bg-bg-hover/50 dark:hover:bg-dark-bg-sidebar/60"
-                        >
-                          <td className="px-2 py-3 text-center">
-                            {repo.owner_avatar_url ? (
-                              <img
-                                src={repo.owner_avatar_url}
-                                alt={repo.owner}
-                                className="mx-auto h-7 min-h-7 w-7 min-w-7 rounded-lg object-cover"
-                                loading="lazy"
-                                decoding="async"
-                                width={24}
-                                height={24}
-                              />
-                            ) : (
-                              <div className="mx-auto flex h-7 min-h-7 w-7 min-w-7 items-center justify-center rounded-lg bg-border-light text-[10px] text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
-                                {repo.owner.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                          </td>
-                          <td className="max-w-xs px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <Link
-                                to={`/graph?node=${repo.id}`}
-                                className="block truncate font-medium text-text-main hover:text-action-primary hover:underline"
-                              >
-                                {repo.full_name}
-                              </Link>
-                            </div>
-                          </td>
-                          <td className="max-w-md px-4 py-3">
-                            <p
-                              className="line-clamp-2 text-sm text-text-muted"
-                              title={repo.ai_summary || repo.description}
-                            >
-                              {repo.ai_summary || repo.description || (
-                                <span className="italic text-text-dim">{t('data.no_summary')}</span>
-                              )}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {repo.language ? (
-                              <span className="inline-flex items-center rounded-full bg-bg-hover px-2.5 py-1 text-xs font-medium text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
-                                {repo.language}
-                              </span>
-                            ) : (
-                              <span className="italic text-text-muted">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center font-mono tabular-nums text-text-dim">
-                            {repo.stargazers_count.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <ClusterBadge
-                              cluster={repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined}
-                              onClick={() => repo.cluster_id != null && handleClusterFilter(repo.cluster_id)}
-                            />
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-center text-xs text-text-muted">
-                            {formatDate(repo.starred_at)}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-center text-xs text-text-muted">
-                            {formatDate(repo.last_commit_time)}
-                          </td>
-                          <td className="hidden max-w-md px-4 py-3">
-                            <p className="truncate text-xs text-text-muted">
-                              {repo.description || (
-                                <span className="italic text-text-dim">{t('data.no_description')}</span>
-                              )}
-                            </p>
-                          </td>
-                        </tr>
-                      ))}
-
-                      {repos.length === 0 && (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-12 text-center text-text-muted">
-                            {hasActiveFilters ? t('data.no_results') : t('data.no_data')}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="space-y-3 sm:hidden">
-                {repos.map((repo) => (
-                  <div key={repo.id} className="panel-surface p-4">
-                    <div className="flex items-start gap-3">
-                      {repo.owner_avatar_url ? (
-                        <img
-                          src={repo.owner_avatar_url}
-                          alt={repo.owner}
-                          className="h-10 w-10 rounded-xl border border-border-light object-cover"
-                          loading="lazy"
-                          decoding="async"
-                          width={40}
-                          height={40}
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-border-light text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
-                          {repo.owner.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          to={`/graph?node=${repo.id}`}
-                          className="block truncate font-semibold text-text-main hover:text-action-primary"
-                        >
-                          {repo.full_name}
-                        </Link>
-                        <p className="mt-1 line-clamp-2 text-xs text-text-muted dark:text-dark-text-main/70">
-                          {repo.ai_summary || repo.description || t('data.no_summary')}
-                        </p>
-                      </div>
-                      <div
-                        className="inline-flex items-center gap-1.5 rounded-full bg-bg-sidebar/75 px-2.5 py-1 text-xs font-medium text-text-muted dark:bg-dark-bg-sidebar/75 dark:text-dark-text-main/70"
-                        aria-label={`${t('data.stars')}: ${repo.stargazers_count.toLocaleString()}`}
-                      >
-                        <Star className="h-3.5 w-3.5 fill-current" />
-                        <span className="tabular-nums">{repo.stargazers_count.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-muted dark:text-dark-text-main/70">
-                      {repo.language && (
-                        <span className="inline-flex items-center rounded-full bg-bg-hover px-2.5 py-1 text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
-                          {repo.language}
-                        </span>
-                      )}
-                      <ClusterBadge
-                        cluster={repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined}
-                        onClick={() => repo.cluster_id != null && handleClusterFilter(repo.cluster_id)}
-                      />
-                      <span>{t('data.starred_date')}: {formatDate(repo.starred_at)}</span>
-                      <span>{t('data.last_commit')}: {formatDate(repo.last_commit_time)}</span>
-                    </div>
-                  </div>
-                ))}
-
-                {repos.length === 0 && (
-                  <div className="panel-surface p-6 text-center text-sm text-text-muted">
-                    {hasActiveFilters ? t('data.no_results') : t('data.no_data')}
-                  </div>
-                )}
-              </div>
+              <DataRepoTable
+                repos={repos}
+                clusterMap={clusterMap}
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                onClusterFilter={handleClusterFilter}
+                hasActiveFilters={hasActiveFilters}
+              />
 
               {count > 0 && (
                 <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">

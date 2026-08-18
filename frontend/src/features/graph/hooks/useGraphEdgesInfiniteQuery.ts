@@ -90,9 +90,21 @@ export const useGraphEdgesInfiniteQuery = ({
       return;
     }
     seenNextCursorsRef.current.add(nextCursor);
+    const pagesBefore = data?.pages.length ?? 0;
     try {
-      await fetchNextPage();
-      pagesLoadedRef.current += 1;
+      const outcome = await fetchNextPage();
+      // React Query resolves `fetchNextPage()` with a result object even when
+      // the page failed — it only rejects if `throwOnError` is set. Checking
+      // whether a page actually landed is therefore the only reliable signal.
+      // Counting a failed page would consume auto-load budget, and leaving its
+      // cursor in `seenNextCursors` would make a later manual retry of the same
+      // cursor trip the duplicate guard and halt loading for good.
+      const pagesAfter = outcome.data?.pages.length ?? pagesBefore;
+      if (pagesAfter > pagesBefore) {
+        pagesLoadedRef.current += 1;
+      } else {
+        seenNextCursorsRef.current.delete(nextCursor);
+      }
     } catch (error) {
       seenNextCursorsRef.current.delete(nextCursor);
       throw error;
@@ -147,8 +159,15 @@ export const useGraphEdgesInfiniteQuery = ({
       return;
     }
     seenNextCursorsRef.current.add(nextCursor);
+    const pagesBefore = data?.pages.length ?? 0;
     try {
-      await fetchNextPage();
+      const outcome = await fetchNextPage();
+      // Same reasoning as the auto-load path: a resolved promise does not mean
+      // the page landed. Releasing the cursor on failure keeps a second manual
+      // attempt possible instead of tripping the duplicate guard.
+      if ((outcome.data?.pages.length ?? pagesBefore) <= pagesBefore) {
+        seenNextCursorsRef.current.delete(nextCursor);
+      }
     } catch (error) {
       seenNextCursorsRef.current.delete(nextCursor);
       throw error;

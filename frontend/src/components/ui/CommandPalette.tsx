@@ -1,137 +1,36 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
-  Search,
-  X,
-  Star,
-  Code,
-  Tag,
   Clock,
-  ArrowRight,
-  TrendingUp,
+  Code,
   Command,
+  Search,
+  Star,
+  Tag,
+  TrendingUp,
+  X,
 } from 'lucide-react';
+
 import { useGraph } from '../../contexts/GraphContext';
-import { GraphNode, ClusterInfo } from '../../types';
-import { searchRepos } from '../../api/repos';
-import {
-  asRepoSearchCandidate,
-  matchesClusterSearch,
-  matchesFacetSearch,
-  matchesRepoSearch,
-  normalizeSearchQuery,
-  parseStarsThreshold,
-} from '../../utils/search';
-import { logClientWarn } from '../../utils/debug';
+import { CommandPaletteResultList } from './CommandPaletteResultList';
+import type {
+  CommandPaletteProps,
+  FilterType,
+  SearchResult,
+} from './commandPaletteTypes';
+import { useRecentSearches } from './hooks/useRecentSearches';
+import { useDialogFocusTrap } from './hooks/useDialogFocusTrap';
+import { useCommandPaletteResults } from './hooks/useCommandPaletteResults';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-interface CommandPaletteProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelectNode?: (node: GraphNode) => void;
-  onSelectCluster?: (cluster: ClusterInfo) => void;
-  onSelectSearch?: (value: string, facet?: 'search' | 'language' | 'tag') => void;
-}
-
-type FilterType = 'all' | 'repos' | 'clusters' | 'languages' | 'tags';
-
-interface SearchResultBase {
-  id: string | number;
-  title: string;
-  subtitle?: string;
-  icon?: React.ReactNode;
-  meta?: string;
-}
-
-interface RepoSearchResult extends SearchResultBase {
-  type: 'repo';
-  data: GraphNode;
-  source?: 'local' | 'remote';
-}
-
-interface ClusterSearchResult extends SearchResultBase {
-  type: 'cluster';
-  data: ClusterInfo;
-}
-
-interface LanguageSearchResult extends SearchResultBase {
-  type: 'language';
-  data: { language: string };
-}
-
-interface TagSearchResult extends SearchResultBase {
-  type: 'tag';
-  data: { tag: string };
-}
-
-type SearchResult =
-  | RepoSearchResult
-  | ClusterSearchResult
-  | LanguageSearchResult
-  | TagSearchResult;
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const RECENT_SEARCHES_KEY = 'nebula_recent_searches';
-const MAX_RECENT_SEARCHES = 5;
-const MAX_RESULTS = 20;
-
-// ============================================================================
-// Hooks
-// ============================================================================
-
-const useRecentSearches = () => {
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
-      if (stored) {
-        setRecentSearches(JSON.parse(stored));
-      }
-    } catch {
-      logClientWarn('Failed to load recent searches');
-    }
-  }, []);
-
-  const addRecentSearch = useCallback((query: string) => {
-    if (!query.trim()) return;
-
-    setRecentSearches(prev => {
-      const filtered = prev.filter(s => s !== query);
-      const updated = [query, ...filtered].slice(0, MAX_RECENT_SEARCHES);
-      try {
-        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
-      } catch {
-        logClientWarn('Failed to save recent searches');
-      }
-      return updated;
-    });
-  }, []);
-
-  const clearRecentSearches = useCallback(() => {
-    setRecentSearches([]);
-    try {
-      localStorage.removeItem(RECENT_SEARCHES_KEY);
-    } catch {
-      logClientWarn('Failed to clear recent searches');
-    }
-  }, []);
-
-  return { recentSearches, addRecentSearch, clearRecentSearches };
-};
-
-// ============================================================================
-// Component
-// ============================================================================
-
+/**
+ * Command palette.
+ *
+ * Result assembly lives in `useCommandPaletteResults`, facet counting in
+ * `commandPaletteFacets`, history in `useRecentSearches`, and focus management
+ * in `useDialogFocusTrap`. This component owns keyboard navigation and markup.
+ */
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
   isOpen,
   onClose,
@@ -146,11 +45,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [remoteRepoResults, setRemoteRepoResults] = useState<RepoSearchResult[]>([]);
-  const [remoteLoading, setRemoteLoading] = useState(false);
-  const [remoteError, setRemoteError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useDialogFocusTrap(isOpen);
 
   // Focus input when opened
   useEffect(() => {
@@ -161,264 +58,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }
   }, [isOpen]);
 
-  // Get unique languages
-  const languages = useMemo(() => {
-    if (!rawData) return [];
-    const langCounts: Record<string, number> = {};
-    rawData.nodes.forEach(node => {
-      if (node.language) {
-        langCounts[node.language] = (langCounts[node.language] || 0) + 1;
-      }
-    });
-    return Object.entries(langCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
-  }, [rawData]);
-
-  // Get unique tags
-  const allTags = useMemo(() => {
-    if (!rawData) return [];
-    const tagCounts: Record<string, number> = {};
-    rawData.nodes.forEach(node => {
-      (node.ai_tags || []).forEach(tag => {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      });
-      (node.topics || []).forEach(topic => {
-        tagCounts[topic] = (tagCounts[topic] || 0) + 1;
-      });
-    });
-    return Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 20);
-  }, [rawData]);
-
-  const normalizedQuery = useMemo(() => normalizeSearchQuery(query), [query]);
-  const starsThreshold = useMemo(
-    () => parseStarsThreshold(normalizedQuery),
-    [normalizedQuery]
-  );
-
-  const buildRepoResult = useCallback((node: GraphNode, source: 'local' | 'remote'): RepoSearchResult => ({
-    type: 'repo',
-    id: node.id,
-    title: node.full_name,
-    subtitle: node.ai_summary || node.description,
-    icon: node.owner_avatar_url ? (
-      <img
-        src={node.owner_avatar_url}
-        alt=""
-        className="w-6 h-6 rounded"
-        loading="lazy"
-        decoding="async"
-        width={24}
-        height={24}
-      />
-    ) : (
-      <div className="w-6 h-6 rounded bg-border-light flex items-center justify-center text-xs dark:bg-dark-border">
-        {node.owner?.charAt(0).toUpperCase()}
-      </div>
-    ),
-    meta:
-      `${source === 'remote' ? 'Semantic · ' : ''}⭐ ${node.stargazers_count.toLocaleString()}${
-        node.language ? ` · ${node.language}` : ''
-      }`,
-    data: node,
-    source,
-  }), []);
-
-  const localRepoResults = useMemo((): RepoSearchResult[] => {
-    if (!rawData || !(activeFilter === 'all' || activeFilter === 'repos') || !normalizedQuery) {
-      return [];
-    }
-    return rawData.nodes
-      .filter(node => matchesRepoSearch(asRepoSearchCandidate(node), normalizedQuery))
-      .slice(0, MAX_RESULTS)
-      .map(node => buildRepoResult(node, 'local'));
-  }, [activeFilter, buildRepoResult, normalizedQuery, rawData]);
-
-  useEffect(() => {
-    if (
-      !isOpen ||
-      !rawData ||
-      !(activeFilter === 'all' || activeFilter === 'repos') ||
-      !normalizedQuery ||
-      starsThreshold !== null ||
-      localRepoResults.length > 0
-    ) {
-      setRemoteRepoResults([]);
-      setRemoteLoading(false);
-      setRemoteError(null);
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-    setRemoteLoading(true);
-    setRemoteError(null);
-
-    const timer = window.setTimeout(async () => {
-      try {
-        const response = await searchRepos({
-          query: query.trim(),
-          limit: MAX_RESULTS,
-        }, {
-          signal: controller.signal,
-        });
-        if (cancelled) return;
-
-        const mapped = response.map((item) => {
-          const existingNode = rawData.nodes.find((node) => node.id === item.repo.id);
-          const repoNode: GraphNode =
-            existingNode ?? {
-              id: item.repo.id,
-              github_id: item.repo.github_repo_id,
-              full_name: item.repo.full_name,
-              name: item.repo.name,
-              description: item.repo.description,
-              language: item.repo.language,
-              html_url: item.repo.html_url,
-              owner: item.repo.owner,
-              owner_avatar_url: undefined,
-              x: 0,
-              y: 0,
-              z: 0,
-              cluster_id: item.repo.cluster_id,
-              color: '#6B7280',
-              size: 1,
-              star_list_id: null,
-              stargazers_count: item.repo.stargazers_count,
-              ai_summary: item.repo.ai_summary,
-              topics: item.repo.topics,
-            };
-          return buildRepoResult(repoNode, 'remote');
-        });
-
-        setRemoteRepoResults(mapped);
-      } catch (error) {
-        if (cancelled) return;
-        logClientWarn('Remote semantic repo search failed', error);
-        setRemoteError(t('search.remoteFailed', 'Semantic search is temporarily unavailable'));
-        setRemoteRepoResults([]);
-      } finally {
-        if (!cancelled) {
-          setRemoteLoading(false);
-        }
-      }
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [
-    activeFilter,
-    buildRepoResult,
+  const { results, quickFilters, remoteLoading, remoteError } = useCommandPaletteResults({
     isOpen,
-    localRepoResults.length,
-    normalizedQuery,
-    query,
     rawData,
-    starsThreshold,
+    query,
+    activeFilter,
     t,
-  ]);
-
-  // Search results
-  const results = useMemo((): SearchResult[] => {
-    if (!rawData) return [];
-
-    const searchResults: SearchResult[] = [];
-    const seenRepoIds = new Set<number>();
-    if (activeFilter === 'all' || activeFilter === 'repos') {
-      for (const repoResult of [...localRepoResults, ...remoteRepoResults]) {
-        if (seenRepoIds.has(repoResult.data.id)) continue;
-        seenRepoIds.add(repoResult.data.id);
-        searchResults.push(repoResult);
-      }
-    }
-
-    // Search clusters
-    if (activeFilter === 'all' || activeFilter === 'clusters') {
-      const matchedClusters = rawData.clusters
-        .filter(cluster => {
-          if (!normalizedQuery || starsThreshold !== null) return false;
-          return matchesClusterSearch(cluster, normalizedQuery);
-        })
-        .slice(0, 5)
-        .map(cluster => ({
-          type: 'cluster' as const,
-          id: cluster.id,
-          title: cluster.name || `Cluster ${cluster.id}`,
-          subtitle: cluster.description,
-          icon: (
-            <div
-              className="w-6 h-6 rounded-full"
-              style={{ backgroundColor: cluster.color }}
-            />
-          ),
-          meta: `${cluster.repo_count} repos`,
-          data: cluster,
-        }));
-      searchResults.push(...matchedClusters);
-    }
-
-    // Search languages
-    if (activeFilter === 'all' || activeFilter === 'languages') {
-      const matchedLanguages = languages
-        .filter(([lang]) => {
-          if (!normalizedQuery || starsThreshold !== null) return false;
-          return matchesFacetSearch(lang, normalizedQuery);
-        })
-        .slice(0, 5)
-        .map(([lang, count]) => ({
-          type: 'language' as const,
-          id: lang,
-          title: lang,
-          subtitle: `Filter by ${lang} repositories`,
-          icon: <Code className="w-5 h-5 text-action-primary" />,
-          meta: `${count} repos`,
-          data: { language: lang },
-        }));
-      searchResults.push(...matchedLanguages);
-    }
-
-    // Search tags
-    if (activeFilter === 'all' || activeFilter === 'tags') {
-      const matchedTags = allTags
-        .filter(([tag]) => {
-          if (!normalizedQuery || starsThreshold !== null) return false;
-          return matchesFacetSearch(tag, normalizedQuery);
-        })
-        .slice(0, 5)
-        .map(([tag, count]) => ({
-          type: 'tag' as const,
-          id: tag,
-          title: tag,
-          subtitle: `Filter by tag`,
-          icon: <Tag className="w-5 h-5 text-action-primary" />,
-          meta: `${count} repos`,
-          data: { tag },
-        }));
-      searchResults.push(...matchedTags);
-    }
-
-    return searchResults;
-  }, [activeFilter, allTags, languages, localRepoResults, normalizedQuery, rawData, remoteRepoResults, starsThreshold]);
-
-  // Quick filters for empty state
-  const quickFilters = useMemo(() => {
-    if (!rawData) return { languages: [], tags: [], starRanges: [] };
-
-    return {
-      languages: languages.slice(0, 5),
-      tags: allTags.slice(0, 6),
-      starRanges: [
-        { label: '⭐ 1k+', min: 1000 },
-        { label: '⭐ 10k+', min: 10000 },
-        { label: '⭐ 50k+', min: 50000 },
-      ],
-    };
-  }, [rawData, languages, allTags]);
+  });
 
   // Handle result selection
   const handleSelectResult = useCallback((result: SearchResult) => {
@@ -507,6 +153,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
       {/* Palette */}
       <div
+        ref={dialogRef}
         className="relative w-full max-w-2xl bg-bg-main rounded-xl shadow-2xl border border-border-light overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200 dark:bg-dark-bg-main dark:border-dark-border"
         role="dialog"
         aria-modal="true"
@@ -681,66 +328,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               </p>
             </div>
           ) : results.length > 0 ? (
-            // Search results
-            <div className="py-2">
-              {results.map((result, idx) => (
-                <button
-                  key={`${result.type}-${result.id}`}
-                  id={`command-palette-option-${idx}`}
-                  data-index={idx}
-                  onClick={() => handleSelectResult(result)}
-                  className={clsx(
-                    'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-                    idx === selectedIndex
-                      ? 'bg-action-primary/10'
-                      : 'hover:bg-bg-hover'
-                  )}
-                  role="option"
-                  aria-selected={idx === selectedIndex}
-                >
-                  {/* Icon */}
-                  <div className="flex-shrink-0">
-                    {result.icon}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-text-main truncate">
-                        {result.title}
-                      </span>
-                      <span className={clsx(
-                        'text-[10px] px-1.5 py-0.5 rounded uppercase',
-                        result.type === 'repo' && 'bg-bg-hover text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70',
-                        result.type === 'cluster' && 'bg-bg-hover text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70',
-                        result.type === 'language' && 'bg-action-primary/10 text-action-primary',
-                        result.type === 'tag' && 'bg-action-primary/10 text-action-primary',
-                      )}>
-                        {result.type}
-                      </span>
-                    </div>
-                    {result.subtitle && (
-                      <p className="text-sm text-text-muted truncate mt-0.5">
-                        {result.subtitle}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Meta */}
-                  {result.meta && (
-                    <span className="text-xs text-text-dim flex-shrink-0">
-                      {result.meta}
-                    </span>
-                  )}
-
-                  {/* Arrow */}
-                  <ArrowRight className={clsx(
-                    'w-4 h-4 flex-shrink-0 transition-opacity',
-                    idx === selectedIndex ? 'opacity-100 text-action-primary' : 'opacity-0'
-                  )} />
-                </button>
-              ))}
-            </div>
+            <CommandPaletteResultList
+              results={results}
+              selectedIndex={selectedIndex}
+              onSelect={handleSelectResult}
+            />
           ) : (
             // No results
             <div className="py-12 text-center">

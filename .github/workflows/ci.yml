@@ -27,10 +27,10 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Ruff check
-        run: uv run ruff check src/
+        run: uv run ruff check src tests scripts alembic
 
       - name: Ruff format check
-        run: uv run ruff format --check src/
+        run: uv run ruff format --check src tests scripts alembic
 
   backend-test:
     name: Backend Unit Tests
@@ -67,8 +67,19 @@ jobs:
       - name: Verify database migrations
         run: uv run alembic upgrade head
 
-      - name: Run tests
-        run: uv run pytest -q
+      - name: Run unit tests
+        run: uv run pytest -q -m "not integration"
+
+      # Separate step on purpose: the integration tier auto-skips when no test
+      # database is reachable, and a skip folded into the unit run would vanish
+      # into the summary as a false green. As its own step, pytest exits 5 on
+      # "no tests collected", which fails the job.
+      - name: Run integration tests
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mynebula_test
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE mynebula_test'
+          uv run pytest -q -m integration
 
       - name: Audit Python dependencies
         run: |
@@ -164,6 +175,54 @@ jobs:
       - name: Build
         run: pnpm run build
 
+  e2e:
+    name: End-to-End (Playwright)
+    runs-on: ubuntu-latest
+    needs: frontend-build
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Chromium only: installing every browser triples the job for no signal.
+      # Invoked through the project's own @playwright/test CLI: `pnpm exec
+      # playwright` can resolve to a different playwright-core and then install
+      # a browser revision the test runner does not use.
+      - name: Install Playwright browser
+        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+
+      - name: Run Playwright suite
+        env:
+          RUN_E2E: '1'
+        run: pnpm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
   container-build:
     name: Container Build
     runs-on: ubuntu-latest
@@ -173,3 +232,14 @@ jobs:
 
       - name: Build production image
         run: docker build --tag mynebula:ci .
+
+      # Assert against the built image. `docker build` succeeding does not prove
+      # the copied virtualenv works, and reading the Dockerfile does not prove
+      # the toolchain is gone.
+      - name: Assert runtime image contains no build toolchain
+        run: |
+          test "$(docker run --rm mynebula:ci sh -c 'command -v gcc || echo absent')" = absent
+          test "$(docker run --rm mynebula:ci sh -c 'command -v g++ || echo absent')" = absent
+          docker run --rm mynebula:ci sh -c 'command -v curl'
+          test "$(docker run --rm mynebula:ci id -un)" = appuser
+          docker run --rm mynebula:ci python -c 'import nebula.main'

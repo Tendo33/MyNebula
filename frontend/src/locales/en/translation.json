@@ -33,7 +33,10 @@
     "confirm": "Confirm",
     "retry": "Retry",
     "load_failed": "Failed to load data",
-    "n_a": "N/A"
+    "n_a": "N/A",
+    "filter": "Filters",
+    "no_description": "No description",
+    "skip_to_content": "Skip to content"
   },
   "dashboard": {
     "title": "Universe Explorer",
@@ -78,7 +81,12 @@
     "reclustering": "Clustering...",
     "recluster_hint": "Re-cluster with current settings",
     "load_more_edges": "Load more edges",
-    "edge_load_paused": "Loaded {{pages}} edge pages (about {{edges}} edge slots). Continue on demand."
+    "edge_load_paused": "Loaded {{pages}} edge pages (about {{edges}} edge slots). Continue on demand.",
+    "browse_as_list": "Browse as list",
+    "recluster_partial_failed": "Re-cluster completed with warnings. Review the latest pipeline details.",
+    "repository_list": "Repository list",
+    "repository_list_count": "{{count}} matching repositories",
+    "repository_list_limited": "Showing the first 50 matches. Refine your search to narrow the list."
   },
   "data": {
     "repository": "Repository",
@@ -99,7 +107,11 @@
     "filter_label": "Filter:",
     "unclustered": "Unclustered",
     "no_summary": "No summary",
-    "no_description": "No description"
+    "no_description": "No description",
+    "next_page": "Next page",
+    "previous_page": "Previous page",
+    "sort": "Sort",
+    "sort_direction": "Toggle sort direction"
   },
   "settings": {
     "title": "Settings",
@@ -154,7 +166,8 @@
     "update_schedule_error": "Failed to update schedule settings",
     "update_time_error": "Failed to update schedule time",
     "full_refresh_error": "Failed to start full refresh",
-    "full_refresh_partial_phase_detail": "{{count}} items failed in this stage."
+    "full_refresh_partial_phase_detail": "{{count}} items failed in this stage.",
+    "full_refresh_partial_failed": "Full refresh completed with warnings. Review the latest run details."
   },
   "repoDetails": {
     "close": "Close",
@@ -168,7 +181,15 @@
     "no_ai_summary": "No AI summary available for this repository yet. Sync data to generate insights.",
     "aiTags": "AI Tags",
     "topics": "Topics",
-    "aiInsight": "AI Insight"
+    "aiInsight": "AI Insight",
+    "noSameLang": "No repos with same language",
+    "noSameTags": "No repos with same tags",
+    "noSimilar": "No similar repos found",
+    "relatedRepos": "Related Repositories",
+    "sameLang": "Lang",
+    "sameTags": "Tags",
+    "similar": "Similar",
+    "similarLoadFailed": "Failed to load similar repos"
   },
   "search": {
     "placeholder": "Search repos, clusters, languages, tags...",
@@ -185,13 +206,16 @@
     "navigate": "Navigate",
     "select": "Select",
     "close": "Close",
-    "results": "results"
+    "results": "results",
+    "command_palette": "Command Palette",
+    "remoteFailed": "Semantic search is temporarily unavailable"
   },
   "errors": {
     "sync_failed": "Sync failed. Please check if GITHUB_TOKEN is configured.",
     "sync_stars_failed": "Failed to sync stars",
     "embedding_failed": "Failed to compute embeddings",
-    "clustering_failed": "Failed to generate clusters"
+    "clustering_failed": "Failed to generate clusters",
+    "not_found": "This page does not exist."
   },
   "sync": {
     "title": "Syncing Data",
@@ -214,7 +238,9 @@
     "step_clustering_label": "Clustering Repositories",
     "step_clustering_desc": "Organizing into knowledge groups",
     "step_snapshot_label": "Rebuilding Graph Snapshot",
-    "step_snapshot_desc": "Publishing the latest graph payload"
+    "step_snapshot_desc": "Publishing the latest graph payload",
+    "loading": "Loading",
+    "partial_failed_warning": "Sync completed with warnings. Check the latest run details before retrying."
   },
   "time": {
     "never_run": "Never Run",

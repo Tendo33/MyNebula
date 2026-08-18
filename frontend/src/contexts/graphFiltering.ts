@@ -46,6 +46,41 @@ export const buildGraphEdgeIndex = (
   return { edgeIndexesByNodeId };
 };
 
+/**
+ * Build an undirected node -> neighbour-ids adjacency map.
+ *
+ * Adjacency is a function of edges alone, so this is memoised on the edge list
+ * rather than on the whole graph payload: node-only updates must not invalidate
+ * it. Built once in `GraphProvider` — building it per consuming component meant
+ * one O(E) pass per consumer on every progressive edge page.
+ *
+ * `react-force-graph` rewrites edge endpoints from ids into node objects once
+ * the simulation starts, so both shapes have to be handled or neighbour lookup
+ * silently breaks after the first render.
+ */
+export const buildAdjacencyIndex = (edges: GraphEdge[]): Map<number, Set<number>> => {
+  const index = new Map<number, Set<number>>();
+  edges.forEach((edge) => {
+    const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+    const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+
+    let sourceNeighbors = index.get(sourceId);
+    if (!sourceNeighbors) {
+      sourceNeighbors = new Set<number>();
+      index.set(sourceId, sourceNeighbors);
+    }
+    let targetNeighbors = index.get(targetId);
+    if (!targetNeighbors) {
+      targetNeighbors = new Set<number>();
+      index.set(targetId, targetNeighbors);
+    }
+
+    sourceNeighbors.add(targetId);
+    targetNeighbors.add(sourceId);
+  });
+  return index;
+};
+
 export const buildGraphFilterIndexes = (rawData: GraphData | null): GraphFilterIndexes => {
   if (!rawData) {
     return {

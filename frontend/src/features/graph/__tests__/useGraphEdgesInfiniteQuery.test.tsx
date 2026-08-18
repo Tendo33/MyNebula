@@ -234,9 +234,16 @@ describe('useGraphEdgesInfiniteQuery', () => {
       await result.current.retryEdgeLoading();
     });
 
-    await waitFor(() => {
-      expect(result.current.stagedEdges).toHaveLength(3);
-    });
+    // The hook sets `retry: 2` on the query itself, which overrides the
+    // wrapper's `retry: false`. React Query's default backoff for the first
+    // retry is ~1000ms, which is exactly waitFor's default timeout — hence the
+    // explicit budget rather than a race between the two.
+    await waitFor(
+      () => {
+        expect(result.current.stagedEdges).toHaveLength(3);
+      },
+      { timeout: 5000 }
+    );
     expect(result.current.autoLoadHalted).toBe(false);
   });
 

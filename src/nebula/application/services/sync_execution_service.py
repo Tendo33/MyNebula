@@ -1,9 +1,10 @@
 """Execution primitives for sync, embedding, and clustering."""
 
+import math
 from datetime import datetime, timezone
 from time import perf_counter
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select, update
 
 from nebula.core.config import get_app_settings, get_sync_settings
 from nebula.core.embedding import get_embedding_service
@@ -371,8 +372,85 @@ async def sync_stars_task(
                     await db.commit()
 
 
+async def _embed_one_chunk(
+    *,
+    repos: list[StarredRepo],
+    llm_service,
+    embedding_service,
+    sync_settings,
+) -> int:
+    """Enhance, embed, and persist one chunk. Returns the LLM failure count.
+
+    Raises on embedding failure so the caller can account for the whole chunk.
+    """
+    llm_failed = 0
+    repos_needing_llm = [
+        repo for repo in repos if not repo.ai_summary or not repo.ai_tags
+    ]
+
+    if repos_needing_llm:
+        llm_results = await generate_repo_enhancements_in_parallel(
+            llm_service,
+            repos_needing_llm,
+            concurrency=sync_settings.llm_enhancement_concurrency,
+        )
+        for repo in repos_needing_llm:
+            summary, tags, error = llm_results.get(
+                repo.id, (None, None, RuntimeError("Missing LLM result"))
+            )
+            if error is None:
+                repo.ai_summary = summary
+                repo.ai_tags = tags
+                repo.is_summarized = True
+            else:
+                llm_failed += 1
+                logger.warning(f"LLM generation failed for {repo.full_name}: {error}")
+                if not repo.ai_tags:
+                    repo.ai_tags = repo.topics[:5] if repo.topics else ["开源项目"]
+
+    texts = []
+    for repo in repos:
+        text = embedding_service.build_repo_text(
+            full_name=repo.full_name,
+            description=repo.description,
+            topics=repo.topics,
+            readme_content=repo.readme_content,
+            language=repo.language,
+            ai_summary=repo.ai_summary,
+            ai_tags=repo.ai_tags,
+        )
+        texts.append(text)
+        repo.embedding_text = text
+
+    embeddings = await embedding_service.embed_batch(
+        texts,
+        batch_size=sync_settings.batch_size,
+    )
+    if len(embeddings) != len(repos):
+        raise ValueError(
+            f"Embedding count mismatch: got {len(embeddings)} for {len(repos)} repos"
+        )
+
+    for repo, embedding in zip(repos, embeddings, strict=True):
+        repo.embedding = embedding
+        repo.is_embedded = True
+
+    return llm_failed
+
+
 async def compute_embeddings_task(user_id: int, task_id: int):
-    """Background task to compute embeddings for repos."""
+    """Background task to compute embeddings for repos.
+
+    Repos are processed in `SYNC_BATCH_SIZE` chunks, each committed before the
+    next starts, so `is_embedded` acts as a durable resume marker. A failing
+    chunk is counted and skipped rather than discarding the whole run: with a
+    large star collection, an all-or-nothing pass throws away paid embedding
+    work on any single transient fault.
+
+    Chunk iteration uses a keyset cursor on `StarredRepo.id` and advances the
+    cursor before processing, so a chunk that keeps failing cannot loop forever.
+    It stays `is_embedded = False` and is retried by the next task run.
+    """
     from nebula.db.database import get_db_context
 
     async with get_db_context() as db:
@@ -385,18 +463,17 @@ async def compute_embeddings_task(user_id: int, task_id: int):
             task.started_at = datetime.now(timezone.utc)
             await db.commit()
 
-            result = await db.execute(
-                select(StarredRepo).where(
+            total_result = await db.execute(
+                select(func.count(StarredRepo.id)).where(
                     StarredRepo.user_id == user_id,
                     StarredRepo.is_embedded == False,  # noqa: E712
                 )
             )
-            repos = result.scalars().all()
-
-            task.total_items = len(repos)
+            total_pending = int(total_result.scalar() or 0)
+            task.total_items = total_pending
             await db.commit()
 
-            if not repos:
+            if total_pending == 0:
                 task.status = "completed"
                 task.completed_at = datetime.now(timezone.utc)
                 await db.commit()
@@ -404,124 +481,105 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 
             sync_settings = get_sync_settings()
             llm_service = get_llm_service()
-            repos_needing_llm = [
-                repo for repo in repos if not repo.ai_summary or not repo.ai_tags
-            ]
-            llm_failed = 0
-
-            if repos_needing_llm:
-                total_llm_repos = len(repos_needing_llm)
-                logger.info(
-                    f"Generating summaries/tags for {total_llm_repos} repos "
-                    "before embedding"
-                )
-                llm_started = perf_counter()
-                llm_results = await generate_repo_enhancements_in_parallel(
-                    llm_service,
-                    repos_needing_llm,
-                    concurrency=sync_settings.llm_enhancement_concurrency,
-                )
-
-                for index, repo in enumerate(repos_needing_llm, 1):
-                    summary, tags, error = llm_results.get(
-                        repo.id, (None, None, RuntimeError("Missing LLM result"))
-                    )
-                    if error is None:
-                        repo.ai_summary = summary
-                        repo.ai_tags = tags
-                        repo.is_summarized = True
-                    else:
-                        llm_failed += 1
-                        logger.warning(
-                            f"LLM generation failed for {repo.full_name}: {error}"
-                        )
-                        if not repo.ai_tags:
-                            repo.ai_tags = (
-                                repo.topics[:5] if repo.topics else ["开源项目"]
-                            )
-
-                    if index % sync_settings.progress_commit_interval == 0:
-                        logger.info(
-                            f"Generating summaries progress: {index}/{total_llm_repos}"
-                        )
-                        task.processed_items = index
-                        await db.commit()
-
-                await db.commit()
-                log_task_stage(
-                    "compute_embeddings_task",
-                    "llm_enhancement",
-                    llm_started,
-                    repos=total_llm_repos,
-                    failed=llm_failed,
-                    concurrency=sync_settings.llm_enhancement_concurrency,
-                )
-                logger.info(f"LLM enhancement complete for {total_llm_repos} repos")
-                task.failed_items = llm_failed
-
             embedding_service = get_embedding_service()
+            chunk_size = sync_settings.batch_size
+
             processed = 0
+            failed = 0
+            llm_failed_total = 0
+            chunks_succeeded = 0
+            chunks_failed = 0
+            last_id = 0
 
-            text_build_started = perf_counter()
-            texts = []
-            for repo in repos:
-                text = embedding_service.build_repo_text(
-                    full_name=repo.full_name,
-                    description=repo.description,
-                    topics=repo.topics,
-                    readme_content=repo.readme_content,
-                    language=repo.language,
-                    ai_summary=repo.ai_summary,
-                    ai_tags=repo.ai_tags,
-                )
-                texts.append(text)
-                repo.embedding_text = text
-            log_task_stage(
-                "compute_embeddings_task",
-                "build_embedding_text",
-                text_build_started,
-                repos=len(repos),
-            )
-
-            try:
-                embedding_started = perf_counter()
-                embeddings = await embedding_service.embed_batch(texts, batch_size=32)
-                if len(embeddings) != len(repos):
-                    raise ValueError(
-                        f"Embedding count mismatch: got {len(embeddings)} "
-                        f"for {len(repos)} repos"
+            while True:
+                chunk_result = await db.execute(
+                    select(StarredRepo)
+                    .where(
+                        StarredRepo.user_id == user_id,
+                        StarredRepo.is_embedded == False,  # noqa: E712
+                        StarredRepo.id > last_id,
                     )
-                for repo, embedding in zip(repos, embeddings, strict=True):
-                    repo.embedding = embedding
-                    repo.is_embedded = True
-                    processed += 1
-
-                task.processed_items = processed
-                task.status = "completed"
-                task.error_details = {
-                    "llm_failed_items": llm_failed,
-                    "embedded_items": processed,
-                }
-                await db.commit()
-                log_task_stage(
-                    "compute_embeddings_task",
-                    "embed_batch",
-                    embedding_started,
-                    repos=len(repos),
-                    embedded=processed,
-                    llm_failed=llm_failed,
+                    .order_by(StarredRepo.id)
+                    .limit(chunk_size)
                 )
-            except Exception as exc:
-                logger.error(f"Batch embedding failed: {exc}")
-                task.failed_items = len(repos)
-                task.error_message = str(exc)
-                task.status = "failed"
-                await db.commit()
+                chunk = list(chunk_result.scalars().all())
+                if not chunk:
+                    break
 
+                chunk_first_id = chunk[0].id
+                chunk_last_id = chunk[-1].id
+                # Advance before processing: a chunk that keeps failing must not
+                # be re-selected on this pass.
+                last_id = chunk_last_id
+
+                chunk_started = perf_counter()
+                try:
+                    llm_failed_total += await _embed_one_chunk(
+                        repos=chunk,
+                        llm_service=llm_service,
+                        embedding_service=embedding_service,
+                        sync_settings=sync_settings,
+                    )
+                    processed += len(chunk)
+                    task.processed_items = processed
+                    task.failed_items = failed
+                    await db.commit()
+                    chunks_succeeded += 1
+                    log_task_stage(
+                        "compute_embeddings_task",
+                        "embed_chunk",
+                        chunk_started,
+                        repos=len(chunk),
+                        first_id=chunk_first_id,
+                        last_id=chunk_last_id,
+                        embedded_total=processed,
+                    )
+                except Exception as exc:
+                    await db.rollback()
+                    failed += len(chunk)
+                    chunks_failed += 1
+                    logger.exception(
+                        "Embedding chunk failed "
+                        f"user_id={user_id} task_id={task_id} "
+                        f"ids={chunk_first_id}..{chunk_last_id} "
+                        f"size={len(chunk)}: {exc}"
+                    )
+                    task = await db.get(SyncTask, task_id)
+                    if task is None:
+                        return
+                    task.processed_items = processed
+                    task.failed_items = failed
+                    await db.commit()
+
+            task = await db.get(SyncTask, task_id)
+            if task is None:
+                return
+
+            task.processed_items = processed
+            task.failed_items = failed
+            task.error_details = {
+                "llm_failed_items": llm_failed_total,
+                "embedded_items": processed,
+                "chunks_succeeded": chunks_succeeded,
+                "chunks_failed": chunks_failed,
+                "chunk_size": chunk_size,
+            }
+            if chunks_succeeded == 0 and chunks_failed > 0:
+                # Nothing landed at all: keep today's hard-failure behaviour so
+                # the pipeline stops instead of building a snapshot on no data.
+                task.status = "failed"
+                task.error_message = (
+                    f"All {chunks_failed} embedding chunks failed for user {user_id}"
+                )
+            else:
+                task.status = "completed"
             task.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
-            logger.info(f"Completed embedding for user {user_id}: {processed} embedded")
+            logger.info(
+                f"Completed embedding for user {user_id}: {processed} embedded, "
+                f"{failed} failed, chunks ok={chunks_succeeded} failed={chunks_failed}"
+            )
         except Exception as exc:
             logger.exception(f"Embedding task failed: {exc}")
 
@@ -634,8 +692,6 @@ async def run_clustering_task(
                 if repo.embedding is not None:
                     repos_with_embeddings.append(repo)
                     embeddings.append(repo.embedding)
-                    import math
-
                     size = math.log10(max(repo.stargazers_count, 1) + 1) * 0.5 + 0.5
                     node_sizes.append(min(size, 3.0))
 
@@ -789,16 +845,11 @@ async def run_clustering_task(
                 resolve_overlap=True,
             )
 
-            existing_clusters = (
-                (await db.execute(select(Cluster).where(Cluster.user_id == user_id)))
-                .scalars()
-                .all()
-            )
-            for cluster in existing_clusters:
-                await db.delete(cluster)
-            await db.commit()
-
-            cluster_map: dict[int, Cluster] = {}
+            # ---- Phase 1: compute everything, write nothing --------------
+            # Cluster naming calls an LLM, which can take minutes. Doing that
+            # after the destructive delete (as this task used to) meant a crash
+            # or lease loss in that window left the user with zero clusters and
+            # every repo unassigned, with no automatic recovery.
             cluster_entries: list[dict] = []
             sorted_cluster_ids = sorted(
                 {cluster_id for cluster_id in cluster_result.labels if cluster_id != -1}
@@ -854,6 +905,29 @@ async def run_clustering_task(
                 )
 
             cluster_entries = deduplicate_cluster_entries(cluster_entries)
+
+            # ---- Phase 2: swap in one transaction ------------------------
+            # Detach every repo from its cluster first so the
+            # starred_repos.cluster_id -> clusters.id foreign key stays
+            # satisfied through the delete. Both statements are set-based; the
+            # previous per-row ORM delete issued one child-nullification query
+            # per cluster.
+            await db.execute(
+                update(StarredRepo)
+                .where(StarredRepo.user_id == user_id)
+                .values(cluster_id=None)
+                .execution_options(synchronize_session=False)
+            )
+            # The bulk UPDATE bypasses the identity map, so realign the loaded
+            # objects before assigning new ids. Without this, an assignment
+            # that happens to match the stale in-session value would emit no
+            # UPDATE and silently leave the row NULL.
+            for repo in repos_with_embeddings:
+                repo.cluster_id = None
+
+            await db.execute(delete(Cluster).where(Cluster.user_id == user_id))
+
+            cluster_map: dict[int, Cluster] = {}
             for entry in cluster_entries:
                 center = entry["center"]
                 cluster = Cluster(
@@ -867,10 +941,8 @@ async def run_clustering_task(
                     center_z=center[2] if len(center) > 2 else None,
                 )
                 db.add(cluster)
-                await db.flush()
                 cluster_map[entry["cluster_id"]] = cluster
-
-            await db.commit()
+            await db.flush()
 
             assigned_count = 0
             unassigned_count = 0

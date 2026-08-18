@@ -11,9 +11,8 @@ src/nebula/
 ├── domain/              # Sync/snapshot lifecycle types
 ├── infrastructure/      # Snapshot repositories and persistence adapters
 ├── jobs/                # Background job entrypoints
-├── models/              # Legacy/internal models
 ├── schemas/             # API schemas and v2 aggregate responses
-└── utils/               # Shared utilities
+└── utils/               # logger_util, decorator_utils, hash_utils only
 ```
 
 ## Placement Rules
@@ -36,3 +35,8 @@ src/nebula/
   services.
 - Scope user-owned records by `user_id`.
 - Persist background status transitions.
+- `src/nebula/utils/` holds only `logger_util`, `decorator_utils`, and
+  `hash_utils`, and `nebula.utils.__all__` lists exactly the names with live
+  call sites. Do not reintroduce generic template helpers (file, JSON, date, or
+  dict utilities): MyNebula is a product repository, not a Python template. A
+  new export needs a caller in the same change.
