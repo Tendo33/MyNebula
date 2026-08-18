@@ -208,7 +208,11 @@
     "close": "关闭",
     "results": "条结果",
     "command_palette": "命令面板",
-    "remoteFailed": "语义搜索暂时不可用"
+    "remoteFailed": "语义搜索暂时不可用",
+    "repo_count": "{{count}} 个仓库",
+    "filter_by_language": "按 {{language}} 语言筛选",
+    "filter_by_tag": "按标签筛选",
+    "cluster_fallback_name": "聚类 {{id}}"
   },
   "errors": {
     "sync_failed": "同步失败，请检查是否已配置 GITHUB_TOKEN",
@@ -240,7 +244,8 @@
     "step_snapshot_label": "重建图谱快照",
     "step_snapshot_desc": "发布最新图谱数据",
     "loading": "加载中",
-    "partial_failed_warning": "同步已完成，但存在警告。重试前请先查看最近一次运行详情。"
+    "partial_failed_warning": "同步已完成，但存在警告。重试前请先查看最近一次运行详情。",
+    "loading_edges": "正在加载连线…"
   },
   "time": {
     "never_run": "从未运行",

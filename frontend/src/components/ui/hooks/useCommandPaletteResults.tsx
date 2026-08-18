@@ -200,10 +200,10 @@ export const useCommandPaletteResults = ({
         .map((cluster) => ({
           type: 'cluster' as const,
           id: cluster.id,
-          title: cluster.name || `Cluster ${cluster.id}`,
+          title: cluster.name || t('search.cluster_fallback_name', 'Cluster {{id}}', { id: cluster.id }),
           subtitle: cluster.description,
           icon: <div className="w-6 h-6 rounded-full" style={{ backgroundColor: cluster.color }} />,
-          meta: `${cluster.repo_count} repos`,
+          meta: t('search.repo_count', '{{count}} repos', { count: cluster.repo_count }),
           data: cluster,
         }));
       searchResults.push(...matchedClusters);
@@ -221,9 +221,9 @@ export const useCommandPaletteResults = ({
           type: 'language' as const,
           id: lang,
           title: lang,
-          subtitle: `Filter by ${lang} repositories`,
+          subtitle: t('search.filter_by_language', 'Filter by {{language}} repositories', { language: lang }),
           icon: <Code className="w-5 h-5 text-action-primary" />,
-          meta: `${count} repos`,
+          meta: t('search.repo_count', '{{count}} repos', { count }),
           data: { language: lang },
         }));
       searchResults.push(...matchedLanguages);
@@ -241,9 +241,9 @@ export const useCommandPaletteResults = ({
           type: 'tag' as const,
           id: tag,
           title: tag,
-          subtitle: `Filter by tag`,
+          subtitle: t('search.filter_by_tag', 'Filter by tag'),
           icon: <Tag className="w-5 h-5 text-action-primary" />,
-          meta: `${count} repos`,
+          meta: t('search.repo_count', '{{count}} repos', { count }),
           data: { tag },
         }));
       searchResults.push(...matchedTags);
@@ -259,6 +259,7 @@ export const useCommandPaletteResults = ({
     rawData,
     remoteRepoResults,
     starsThreshold,
+    t,
   ]);
 
   const quickFilters = useMemo(() => {

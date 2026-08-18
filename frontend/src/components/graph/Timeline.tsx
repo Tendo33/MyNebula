@@ -232,7 +232,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
               type="button"
               key={point.date}
               aria-pressed={Boolean(currentRange && idx >= currentRange[0] && idx <= currentRange[1])}
-              aria-label={`${formatDate(point.date)}: ${point.count} repos`}
+              aria-label={`${formatDate(point.date)}: ${t('search.repo_count', '{{count}} repos', { count: point.count })}`}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
@@ -266,7 +266,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
               {/* Tooltip */}
               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-50">
                 <div className="bg-text-main text-bg-main px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap shadow-lg">
-                  <div className="font-semibold">{point.count} repos</div>
+                  <div className="font-semibold">{t('search.repo_count', '{{count}} repos', { count: point.count })}</div>
                   <div className="text-bg-main/70">{formatDate(point.date)}</div>
                   {point.top_languages.length > 0 && (
                     <div className="mt-1 text-bg-main/60 text-[10px]">
@@ -298,7 +298,11 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
               {formatDate(points[currentRange[0]].date)} — {formatDate(points[currentRange[1]].date)}
             </span>
             <span className="text-text-main font-medium">
-              {points.slice(currentRange[0], currentRange[1] + 1).reduce((sum, p) => sum + p.count, 0)} repos
+              {t('search.repo_count', '{{count}} repos', {
+                count: points
+                  .slice(currentRange[0], currentRange[1] + 1)
+                  .reduce((sum, p) => sum + p.count, 0),
+              })}
             </span>
           </div>
         </div>

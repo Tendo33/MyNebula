@@ -86,15 +86,18 @@ export const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) 
         event.stopPropagation();
         onClick?.();
       }}
-      className="chip-button"
+      className="chip-button max-w-full"
       style={{
         backgroundColor: accent.softBackground,
         borderColor: accent.softBorder,
         color: accent.text,
       }}
+      title={cluster.name || undefined}
     >
-      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: accent.dot }} />
-      {cluster.name || `Cluster ${cluster.id}`}
+      <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accent.dot }} />
+      {/* Truncate rather than wrap: a wrapped Chinese cluster name split the
+          chip across two lines and made every table row a different height. */}
+      <span className="truncate">{cluster.name || `Cluster ${cluster.id}`}</span>
     </button>
   );
 };

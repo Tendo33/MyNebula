@@ -208,7 +208,11 @@
     "close": "Close",
     "results": "results",
     "command_palette": "Command Palette",
-    "remoteFailed": "Semantic search is temporarily unavailable"
+    "remoteFailed": "Semantic search is temporarily unavailable",
+    "repo_count": "{{count}} repos",
+    "filter_by_language": "Filter by {{language}} repositories",
+    "filter_by_tag": "Filter by tag",
+    "cluster_fallback_name": "Cluster {{id}}"
   },
   "errors": {
     "sync_failed": "Sync failed. Please check if GITHUB_TOKEN is configured.",
@@ -240,7 +244,8 @@
     "step_snapshot_label": "Rebuilding Graph Snapshot",
     "step_snapshot_desc": "Publishing the latest graph payload",
     "loading": "Loading",
-    "partial_failed_warning": "Sync completed with warnings. Check the latest run details before retrying."
+    "partial_failed_warning": "Sync completed with warnings. Check the latest run details before retrying.",
+    "loading_edges": "Loading edges…"
   },
   "time": {
     "never_run": "Never Run",

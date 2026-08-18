@@ -14,7 +14,7 @@ export const LanguageSwitch = () => {
     <button
       type="button"
       onClick={toggleLanguage}
-      className="header-action group min-w-[104px] px-3.5 text-xs font-semibold tracking-[0.08em] sm:min-w-[96px] sm:px-3"
+      className="header-action group h-11 min-h-0 shrink-0 px-3 text-xs font-semibold tracking-[0.08em]"
       title={t('settings.language')}
       aria-label={t('settings.language', 'Switch language')}
     >

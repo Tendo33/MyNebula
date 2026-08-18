@@ -250,7 +250,7 @@ const GraphPage = () => {
             )}
             {edgesLoading && (
               <span className="hidden toolbar-badge sm:inline-flex">
-                {t('sync.loading', 'Loading')} edges…
+                {t('sync.loading_edges', 'Loading edges…')}
               </span>
             )}
             {autoLoadHalted && (
@@ -278,10 +278,13 @@ const GraphPage = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:min-w-0 sm:flex-1 sm:flex-nowrap sm:gap-3">
             <LanguageSwitch />
 
-            <div className="w-40 transition-[width] sm:w-56 sm:focus-within:w-64 motion-reduce:transition-none">
+            {/* Below `sm` the search takes its own full-width row: squeezed
+                inline it dropped to ~175px, and the 12-character Chinese
+                placeholder cannot fit there at any gutter size. */}
+            <div className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:max-w-md sm:flex-1">
               <SearchInput onSearch={handleSearch} value={filters.searchQuery} />
             </div>
 
@@ -291,14 +294,17 @@ const GraphPage = () => {
               aria-expanded={showFilters}
               aria-controls="graph-filters-panel"
               aria-label={t('common.filter', 'Filters')}
-              className={`header-action min-h-0 px-3 ${
+              className={`header-action relative min-h-0 h-11 w-11 shrink-0 px-0 ${
                 showFilters
                   ? 'border-border-light bg-bg-sidebar text-text-main dark:border-dark-border dark:bg-dark-bg-sidebar dark:text-dark-text-main'
                   : 'border-transparent bg-transparent text-text-muted shadow-none hover:bg-bg-hover dark:text-dark-text-main/70 dark:hover:bg-dark-bg-sidebar/70 dark:hover:text-dark-text-main'
               }`}
             >
-              <Filter className="h-4 w-4" />
-              {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-action-primary" />}
+              <Filter aria-hidden="true" className="h-4 w-4" />
+              {/* Absolute so the dot cannot stretch the icon button out of square. */}
+              {hasActiveFilters && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-action-primary" />
+              )}
             </button>
 
             <button
@@ -306,7 +312,7 @@ const GraphPage = () => {
               onClick={() => setShowNodeList((current) => !current)}
               aria-expanded={showNodeList}
               aria-controls="graph-accessible-node-list"
-              className="header-action min-h-0 px-3"
+              className="header-action min-h-0 h-11 shrink-0 whitespace-nowrap px-3"
             >
               <List aria-hidden="true" className="h-4 w-4" />
               <span className="sr-only sm:not-sr-only">

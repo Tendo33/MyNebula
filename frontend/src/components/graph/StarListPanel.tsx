@@ -130,7 +130,7 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className="flex items-center justify-between gap-2 flex-1 text-left hover:bg-bg-hover/50 rounded-md px-2 -ml-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:hover:bg-dark-bg-sidebar/70"
+          className="flex min-h-[2.25rem] items-center justify-between gap-2 flex-1 text-left hover:bg-bg-hover/50 rounded-md px-2 py-1.5 -ml-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:hover:bg-dark-bg-sidebar/70"
           aria-expanded={!collapsed}
           aria-controls="starlist-panel-list"
         >

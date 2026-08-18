@@ -72,7 +72,14 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         type="search"
         value={localValue}
         onChange={handleChange}
-        className="field-surface block h-11 w-full pl-11 pr-11 text-sm font-medium leading-5 placeholder:text-text-dim/90 sm:h-11"
+        className={clsx(
+          'field-surface block h-11 w-full pl-11 text-sm font-medium leading-5 placeholder:text-text-dim/90',
+          // Only reserve the right gutter while the clear button actually
+          // exists. Reserving it unconditionally cost 44px of placeholder room
+          // on every empty field, which is what truncated the Chinese
+          // placeholder in narrow toolbars.
+          localValue ? 'pr-11' : 'pr-4'
+        )}
         placeholder={placeholder || t('dashboard.search_placeholder')}
         aria-label={computedAriaLabel}
         {...props}

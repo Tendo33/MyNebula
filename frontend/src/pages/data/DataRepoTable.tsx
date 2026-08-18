@@ -108,7 +108,7 @@ export const DataRepoTable: React.FC<{
                   <div className="flex items-center gap-2">
                     <Link
                       to={`/graph?node=${repo.id}`}
-                      className="block truncate font-medium text-text-main hover:text-action-primary hover:underline"
+                      className="block min-h-[1.75rem] truncate py-1 font-medium text-text-main hover:text-action-primary hover:underline"
                     >
                       {repo.full_name}
                     </Link>
@@ -192,7 +192,7 @@ export const DataRepoTable: React.FC<{
             <div className="min-w-0 flex-1">
               <Link
                 to={`/graph?node=${repo.id}`}
-                className="block truncate font-semibold text-text-main hover:text-action-primary"
+                className="block min-h-[1.75rem] truncate py-1 font-semibold text-text-main hover:text-action-primary"
               >
                 {repo.full_name}
               </Link>
