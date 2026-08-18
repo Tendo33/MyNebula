@@ -140,7 +140,7 @@ export const Sidebar = () => {
             <div className="font-heading truncate text-sm font-semibold text-text-main">
               {t('app.title')}
             </div>
-            <div className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-text-dim">
+            <div className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
               {t('sidebar.tagline')}
             </div>
           </div>
@@ -178,7 +178,7 @@ export const Sidebar = () => {
                 <item.icon
                   className={clsx(
                     'h-4 w-4',
-                    isActive ? 'text-text-main' : 'text-text-dim group-hover:text-text-main'
+                    isActive ? 'text-text-main' : 'text-text-muted group-hover:text-text-main'
                   )}
                 />
                 <span className={clsx('truncate font-medium', isActive && 'font-semibold')}>

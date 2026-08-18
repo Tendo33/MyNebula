@@ -199,7 +199,7 @@ const Settings = () => {
                         <label htmlFor="settings-max-clusters" className="text-xs text-text-muted">
                           {t('graph.max_clusters')}
                         </label>
-                        <span className="text-xs font-mono tabular-nums text-text-dim">
+                        <span className="text-xs font-mono tabular-nums text-text-muted">
                           {settings.maxClusters}
                         </span>
                       </div>
@@ -227,7 +227,7 @@ const Settings = () => {
                         <label htmlFor="settings-min-clusters" className="text-xs text-text-muted">
                           {t('graph.min_clusters')}
                         </label>
-                        <span className="text-xs font-mono tabular-nums text-text-dim">
+                        <span className="text-xs font-mono tabular-nums text-text-muted">
                           {settings.minClusters}
                         </span>
                       </div>
@@ -313,7 +313,7 @@ const Settings = () => {
                         githubTokenStatus.state === 'unknown' &&
                           'text-text-muted bg-bg-hover border-border-light dark:text-dark-text-main/70 dark:bg-dark-bg-sidebar/70 dark:border-dark-border',
                         githubTokenStatus.state === 'loading' &&
-                          'text-text-dim bg-bg-hover border-border-light dark:text-dark-text-main/60 dark:bg-dark-bg-sidebar/60 dark:border-dark-border'
+                          'text-text-muted bg-bg-hover border-border-light dark:text-dark-text-main/60 dark:bg-dark-bg-sidebar/60 dark:border-dark-border'
                       )}
                     >
                       <div

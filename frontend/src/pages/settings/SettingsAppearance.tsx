@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
-import { Eye, Link2, Zap } from 'lucide-react';
+import { Eye, Link2, Monitor, Moon, Sun, Zap } from 'lucide-react';
+
+import { useTheme, type ThemePreference } from '../../hooks/useTheme';
 import type { GraphSettings } from '../../contexts/GraphContext';
 
 interface SettingsAppearanceProps {
@@ -10,6 +12,13 @@ interface SettingsAppearanceProps {
 
 export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppearanceProps) => {
   const { t } = useTranslation();
+  const { preference, setPreference } = useTheme();
+
+  const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: typeof Sun }[] = [
+    { value: 'light', label: t('settings.theme_light', 'Light'), Icon: Sun },
+    { value: 'dark', label: t('settings.theme_dark', 'Dark'), Icon: Moon },
+    { value: 'system', label: t('settings.theme_system', 'System'), Icon: Monitor },
+  ];
 
   return (
     <section>
@@ -17,6 +26,49 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
         {t('settings.appearance')}
       </h2>
       <div className="space-y-2">
+        {/* Theme */}
+        <div className="panel-subtle p-4 transition-all group">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
+                <Moon className="w-5 h-5 text-text-muted group-hover:text-text-main" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-text-main">
+                  {t('settings.theme', 'Theme')}
+                </span>
+                <span className="text-xs text-text-muted">
+                  {t('settings.theme_desc', 'Follow the system, or pick one.')}
+                </span>
+              </div>
+            </div>
+            <div
+              role="radiogroup"
+              aria-label={t('settings.theme', 'Theme')}
+              className="flex items-center gap-1 rounded-2xl border border-border-light bg-bg-main p-1 dark:border-dark-border dark:bg-dark-bg-main"
+            >
+              {THEME_OPTIONS.map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={preference === value}
+                  onClick={() => setPreference(value)}
+                  className={clsx(
+                    'inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                    preference === value
+                      ? 'bg-bg-hover text-text-main dark:bg-dark-bg-sidebar dark:text-dark-text-main'
+                      : 'text-text-muted hover:bg-bg-hover hover:text-text-main dark:text-dark-text-main/70 dark:hover:bg-dark-bg-sidebar'
+                  )}
+                >
+                  <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* HQ Rendering toggle */}
         <div className="panel-subtle flex items-center justify-between p-4 transition-all group">
           <div className="flex items-center gap-3">
@@ -86,7 +138,7 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
           <p className="text-xs text-text-muted">{t('settings.related_min_semantic_desc')}</p>
           <div className="flex items-center justify-between">
             <span className="text-xs text-text-muted">{t('repoDetails.similar', 'Similar')}</span>
-            <span className="text-xs font-mono tabular-nums text-text-dim">
+            <span className="text-xs font-mono tabular-nums text-text-muted">
               {settings.relatedMinSemantic.toFixed(2)}
             </span>
           </div>

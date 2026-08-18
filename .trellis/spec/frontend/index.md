@@ -83,9 +83,50 @@ Enforced by `frontend/src/__tests__/accessibility.baseline.test.ts`:
   `role="alert"` (`ErrorFallback`).
 
 Deliberately out of scope, so the passing check is not misread as a guarantee:
-colour-contrast auditing, screen-reader transcript testing, and the
-`react-force-graph` canvas, which exposes no accessible node tree. Automated
-rules catch only part of real accessibility problems.
+screen-reader transcript testing, and the `react-force-graph` canvas, which
+exposes no accessible node tree. Automated rules catch only part of real
+accessibility problems.
+
+## Colour Tokens And Theme
+
+Semantic colours are CSS custom properties declared in `src/index.css`
+(`--color-text-main`, `--color-bg-sidebar`, …), and the Tailwind tokens in
+`tailwind.config.js` point at them with `var()`. `html.dark` swaps the
+variables.
+
+**Do not add a `dark:` variant for colour.** The token already resolves per
+theme. Before this, 146 className blocks used a light token with no dark
+counterpart, which is why forcing dark mode rendered text at 1.14:1. Adding
+`dark:` variants one element at a time is the failure mode, not the fix.
+
+**Do not write literal colours in `style={{}}`.** Inline styles cannot react to
+`html.dark`. Two places legitimately need a runtime colour — cluster chips,
+whose hue comes from the database — and they hand both variants over as custom
+properties (`--chip-text`, `--chip-text-dark`) for a CSS rule to choose.
+
+Each text tier has a role and a floor, enforced by
+`src/__tests__/paletteContrast.test.ts`:
+
+| Token | Role | Floor |
+| --- | --- | --- |
+| `text-main` | primary text | 4.5 (WCAG 1.4.3 AA) |
+| `text-muted` | secondary text that carries information | 4.5 |
+| `text-dim` | disabled controls and decorative icons only | 3.0 (WCAG 1.4.11) |
+
+`text-dim` is **not** a third text tier. The three surfaces sit in a narrow
+luminance band, so a token light enough to read as "tertiary" cannot clear 4.5
+against the darkest of them. Anything carrying information — counts, values,
+labels — belongs to `text-muted`.
+
+Rendered contrast is verified in both themes by
+`e2e/contrast.spec.ts`, which fails with the offending strings and their exact
+ratios. The token test alone is not enough: the defects that shipped were in
+what rendered, not in the tokens.
+
+The theme preference lives in `hooks/useTheme.ts` and persists to
+`localStorage` under `nebula_theme`. `index.html` applies the class before the
+bundle loads, otherwise a dark-mode user gets a white flash on every
+navigation.
 
 ## Source Of Truth
 

@@ -45,7 +45,7 @@ const StarListItem: React.FC<StarListItemProps> = ({
       {/* Icon */}
       <FolderHeart className={clsx(
         'w-4 h-4 flex-shrink-0',
-        isSelected ? 'text-action-primary' : 'text-text-dim group-hover:text-action-primary'
+        isSelected ? 'text-action-primary' : 'text-text-muted group-hover:text-action-primary'
       )} />
 
       {/* List info */}
@@ -57,14 +57,14 @@ const StarListItem: React.FC<StarListItemProps> = ({
           )}>
             {list.name}
           </span>
-          <span className="text-xs text-text-dim font-mono tabular-nums dark:text-dark-text-main/60">
+          <span className="text-xs text-text-muted font-mono tabular-nums dark:text-dark-text-main/60">
             {list.repo_count}
           </span>
         </div>
 
         {/* Description */}
         {list.description && (
-          <p className="text-[11px] text-text-dim truncate mt-0.5 dark:text-dark-text-main/60">
+          <p className="text-[11px] text-text-muted truncate mt-0.5 dark:text-dark-text-main/60">
             {list.description}
           </p>
         )}
@@ -139,15 +139,15 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
             <span className="text-sm font-medium text-text-main dark:text-dark-text-main">
               {t('graph.my_lists')}
             </span>
-            <span className="text-xs text-text-dim dark:text-dark-text-main/60">
+            <span className="text-xs text-text-muted dark:text-dark-text-main/60">
               ({hasSelectedLists ? `${selectedCount}/${totalLists}` : totalLists})
             </span>
           </div>
           {onToggleCollapsed && (
             collapsed ? (
-              <ChevronDown className="w-4 h-4 text-text-dim dark:text-dark-text-main/60" />
+              <ChevronDown className="w-4 h-4 text-text-muted dark:text-dark-text-main/60" />
             ) : (
-              <ChevronUp className="w-4 h-4 text-text-dim dark:text-dark-text-main/60" />
+              <ChevronUp className="w-4 h-4 text-text-muted dark:text-dark-text-main/60" />
             )
           )}
         </button>
@@ -155,7 +155,7 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
         {hasSelectedLists && (
           <button
             onClick={() => clearStarListFilter?.()}
-            className="p-1 rounded hover:bg-bg-hover text-text-dim hover:text-text-main transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main/60 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
+            className="p-1 rounded hover:bg-bg-hover text-text-muted hover:text-text-main transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main/60 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
             title={t('common.clear_filter')}
             aria-label={t('common.clear_filter')}
             type="button"

@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Link, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from './hooks/useTheme';
 import { GraphProvider, useGraph } from './contexts/GraphContext';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { ErrorFallback } from './components/ui/ErrorFallback';
@@ -57,13 +58,14 @@ function GraphAppContent({
   };
 
   const { t } = useTranslation();
+  useTheme();
 
   return (
     <>
       <div className="min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main font-sans selection:bg-action-primary/20">
         <a
           href="#main-content"
-          className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-action-primary px-4 py-2 text-white transition-transform focus:translate-y-0"
+          className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-action-primary px-4 py-2 text-action-on transition-transform focus:translate-y-0"
         >
           {t('common.skip_to_content', 'Skip to content')}
         </a>

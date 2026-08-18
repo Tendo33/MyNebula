@@ -243,7 +243,8 @@ const DataPage = () => {
                                 {
                                   backgroundColor: selected ? accent.strongBackground : accent.softBackground,
                                   borderColor: selected ? accent.strongBorder : accent.softBorder,
-                                  color: accent.text,
+                                  ['--chip-text' as string]: accent.text,
+                                  ['--chip-text-dark' as string]: accent.textOnDark,
                                   '--tw-ring-color': accent.base,
                                 } as React.CSSProperties
                               }

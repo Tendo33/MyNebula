@@ -167,7 +167,12 @@
     "update_time_error": "Failed to update schedule time",
     "full_refresh_error": "Failed to start full refresh",
     "full_refresh_partial_phase_detail": "{{count}} items failed in this stage.",
-    "full_refresh_partial_failed": "Full refresh completed with warnings. Review the latest run details."
+    "full_refresh_partial_failed": "Full refresh completed with warnings. Review the latest run details.",
+    "theme": "Theme",
+    "theme_desc": "Follow the system, or pick one.",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "theme_system": "System"
   },
   "repoDetails": {
     "close": "Close",

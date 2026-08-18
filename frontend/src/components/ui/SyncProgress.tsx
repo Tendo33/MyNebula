@@ -71,7 +71,7 @@ const getStatusIcon = (status: SyncStepStatus): React.ReactNode => {
     case 'warning':
       return <AlertCircle className="w-4 h-4 text-amber-500" />;
     default:
-      return <Circle className="w-4 h-4 text-text-dim" />;
+      return <Circle className="w-4 h-4 text-text-muted" />;
   }
 };
 
@@ -265,7 +265,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
                   step.status === 'running' && 'bg-action-primary/20 text-action-primary',
                   step.status === 'warning' && 'bg-amber-100 text-amber-600',
                   step.status === 'failed' && 'bg-red-100 text-red-600',
-                  step.status === 'pending' && 'bg-bg-hover text-text-dim dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60'
+                  step.status === 'pending' && 'bg-bg-hover text-text-muted dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60'
                 )}
               >
                 {getStepIcon(step.id)}
@@ -300,7 +300,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
                         style={{ width: `${step.progress}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-text-dim mt-1 dark:text-dark-text-main/60">
+                    <span className="text-[10px] text-text-muted mt-1 dark:text-dark-text-main/60">
                       {step.progress}%
                     </span>
                   </div>

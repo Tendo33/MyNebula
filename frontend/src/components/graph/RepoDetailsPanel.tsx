@@ -54,7 +54,7 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
         />
       ) : (
         <div className="w-9 h-9 rounded-lg bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
-          <span className="text-text-dim text-xs font-medium dark:text-dark-text-main/60">
+          <span className="text-text-muted text-xs font-medium dark:text-dark-text-main/60">
             {repo.owner?.charAt(0).toUpperCase()}
           </span>
         </div>
@@ -289,7 +289,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               />
             ) : (
               <div className="w-10 h-10 rounded-lg bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
-                <span className="text-text-dim text-sm font-medium dark:text-dark-text-main/60">
+                <span className="text-text-muted text-sm font-medium dark:text-dark-text-main/60">
                   {node.owner?.charAt(0).toUpperCase()}
                 </span>
               </div>
@@ -303,7 +303,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                         </h2>
                     </a>
                 </div>
-                <p className="text-xs text-text-dim dark:text-dark-text-main/60">{node.owner}</p>
+                <p className="text-xs text-text-muted dark:text-dark-text-main/60">{node.owner}</p>
                 <p className="text-sm text-text-muted leading-relaxed mt-1 dark:text-dark-text-main/70">
                 {node.description || t('repoDetails.no_description')}
                 </p>
@@ -313,7 +313,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           type="button"
           onClick={onClose}
           aria-label={t('repoDetails.close')}
-          className="absolute top-4 right-4 p-1.5 rounded-md text-text-dim hover:bg-bg-hover hover:text-text-main transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-md text-text-muted hover:bg-bg-hover hover:text-text-main transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -444,7 +444,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                   </span>
                 ))}
                 {node.topics.length > 8 && (
-                  <span className="text-xs text-text-dim dark:text-dark-text-main/60">+{node.topics.length - 8}</span>
+                  <span className="text-xs text-text-muted dark:text-dark-text-main/60">+{node.topics.length - 8}</span>
                 )}
               </div>
             </div>
@@ -487,7 +487,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               <Link2 className="w-3 h-3" />
               <span>{t('repoDetails.similar', 'Similar')}</span>
               {tabCounts.similar > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim dark:bg-dark-bg-sidebar dark:text-dark-text-main/60">({tabCounts.similar})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/60">({tabCounts.similar})</span>
               )}
             </button>
             <button
@@ -502,7 +502,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               <Tag className="w-3 h-3" />
               <span>{t('repoDetails.sameTags', 'Tags')}</span>
               {tabCounts.sameTags > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim">({tabCounts.sameTags})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-muted">({tabCounts.sameTags})</span>
               )}
             </button>
             <button
@@ -517,7 +517,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               <Code className="w-3 h-3" />
               <span>{t('repoDetails.sameLang', 'Lang')}</span>
               {tabCounts.sameLang > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-dim dark:bg-dark-bg-sidebar dark:text-dark-text-main/60">({tabCounts.sameLang})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/60">({tabCounts.sameLang})</span>
               )}
             </button>
           </div>

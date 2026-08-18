@@ -167,7 +167,12 @@
     "update_time_error": "更新时间设置失败",
     "full_refresh_error": "启动全量刷新失败",
     "full_refresh_partial_phase_detail": "该阶段有 {{count}} 条记录处理失败。",
-    "full_refresh_partial_failed": "全量刷新已完成，但存在警告。请查看最近一次运行详情。"
+    "full_refresh_partial_failed": "全量刷新已完成，但存在警告。请查看最近一次运行详情。",
+    "theme": "主题",
+    "theme_desc": "跟随系统，或手动选择。",
+    "theme_light": "浅色",
+    "theme_dark": "深色",
+    "theme_system": "跟随系统"
   },
   "repoDetails": {
     "close": "关闭",

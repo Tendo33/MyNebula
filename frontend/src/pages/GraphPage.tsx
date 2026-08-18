@@ -244,7 +244,7 @@ const GraphPage = () => {
                 : t('dashboard.subtitle_infinite')}
             </span>
             {rawData && filteredData && rawData.total_nodes !== filteredData.total_nodes && (
-              <span className="hidden text-xs text-text-dim sm:inline">
+              <span className="hidden text-xs text-text-muted sm:inline">
                 / {rawData.total_nodes} {t('common.total')}
               </span>
             )}

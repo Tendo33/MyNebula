@@ -49,14 +49,14 @@ export const SortableHeader: React.FC<SortableHeaderProps> = ({
         <span className="flex flex-col">
           <ChevronUp
             className={`-mb-1 h-3 w-3 ${
-              isActive && currentSort.direction === 'asc' ? 'text-action-primary' : 'text-text-dim'
+              isActive && currentSort.direction === 'asc' ? 'text-action-primary' : 'text-text-muted'
             }`}
           />
           <ChevronDown
             className={`h-3 w-3 ${
               isActive && currentSort.direction === 'desc'
                 ? 'text-action-primary'
-                : 'text-text-dim'
+                : 'text-text-muted'
             }`}
           />
         </span>
@@ -74,7 +74,7 @@ export const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) 
   const { t } = useTranslation();
 
   if (!cluster) {
-    return <span className="text-xs italic text-text-dim">{t('data.unclustered')}</span>;
+    return <span className="text-xs italic text-text-muted">{t('data.unclustered')}</span>;
   }
 
   const accent = getClusterAccent({ id: cluster.id, color: cluster.color });
@@ -90,7 +90,8 @@ export const ClusterBadge: React.FC<ClusterBadgeProps> = ({ cluster, onClick }) 
       style={{
         backgroundColor: accent.softBackground,
         borderColor: accent.softBorder,
-        color: accent.text,
+        ['--chip-text' as string]: accent.text,
+        ['--chip-text-dark' as string]: accent.textOnDark,
       }}
       title={cluster.name || undefined}
     >

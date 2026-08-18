@@ -73,7 +73,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         value={localValue}
         onChange={handleChange}
         className={clsx(
-          'field-surface block h-11 w-full pl-11 text-sm font-medium leading-5 placeholder:text-text-dim/90',
+          'field-surface block h-11 w-full pl-11 text-sm font-medium leading-5 placeholder:text-text-muted/90',
           // Only reserve the right gutter while the clear button actually
           // exists. Reserving it unconditionally cost 44px of placeholder room
           // on every empty field, which is what truncated the Chinese
@@ -89,7 +89,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           type="button"
           onClick={handleClear}
           aria-label={t('common.clear', 'Clear')}
-          className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-text-dim hover:text-text-main"
+          className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-text-muted hover:text-text-main"
         >
           <X className="h-4 w-4" />
         </button>

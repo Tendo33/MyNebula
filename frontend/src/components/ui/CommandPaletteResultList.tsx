@@ -62,7 +62,7 @@ export const CommandPaletteResultList: React.FC<{
 
           {/* Meta */}
           {result.meta && (
-            <span className="text-xs text-text-dim flex-shrink-0">
+            <span className="text-xs text-text-muted flex-shrink-0">
               {result.meta}
             </span>
           )}

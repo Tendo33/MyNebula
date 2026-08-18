@@ -59,7 +59,7 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
           )}>
             {cluster.name || `Cluster ${cluster.id}`}
           </span>
-          <span className="text-xs text-text-dim font-mono tabular-nums dark:text-dark-text-main/60">
+          <span className="text-xs text-text-muted font-mono tabular-nums dark:text-dark-text-main/60">
             {nodeCount}
           </span>
         </div>
@@ -76,7 +76,7 @@ const ClusterItem: React.FC<ClusterItemProps> = ({
               </span>
             ))}
             {cluster.keywords.length > 3 && (
-              <span className="text-[10px] text-text-dim dark:text-dark-text-main/60">
+              <span className="text-[10px] text-text-muted dark:text-dark-text-main/60">
                 +{cluster.keywords.length - 3}
               </span>
             )}
@@ -167,15 +167,15 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
             <span className="text-sm font-medium text-text-main dark:text-dark-text-main">
               {t('graph.clusters')}
             </span>
-            <span className="text-xs text-text-dim dark:text-dark-text-main/60">
+            <span className="text-xs text-text-muted dark:text-dark-text-main/60">
               ({hasSelectedClusters ? `${selectedCount}/${totalClusters}` : totalClusters})
             </span>
           </div>
           {onToggleCollapsed && (
             collapsed ? (
-              <ChevronDown className="w-4 h-4 text-text-dim dark:text-dark-text-main/60" />
+              <ChevronDown className="w-4 h-4 text-text-muted dark:text-dark-text-main/60" />
             ) : (
-              <ChevronUp className="w-4 h-4 text-text-dim dark:text-dark-text-main/60" />
+              <ChevronUp className="w-4 h-4 text-text-muted dark:text-dark-text-main/60" />
             )
           )}
         </button>
@@ -183,7 +183,7 @@ const ClusterPanel: React.FC<ClusterPanelProps> = ({
         {hasSelectedClusters && (
           <button
             onClick={clearClusterFilter}
-            className="p-1 rounded hover:bg-bg-hover text-text-dim hover:text-text-main transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main/60 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
+            className="p-1 rounded hover:bg-bg-hover text-text-muted hover:text-text-main transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main/60 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
             title={t('common.clear_filter')}
             aria-label={t('common.clear_filter')}
             type="button"

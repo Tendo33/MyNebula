@@ -8,22 +8,26 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Point at the CSS variables declared in src/index.css so every token
+        // is theme-aware. `html.dark` swaps the variables; no `dark:` variant
+        // is needed on individual elements.
         bg: {
-          main: "#FBFAF6",
-          sidebar: "#F2EFE6",
-          hover: "#ECE6DA",
+          main: "var(--color-bg-main)",
+          sidebar: "var(--color-bg-sidebar)",
+          hover: "var(--color-bg-hover)",
         },
         text: {
-          main: "#272B35",
-          muted: "#616A78",
-          dim: "#8A92A0",
+          main: "var(--color-text-main)",
+          muted: "var(--color-text-muted)",
+          dim: "var(--color-text-dim)",
         },
         border: {
-          light: "#DAD5C8",
+          light: "var(--color-border-light)",
         },
         action: {
-          primary: "#2D59C8",
-          hover: "#2347A3",
+          primary: "var(--color-action-primary)",
+          hover: "var(--color-action-hover)",
+          on: "var(--color-on-action)",
         },
         dark: {
           bg: {

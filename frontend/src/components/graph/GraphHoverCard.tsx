@@ -26,7 +26,7 @@ export const GraphHoverCard: React.FC<{ node: ProcessedNode }> = ({ node }) => (
         />
       ) : (
         <div className="w-10 h-10 rounded-md bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
-          <span className="text-text-dim text-sm font-medium dark:text-dark-text-main/60">
+          <span className="text-text-muted text-sm font-medium dark:text-dark-text-main/60">
             {(node.owner || node.name)?.charAt(0).toUpperCase()}
           </span>
         </div>
@@ -66,7 +66,7 @@ export const GraphHoverCard: React.FC<{ node: ProcessedNode }> = ({ node }) => (
           </span>
         ))}
         {node.ai_tags.length > 4 && (
-          <span className="text-[10px] text-text-dim">+{node.ai_tags.length - 4}</span>
+          <span className="text-[10px] text-text-muted">+{node.ai_tags.length - 4}</span>
         )}
       </div>
     )}

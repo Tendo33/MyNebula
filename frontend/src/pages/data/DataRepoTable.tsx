@@ -99,7 +99,7 @@ export const DataRepoTable: React.FC<{
                       height={24}
                     />
                   ) : (
-                    <div className="mx-auto flex h-7 min-h-7 w-7 min-w-7 items-center justify-center rounded-lg bg-border-light text-[10px] text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
+                    <div className="mx-auto flex h-7 min-h-7 w-7 min-w-7 items-center justify-center rounded-lg bg-border-light text-[10px] text-text-muted dark:bg-dark-border dark:text-dark-text-main/60">
                       {repo.owner.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -120,7 +120,7 @@ export const DataRepoTable: React.FC<{
                     title={repo.ai_summary || repo.description}
                   >
                     {repo.ai_summary || repo.description || (
-                      <span className="italic text-text-dim">{t('data.no_summary')}</span>
+                      <span className="italic text-text-muted">{t('data.no_summary')}</span>
                     )}
                   </p>
                 </td>
@@ -133,7 +133,7 @@ export const DataRepoTable: React.FC<{
                     <span className="italic text-text-muted">-</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-center font-mono tabular-nums text-text-dim">
+                <td className="px-4 py-3 text-center font-mono tabular-nums text-text-muted">
                   {repo.stargazers_count.toLocaleString()}
                 </td>
                 <td className="px-4 py-3 text-center">
@@ -151,7 +151,7 @@ export const DataRepoTable: React.FC<{
                 <td className="hidden max-w-md px-4 py-3">
                   <p className="truncate text-xs text-text-muted">
                     {repo.description || (
-                      <span className="italic text-text-dim">{t('data.no_description')}</span>
+                      <span className="italic text-text-muted">{t('data.no_description')}</span>
                     )}
                   </p>
                 </td>
@@ -185,7 +185,7 @@ export const DataRepoTable: React.FC<{
                 height={40}
               />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-border-light text-text-dim dark:bg-dark-border dark:text-dark-text-main/60">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-border-light text-text-muted dark:bg-dark-border dark:text-dark-text-main/60">
                 {repo.owner.charAt(0).toUpperCase()}
               </div>
             )}

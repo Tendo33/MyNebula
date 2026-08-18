@@ -20,27 +20,61 @@
   --page-gutter: clamp(1rem, 2vw, 2rem);
 }
 
+/* Semantic colour tokens.
+ *
+ * The Tailwind tokens point at these variables, so `text-text-main` resolves
+ * correctly in both themes without a `dark:` variant on every element. Before
+ * this, 146 className blocks used a light token with no dark counterpart, which
+ * is why forcing dark mode produced text at 1.14:1. */
+:root {
+  --color-bg-main: #fbfaf6;
+  --color-bg-sidebar: #f2efe6;
+  --color-bg-hover: #ece6da;
+  --color-text-main: #272b35;
+  --color-text-muted: #5a626f;
+  --color-text-dim: #7c8494;
+  --color-border-light: #dad5c8;
+  --color-action-primary: #2d59c8;
+  --color-action-hover: #2347a3;
+  /* Text placed on top of the action colour. Flips with the theme:
+     white reads at 6.22:1 on the light accent but only 2.56:1 on the
+     lightened dark accent. */
+  --color-on-action: #ffffff;
+}
+
+html.dark {
+  --color-bg-main: #171a22;
+  --color-bg-sidebar: #1d212c;
+  --color-bg-hover: #262c39;
+  --color-text-main: #ece8de;
+  --color-text-muted: #afb6c4;
+  --color-text-dim: #828b9c;
+  --color-border-light: #343b4a;
+  --color-action-primary: #7fa0f0;
+  --color-action-hover: #a3bcf7;
+  --color-on-action: #171a22;
+}
+
 html {
   min-height: 100%;
-  background-color: #fbfaf6;
+  background-color: var(--color-bg-main);
   scroll-behavior: smooth;
 }
 
 html.dark {
   color-scheme: dark;
-  background-color: #171a22;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #fbfaf6;
+  background-color: var(--color-bg-main);
   background-image:
     radial-gradient(circle at 12% -10%, rgba(126, 148, 229, 0.13) 0%, transparent 30%),
     radial-gradient(circle at 88% 0%, rgba(171, 196, 145, 0.12) 0%, transparent 28%),
     radial-gradient(circle at 50% 120%, rgba(182, 147, 219, 0.08) 0%, transparent 32%);
-  color: #272b35;
+  color: var(--color-text-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -192,7 +226,15 @@ button,
   }
 
   .chip-button {
-    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-3 py-1.5 text-xs font-semibold text-text-main transition-all focus-visible:ring-2 focus-visible:ring-action-primary hover:opacity-80 hover:-translate-y-px dark:text-dark-text-main;
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-3 py-1.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-action-primary hover:opacity-80 hover:-translate-y-px;
+    /* Cluster hues come from the database, so the readable variant is computed
+       per theme in clusterAccent.ts and handed over as custom properties.
+       Inline styles cannot react to `html.dark` on their own. */
+    color: var(--chip-text, var(--color-text-main));
+  }
+
+  html.dark .chip-button {
+    color: var(--chip-text-dark, var(--color-text-main));
   }
 
   .danger-button-soft {
@@ -229,7 +271,7 @@ button,
   }
 
   .section-kicker {
-    @apply px-1 text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-text-dim dark:text-dark-text-main;
+    @apply px-1 text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-text-muted dark:text-dark-text-main;
   }
 
   .toolbar-badge {

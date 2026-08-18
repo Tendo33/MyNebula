@@ -174,11 +174,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               setSelectedIndex(0);
             }}
             placeholder={t('search.placeholder', 'Search repos, clusters, languages, tags...')}
-            className="flex-1 text-base outline-none placeholder:text-text-dim"
+            className="flex-1 text-base outline-none placeholder:text-text-muted"
             aria-label={t('search.placeholder', 'Search repos, clusters, languages, tags...')}
           />
           <div className="flex items-center gap-2">
-            <kbd className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-text-dim bg-bg-sidebar rounded border border-border-light">
+            <kbd className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-text-muted bg-bg-sidebar rounded border border-border-light">
               <Command className="w-3 h-3" />K
             </kbd>
             <button
@@ -234,7 +234,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                     </span>
                     <button
                       onClick={clearRecentSearches}
-                      className="text-xs text-text-dim hover:text-text-main"
+                      className="text-xs text-text-muted hover:text-text-main"
                     >
                       {t('common.clear', 'Clear')}
                     </button>
@@ -246,7 +246,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                         onClick={() => setQuery(search)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-bg-sidebar hover:bg-bg-hover rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
                       >
-                        <Clock className="w-3 h-3 text-text-dim" />
+                        <Clock className="w-3 h-3 text-text-muted" />
                         {search}
                       </button>
                     ))}
@@ -314,7 +314,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
               {/* Tips */}
               <div className="pt-2 border-t border-border-light">
-                <div className="flex items-center gap-2 text-xs text-text-dim">
+                <div className="flex items-center gap-2 text-xs text-text-muted">
                   <TrendingUp className="w-3 h-3" />
                   <span>{t('search.tip', 'Tip: Type to search, use arrow keys to navigate, Enter to select')}</span>
                 </div>
@@ -340,7 +340,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               <p className="text-text-muted">
                 {t('search.noResults', 'No results found for')} "{query}"
               </p>
-              <p className="text-sm text-text-dim mt-1">
+              <p className="text-sm text-text-muted mt-1">
                 {remoteError ?? t('search.tryDifferent', 'Try a different search term')}
               </p>
             </div>
@@ -348,7 +348,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-2 border-t border-border-light bg-bg-sidebar/50 text-xs text-text-dim">
+        <div className="flex items-center justify-between px-4 py-2 border-t border-border-light bg-bg-sidebar/50 text-xs text-text-muted">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 bg-bg-main rounded border border-border-light dark:bg-dark-bg-main dark:border-dark-border">↑↓</kbd>

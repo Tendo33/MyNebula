@@ -42,7 +42,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue,
   const content = (
     <>
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-dim">{title}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">{title}</p>
         <h3 className="font-heading mt-3 text-3xl font-semibold text-text-main">{value}</h3>
         {subValue && <p className="mt-1.5 text-sm text-text-muted">{subValue}</p>}
         {trend && (
@@ -333,7 +333,7 @@ const Dashboard = () => {
                   {activityData.length > 0 && (
                     <div className="flex justify-between mt-3 text-[10px] text-text-muted font-medium">
                       <span>{activityData[0]?.date}</span>
-                      <span className="text-text-dim">
+                      <span className="text-text-muted">
                         {activityData[Math.floor(activityData.length / 2)]?.date}
                       </span>
                       <span>{activityData[activityData.length - 1]?.date}</span>
@@ -368,12 +368,9 @@ const Dashboard = () => {
                         <button
                           key={item.topic}
                           onClick={() => navigate(`/data?topic=${encodeURIComponent(item.topic)}`)}
-                          className="group rounded-full px-4 py-2 text-sm font-semibold transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-sm motion-reduce:transition-none"
-                          style={{
-                            backgroundColor: `rgba(45, 89, 200, 0.08)`,
-                            color: `rgba(35, 71, 163, 1)`,
-                            border: `1px solid rgba(45, 89, 200, 0.22)`,
-                          }}
+                          // Hardcoded rgb() here bypassed the token system and
+                          // stayed light-theme blue in dark mode, at 2.07:1.
+                          className="group rounded-full border border-action-primary/25 bg-action-primary/10 px-4 py-2 text-sm font-semibold text-action-primary transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-sm motion-reduce:transition-none"
                         >
                           <span>{item.topic}</span>
                           <span className="ml-1.5 text-xs opacity-60">
