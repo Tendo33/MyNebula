@@ -254,16 +254,9 @@ uv run uvicorn nebula.main:app --reload --port 8000
 | 同步 | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | 可选 | 控制吞吐量与成本。`SYNC_BATCH_SIZE`（10–500，默认 100）同时决定每次事务提交的 embedding 分块大小和每次供应商请求的文本数 |
 | 运行时 | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | 可选 | 调试、日志与可观测性相关配置 |
 
-完整环境变量与运维说明见 `.trellis/spec/backend/database-when-added.md`。
 
 ## 文档地图
 
-- `.trellis/spec/README.md`：主 AI spec 入口
-- `.trellis/spec/shared/index.md`：仓库级事实与任务路由
-- `.trellis/spec/backend/index.md`：后端实现与服务边界
-- `.trellis/spec/frontend/index.md`：前端实现与页面/数据边界
-- `.trellis/spec/backend/database-when-added.md`：部署、环境变量、认证、代理与重置
-- `.trellis/spec/shared/verification.md`：本地验证、CI 门禁与文档链接检查
 
 ## API 快速参考
 
@@ -316,7 +309,6 @@ MyNebula/
 |-- alembic/                   # 数据库迁移
 |-- tests/                     # 后端测试
 |-- scripts/                   # 自动化、评估与维护脚本
-|-- .trellis/spec/             # 主 AI 与工程规范
 |-- doc/                       # 兼容页与 README 图片资源
 |-- docker-compose.yml
 `-- .env.example
@@ -359,7 +351,6 @@ RUN_E2E=1 pnpm --prefix frontend run test:e2e
 uv run python scripts/evals/run_all_quality_checks.py
 ```
 
-质量门禁与验证命令说明见 `.trellis/spec/shared/verification.md`。
 
 ## 常见问题
 

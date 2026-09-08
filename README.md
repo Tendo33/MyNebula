@@ -255,16 +255,9 @@ If `frontend/dist` exists, FastAPI will serve the SPA and static assets directly
 | Sync | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | Optional | Controls throughput and cost. `SYNC_BATCH_SIZE` (10–500, default 100) sets both the embedding chunk committed per transaction and the texts per provider request |
 | Runtime | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | Optional | Debugging and observability settings |
 
-For the full environment and operations reference, see `.trellis/spec/backend/database-when-added.md`.
 
 ## Documentation Map
 
-- `.trellis/spec/README.md`: main AI-facing spec entrypoint
-- `.trellis/spec/shared/index.md`: repository-wide facts and routing
-- `.trellis/spec/backend/index.md`: backend implementation map and service boundaries
-- `.trellis/spec/frontend/index.md`: frontend implementation map and data-surface boundaries
-- `.trellis/spec/backend/database-when-added.md`: deployment, environment variables, auth, proxy, and reset facts
-- `.trellis/spec/shared/verification.md`: local verification, CI gates, and docs link checks
 
 ## API Quick Reference
 
@@ -320,7 +313,6 @@ MyNebula/
 |-- alembic/                   # database migrations
 |-- tests/                     # backend tests
 |-- scripts/                   # automation, evaluation, and maintenance scripts
-|-- .trellis/spec/             # main AI and engineering specs
 |-- doc/                       # compatibility pages and README image assets
 |-- docker-compose.yml
 `-- .env.example
@@ -360,7 +352,6 @@ RUN_E2E=1 pnpm --prefix frontend run test:e2e
 uv run python scripts/evals/run_all_quality_checks.py
 ```
 
-Threshold details live in `.trellis/spec/shared/verification.md`.
 
 ## Troubleshooting
 

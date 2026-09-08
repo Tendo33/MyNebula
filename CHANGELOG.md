@@ -73,10 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.6] - 2026-04-12
 
 ### Added
-- Introduced the `.trellis/spec/` documentation system as the primary AI and engineering documentation entrypoint.
 
 ### Changed
-- Consolidated deployment, backend, frontend, scripts, release, and shared reference facts under `.trellis/spec/`.
 - Converted legacy `doc/` pages into compatibility redirects and updated `README*`, `CONTRIBUTING.md`, `AGENTS.md`, and `CLAUDE.md` to point at the new entrypoints.
 - Synchronized version metadata to `1.2.6` across backend package metadata, frontend package metadata, runtime config, environment template, lockfiles, and documentation examples.
 

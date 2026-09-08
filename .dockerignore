@@ -77,6 +77,5 @@ coverage/
 .cursor/
 .agent/
 .shared/
-.trellis/
 scripts/
 examples/

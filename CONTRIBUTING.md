@@ -7,14 +7,9 @@
 在开始改代码前，建议先读这几份文档：
 
 - `README.md` 或 `README.zh.md`
-- `.trellis/spec/backend/database-when-added.md`
-- `.trellis/spec/shared/verification.md`
-- `.trellis/spec/shared/verification.md`
 
 如果你要改动接口、同步流程或数据库结构，再补读：
 
-- `.trellis/spec/backend/index.md`
-- `.trellis/spec/backend/database-when-added.md`
 
 ## 本地开发环境
 
@@ -41,7 +36,6 @@ VITE_API_BASE_URL=http://localhost:8000 pnpm --prefix frontend run dev
 uv run pre-commit install
 ```
 
-更多说明见 `.trellis/spec/shared/verification.md` 和 `.trellis/spec/shared/verification.md`。
 
 ## 分支和提交建议
 
@@ -139,9 +133,6 @@ uv run python scripts/reset_db.py
 
 - `README.md`
 - `README.zh.md`
-- `.trellis/spec/backend/database-when-added.md`
-- `.trellis/spec/shared/verification.md`
-- `.trellis/spec/shared/verification.md`
 
 ## Pull Request 建议
 
