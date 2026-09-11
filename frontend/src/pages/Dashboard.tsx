@@ -3,21 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { DashboardSkeleton } from '../components/ui/Skeleton';
-import { Book, Code, Layers, TrendingUp, ArrowRight, Calendar, Hash, Tag } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useDashboardQuery } from '../features/dashboard/hooks/useDashboardQuery';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ElementType;
-  subValue?: string;
-  trend?: { value: number; label: string };
-  onClick?: () => void;
-}
+import { EmptyState } from '../components/ui/EmptyState';
 
 interface LanguageBarProps {
   language: string;
@@ -26,7 +14,7 @@ interface LanguageBarProps {
   color: string;
 }
 
-interface ClusterCardProps {
+interface ClusterRowProps {
   name: string;
   color: string;
   repoCount: number;
@@ -34,139 +22,59 @@ interface ClusterCardProps {
   onClick?: () => void;
 }
 
-// ============================================================================
-// Sub Components
-// ============================================================================
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, subValue, trend, onClick }) => {
-  const content = (
-    <>
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">{title}</p>
-        <h3 className="font-heading mt-3 text-3xl font-semibold text-text-main">{value}</h3>
-        {subValue && <p className="mt-1.5 text-sm text-text-muted">{subValue}</p>}
-        {trend && (
-          <div className={`mt-3 flex items-center gap-1 text-xs font-medium ${trend.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            <TrendingUp className={`w-3 h-3 ${trend.value < 0 ? 'rotate-180' : ''}`} />
-            <span>{trend.value >= 0 ? '+' : ''}{trend.value}% {trend.label}</span>
-          </div>
-        )}
-      </div>
-      <div className="rounded-2xl bg-bg-hover/85 p-3 text-text-main dark:bg-dark-bg-sidebar">
-        <Icon className="w-5 h-5" />
-      </div>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="panel-surface-strong flex items-start justify-between p-6 text-left transition-transform hover:-translate-y-0.5 motion-reduce:transition-none"
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div className="panel-surface-strong flex items-start justify-between p-6">
-      {content}
-    </div>
-  );
-};
-
 const LanguageBar: React.FC<LanguageBarProps> = ({ language, count, percentage, color }) => {
   const { t } = useTranslation();
   return (
-    <div className="group">
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-3 h-3 rounded-full ring-1 ring-black/10"
-            style={{ backgroundColor: color }}
-          />
-          <span className="text-sm font-medium text-text-main dark:text-dark-text-main">{language}</span>
-        </div>
-        <span className="text-xs text-text-muted tabular-nums dark:text-dark-text-main/70">
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <span className="min-w-0 truncate text-sm text-text-main">{language}</span>
+        <span className="shrink-0 text-xs tabular-nums text-text-muted">
           {t('dashboard.repos_count', { count })}
         </span>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-bg-hover/90 dark:bg-dark-bg-sidebar">
+      <div className="h-1.5 overflow-hidden rounded-full bg-bg-hover">
         <div
-          className="h-full rounded-full transition-[width,opacity] duration-500 group-hover:opacity-90 motion-reduce:transition-none"
-          style={{
-            width: `${percentage}%`,
-            backgroundColor: color,
-          }}
+          className="h-full rounded-full"
+          style={{ width: `${percentage}%`, backgroundColor: color }}
         />
       </div>
     </div>
-);
+  );
 };
 
-const ClusterCard: React.FC<ClusterCardProps> = ({ name, color, repoCount, keywords, onClick }) => {
+const ClusterRow: React.FC<ClusterRowProps> = ({ name, color, repoCount, keywords, onClick }) => {
   const { t } = useTranslation();
-  const content = (
-    <div className="flex items-start gap-3">
-      <div
-        className="w-4 h-4 rounded-full mt-0.5 ring-1 ring-black/10 flex-shrink-0"
-        style={{ backgroundColor: color }}
-      />
-      <div className="flex-1 min-w-0">
-        <h4 className="font-heading text-sm font-semibold text-text-main truncate dark:text-dark-text-main">{name}</h4>
-        <p className="text-xs text-text-muted mt-1 dark:text-dark-text-main/70">
-          {t('common.repositories', { count: repoCount })}
-        </p>
-        {keywords.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {keywords.slice(0, 4).map((keyword) => (
-              <span
-                key={keyword}
-                className="rounded-full bg-bg-hover px-2 py-1 text-[10px] font-semibold text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
-              >
-                {keyword}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="panel-surface p-5 text-left transition-transform hover:-translate-y-px motion-reduce:transition-none"
-      >
-        {content}
-      </button>
-    );
-  }
-
   return (
-    <div className="panel-surface p-4">
-      {content}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="grid w-full grid-cols-[auto_1fr_auto] items-baseline gap-x-3 gap-y-1 rounded-xl px-2 py-3 text-left transition-colors hover:bg-bg-hover/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary motion-reduce:transition-none"
+    >
+      <span
+        className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+        aria-hidden="true"
+      />
+      <span className="min-w-0 truncate font-heading text-sm font-semibold text-text-main">
+        {name}
+      </span>
+      <span className="shrink-0 text-xs tabular-nums text-text-muted">
+        {t('dashboard.repos_count', { count: repoCount })}
+      </span>
+      {keywords.length > 0 ? (
+        <span className="col-start-2 truncate text-xs text-text-muted">
+          {keywords.slice(0, 4).join(' · ')}
+        </span>
+      ) : null}
+    </button>
   );
 };
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 const Dashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { stats, activityData, maxActivity, loading, error, retry } = useDashboardQuery();
-
-  // Navigate to graph with cluster filter
-  const handleClusterClick = (clusterId: number) => {
-    navigate(`/graph?cluster=${clusterId}`);
-  };
+  const hasCollection = (stats?.totalRepos ?? 0) > 0;
 
   return (
     <div className="page-shell">
@@ -174,89 +82,63 @@ const Dashboard = () => {
 
       <main id="main-content" className="page-main">
         <header className="page-header">
-          <div className="page-header-inner select-none">
-            <div>
-              <div className="section-kicker mb-1 px-0">{t('common.overview')}</div>
-              <h1 className="page-title">
-              {t('sidebar.dashboard')}
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <LanguageSwitch />
-            <button
-              type="button"
-              onClick={() => navigate('/graph')}
-              className="header-action-ghost"
-            >
-              <span>{t('dashboard.explore_graph')}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          <h1 className="page-title">{t('sidebar.dashboard')}</h1>
+          <LanguageSwitch />
         </header>
 
         <section className="page-content">
           {loading ? (
             <DashboardSkeleton />
           ) : error ? (
-            <div className="max-w-6xl mx-auto min-h-[320px] flex flex-col items-center justify-center gap-3">
-              <p className="text-sm text-red-600">{t('common.load_failed', 'Failed to load data')}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  void retry();
-                }}
-                className="header-action"
-              >
-                {t('common.retry')}
-              </button>
-            </div>
+            <EmptyState
+              title={t('common.load_failed_dashboard')}
+              actionType="button"
+              actionLabel={t('common.retry')}
+              onAction={() => {
+                void retry();
+              }}
+            />
+          ) : !hasCollection ? (
+            <EmptyState
+              title={t('dashboard.empty_title')}
+              description={t('dashboard.empty_hint')}
+              actionTo="/settings"
+              actionLabel={t('common.sync_now')}
+            />
           ) : (
-            <div className="mx-auto max-w-[88rem] space-y-8">
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                  title={t('dashboard.total_repos')}
-                  value={stats?.totalRepos || 0}
-                  icon={Book}
-                  subValue={t('dashboard.starred_repos')}
-                  onClick={() => navigate('/data')}
-                />
-                <StatCard
-                  title={t('dashboard.total_topics')}
-                  value={stats ? stats.totalTopics.toLocaleString() : '0'}
-                  icon={Hash}
-                  subValue={t('dashboard.unique_topics')}
-                />
-                <StatCard
-                  title={t('dashboard.top_language')}
-                  value={stats?.topLanguage || t('common.n_a')}
-                  icon={Code}
-                />
-                <StatCard
-                  title={t('dashboard.clusters')}
-                  value={stats?.totalClusters || 0}
-                  icon={Layers}
-                  subValue={t('dashboard.knowledge_groups')}
-                  onClick={() => navigate('/graph')}
-                />
+            <div className="mx-auto max-w-5xl">
+              <div className="border-b border-border-light pb-8">
+                <h2 className="font-heading text-[32px] font-semibold leading-10 tracking-[-1.28px] text-text-main">
+                  {t('dashboard.collection_heading', { count: stats?.totalRepos ?? 0 })}
+                </h2>
+                <p className="mt-3 max-w-prose text-sm text-text-muted">
+                  {t('dashboard.collection_meta', {
+                    clusters: stats?.totalClusters ?? 0,
+                    topics: stats?.totalTopics ?? 0,
+                  })}
+                  {stats?.topLanguage ? ` · ${stats.topLanguage}` : ''}
+                </p>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => navigate('/graph')} className="header-action">
+                    {t('dashboard.explore_graph')}
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/data')}
+                    className="header-action-ghost"
+                  >
+                    {t('dashboard.browse_table')}
+                  </button>
+                </div>
               </div>
 
-              {/* Charts Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                {/* Language Distribution */}
-                <div className="panel-surface p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-heading text-sm font-semibold text-text-main">
-                      {t('dashboard.language_distribution')}
-                    </h3>
-                    <span className="text-xs text-text-muted">
-                      {stats?.topLanguages?.length || 0} {t('common.languages')}
-                    </span>
-                  </div>
-
-                  <div className="space-y-4">
+              <div className="mt-10 grid grid-cols-1 gap-12 lg:grid-cols-5">
+                <div className="lg:col-span-2">
+                  <h3 className="font-heading text-sm font-semibold text-text-main">
+                    {t('dashboard.language_distribution')}
+                  </h3>
+                  <div className="mt-5 flex flex-col gap-4">
                     {stats?.topLanguages?.map((lang) => (
                       <LanguageBar
                         key={lang.language}
@@ -266,167 +148,117 @@ const Dashboard = () => {
                         color={lang.color}
                       />
                     ))}
+                    {(!stats?.topLanguages || stats.topLanguages.length === 0) && (
+                      <p className="text-sm text-text-muted">{t('dashboard.no_data')}</p>
+                    )}
                   </div>
-
-                  {(!stats?.topLanguages || stats.topLanguages.length === 0) && (
-                    <div className="flex items-center justify-center h-32 text-text-muted text-sm">
-                      {t('dashboard.no_data')}
-                    </div>
-                  )}
                 </div>
 
-                {/* Right Column: Activity + Topics */}
-                <div className="flex flex-col gap-6">
-                  {/* Activity Timeline */}
-                  <div className="panel-surface p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-text-muted" />
-                        <h3 className="font-heading text-sm font-semibold text-text-main">
-                          {t('dashboard.star_activity')}
-                        </h3>
-                      </div>
+                <div className="flex flex-col gap-12 lg:col-span-3">
+                  <div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <h3 className="font-heading text-sm font-semibold text-text-main">
+                        {t('dashboard.star_activity')}
+                      </h3>
                       {stats?.recentActivity !== undefined && stats.recentActivity > 0 && (
-                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full font-medium">
+                        <span className="text-xs tabular-nums text-text-muted">
                           +{stats.recentActivity} {t('dashboard.last_3_months')}
                         </span>
                       )}
                     </div>
-
-                  {/* Activity bars */}
-                  <div className="flex items-end gap-1.5 h-32 pt-8">
-                    {activityData.map((data, idx) => {
-                      const height = (data.count / maxActivity) * 100;
-                      const isRecent = idx >= activityData.length - 3;
-                      return (
-                        <div
-                          key={data.date}
-                          className="flex-1 flex flex-col items-center justify-end group h-full relative"
-                        >
-                          {/* Hover tooltip */}
-                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
-                            <div className="bg-text-main text-bg-main text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                              <div className="font-medium">{t('dashboard.repos_count', { count: data.count })}</div>
-                              <div className="text-bg-main/70">{data.date}</div>
-                            </div>
-                            <div className="w-2 h-2 bg-text-main rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
-                          </div>
-
-                          {/* Bar */}
-                          <button
-                            type="button"
-                            className={`w-full rounded-t transition-[height,opacity] duration-300 cursor-pointer hover:opacity-90 motion-reduce:transition-none ${
-                              isRecent
-                                ? 'bg-action-primary shadow-sm'
-                                : 'bg-action-primary/45'
-                            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/50`}
-                            style={{ height: `${Math.max(height, 8)}%` }}
-                            onClick={() => navigate(`/data?month=${data.date}`)}
-                            aria-label={t('dashboard.repos_count', { count: data.count }) + ` (${data.date})`}
-                          />
+                    {activityData.length > 0 ? (
+                      <>
+                        <div className="mt-6 flex h-28 items-end gap-1">
+                          {activityData.map((data, idx) => {
+                            const height = (data.count / maxActivity) * 100;
+                            const isRecent = idx >= activityData.length - 3;
+                            return (
+                              <button
+                                key={data.date}
+                                type="button"
+                                className={`min-h-1 flex-1 rounded-sm transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary ${
+                                  isRecent ? 'bg-action-primary' : 'bg-action-primary/40'
+                                }`}
+                                style={{ height: `${Math.max(height, 6)}%` }}
+                                onClick={() => navigate(`/data?month=${data.date}`)}
+                                aria-label={`${t('dashboard.repos_count', { count: data.count })} (${data.date})`}
+                              />
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                        <div className="mt-2 flex justify-between text-xs text-text-muted">
+                          <span>{activityData[0]?.date}</span>
+                          <span>{activityData[activityData.length - 1]?.date}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-5 text-sm text-text-muted">{t('dashboard.no_activity')}</p>
+                    )}
                   </div>
 
-                  {/* Date labels */}
-                  {activityData.length > 0 && (
-                    <div className="flex justify-between mt-3 text-[10px] text-text-muted font-medium">
-                      <span>{activityData[0]?.date}</span>
-                      <span className="text-text-muted">
-                        {activityData[Math.floor(activityData.length / 2)]?.date}
-                      </span>
-                      <span>{activityData[activityData.length - 1]?.date}</span>
-                    </div>
-                  )}
-
-                  {activityData.length === 0 && (
-                    <div className="flex items-center justify-center h-32 text-text-muted text-sm">
-                      {t('dashboard.no_activity')}
-                    </div>
-                  )}
-                </div>
-
-                {/* Popular Topics */}
-                <div className="panel-surface p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-text-muted" />
-                      <h3 className="font-heading text-sm font-semibold text-text-main">
-                        {t('dashboard.popular_topics')}
-                      </h3>
-                    </div>
-                    <span className="text-xs text-text-muted">
-                      {t('dashboard.top_12')}
-                    </span>
+                  <div>
+                    <h3 className="font-heading text-sm font-semibold text-text-main">
+                      {t('dashboard.popular_topics')}
+                    </h3>
+                    {stats?.topTopics && stats.topTopics.length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {stats.topTopics.map((item) => (
+                          <button
+                            key={item.topic}
+                            type="button"
+                            onClick={() =>
+                              navigate(`/data?topic=${encodeURIComponent(item.topic)}`)
+                            }
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border-light bg-bg-sidebar px-3 py-1.5 text-sm text-text-main transition-colors hover:border-action-primary hover:bg-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+                          >
+                            {item.topic}
+                            <span className="tabular-nums text-text-muted">{item.count}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-4 text-sm text-text-muted">{t('dashboard.no_topics')}</p>
+                    )}
                   </div>
-
-                  {/* Topics cloud */}
-                  <div className="flex flex-wrap gap-2">
-                    {stats?.topTopics?.map((item) => {
-                      return (
-                        <button
-                          key={item.topic}
-                          onClick={() => navigate(`/data?topic=${encodeURIComponent(item.topic)}`)}
-                          // Hardcoded rgb() here bypassed the token system and
-                          // stayed light-theme blue in dark mode, at 2.07:1.
-                          className="group rounded-full border border-action-primary/25 bg-action-primary/10 px-4 py-2 text-sm font-semibold text-action-primary transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-sm motion-reduce:transition-none"
-                        >
-                          <span>{item.topic}</span>
-                          <span className="ml-1.5 text-xs opacity-60">
-                            {item.count}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {(!stats?.topTopics || stats.topTopics.length === 0) && (
-                    <div className="flex items-center justify-center h-20 text-text-muted text-sm">
-                      {t('dashboard.no_topics')}
-                    </div>
-                  )}
                 </div>
               </div>
+
+              {stats?.topClusters && stats.topClusters.length > 0 && (
+                <div className="mt-12 border-t border-border-light pt-10">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="font-heading text-sm font-semibold text-text-main">
+                      {t('dashboard.top_clusters')}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/graph')}
+                      className="header-action-ghost"
+                    >
+                      {t('common.view_all')}
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <ul className="mt-2 divide-y divide-border-light">
+                    {stats.topClusters.map((cluster) => (
+                      <li key={cluster.id}>
+                        <ClusterRow
+                          name={cluster.name || `Cluster ${cluster.id}`}
+                          color={cluster.color || '#8f8f8f'}
+                          repoCount={cluster.repo_count}
+                          keywords={cluster.keywords || []}
+                          onClick={() => navigate(`/graph?cluster=${cluster.id}`)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-
-            {/* Clusters Grid */}
-            {stats?.topClusters && stats.topClusters.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-heading text-sm font-semibold text-text-main">
-                    {t('dashboard.top_clusters')}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/graph')}
-                    className="header-action-ghost min-h-11 px-3 text-xs text-action-primary hover:bg-transparent hover:text-action-hover"
-                  >
-                    {t('common.view_all')}
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {stats.topClusters.map((cluster) => (
-                    <ClusterCard
-                      key={cluster.id}
-                      name={cluster.name || `Cluster ${cluster.id}`}
-                      color={cluster.color || '#6B7280'}
-                      repoCount={cluster.repo_count}
-                      keywords={cluster.keywords || []}
-                      onClick={() => handleClusterClick(cluster.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-    </main>
-  </div>
-);
+          )}
+        </section>
+      </main>
+    </div>
+  );
 };
 
 export default Dashboard;

@@ -302,14 +302,16 @@ class SnapshotStoreRepository:
         snapshot: GraphSnapshot,
         *,
         include_edges: bool = True,
+        include_nodes: bool = True,
     ) -> GraphData:
-        node_rows = await db.execute(
-            select(GraphSnapshotNode)
-            .where(GraphSnapshotNode.snapshot_id == snapshot.id)
-            .order_by(GraphSnapshotNode.id.asc())
-        )
-
-        nodes = [row.payload for row in node_rows.scalars().all()]
+        nodes: list[dict] = []
+        if include_nodes:
+            node_rows = await db.execute(
+                select(GraphSnapshotNode)
+                .where(GraphSnapshotNode.snapshot_id == snapshot.id)
+                .order_by(GraphSnapshotNode.id.asc())
+            )
+            nodes = [row.payload for row in node_rows.scalars().all()]
         edges: list[dict] = []
         if include_edges:
             edge_rows = await db.execute(
@@ -392,3 +394,25 @@ class SnapshotStoreRepository:
             for edge in current
         ]
         return payload, next_cursor
+
+    async def get_nodes_page(
+        self,
+        db: AsyncSession,
+        snapshot_id: int,
+        cursor: int,
+        limit: int,
+    ) -> tuple[list[dict], int | None]:
+        rows = await db.execute(
+            select(GraphSnapshotNode)
+            .where(
+                GraphSnapshotNode.snapshot_id == snapshot_id,
+                GraphSnapshotNode.id >= cursor,
+            )
+            .order_by(GraphSnapshotNode.id.asc())
+            .limit(limit + 1)
+        )
+        nodes = rows.scalars().all()
+        has_next = len(nodes) > limit
+        current = nodes[:limit]
+        next_cursor = current[-1].id + 1 if has_next and current else None
+        return [node.payload for node in current], next_cursor

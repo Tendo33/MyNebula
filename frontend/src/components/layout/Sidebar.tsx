@@ -104,7 +104,7 @@ export const Sidebar = () => {
         <button
           type="button"
           onClick={() => setMobileOpen((prev) => !prev)}
-          className="header-action fixed left-3 top-3 z-[70] h-11 w-11 px-0"
+          className="icon-button fixed left-3 top-3 z-[70]"
           aria-label={mobileOpen ? t('common.close') : t('common.open_menu', 'Open menu')}
         >
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -114,7 +114,7 @@ export const Sidebar = () => {
       {isMobile && mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-[55] bg-slate-950/50"
+          className="fixed inset-0 z-[55] bg-overlay"
           onClick={() => setMobileOpen(false)}
           aria-label={t('common.close')}
         />
@@ -122,7 +122,7 @@ export const Sidebar = () => {
 
       <aside
         className={clsx(
-          'fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border-light bg-bg-sidebar shadow-[0_24px_64px_-36px_rgba(28,34,46,0.12)] transition-transform duration-200 dark:border-dark-border dark:bg-dark-bg-sidebar',
+          'fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border-light bg-bg-sidebar transition-transform duration-200 dark:border-dark-border dark:bg-dark-bg-sidebar',
           isMobile ? (mobileOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'
         )}
         style={{ width: `${isMobile ? Math.min(sidebarWidth, 300) : sidebarWidth}px` }}
@@ -131,22 +131,22 @@ export const Sidebar = () => {
           href="https://github.com/Tendo33/MyNebula"
           target="_blank"
           rel="noopener noreferrer"
-          className="panel-subtle mx-3 mb-3 mt-3 flex min-h-[4.5rem] items-center gap-3 px-4 py-3 hover:bg-bg-main/78 dark:hover:bg-dark-bg-main/72"
+          className="mx-3 mb-2 mt-3 flex min-h-12 items-center gap-2.5 rounded-md px-2 py-2 hover:bg-bg-hover"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-bg-main/85 text-text-main shadow-sm dark:bg-dark-bg-main/85">
-            <Github className="h-4 w-4" />
+          <div className="flex h-6 w-6 items-center justify-center rounded-md border border-border-light bg-bg-elevated text-text-main">
+            <Github className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="font-heading truncate text-sm font-semibold text-text-main">
+            <div className="truncate text-sm font-semibold tracking-[-0.28px] text-text-main">
               {t('app.title')}
             </div>
-            <div className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="truncate font-mono text-xs text-text-dim">
               {t('sidebar.tagline')}
             </div>
           </div>
         </a>
 
-        <nav className="flex-1 space-y-1.5 px-3 py-1">
+        <nav className="flex flex-1 flex-col gap-0.5 px-3 py-1">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
@@ -158,27 +158,19 @@ export const Sidebar = () => {
             }}
             className={({ isActive }) =>
               clsx(
-                'group relative flex min-h-[48px] items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm transition-all duration-200',
+                'group relative flex min-h-10 items-center gap-2 rounded-md px-2 text-sm transition-colors',
                 isActive
-                  ? 'border-border-light/95 bg-bg-main/94 text-text-main shadow-sm dark:border-dark-border/90 dark:bg-dark-bg-main/90 dark:text-dark-text-main'
-                  : 'border-transparent text-text-muted hover:-translate-y-px hover:border-border-light/70 hover:bg-bg-main/68 hover:text-text-main dark:text-dark-text-main/70 dark:hover:border-dark-border/85 dark:hover:bg-dark-bg-main/58 dark:hover:text-dark-text-main'
+                  ? 'bg-bg-hover font-medium text-text-main'
+                  : 'text-text-muted hover:bg-bg-hover hover:text-text-main'
               )
             }
           >
             {({ isActive }) => (
               <>
-                <span
-                  className={clsx(
-                    'h-2 w-2 rounded-full transition-all',
-                    isActive
-                      ? 'scale-100 bg-action-primary shadow-[0_0_0_4px_rgba(45,89,200,0.12)]'
-                      : 'scale-75 bg-border-light group-hover:bg-action-primary/45 dark:bg-dark-border'
-                  )}
-                />
                 <item.icon
                   className={clsx(
                     'h-4 w-4',
-                    isActive ? 'text-text-main' : 'text-text-muted group-hover:text-text-main'
+                    isActive ? 'text-text-main' : 'text-text-dim group-hover:text-text-main'
                   )}
                 />
                 <span className={clsx('truncate font-medium', isActive && 'font-semibold')}>

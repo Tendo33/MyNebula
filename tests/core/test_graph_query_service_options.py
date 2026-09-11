@@ -21,10 +21,29 @@ class _SnapshotRepoStub:
             created_at=datetime(2026, 3, 3, 12, 0, tzinfo=timezone.utc),
         )
 
-    async def hydrate_graph_data(self, _db, snapshot, *, include_edges=True):
+    async def hydrate_graph_data(
+        self, _db, snapshot, *, include_edges=True, include_nodes=True
+    ):
         edges = [GraphEdge(source=1, target=2, weight=0.9)] if include_edges else []
+        nodes = []
+        if include_nodes:
+            from nebula.schemas.graph import GraphNode
+
+            nodes = [
+                GraphNode(
+                    id=1,
+                    github_id=1,
+                    full_name="octo/demo",
+                    name="demo",
+                    html_url="https://github.com/octo/demo",
+                    owner="octo",
+                    x=0,
+                    y=0,
+                    z=0,
+                )
+            ]
         return GraphData(
-            nodes=[],
+            nodes=nodes,
             edges=edges,
             clusters=[],
             star_lists=[],
@@ -82,6 +101,22 @@ async def test_get_graph_data_with_options_omits_edges():
 
 
 @pytest.mark.asyncio
+async def test_get_graph_data_with_options_omits_nodes():
+    service = GraphQueryService(snapshot_repo=_SnapshotRepoStub())
+
+    payload = await service.get_graph_data_with_options(
+        db=object(),
+        user=SimpleNamespace(id=1),
+        version="active",
+        include_edges=False,
+        include_nodes=False,
+    )
+
+    assert payload.nodes == []
+    assert payload.request_id is not None
+
+
+@pytest.mark.asyncio
 async def test_rollback_active_snapshot_activates_previous():
     repo = _SnapshotRepoStub()
     service = GraphQueryService(snapshot_repo=repo)
@@ -131,7 +166,9 @@ async def test_get_snapshot_metadata_returns_request_id():
 
 
 class _BrokenSnapshotRepo(_SnapshotRepoStub):
-    async def hydrate_graph_data(self, _db, snapshot, *, include_edges=True):
+    async def hydrate_graph_data(
+        self, _db, snapshot, *, include_edges=True, include_nodes=True
+    ):
         raise RuntimeError("corrupt payload")
 
 

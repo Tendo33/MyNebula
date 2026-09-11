@@ -114,7 +114,7 @@ export const useGraphForces = ({
     fg.d3Force(
       'collide',
       forceCollide<ProcessedNode>()
-        .radius((node: ProcessedNode) => calculateNodeRadius(node.stargazers_count) * 1.5 + 3)
+        .radius((node: ProcessedNode) => calculateNodeRadius(node.stargazers_count) * 2.4 + 10)
         .strength(0.9)
         .iterations(2) as unknown as RegisteredForce
     );

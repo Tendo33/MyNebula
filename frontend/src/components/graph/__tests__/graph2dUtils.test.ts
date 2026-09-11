@@ -40,7 +40,7 @@ describe('graph2dUtils', () => {
   });
 
   it('exports the shared graph color palette', () => {
-    expect(GRAPH_2D_COLORS.NODE_DEFAULT).toBe('#6B7280');
-    expect(GRAPH_2D_COLORS.LINK_ACTIVE).toContain('139, 92, 246');
+    expect(GRAPH_2D_COLORS.NODE_DEFAULT).toBe('#8f8f8f');
+    expect(GRAPH_2D_COLORS.LINK_ACTIVE).toContain('0, 112, 243');
   });
 });

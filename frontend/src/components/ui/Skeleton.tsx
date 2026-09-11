@@ -201,7 +201,7 @@ export const RepoDetailsSkeleton: React.FC = () => (
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         {[...Array(2)].map((_, i) => (
-          <div key={i} className="rounded-2xl border border-border-light p-3">
+          <div key={i} className="rounded-xl border border-border-light p-3">
             <Skeleton className="h-6 w-16 mb-1" />
             <Skeleton className="h-3 w-12" />
           </div>

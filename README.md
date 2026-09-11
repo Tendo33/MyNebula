@@ -189,6 +189,7 @@ Recommended defaults by deployment style:
 
 - Local demo: `READ_ACCESS_MODE=demo`
 - Internet-facing deployment: `READ_ACCESS_MODE=authenticated`, `FORCE_SECURE_COOKIES=true`, `TRUST_PROXY_HEADERS=true`, `TRUSTED_PROXY_IPS=<your reverse proxy IPs>`
+- Internet-facing processes refuse demo mode and empty admin credentials unless `ALLOW_ANONYMOUS_DEMO=true`
 
 ### 2. Start the stack
 

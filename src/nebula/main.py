@@ -81,6 +81,7 @@ def create_app() -> FastAPI:
         Configured FastAPI application
     """
     settings = get_app_settings()
+    settings.assert_runtime_access_policy()
 
     app = FastAPI(
         title="MyNebula API",

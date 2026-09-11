@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 
 import type { DataClusterInfo, DataRepoItem } from '../../api/v2/data';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { ClusterBadge, SortableHeader } from './DataTableParts';
 import { formatDataDate, type SortConfig, type SortField } from './dataPageFilters';
 
@@ -20,7 +21,8 @@ export const DataRepoTable: React.FC<{
   onSort: (field: SortField) => void;
   onClusterFilter: (clusterId: number) => void;
   hasActiveFilters: boolean;
-}> = ({ repos, clusterMap, sortConfig, onSort, onClusterFilter, hasActiveFilters }) => {
+  onClearFilters: () => void;
+}> = ({ repos, clusterMap, sortConfig, onSort, onClusterFilter, hasActiveFilters, onClearFilters }) => {
   const { t } = useTranslation();
 
   return (
@@ -160,8 +162,15 @@ export const DataRepoTable: React.FC<{
 
             {repos.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-text-muted">
-                  {hasActiveFilters ? t('data.no_results') : t('data.no_data')}
+                <td colSpan={8}>
+                  <EmptyState
+                    title={hasActiveFilters ? t('data.no_results') : t('data.no_data')}
+                    description={t('data.empty_hint')}
+                    actionTo={hasActiveFilters ? undefined : '/settings'}
+                    actionLabel={hasActiveFilters ? t('common.clear_filters') : t('common.sync_now')}
+                    actionType={hasActiveFilters ? 'button' : 'link'}
+                    onAction={hasActiveFilters ? onClearFilters : undefined}
+                  />
                 </td>
               </tr>
             )}
@@ -226,9 +235,14 @@ export const DataRepoTable: React.FC<{
       ))}
 
       {repos.length === 0 && (
-        <div className="panel-surface p-6 text-center text-sm text-text-muted">
-          {hasActiveFilters ? t('data.no_results') : t('data.no_data')}
-        </div>
+        <EmptyState
+          title={hasActiveFilters ? t('data.no_results') : t('data.no_data')}
+          description={t('data.empty_hint')}
+          actionTo={hasActiveFilters ? undefined : '/settings'}
+          actionLabel={hasActiveFilters ? t('common.clear_filters') : t('common.sync_now')}
+          actionType={hasActiveFilters ? 'button' : 'link'}
+          onAction={hasActiveFilters ? onClearFilters : undefined}
+        />
       )}
     </div>
     </>

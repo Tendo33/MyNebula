@@ -27,6 +27,19 @@ def _trimmed_query(query: str | None) -> str:
     return (query or "").strip()
 
 
+def _escape_ilike_fragment(query: str) -> str:
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _array_text_ilike(array_column, query: str):
+    """Search array columns via a trigram-indexable concatenated text expression."""
+    return func.coalesce(func.array_to_string(array_column, " "), "").ilike(
+        _escape_ilike_fragment(query),
+        escape="\\",
+    )
+
+
 def _parse_stars_threshold(query: str | None) -> int | None:
     normalized = _normalized_query(query)
     match = STARS_QUERY_PATTERN.match(normalized)
@@ -71,19 +84,6 @@ def _build_topic_filter_condition(topic: str):
     )
 
 
-def _build_array_fragment_condition(array_column, query: str, alias_name: str):
-    values = (
-        func.unnest(array_column).table_valued("value").render_derived(name=alias_name)
-    )
-    return (
-        select(1)
-        .select_from(values)
-        .where(values.c.value.ilike(f"%{query}%"))
-        .correlate(StarredRepo)
-        .exists()
-    )
-
-
 def _data_repo_order_by(sort_field: str, sort_direction: str):
     sort_column_map = {
         "name": StarredRepo.name,
@@ -113,7 +113,7 @@ async def get_data_repos(
         pattern="^(name|language|stargazers_count|starred_at|cluster|summary|last_commit_time)$",
     ),
     sort_direction: str = Query(default="desc", pattern="^(asc|desc)$"),
-    limit: int = Query(default=200, ge=1, le=2000),
+    limit: int = Query(default=200, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
@@ -137,20 +137,16 @@ async def get_data_repos(
         if stars_threshold is not None:
             conditions.append(StarredRepo.stargazers_count > stars_threshold)
         else:
-            like_q = f"%{trimmed_query}%"
+            like_q = _escape_ilike_fragment(trimmed_query)
             conditions.append(
                 or_(
-                    StarredRepo.name.ilike(like_q),
-                    StarredRepo.full_name.ilike(like_q),
-                    StarredRepo.description.ilike(like_q),
-                    StarredRepo.ai_summary.ilike(like_q),
-                    StarredRepo.language.ilike(like_q),
-                    _build_array_fragment_condition(
-                        StarredRepo.ai_tags, trimmed_query, "ai_tag_values"
-                    ),
-                    _build_array_fragment_condition(
-                        StarredRepo.topics, trimmed_query, "topic_search_values"
-                    ),
+                    StarredRepo.name.ilike(like_q, escape="\\"),
+                    StarredRepo.full_name.ilike(like_q, escape="\\"),
+                    StarredRepo.description.ilike(like_q, escape="\\"),
+                    StarredRepo.ai_summary.ilike(like_q, escape="\\"),
+                    StarredRepo.language.ilike(like_q, escape="\\"),
+                    _array_text_ilike(StarredRepo.ai_tags, trimmed_query),
+                    _array_text_ilike(StarredRepo.topics, trimmed_query),
                 )
             )
     month_window = _parse_month_window(month)

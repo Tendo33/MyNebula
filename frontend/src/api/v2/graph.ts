@@ -1,5 +1,5 @@
 import client from '../client';
-import { GraphData, GraphEdge, TimelineData } from '../../types';
+import { GraphData, GraphEdge, GraphNode, TimelineData } from '../../types';
 
 export interface GraphEdgesPage {
   edges: GraphEdge[];
@@ -9,14 +9,24 @@ export interface GraphEdgesPage {
   request_id?: string;
 }
 
+export interface GraphNodesPage {
+  nodes: GraphNode[];
+  next_cursor: number | null;
+  version: string;
+  generated_at?: string;
+  request_id?: string;
+}
+
 export const getGraphDataV2 = async (params?: {
   version?: string;
   include_edges?: boolean;
+  include_nodes?: boolean;
 }): Promise<GraphData> => {
   const response = await client.get<GraphData>('/v2/graph', {
     params: {
       version: params?.version ?? 'active',
       include_edges: params?.include_edges ?? false,
+      include_nodes: params?.include_nodes ?? true,
     },
   });
   return response.data;
@@ -37,6 +47,19 @@ export const getGraphEdgesPageV2 = async (
       version: params?.version ?? 'active',
       cursor: params?.cursor ?? 0,
       limit: params?.limit ?? 1000,
+    },
+  });
+  return response.data;
+};
+
+export const getGraphNodesPageV2 = async (
+  params?: { version?: string; cursor?: number; limit?: number }
+): Promise<GraphNodesPage> => {
+  const response = await client.get<GraphNodesPage>('/v2/graph/nodes', {
+    params: {
+      version: params?.version ?? 'active',
+      cursor: params?.cursor ?? 0,
+      limit: params?.limit ?? 400,
     },
   });
   return response.data;

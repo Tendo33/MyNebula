@@ -21,7 +21,7 @@ export const SettingsSchedule = ({
 
   return (
     <section>
-      <h2 className="section-kicker mb-4 select-none">
+      <h2 className="section-heading mb-4 select-none">
         {t('settings.scheduled_sync')}
       </h2>
 
@@ -71,7 +71,7 @@ export const SettingsSchedule = ({
                   value={schedule.schedule_hour}
                   onChange={(e) => onTimeChange(Number(e.target.value), schedule.schedule_minute)}
                   disabled={scheduleLoading}
-                  className="field-surface h-11 px-3 py-1.5 text-sm"
+                  className="field-surface"
                 >
                   {Array.from({ length: 24 }, (_, i) => (
                     <option key={i} value={i}>
@@ -84,7 +84,7 @@ export const SettingsSchedule = ({
                   value={schedule.schedule_minute}
                   onChange={(e) => onTimeChange(schedule.schedule_hour, Number(e.target.value))}
                   disabled={scheduleLoading}
-                  className="field-surface h-11 px-3 py-1.5 text-sm"
+                  className="field-surface"
                 >
                   {[0, 15, 30, 45].map((m) => (
                     <option key={m} value={m}>

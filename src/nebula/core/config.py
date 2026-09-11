@@ -306,6 +306,14 @@ class AppSettings(BaseSettings):
         default=False,
         description="Redirect HTTP requests to HTTPS",
     )
+    allow_anonymous_demo: bool = Field(
+        default=False,
+        description=(
+            "Explicit opt-in for anonymous demo reads on an internet-facing "
+            "process. Local Docker/demo does not need this; set it only if you "
+            "intentionally publish READ_ACCESS_MODE=demo behind TLS."
+        ),
+    )
     content_security_policy: str = Field(
         default=DEFAULT_CONTENT_SECURITY_POLICY,
         description="Optional Content-Security-Policy header value",
@@ -343,6 +351,33 @@ class AppSettings(BaseSettings):
     def trusted_proxy_ips_list(self) -> list[str]:
         """Return parsed trusted proxy IP allowlist."""
         return [ip.strip() for ip in self.trusted_proxy_ips.split(",") if ip.strip()]
+
+    def is_internet_facing(self) -> bool:
+        """Return whether runtime flags indicate a public deployment."""
+        return bool(
+            self.force_secure_cookies
+            or self.https_redirect
+            or self.trusted_hosts_list()
+        )
+
+    def assert_runtime_access_policy(self) -> None:
+        """Refuse internet-facing processes that still use the demo footgun."""
+        if self.allow_anonymous_demo or not self.is_internet_facing():
+            return
+
+        auth_enabled = bool(self.admin_password and self.admin_session_secret)
+        if not auth_enabled:
+            raise RuntimeError(
+                "Internet-facing deployments require ADMIN_PASSWORD and "
+                "ADMIN_SESSION_SECRET. Set both, or set ALLOW_ANONYMOUS_DEMO=true "
+                "only for an intentional public demo."
+            )
+        if self.effective_read_access_mode() == "demo":
+            raise RuntimeError(
+                "Internet-facing deployments cannot use READ_ACCESS_MODE=demo. "
+                "Set READ_ACCESS_MODE=authenticated, or set "
+                "ALLOW_ANONYMOUS_DEMO=true only for an intentional public demo."
+            )
 
 
 @lru_cache

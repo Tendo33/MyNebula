@@ -28,7 +28,6 @@ const GraphPage = () => {
     filteredData,
     rawData,
     loadData,
-    edgesLoading,
     error,
     selectedNode,
     setSelectedNode,
@@ -43,6 +42,12 @@ const GraphPage = () => {
     autoLoadHalted,
     loadedEdgePages,
     edgePageSize,
+    retryNodeLoading,
+    loadMoreNodes,
+    canLoadMoreNodes,
+    nodeAutoLoadHalted,
+    loadedNodePages,
+    nodePageSize,
   } = useGraph();
 
   useEffect(() => {
@@ -198,7 +203,15 @@ const GraphPage = () => {
   const [showFilters, setShowFilters] = useState(
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
-  const [showNodeList, setShowNodeList] = useState(false);
+  const [showNodeList, setShowNodeList] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return (
+      window.innerWidth < 1024 ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -234,57 +247,16 @@ const GraphPage = () => {
       <main id="main-content" className="page-main">
         <header className="page-header sm:px-6">
           <div className="page-header-inner select-none">
-            <div>
-              <div className="section-kicker mb-1 px-0">{t('common.explore')}</div>
-              <h1 className="page-title">{t('sidebar.graph')}</h1>
-            </div>
-            <span className="hidden page-subtitle sm:inline">
-              {filteredData?.total_nodes !== undefined
-                ? t('dashboard.subtitle', { count: filteredData.total_nodes })
-                : t('dashboard.subtitle_infinite')}
-            </span>
-            {rawData && filteredData && rawData.total_nodes !== filteredData.total_nodes && (
-              <span className="hidden text-xs text-text-muted sm:inline">
-                / {rawData.total_nodes} {t('common.total')}
+            <h1 className="page-title">{t('sidebar.graph')}</h1>
+            {filteredData && filteredData.total_nodes > 0 ? (
+              <span className="hidden page-subtitle sm:inline">
+                {t('graph.showing_repos', { count: filteredData.total_nodes })}
               </span>
-            )}
-            {edgesLoading && (
-              <span className="hidden toolbar-badge sm:inline-flex">
-                {t('sync.loading_edges', 'Loading edges…')}
-              </span>
-            )}
-            {autoLoadHalted && (
-              <button
-                type="button"
-                onClick={() => {
-                  void loadMoreEdges();
-                }}
-                disabled={!canLoadMoreEdges}
-                className="hidden text-xs text-text-main hover:underline sm:inline"
-              >
-                {t('graph.load_more_edges', 'Load more edges')}
-              </button>
-            )}
-            {error && (
-              <button
-                type="button"
-                onClick={() => {
-                  void Promise.all([loadData(), retryEdgeLoading()]);
-                }}
-                className="hidden text-xs text-red-600 hover:underline sm:inline"
-              >
-                {t('common.retry')}
-              </button>
-            )}
+            ) : null}
           </div>
 
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:min-w-0 sm:flex-1 sm:flex-nowrap sm:gap-3">
-            <LanguageSwitch />
-
-            {/* Below `sm` the search takes its own full-width row: squeezed
-                inline it dropped to ~175px, and the 12-character Chinese
-                placeholder cannot fit there at any gutter size. */}
-            <div className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:max-w-md sm:flex-1">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+            <div className="order-last w-full min-w-0 sm:order-none sm:w-64 sm:flex-none">
               <SearchInput onSearch={handleSearch} value={filters.searchQuery} />
             </div>
 
@@ -293,17 +265,14 @@ const GraphPage = () => {
               onClick={() => setShowFilters(!showFilters)}
               aria-expanded={showFilters}
               aria-controls="graph-filters-panel"
-              aria-label={t('common.filter', 'Filters')}
-              className={`header-action relative min-h-0 h-11 w-11 shrink-0 px-0 ${
-                showFilters
-                  ? 'border-border-light bg-bg-sidebar text-text-main dark:border-dark-border dark:bg-dark-bg-sidebar dark:text-dark-text-main'
-                  : 'border-transparent bg-transparent text-text-muted shadow-none hover:bg-bg-hover dark:text-dark-text-main/70 dark:hover:bg-dark-bg-sidebar/70 dark:hover:text-dark-text-main'
+              aria-label={t('common.filter')}
+              className={`header-action-ghost relative w-10 shrink-0 px-0 ${
+                showFilters ? 'bg-bg-hover' : ''
               }`}
             >
               <Filter aria-hidden="true" className="h-4 w-4" />
-              {/* Absolute so the dot cannot stretch the icon button out of square. */}
               {hasActiveFilters && (
-                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-action-primary" />
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-link" />
               )}
             </button>
 
@@ -311,14 +280,17 @@ const GraphPage = () => {
               type="button"
               onClick={() => setShowNodeList((current) => !current)}
               aria-expanded={showNodeList}
+              aria-pressed={showNodeList}
               aria-controls="graph-accessible-node-list"
-              className="header-action min-h-0 h-11 shrink-0 whitespace-nowrap px-3"
+              className={`header-action-ghost shrink-0 whitespace-nowrap ${
+                showNodeList ? 'bg-bg-hover' : ''
+              }`}
             >
               <List aria-hidden="true" className="h-4 w-4" />
-              <span className="sr-only sm:not-sr-only">
-                {t('graph.browse_as_list', 'Browse as list')}
-              </span>
+              <span className="sr-only sm:not-sr-only">{t('graph.browse_as_list', 'Browse as list')}</span>
             </button>
+
+            <LanguageSwitch />
           </div>
         </header>
 
@@ -326,7 +298,7 @@ const GraphPage = () => {
           {isMobile && showFilters && (
             <button
               type="button"
-              className="absolute inset-0 z-20 bg-slate-950/50"
+              className="absolute inset-0 z-20 bg-overlay"
               onClick={() => setShowFilters(false)}
               aria-label={t('common.close')}
             />
@@ -390,39 +362,58 @@ const GraphPage = () => {
                     type="button"
                     onClick={() => setShowNodeList(false)}
                     aria-label={t('common.close', 'Close')}
-                    className="header-action h-10 w-10 px-0"
+                    className="icon-button"
                   >
                     <X aria-hidden="true" className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                <ul className="min-h-0 flex-1 overflow-y-auto p-2">
                   {(filteredData?.nodes ?? []).slice(0, 50).map((node) => (
+                    <li key={node.id}>
                     <button
-                      key={node.id}
                       type="button"
                       onClick={() => setSelectedNode(node)}
+                      aria-current={selectedNode?.id === node.id ? 'true' : undefined}
                       className="w-full rounded-xl px-3 py-2 text-left hover:bg-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary dark:hover:bg-dark-bg-sidebar/70"
                     >
                       <span className="block truncate text-sm font-medium text-text-main dark:text-dark-text-main">
                         {node.full_name}
                       </span>
                       <span className="block truncate text-xs text-text-muted">
-                        {node.description || node.ai_summary || t('common.no_description', 'No description')}
+                        {node.description || node.ai_summary || t('common.no_description')}
                       </span>
                     </button>
+                    </li>
                   ))}
                   {filteredData && filteredData.nodes.length > 50 && (
-                    <p className="px-3 py-2 text-xs text-text-muted">
-                      {t(
-                        'graph.repository_list_limited',
-                        'Showing the first 50 matches. Refine your search to narrow the list.'
-                      )}
-                    </p>
+                    <li className="px-3 py-2 text-xs text-text-muted">
+                      {t('graph.repository_list_limited')}
+                    </li>
                   )}
-                </div>
+                </ul>
               </section>
             )}
-            {autoLoadHalted && (
+            {nodeAutoLoadHalted && (
+              <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
+                <span>
+                  {t('graph.node_load_paused', {
+                    pages: loadedNodePages,
+                    nodes: loadedNodePages * nodePageSize,
+                  })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void loadMoreNodes();
+                  }}
+                  disabled={!canLoadMoreNodes}
+                  className="header-action-ghost shrink-0"
+                >
+                  {t('graph.load_more_nodes')}
+                </button>
+              </div>
+            )}
+            {autoLoadHalted && !nodeAutoLoadHalted && (
               <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
                 <span>
                   {t(
@@ -440,21 +431,21 @@ const GraphPage = () => {
                     void loadMoreEdges();
                   }}
                   disabled={!canLoadMoreEdges}
-                  className="header-action min-h-0 shrink-0 px-3 py-1.5 text-xs"
+                  className="header-action-ghost shrink-0"
                 >
                   {t('graph.load_more_edges', 'Load more edges')}
                 </button>
               </div>
             )}
             {error && (
-              <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 px-3 py-2 text-xs text-red-700">
-                <span>{t('common.load_failed', 'Failed to load data')}</span>
+              <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex w-[min(92%,28rem)] -translate-x-1/2 items-center justify-between gap-3 px-4 py-3">
+                <span className="text-sm text-text-main">{t('common.load_failed_graph')}</span>
                 <button
                   type="button"
                   onClick={() => {
-                    void Promise.all([loadData(), retryEdgeLoading()]);
+                    void Promise.all([loadData(), retryNodeLoading(), retryEdgeLoading()]);
                   }}
-                  className="underline underline-offset-2"
+                  className="header-action shrink-0"
                 >
                   {t('common.retry')}
                 </button>
@@ -466,13 +457,6 @@ const GraphPage = () => {
             </div>
 
             {selectedNode && <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />}
-
-            {!filteredData && !error && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg-main dark:bg-dark-bg-main">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-action-primary border-t-transparent motion-reduce:animate-none" />
-                <p className="text-sm text-text-muted">{t('common.loading', 'Loading…')}</p>
-              </div>
-            )}
           </div>
         </section>
       </main>

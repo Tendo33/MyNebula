@@ -26,18 +26,17 @@ class _FakeResult:
         return iter(self._rows)
 
 
-def test_data_array_search_uses_native_unnest_without_text_cast():
+def test_data_array_search_uses_concatenated_text_without_unnest():
     from nebula.api.v2 import data as data_api
     from nebula.db import StarredRepo
 
-    condition = data_api._build_array_fragment_condition(
-        StarredRepo.topics, "graph", "topic_search_values"
-    )
+    condition = data_api._array_text_ilike(StarredRepo.topics, "graph")
     sql = str(
         select(StarredRepo.id).where(condition).compile(dialect=postgresql.dialect())
     ).lower()
 
-    assert "unnest(starred_repos.topics) as topic_search_values(value)" in sql
+    assert "array_to_string" in sql
+    assert "unnest" not in sql
     assert "ilike" in sql
     assert "cast(starred_repos.topics as text)" not in sql
 

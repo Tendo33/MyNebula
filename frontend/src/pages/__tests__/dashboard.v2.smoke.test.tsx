@@ -40,14 +40,15 @@ vi.mock('../../features/dashboard/hooks/useDashboardQuery', () => ({
 import Dashboard from '../Dashboard';
 
 describe('Dashboard v2 smoke', () => {
-  it('renders v2 dashboard summary cards', () => {
+  it('renders the collection heading and cluster list', () => {
     render(
       <MemoryRouter>
         <Dashboard />
       </MemoryRouter>
     );
 
-    expect(screen.getByText('dashboard.total_repos')).toBeInTheDocument();
-    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.collection_heading')).toBeInTheDocument();
+    expect(screen.getByText('Cluster 1')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.explore_graph')).toBeInTheDocument();
   });
 });

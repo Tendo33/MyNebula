@@ -11,6 +11,10 @@ import {
   useGraphEdgesInfiniteQuery,
 } from '../features/graph/hooks/useGraphEdgesInfiniteQuery';
 import {
+  GRAPH_NODES_QUERY_KEY,
+  useGraphNodesInfiniteQuery,
+} from '../features/graph/hooks/useGraphNodesInfiniteQuery';
+import {
   TIMELINE_QUERY_KEY,
   useTimelineQuery,
 } from '../features/graph/hooks/useTimelineQuery';
@@ -43,6 +47,7 @@ interface GraphState {
   settings: GraphSettings;
   loading: boolean;
   edgesLoading: boolean;
+  nodesLoading: boolean;
   syncing: boolean;
   syncStep: string;
   error: string | null;
@@ -75,6 +80,12 @@ interface GraphContextValue extends GraphState {
   autoLoadHalted: boolean;
   loadedEdgePages: number;
   edgePageSize: number;
+  retryNodeLoading: () => Promise<void>;
+  loadMoreNodes: () => Promise<void>;
+  canLoadMoreNodes: boolean;
+  nodeAutoLoadHalted: boolean;
+  loadedNodePages: number;
+  nodePageSize: number;
 }
 
 const GraphContext = createContext<GraphContextValue | null>(null);
@@ -113,25 +124,33 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
   const graphQuery = useGraphDataQuery(refreshNonce, enabled);
   const timelineQuery = useTimelineQuery(refreshNonce, enabled);
   const graphVersion = graphQuery.data?.version ?? 'active';
+  const nodesQuery = useGraphNodesInfiniteQuery({
+    version: graphVersion,
+    refreshNonce,
+    enabled: enabled && !!graphQuery.data,
+  });
   const edgesQuery = useGraphEdgesInfiniteQuery({
     version: graphVersion,
     refreshNonce,
     enabled: enabled && !!graphQuery.data,
   });
+  const stagedNodes = nodesQuery.stagedNodes;
   const stagedEdges = edgesQuery.stagedEdges;
   const rawData = useMemo(() => {
     const graphPayload = graphQuery.data;
     if (!graphPayload) return null;
     return {
       ...graphPayload,
+      nodes: stagedNodes,
       edges: stagedEdges,
+      total_nodes: graphPayload.total_nodes,
       total_edges: graphPayload.total_edges,
     };
-  }, [graphQuery.data, stagedEdges]);
+  }, [graphQuery.data, stagedEdges, stagedNodes]);
   const timelineData = timelineQuery.data ?? null;
   const nodeFilterIndexes = useMemo(
-    () => buildGraphNodeSearchIndex(graphQuery.data?.nodes ?? []),
-    [graphQuery.data?.nodes]
+    () => buildGraphNodeSearchIndex(stagedNodes),
+    [stagedNodes]
   );
   const edgeFilterIndexes = useMemo(() => buildGraphEdgeIndex(stagedEdges), [stagedEdges]);
   // Built once here rather than inside each consumer of `useNodeNeighbors`.
@@ -142,6 +161,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     [edgeFilterIndexes, nodeFilterIndexes]
   );
   const loading = enabled && (graphQuery.isLoading || timelineQuery.isLoading);
+  const nodesLoading = Boolean(
+    graphQuery.data && (nodesQuery.isLoading || nodesQuery.isFetchingNextPage)
+  );
   const edgesLoading = Boolean(
     graphQuery.data && (edgesQuery.isLoading || edgesQuery.isFetchingNextPage)
   );
@@ -150,8 +172,14 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     if (queryError) {
       return queryError instanceof Error ? queryError.message : 'Failed to load graph data';
     }
-    return edgesQuery.edgesError ?? localError;
-  }, [edgesQuery.edgesError, graphQuery.error, localError, timelineQuery.error]);
+    return nodesQuery.nodesError ?? edgesQuery.edgesError ?? localError;
+  }, [
+    edgesQuery.edgesError,
+    graphQuery.error,
+    localError,
+    nodesQuery.nodesError,
+    timelineQuery.error,
+  ]);
 
   const loadData = useCallback(async () => {
     try {
@@ -160,6 +188,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
         queryClient.invalidateQueries({ queryKey: [GRAPH_DATA_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [TIMELINE_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [GRAPH_EDGES_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [GRAPH_NODES_QUERY_KEY] }),
       ]);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to load data');
@@ -225,6 +254,8 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
 
   const retryEdgeLoading = edgesQuery.retryEdgeLoading;
   const loadMoreEdges = edgesQuery.loadMoreEdges;
+  const retryNodeLoading = nodesQuery.retryNodeLoading;
+  const loadMoreNodes = nodesQuery.loadMoreNodes;
 
   const value: GraphContextValue = useMemo(() => ({
     rawData,
@@ -234,6 +265,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     settings,
     loading,
     edgesLoading,
+    nodesLoading,
     syncing,
     syncStep,
     error,
@@ -263,9 +295,15 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     autoLoadHalted: edgesQuery.autoLoadHalted,
     loadedEdgePages: edgesQuery.loadedPages,
     edgePageSize: edgesQuery.pageSize,
+    retryNodeLoading,
+    loadMoreNodes,
+    canLoadMoreNodes: nodesQuery.canLoadMoreNodes,
+    nodeAutoLoadHalted: nodesQuery.autoLoadHalted,
+    loadedNodePages: nodesQuery.loadedPages,
+    nodePageSize: nodesQuery.pageSize,
   }), [
     rawData, timelineData, selectedNode, filters, settings,
-    loading, edgesLoading, syncing, syncStep, error, filteredData,
+    loading, edgesLoading, nodesLoading, syncing, syncStep, error, filteredData,
     adjacencyIndex,
     loadData, refreshData,
     setSelectedNode, setSearchQuery, toggleCluster, setSelectedClusters,
@@ -274,6 +312,8 @@ export const GraphProvider: React.FC<{ children: React.ReactNode; enabled?: bool
     clearFilters, updateSettings, setSyncing, setSyncStep, retryEdgeLoading,
     loadMoreEdges, edgesQuery.canLoadMoreEdges, edgesQuery.autoLoadHalted,
     edgesQuery.loadedPages, edgesQuery.pageSize,
+    retryNodeLoading, loadMoreNodes, nodesQuery.canLoadMoreNodes,
+    nodesQuery.autoLoadHalted, nodesQuery.loadedPages, nodesQuery.pageSize,
   ]);
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>;

@@ -57,6 +57,7 @@ const clusters = [1, 2, 3].map((id) => ({
 
 const ROUTES: [string, unknown][] = [
   ['/api/v2/graph/edges', { edges: [], next_cursor: null, total_edges: 0, ...META }],
+  ['/api/v2/graph/nodes', { nodes, next_cursor: null, ...META }],
   [
     '/api/v2/graph/timeline',
     {

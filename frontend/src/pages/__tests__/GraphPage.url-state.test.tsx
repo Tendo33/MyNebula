@@ -61,6 +61,13 @@ const graphState = {
   autoLoadHalted: false,
   loadedEdgePages: 0,
   edgePageSize: 400,
+  nodesLoading: false,
+  retryNodeLoading: vi.fn(),
+  loadMoreNodes: vi.fn(),
+  canLoadMoreNodes: false,
+  nodeAutoLoadHalted: false,
+  loadedNodePages: 0,
+  nodePageSize: 400,
   error: null,
   selectedNode: null as GraphNode | null,
   setSelectedNode: vi.fn(),
@@ -87,6 +94,9 @@ vi.mock('react-i18next', () => ({
     ) => {
       const fallback = typeof fallbackOrOptions === 'string' ? fallbackOrOptions : undefined;
       const options = typeof fallbackOrOptions === 'object' ? fallbackOrOptions : maybeOptions;
+      if (key === 'graph.showing_repos' && options?.count !== undefined) {
+        return `${options.count} repos`;
+      }
       if (key === 'dashboard.subtitle' && options?.count !== undefined) {
         return `${options.count} repos`;
       }
@@ -250,7 +260,7 @@ describe('GraphPage URL state', () => {
     );
 
     const pausedButtons = getAllByRole('button', { name: 'Load more edges' });
-    expect(pausedButtons).toHaveLength(2);
+    expect(pausedButtons).toHaveLength(1);
     expect(pausedButtons.every((button) => (button as HTMLButtonElement).disabled)).toBe(true);
 
     graphState.autoLoadHalted = false;

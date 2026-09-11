@@ -136,7 +136,7 @@ export const useCommandPaletteResults = ({
             y: 0,
             z: 0,
             cluster_id: item.repo.cluster_id,
-            color: '#6B7280',
+            color: '#8f8f8f',
             size: 1,
             star_list_id: null,
             stargazers_count: item.repo.stargazers_count,

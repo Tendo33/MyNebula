@@ -2,8 +2,8 @@
 @config "../tailwind.config.js";
 
 :root {
-  font-family: "Avenir Next", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  line-height: 1.55;
+  font-family: "Geist Variable", Geist, Arial, sans-serif;
+  line-height: 1.5;
   font-weight: 400;
   color-scheme: light;
   --sidebar-width: 240px;
@@ -14,10 +14,10 @@
   --space-lg: 1.5rem;
   --space-xl: 2rem;
   --space-2xl: 3rem;
-  --surface-glow: 0 24px 60px -40px rgba(32, 40, 58, 0.12);
-  --surface-shadow: 0 18px 46px -34px rgba(32, 40, 58, 0.12);
-  --surface-shadow-soft: 0 10px 26px -24px rgba(32, 40, 58, 0.08);
-  --page-gutter: clamp(1rem, 2vw, 2rem);
+  --surface-glow: none;
+  --surface-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  --surface-shadow-soft: none;
+  --page-gutter: 1.5rem;
 }
 
 /* Semantic colour tokens.
@@ -27,32 +27,51 @@
  * this, 146 className blocks used a light token with no dark counterpart, which
  * is why forcing dark mode produced text at 1.14:1. */
 :root {
-  --color-bg-main: #fbfaf6;
-  --color-bg-sidebar: #f2efe6;
-  --color-bg-hover: #ece6da;
-  --color-text-main: #272b35;
-  --color-text-muted: #5a626f;
-  --color-text-dim: #7c8494;
-  --color-border-light: #dad5c8;
-  --color-action-primary: #2d59c8;
-  --color-action-hover: #2347a3;
-  /* Text placed on top of the action colour. Flips with the theme:
-     white reads at 6.22:1 on the light accent but only 2.56:1 on the
-     lightened dark accent. */
+  --color-bg-main: #fafafa;
+  --color-bg-sidebar: #fafafa;
+  --color-bg-hover: #f2f2f2;
+  --color-bg-elevated: #ffffff;
+  --color-text-main: #171717;
+  --color-text-muted: #4d4d4d;
+  --color-text-dim: #737373;
+  --color-border-light: #ebebeb;
+  --color-action-primary: #171717;
+  --color-action-hover: #000000;
   --color-on-action: #ffffff;
+  --color-danger: #ee0000;
+  --color-danger-bg: #fff0f0;
+  --color-danger-foreground: #c50000;
+  --color-success: #0070f3;
+  --color-success-bg: #d3e5ff;
+  --color-warning: #f5a623;
+  --color-warning-bg: #ffefcf;
+  --color-warning-foreground: #ab570a;
+  --color-overlay: rgba(0, 0, 0, 0.4);
+  --color-link: #0070f3;
 }
 
 html.dark {
-  --color-bg-main: #171a22;
-  --color-bg-sidebar: #1d212c;
-  --color-bg-hover: #262c39;
-  --color-text-main: #ece8de;
-  --color-text-muted: #afb6c4;
-  --color-text-dim: #828b9c;
-  --color-border-light: #343b4a;
-  --color-action-primary: #7fa0f0;
-  --color-action-hover: #a3bcf7;
-  --color-on-action: #171a22;
+  --color-bg-main: #0a0a0a;
+  --color-bg-sidebar: #0a0a0a;
+  --color-bg-hover: #171717;
+  --color-bg-elevated: #111111;
+  --color-text-main: #ededed;
+  --color-text-muted: #a1a1a1;
+  --color-text-dim: #737373;
+  --color-border-light: #2e2e2e;
+  --color-action-primary: #ededed;
+  --color-action-hover: #ffffff;
+  --color-on-action: #0a0a0a;
+  --color-danger: #ff5c5c;
+  --color-danger-bg: #2a0a0a;
+  --color-danger-foreground: #ff8a8a;
+  --color-success: #47a8ff;
+  --color-success-bg: #0b1c33;
+  --color-warning: #f5a623;
+  --color-warning-bg: #2a1c08;
+  --color-warning-foreground: #ffefcf;
+  --color-overlay: rgba(0, 0, 0, 0.64);
+  --color-link: #47a8ff;
 }
 
 html {
@@ -70,10 +89,6 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background-color: var(--color-bg-main);
-  background-image:
-    radial-gradient(circle at 12% -10%, rgba(126, 148, 229, 0.13) 0%, transparent 30%),
-    radial-gradient(circle at 88% 0%, rgba(171, 196, 145, 0.12) 0%, transparent 28%),
-    radial-gradient(circle at 50% 120%, rgba(182, 147, 219, 0.08) 0%, transparent 32%);
   color: var(--color-text-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -96,8 +111,9 @@ h2,
 h3,
 h4,
 .font-heading {
-  font-family: "Avenir Next", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  letter-spacing: -0.03em;
+  font-family: "Geist Variable", Geist, Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 p {
@@ -123,13 +139,9 @@ button,
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Dark Mode Defaults */
 .dark body {
-  background-color: #171a22;
-  background-image:
-    radial-gradient(circle at 15% -10%, rgba(97, 123, 202, 0.18) 0%, transparent 28%),
-    radial-gradient(circle at 85% 0%, rgba(85, 122, 109, 0.16) 0%, transparent 26%);
-  color: #ece8de;
+  background-color: var(--color-bg-main);
+  color: var(--color-text-main);
 }
 
 /* Minimal Scrollbar */
@@ -143,26 +155,26 @@ button,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(140, 145, 159, 0.45);
-  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(104, 110, 125, 0.6);
+  background: rgba(0, 0, 0, 0.28);
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(126, 134, 149, 0.38);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(160, 169, 187, 0.5);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 ::selection {
-  background: rgba(45, 89, 200, 0.16);
+  background: rgba(0, 112, 243, 0.18);
   color: inherit;
 }
 
@@ -172,17 +184,22 @@ button,
     box-sizing: border-box;
   }
 
+  ::selection {
+    background: color-mix(in srgb, var(--color-link) 18%, transparent);
+    color: inherit;
+  }
+
   *:focus-visible {
     outline: none;
     box-shadow:
-      0 0 0 1px rgba(45, 89, 200, 0.32),
-      0 0 0 4px rgba(45, 89, 200, 0.12);
+      0 0 0 1px var(--color-link),
+      0 0 0 4px color-mix(in srgb, var(--color-link) 18%, transparent);
   }
 
   input,
   textarea,
   select {
-    accent-color: #2d59c8;
+    accent-color: var(--color-link);
   }
 
   button:disabled,
@@ -195,38 +212,37 @@ button,
 
 @layer components {
   .panel-surface {
-    @apply rounded-3xl border border-border-light bg-bg-main dark:border-dark-border dark:bg-dark-bg-main;
-    box-shadow: var(--surface-shadow-soft);
+    @apply rounded-xl border border-border-light bg-bg-elevated dark:border-dark-border;
+    box-shadow: none;
   }
 
   .panel-surface-strong {
-    @apply rounded-[1.75rem] border border-border-light bg-bg-main dark:border-dark-border dark:bg-dark-bg-main;
-    box-shadow: var(--surface-shadow), var(--surface-glow);
+    @apply rounded-xl border border-border-light bg-bg-elevated dark:border-dark-border;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
   }
 
   .panel-subtle {
-    @apply rounded-2xl border border-border-light bg-bg-sidebar dark:border-dark-border dark:bg-dark-bg-sidebar;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    @apply rounded-md border border-border-light bg-bg-hover dark:border-dark-border dark:bg-dark-bg-hover;
   }
 
   .field-surface {
-    @apply rounded-2xl border border-border-light bg-bg-main text-text-main shadow-sm hover:border-action-primary focus:border-action-primary focus:bg-bg-main dark:border-dark-border dark:bg-dark-bg-main dark:text-dark-text-main dark:focus:bg-dark-bg-main;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    @apply h-10 rounded-md border border-border-light bg-bg-elevated px-3 text-sm text-text-main hover:border-text-dim focus:border-text-main dark:border-dark-border;
+  }
+
+  .icon-button {
+    @apply inline-flex h-10 min-h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border-light bg-bg-elevated px-0 text-sm font-medium text-text-main hover:bg-bg-hover dark:border-dark-border;
   }
 
   .header-action {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-border-light bg-bg-main px-3.5 text-sm font-semibold text-text-main shadow-sm hover:border-action-primary hover:bg-bg-hover hover:shadow-md hover:-translate-y-px dark:border-dark-border dark:bg-dark-bg-main dark:text-dark-text-main dark:hover:bg-dark-bg-sidebar;
-    min-height: 2.875rem;
-    box-shadow: var(--surface-shadow-soft);
+    @apply inline-flex h-10 min-h-10 items-center justify-center gap-1.5 rounded-md bg-action-primary px-3 text-sm font-medium text-action-on hover:bg-action-hover dark:bg-dark-text-main dark:text-dark-bg-main;
   }
 
   .header-action-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-3.5 text-sm font-semibold text-text-muted hover:bg-bg-hover hover:text-text-main hover:-translate-y-px dark:text-dark-text-main dark:hover:bg-dark-bg-sidebar dark:hover:text-dark-text-main;
-    min-height: 2.875rem;
+    @apply inline-flex h-10 min-h-10 items-center justify-center gap-1.5 rounded-md border border-border-light bg-bg-elevated px-3 text-sm font-medium text-text-main hover:bg-bg-hover dark:border-dark-border;
   }
 
   .chip-button {
-    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-3 py-1.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-action-primary hover:opacity-80 hover:-translate-y-px;
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-link hover:opacity-80;
     /* Cluster hues come from the database, so the readable variant is computed
        per theme in clusterAccent.ts and handed over as custom properties.
        Inline styles cannot react to `html.dark` on their own. */
@@ -238,7 +254,7 @@ button,
   }
 
   .danger-button-soft {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-100 hover:shadow-md hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-action-primary;
+    @apply inline-flex h-10 min-h-10 items-center justify-center gap-1.5 rounded-md border border-danger/30 bg-danger-bg px-3 text-sm font-medium text-danger-foreground;
   }
 
   .page-shell {
@@ -251,7 +267,7 @@ button,
   }
 
   .page-header {
-    @apply sticky top-0 z-40 flex flex-col gap-3 border-b border-border-light bg-bg-main px-4 py-3 sm:min-h-[4.75rem] sm:flex-row sm:items-center sm:justify-between dark:border-dark-border dark:bg-dark-bg-main;
+    @apply sticky top-0 z-40 flex min-h-14 flex-col gap-3 border-b border-border-light bg-bg-main px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-dark-border dark:bg-dark-bg-main;
   }
 
   .page-header-inner {
@@ -259,7 +275,7 @@ button,
   }
 
   .page-title {
-    @apply font-heading text-base font-semibold text-text-main dark:text-dark-text-main sm:text-lg;
+    @apply font-heading text-base font-semibold tracking-[-0.32px] text-text-main dark:text-dark-text-main;
   }
 
   .page-subtitle {
@@ -267,11 +283,11 @@ button,
   }
 
   .page-content {
-    @apply flex-1 overflow-auto px-4 py-5 sm:px-8 sm:py-8;
+    @apply flex-1 overflow-auto px-4 py-5 sm:px-6 sm:py-6;
   }
 
-  .section-kicker {
-    @apply px-1 text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-text-muted dark:text-dark-text-main;
+  .section-heading {
+    @apply text-sm font-semibold text-text-main dark:text-dark-text-main;
   }
 
   .toolbar-badge {
@@ -296,26 +312,30 @@ button,
   }
 
   .status-banner {
-    @apply flex items-start gap-3 rounded-3xl border border-border-light bg-bg-main p-4 text-sm dark:border-dark-border dark:bg-dark-bg-main;
-    box-shadow: var(--surface-shadow-soft);
+    @apply flex items-start gap-3 rounded-xl border border-border-light bg-bg-elevated p-4 text-sm dark:border-dark-border;
   }
 
   .status-banner[data-tone="error"] {
-    @apply border-red-200 bg-red-50 text-red-700;
+    @apply border-danger/30 bg-danger-bg text-danger-foreground;
   }
 
   .status-banner[data-tone="warning"] {
-    @apply border-amber-200 bg-amber-50 text-amber-800;
+    @apply border-warning/40 bg-warning-bg text-warning-foreground;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    animation: none !important;
+  }
+
+  *:not(:focus):not(:focus-visible) {
+    transition: none !important;
   }
 }

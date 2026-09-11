@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Graph nodes now load in snapshot pages (`GET /api/v2/graph/nodes`) the same
+  way edges already did, with auto-load halt and a continue control.
+- Empty Dashboard / Graph / Data states now lead to Settings sync, with a
+  keyboard-first repository list opened by default on mobile and reduced motion.
+- `PRODUCT.md` and `DESIGN.md` capture the incumbent research-desk identity.
+- GIN trigram indexes on concatenated `topics` / `ai_tags` text, plus an
+  explicit internet-facing demo-mode refusal unless `ALLOW_ANONYMOUS_DEMO=true`.
+
+### Changed
+- Frontend visual language switched to Vercel Geist (`npx getdesign@latest add vercel`):
+  ink-on-canvas tokens, 6px app chrome, hairline cards, Geist Sans/Mono.
+- Data search no longer `unnest`s tag arrays for fragment match; LIKE wildcards
+  are escaped; list `limit` max is 200.
+- Semantic danger / success / overlay tokens replace raw red/green/slate status
+  colors. Reduced-motion no longer strips focus rings.
+- Dashboard drops the four icon metric cards for a single collection summary.
+- Split `sync_execution_service` into stars / embeddings / clustering modules
+  behind the same public import surface.
+
+### Fixed
+- Internet-facing processes with empty admin credentials or `READ_ACCESS_MODE=demo`
+  now fail closed at startup.
+
 ## [1.3.0] - 2026-08-09
 
 ### Added

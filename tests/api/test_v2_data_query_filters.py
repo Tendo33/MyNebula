@@ -3,8 +3,10 @@ from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
 
 from nebula.api.v2.data import (
+    _array_text_ilike,
     _build_topic_filter_condition,
     _data_repo_order_by,
+    _escape_ilike_fragment,
     _parse_month_window,
     _parse_stars_threshold,
     _trimmed_query,
@@ -47,6 +49,27 @@ def test_topic_filter_condition_normalizes_case_for_dashboard_links():
     assert "unnest" in compiled
     assert "lower(trim(" in compiled
     assert "= 'ai'" in compiled
+
+
+def test_escape_ilike_fragment_neutralizes_wildcards():
+    assert _escape_ilike_fragment("100%") == "%100\\%%"
+    assert _escape_ilike_fragment("a_b") == "%a\\_b%"
+    assert _escape_ilike_fragment("plain") == "%plain%"
+
+
+def test_array_text_search_uses_concatenated_text_not_unnest():
+    condition = _array_text_ilike(StarredRepo.topics, "graph")
+    statement = select(StarredRepo.id).where(condition)
+    compiled = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+
+    assert "array_to_string" in compiled
+    assert "unnest" not in compiled
+    assert "ESCAPE" in compiled.upper()
 
 
 def test_data_repo_order_by_adds_stable_id_tiebreaker():

@@ -13,7 +13,7 @@ from nebula.application.services.graph_query_service import (
 from nebula.core.config import get_app_settings
 from nebula.db import User, get_db
 from nebula.schemas.graph import GraphData, TimelineData
-from nebula.schemas.v2 import GraphEdgesPage
+from nebula.schemas.v2 import GraphEdgesPage, GraphNodesPage
 
 from .access import resolve_read_user
 from .auth import require_admin, require_admin_csrf
@@ -43,6 +43,10 @@ async def get_graph(
         default=False,
         description="Whether to include all edges in graph payload",
     ),
+    include_nodes: bool = Query(
+        default=True,
+        description="Whether to include all nodes in graph payload",
+    ),
     user: User = Depends(resolve_read_user),  # noqa: B008
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> GraphData:
@@ -57,7 +61,10 @@ async def get_graph(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except SnapshotUnavailableError as exc:
         raise _snapshot_unavailable_http(exc) from exc
-    etag = f'W/"graph:{resolved_version}:edges:{int(include_edges)}"'
+    etag = (
+        f'W/"graph:{resolved_version}:edges:{int(include_edges)}:'
+        f'nodes:{int(include_nodes)}"'
+    )
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
     try:
@@ -67,6 +74,7 @@ async def get_graph(
                 user=user,
                 version=resolved_version,
                 include_edges=include_edges,
+                include_nodes=include_nodes,
             ),
             timeout=settings.api_query_timeout_seconds,
         )
@@ -117,6 +125,52 @@ async def get_graph_edges(
     except TimeoutError as exc:
         raise HTTPException(
             status_code=504, detail="Graph edges query timed out"
+        ) from exc
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc
+    response.headers["ETag"] = etag
+    return page
+
+
+@router.get("/nodes", response_model=GraphNodesPage)
+async def get_graph_nodes(
+    request: Request,
+    response: Response,
+    version: str = Query(default="active", description="Snapshot version or 'active'"),
+    cursor: int = Query(default=0, ge=0, description="Node pagination cursor"),
+    limit: int = Query(default=400, ge=1, le=2000, description="Node page size"),
+    user: User = Depends(resolve_read_user),  # noqa: B008
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+) -> GraphNodesPage:
+    """Get paged graph nodes from snapshot storage."""
+    try:
+        resolved_version = await graph_service.resolve_snapshot_version(
+            db,
+            user=user,
+            version=version,
+        )
+    except SnapshotVersionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SnapshotUnavailableError as exc:
+        raise _snapshot_unavailable_http(exc) from exc
+    etag = f'W/"graph-nodes:{resolved_version}:cursor:{cursor}:limit:{limit}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+
+    try:
+        page = await asyncio.wait_for(
+            graph_service.get_nodes_page(
+                db,
+                user=user,
+                version=resolved_version,
+                cursor=cursor,
+                limit=limit,
+            ),
+            timeout=settings.api_query_timeout_seconds,
+        )
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=504, detail="Graph nodes query timed out"
         ) from exc
     except SnapshotUnavailableError as exc:
         raise _snapshot_unavailable_http(exc) from exc

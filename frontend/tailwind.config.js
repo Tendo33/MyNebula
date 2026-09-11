@@ -15,6 +15,7 @@ export default {
           main: "var(--color-bg-main)",
           sidebar: "var(--color-bg-sidebar)",
           hover: "var(--color-bg-hover)",
+          elevated: "var(--color-bg-elevated)",
         },
         text: {
           main: "var(--color-text-main)",
@@ -29,26 +30,42 @@ export default {
           hover: "var(--color-action-hover)",
           on: "var(--color-on-action)",
         },
+        danger: {
+          DEFAULT: "var(--color-danger)",
+          bg: "var(--color-danger-bg)",
+          foreground: "var(--color-danger-foreground)",
+        },
+        success: {
+          DEFAULT: "var(--color-success)",
+          bg: "var(--color-success-bg)",
+        },
+        warning: {
+          DEFAULT: "var(--color-warning)",
+          bg: "var(--color-warning-bg)",
+          foreground: "var(--color-warning-foreground)",
+        },
+        overlay: "var(--color-overlay)",
+        link: "var(--color-link)",
         dark: {
           bg: {
-            main: "#171A22",
-            sidebar: "#1D212C",
+            main: "var(--color-bg-main)",
+            sidebar: "var(--color-bg-sidebar)",
+            hover: "var(--color-bg-hover)",
           },
           text: {
-            main: "#ECE8DE",
+            main: "var(--color-text-main)",
           },
-          border: "#343B4A",
+          border: "var(--color-border-light)",
         }
       },
       fontFamily: {
-        sans: ['Avenir Next', 'Segoe UI', '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif'],
-        heading: ['Avenir Next', 'Segoe UI', '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-        serif: ['Spectral', 'Georgia', 'serif'],
+        sans: ['Geist Variable', 'Geist', 'Arial', 'sans-serif'],
+        heading: ['Geist Variable', 'Geist', 'Arial', 'sans-serif'],
+        mono: ['Geist Mono Variable', 'Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       boxShadow: {
-        'sm': '0 1px 2px rgba(34, 38, 47, 0.05), 0 0 0 1px rgba(77, 88, 107, 0.08)',
-        'md': '0 14px 34px -24px rgba(24, 30, 45, 0.28)',
+        'sm': '0 1px 1px rgba(0, 0, 0, 0.04)',
+        'md': '0 2px 2px rgba(0, 0, 0, 0.04), 0 8px 16px -4px rgba(0, 0, 0, 0.08)',
       }
     },
   },

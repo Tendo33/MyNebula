@@ -105,17 +105,14 @@ const Settings = () => {
       <main id="main-content" className="page-main">
         <header className="page-header">
           <div className="page-header-inner">
-            <div>
-              <div className="section-kicker mb-1 px-0">{t('sidebar.settings')}</div>
-              <h1 className="page-title select-none">{t('settings.title')}</h1>
-            </div>
+            <h1 className="page-title select-none">{t('settings.title')}</h1>
           </div>
           <div className="flex items-center gap-3">
             <LanguageSwitch />
             {isAuthenticated && (
               <button
                 onClick={auth.handleAdminLogout}
-                className="header-action min-h-11 px-4 text-xs"
+                className="header-action-ghost"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 {t('app.logout')}
@@ -160,7 +157,7 @@ const Settings = () => {
               <hr className="border-t border-border-light/80" />
 
               <section>
-                <h2 className="section-kicker mb-4 select-none">{t('settings.operations')}</h2>
+                <h2 className="section-heading mb-4 select-none">{t('settings.operations')}</h2>
                 <div className="space-y-4">
                   <div className="panel-surface p-5">
                     <div className="flex items-center justify-between gap-3">
@@ -275,7 +272,7 @@ const Settings = () => {
               <hr className="border-t border-border-light/80" />
 
               <section>
-                <h2 className="section-kicker mb-4 select-none">{t('settings.connection')}</h2>
+                <h2 className="section-heading mb-4 select-none">{t('settings.connection')}</h2>
                 <div className="space-y-2">
                   <div className="panel-subtle p-4">
                     <div className="flex items-center gap-2 mb-3">
@@ -307,9 +304,9 @@ const Settings = () => {
                       className={clsx(
                         'flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full border',
                         githubTokenStatus.state === 'connected' &&
-                          'text-green-700 bg-green-50 border-green-200',
+                          'border-success/30 bg-success-bg text-success',
                         githubTokenStatus.state === 'not_configured' &&
-                          'text-amber-700 bg-amber-50 border-amber-200',
+                          'border-warning/40 bg-warning-bg text-warning-foreground',
                         githubTokenStatus.state === 'unknown' &&
                           'text-text-muted bg-bg-hover border-border-light dark:text-dark-text-main/70 dark:bg-dark-bg-sidebar/70 dark:border-dark-border',
                         githubTokenStatus.state === 'loading' &&
@@ -319,8 +316,8 @@ const Settings = () => {
                       <div
                         className={clsx(
                           'w-2 h-2 rounded-full',
-                          githubTokenStatus.state === 'connected' && 'bg-green-500 animate-pulse',
-                          githubTokenStatus.state === 'not_configured' && 'bg-amber-500',
+                          githubTokenStatus.state === 'connected' && 'bg-success animate-pulse',
+                          githubTokenStatus.state === 'not_configured' && 'bg-warning',
                           githubTokenStatus.state === 'unknown' && 'bg-text-dim',
                           githubTokenStatus.state === 'loading' && 'bg-text-dim/70 animate-pulse'
                         )}

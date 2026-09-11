@@ -44,6 +44,47 @@ def test_admin_auth_disabled_when_password_not_set():
     assert verify_admin_credentials("owner", "anything", settings) is False
 
 
+def test_runtime_access_policy_allows_local_demo():
+    settings = AppSettings(
+        admin_password="",
+        admin_session_secret="",
+        read_access_mode="demo",
+    )
+    settings.assert_runtime_access_policy()
+
+
+def test_runtime_access_policy_rejects_internet_facing_demo():
+    settings = AppSettings(
+        admin_password="secret",
+        admin_session_secret="session-secret",
+        read_access_mode="demo",
+        force_secure_cookies=True,
+    )
+    with pytest.raises(RuntimeError, match="READ_ACCESS_MODE=demo"):
+        settings.assert_runtime_access_policy()
+
+
+def test_runtime_access_policy_rejects_internet_facing_without_auth():
+    settings = AppSettings(
+        admin_password="",
+        admin_session_secret="",
+        force_secure_cookies=True,
+    )
+    with pytest.raises(RuntimeError, match="ADMIN_PASSWORD"):
+        settings.assert_runtime_access_policy()
+
+
+def test_runtime_access_policy_allows_explicit_public_demo():
+    settings = AppSettings(
+        admin_password="",
+        admin_session_secret="",
+        read_access_mode="demo",
+        force_secure_cookies=True,
+        allow_anonymous_demo=True,
+    )
+    settings.assert_runtime_access_policy()
+
+
 def test_admin_auth_disabled_when_session_secret_not_set():
     settings = AppSettings(
         admin_username="owner",

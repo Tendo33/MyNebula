@@ -1,15 +1,15 @@
 export const GRAPH_2D_COLORS = {
-  NODE_DEFAULT: '#6B7280',
-  NODE_HOVER: '#8B5CF6',
-  NODE_SELECTED: '#3B82F6',
-  NODE_NEIGHBOR: '#60A5FA',
-  NODE_DIM: 'rgba(107, 114, 128, 0.3)',
-  LINK_DEFAULT: 'rgba(156, 163, 175, 0.4)',
-  LINK_ACTIVE: 'rgba(139, 92, 246, 0.6)',
-  LINK_DIM: 'rgba(156, 163, 175, 0.1)',
+  NODE_DEFAULT: '#8f8f8f',
+  NODE_HOVER: '#171717',
+  NODE_SELECTED: '#0070f3',
+  NODE_NEIGHBOR: '#0761d1',
+  NODE_DIM: 'rgba(143, 143, 143, 0.3)',
+  LINK_DEFAULT: 'rgba(143, 143, 143, 0.35)',
+  LINK_ACTIVE: 'rgba(0, 112, 243, 0.55)',
+  LINK_DIM: 'rgba(143, 143, 143, 0.1)',
   CLUSTER_BG: 'rgba(0, 0, 0, 0.03)',
-  LABEL_BG: 'rgba(255, 255, 255, 0.9)',
-  LABEL_TEXT: '#1F2937',
+  LABEL_BG: 'rgba(255, 255, 255, 0.92)',
+  LABEL_TEXT: '#171717',
 } as const;
 
 const NODE_BASE_SIZE = 5;

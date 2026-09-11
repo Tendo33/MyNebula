@@ -57,13 +57,14 @@ async def test_get_graph_returns_304_when_etag_matches(monkeypatch):
         ),
     )
 
-    request = _build_request('W/"graph:snapshot-a:edges:0"')
+    request = _build_request('W/"graph:snapshot-a:edges:0:nodes:1"')
     response = Response()
     result = await graph_api.get_graph(
         request=request,
         response=response,
         version="active",
         include_edges=False,
+        include_nodes=True,
         user=SimpleNamespace(id=1),
         db=object(),
     )
@@ -115,6 +116,7 @@ async def test_get_graph_returns_404_for_missing_snapshot_version(monkeypatch):
             response=response,
             version="snapshot-missing",
             include_edges=False,
+            include_nodes=True,
             user=SimpleNamespace(id=1),
             db=object(),
         )
@@ -133,11 +135,12 @@ async def test_get_graph_uses_resolved_snapshot_version_for_payload(monkeypatch)
         return "snapshot-resolved"
 
     async def get_graph_data_with_options(
-        _db, *, user, version: str, include_edges: bool
+        _db, *, user, version: str, include_edges: bool, include_nodes: bool = True
     ):
         assert user.id == 1
         assert version == "snapshot-resolved"
         assert include_edges is False
+        assert include_nodes is True
         return GraphData(
             nodes=[],
             edges=[],
@@ -166,6 +169,7 @@ async def test_get_graph_uses_resolved_snapshot_version_for_payload(monkeypatch)
         response=response,
         version="active",
         include_edges=False,
+        include_nodes=True,
         user=SimpleNamespace(id=1),
         db=object(),
     )
@@ -212,6 +216,52 @@ async def test_get_graph_edges_uses_resolved_snapshot_version_for_payload(monkey
         version="active",
         cursor=0,
         limit=1000,
+        user=SimpleNamespace(id=1),
+        db=object(),
+    )
+
+    assert payload.version == "snapshot-resolved"
+
+
+@pytest.mark.asyncio
+async def test_get_graph_nodes_uses_resolved_snapshot_version_for_payload(monkeypatch):
+    from nebula.api.v2 import graph as graph_api
+    from nebula.schemas.v2.graph import GraphNodesPage
+
+    async def resolve_snapshot_version(_db, *, user, version: str):
+        assert user.id == 1
+        assert version == "active"
+        return "snapshot-resolved"
+
+    async def get_nodes_page(_db, *, user, version: str, cursor: int, limit: int):
+        assert user.id == 1
+        assert version == "snapshot-resolved"
+        assert cursor == 0
+        assert limit == 400
+        return GraphNodesPage(
+            nodes=[],
+            next_cursor=None,
+            version=version,
+            generated_at=None,
+        )
+
+    monkeypatch.setattr(
+        graph_api,
+        "graph_service",
+        SimpleNamespace(
+            resolve_snapshot_version=resolve_snapshot_version,
+            get_nodes_page=get_nodes_page,
+        ),
+    )
+
+    request = _build_request()
+    response = Response()
+    payload = await graph_api.get_graph_nodes(
+        request=request,
+        response=response,
+        version="active",
+        cursor=0,
+        limit=400,
         user=SimpleNamespace(id=1),
         db=object(),
     )

@@ -22,7 +22,7 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
 
   return (
     <section>
-      <h2 className="section-kicker mb-4 select-none">
+      <h2 className="section-heading mb-4 select-none">
         {t('settings.appearance')}
       </h2>
       <div className="space-y-2">
@@ -45,7 +45,7 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
             <div
               role="radiogroup"
               aria-label={t('settings.theme', 'Theme')}
-              className="flex items-center gap-1 rounded-2xl border border-border-light bg-bg-main p-1 dark:border-dark-border dark:bg-dark-bg-main"
+              className="flex items-center gap-1 rounded-md border border-border-light bg-bg-elevated p-0.5 dark:border-dark-border"
             >
               {THEME_OPTIONS.map(({ value, label, Icon }) => (
                 <button
@@ -55,7 +55,7 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
                   aria-checked={preference === value}
                   onClick={() => setPreference(value)}
                   className={clsx(
-                    'inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
+                    'inline-flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-link',
                     preference === value
                       ? 'bg-bg-hover text-text-main dark:bg-dark-bg-sidebar dark:text-dark-text-main'
                       : 'text-text-muted hover:bg-bg-hover hover:text-text-main dark:text-dark-text-main/70 dark:hover:bg-dark-bg-sidebar'

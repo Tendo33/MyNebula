@@ -21,7 +21,7 @@ const NotFound = () => {
     <main id="main-content" className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="page-title">404</h1>
       <p className="text-text-muted">{t('errors.not_found', 'This page does not exist.')}</p>
-      <Link className="button-primary" to="/">{t('sidebar.dashboard', 'Dashboard')}</Link>
+      <Link className="header-action" to="/">{t('sidebar.dashboard', 'Dashboard')}</Link>
     </main>
   );
 };

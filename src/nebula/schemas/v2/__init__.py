@@ -8,7 +8,7 @@ from .dashboard import (
     DashboardTopicStat,
 )
 from .data import DataClusterInfo, DataRepoItem, DataReposResponse
-from .graph import GraphEdgesPage
+from .graph import GraphEdgesPage, GraphNodesPage
 from .settings import (
     FullRefreshJobResponse,
     FullRefreshRequest,
@@ -43,6 +43,7 @@ __all__ = [
     "GraphDefaultsUpdateRequest",
     "GraphDefaultsUpdateResponse",
     "GraphEdgesPage",
+    "GraphNodesPage",
     "JobStatusResponse",
     "PipelineStartResponse",
     "PipelineStatusResponse",

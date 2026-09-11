@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useResizeObserver } from '../../hooks/useResizeObserver';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
 import { GraphSkeleton } from '../ui/Skeleton';
+import { EmptyState } from '../ui/EmptyState';
 import { GraphHoverCard } from './GraphHoverCard';
 import type {
   HullCache,
@@ -45,10 +46,22 @@ const Graph2D: React.FC = () => {
   const { imageCacheRef, triggerAvatarRedraw } = useAvatarImageCache();
 
   // Global state
-  const { filteredData, rawData, selectedNode, setSelectedNode, settings, loading } = useGraph();
+  const { filteredData, rawData, selectedNode, setSelectedNode, settings, loading, nodesLoading, error } = useGraph();
 
   // Local state for graph-specific interactions
   const [activeHoverNode, setActiveHoverNode] = useState<ProcessedNode | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => setReduceMotion(media.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
 
   // Get neighbors of hovered node for highlighting
   const hoverNeighbors = useNodeNeighbors(activeHoverNode?.id);
@@ -84,6 +97,11 @@ const Graph2D: React.FC = () => {
   const clusterGroups = useMemo(() => buildClusterGroups(rawData), [rawData]);
 
   useGraphForces({ graphRef, clusterLayoutData });
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    graphRef.current?.d3ReheatSimulation();
+  }, [layoutKey, reduceMotion]);
 
   const { tryAutoFit, getLiveNodeById, focusNodeById, markUserInteracted, skipNextFocusRef } =
     useGraphViewport({
@@ -225,8 +243,11 @@ const Graph2D: React.FC = () => {
     setSelectedNode(null);
   }, [setSelectedNode]);
 
-  // Loading state with skeleton
-  if (loading) {
+  const awaitingFirstNodes = Boolean(
+    rawData && rawData.total_nodes > 0 && rawData.nodes.length === 0 && nodesLoading
+  );
+
+  if (loading || awaitingFirstNodes) {
     return (
       <div ref={containerRef} className="w-full h-full relative">
         <GraphSkeleton />
@@ -234,20 +255,22 @@ const Graph2D: React.FC = () => {
     );
   }
 
-  // Empty state
+  if (error && (!filteredData || filteredData.nodes.length === 0)) {
+    return <div ref={containerRef} className="relative h-full w-full" />;
+  }
+
   if (!filteredData || filteredData.nodes.length === 0) {
     return (
       <div
         ref={containerRef}
-        className="w-full h-full relative flex items-center justify-center bg-bg-hover/50 dark:bg-dark-bg-sidebar/60"
+        className="relative flex h-full w-full items-center justify-center bg-bg-hover/50 dark:bg-dark-bg-sidebar/60"
       >
-        <div className="text-center p-8 opacity-50">
-          <div className="text-6xl mb-4 grayscale">🕸️</div>
-          <h3 className="font-semibold text-lg text-text-main">
-            {t('dashboard.subtitle_infinite')}
-          </h3>
-          <p className="text-sm text-text-muted mt-2">{t('graph.empty_hint')}</p>
-        </div>
+        <EmptyState
+          title={t('graph.empty_title')}
+          description={t('graph.empty_hint')}
+          actionTo="/settings"
+          actionLabel={t('common.sync_now')}
+        />
       </div>
     );
   }
@@ -280,10 +303,10 @@ const Graph2D: React.FC = () => {
         // Pre-render callback for cluster hulls
         onRenderFramePre={paintClusterHulls}
         // Physics
-        d3AlphaDecay={0.02}
-        d3VelocityDecay={0.3}
-        cooldownTicks={120}
-        warmupTicks={60}
+        d3AlphaDecay={reduceMotion ? 0.05 : 0.008}
+        d3VelocityDecay={0.28}
+        cooldownTicks={reduceMotion ? 0 : 480}
+        warmupTicks={reduceMotion ? 80 : 0}
         // After engine stops
         onEngineStop={tryAutoFit}
       />

@@ -15,6 +15,7 @@ import {
 import { Sidebar } from '../components/layout/Sidebar';
 import { LanguageSwitch } from '../components/layout/LanguageSwitch';
 import { SearchInput } from '../components/ui/SearchInput';
+import { EmptyState } from '../components/ui/EmptyState';
 import type { DataClusterInfo } from '../api/v2/data';
 import { useDataReposQuery } from '../features/data/hooks/useDataReposQuery';
 import { useDataPageUrlState } from './data/hooks/useDataPageUrlState';
@@ -80,18 +81,17 @@ const DataPage = () => {
         <header className="page-header">
           <div className="page-header-inner select-none">
             <div>
-              <div className="section-kicker mb-1 px-0">{t('common.repositories')}</div>
               <h1 className="page-title">{t('sidebar.data')}</h1>
             </div>
-            <span className="toolbar-badge">
-              {count} / {totalNodes} {t('common.repositories')}
-            </span>
+            {!loading && !error && totalNodes > 0 ? (
+              <span className="page-subtitle">
+                {t('data.shown_of_total', { shown: count, total: totalNodes })}
+              </span>
+            ) : null}
           </div>
 
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <LanguageSwitch />
-
-            <div className="w-full sm:w-72">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="w-full sm:w-64 sm:flex-none">
               <SearchInput
                 onSearch={handleSearch}
                 value={localSearch}
@@ -100,7 +100,7 @@ const DataPage = () => {
             </div>
 
             <div className="flex items-center gap-2 sm:hidden">
-              <label htmlFor="data-mobile-sort" className="text-xs text-text-muted">{t('data.sort', 'Sort')}:</label>
+              <label htmlFor="data-mobile-sort" className="text-sm text-text-muted">{t('data.sort', 'Sort')}:</label>
               <select
                 id="data-mobile-sort"
                 value={sortConfig.field}
@@ -111,7 +111,7 @@ const DataPage = () => {
                   }));
                   setCurrentPage(1);
                 }}
-                className="field-surface h-11 flex-1 px-3 text-sm"
+                className="field-surface flex-1"
               >
                 <option value="starred_at">{t('data.starred_date')}</option>
                 <option value="name">{t('data.repository')}</option>
@@ -130,7 +130,7 @@ const DataPage = () => {
                   }));
                   setCurrentPage(1);
                 }}
-                className="header-action w-11 px-0"
+                className="icon-button"
                 aria-label={t('data.sort_direction', 'Toggle sort direction')}
               >
                 {sortConfig.direction === 'asc' ? (
@@ -145,12 +145,14 @@ const DataPage = () => {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="header-action-ghost self-start sm:self-auto"
+                className="header-action-ghost"
               >
                 <X className="h-4 w-4" />
                 {t('common.clear_filters')}
               </button>
             )}
+
+            <LanguageSwitch />
           </div>
         </header>
 
@@ -160,18 +162,14 @@ const DataPage = () => {
               <Loader2 className="h-8 w-8 animate-spin text-text-muted" />
             </div>
           ) : error ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-3">
-              <p className="text-sm text-red-600">{t('common.load_failed', 'Failed to load data')}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  void retry();
-                }}
-                className="header-action"
-              >
-                {t('common.retry')}
-              </button>
-            </div>
+            <EmptyState
+              title={t('common.load_failed_data')}
+              actionType="button"
+              actionLabel={t('common.retry')}
+              onAction={() => {
+                void retry();
+              }}
+            />
           ) : (
             <div className="space-y-4">
               {(clusters.length > 0 || monthFilter || topicFilter) && (
@@ -271,6 +269,7 @@ const DataPage = () => {
                 onSort={handleSort}
                 onClusterFilter={handleClusterFilter}
                 hasActiveFilters={hasActiveFilters}
+                onClearFilters={clearFilters}
               />
 
               {count > 0 && (
@@ -284,7 +283,7 @@ const DataPage = () => {
                         setPageSize(Number(event.target.value));
                         setCurrentPage(1);
                       }}
-                      className="field-surface h-11 px-3 text-sm"
+                      className="field-surface"
                     >
                       {PAGE_SIZES.map((size) => (
                         <option key={size} value={size}>
@@ -308,7 +307,7 @@ const DataPage = () => {
                         type="button"
                         onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                         disabled={currentPage === 1}
-                        className="header-action h-11 w-11 px-0 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="icon-button disabled:cursor-not-allowed disabled:opacity-30"
                         aria-label={t('data.previous_page', 'Previous page')}
                       >
                         <ChevronLeft className="h-4 w-4" />
@@ -322,7 +321,7 @@ const DataPage = () => {
                         type="button"
                         onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                         disabled={currentPage === totalPages || totalPages === 0}
-                        className="header-action h-11 w-11 px-0 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="icon-button disabled:cursor-not-allowed disabled:opacity-30"
                         aria-label={t('data.next_page', 'Next page')}
                       >
                         <ChevronRight className="h-4 w-4" />

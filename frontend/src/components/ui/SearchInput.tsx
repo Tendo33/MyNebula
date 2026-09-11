@@ -73,7 +73,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         value={localValue}
         onChange={handleChange}
         className={clsx(
-          'field-surface block h-11 w-full pl-11 text-sm font-medium leading-5 placeholder:text-text-muted/90',
+          'field-surface block w-full pl-11 placeholder:text-text-muted',
           // Only reserve the right gutter while the clear button actually
           // exists. Reserving it unconditionally cost 44px of placeholder room
           // on every empty field, which is what truncated the Chinese

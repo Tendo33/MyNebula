@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => fallback ?? key,
+    t: (key: string, options?: string | Record<string, unknown>) =>
+      typeof options === 'string' ? options : key,
   }),
 }));
 

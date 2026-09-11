@@ -188,6 +188,7 @@ cp .env.example .env
 
 - 本地演示：`READ_ACCESS_MODE=demo`
 - 公网部署：`READ_ACCESS_MODE=authenticated`、`FORCE_SECURE_COOKIES=true`、`TRUST_PROXY_HEADERS=true`、`TRUSTED_PROXY_IPS=<反向代理 IP>`
+- 公网进程若仍是 demo 或管理员密码为空，启动会失败，除非设置 `ALLOW_ANONYMOUS_DEMO=true`
 
 ### 2. 启动服务
 

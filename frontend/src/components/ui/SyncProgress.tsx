@@ -63,13 +63,13 @@ const getStepIcon = (stepId: string): React.ReactNode => {
 const getStatusIcon = (status: SyncStepStatus): React.ReactNode => {
   switch (status) {
     case 'completed':
-      return <Check className="w-4 h-4 text-green-500" />;
+      return <Check className="h-4 w-4 text-success" />;
     case 'running':
       return <Loader2 className="w-4 h-4 text-action-primary animate-spin" />;
     case 'failed':
-      return <AlertCircle className="w-4 h-4 text-red-500" />;
+      return <AlertCircle className="h-4 w-4 text-danger" />;
     case 'warning':
-      return <AlertCircle className="w-4 h-4 text-amber-500" />;
+      return <AlertCircle className="h-4 w-4 text-warning" />;
     default:
       return <Circle className="w-4 h-4 text-text-muted" />;
   }
@@ -148,7 +148,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
   return createPortal(
     <div className="fixed inset-0 z-[90] flex items-center justify-center px-4">
       {/* Backdrop overlay */}
-      <div className="absolute inset-0 bg-slate-950/60" />
+      <div className="absolute inset-0 bg-overlay" />
 
       {/* Modal */}
       <div
@@ -157,22 +157,22 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="panel-surface-strong relative w-full max-w-md overflow-hidden overscroll-contain rounded-[1.35rem] animate-in fade-in zoom-in-95 duration-200 focus:outline-none motion-reduce:animate-none"
+        className="panel-surface-strong relative w-full max-w-md overflow-hidden overscroll-contain rounded-xl focus:outline-none"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-light px-5 py-4 dark:border-dark-border">
           <div className="flex items-center gap-3">
             {allCompleted && hasWarnings ? (
-              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-amber-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning-bg">
+                <AlertCircle className="h-5 w-5 text-warning" />
               </div>
             ) : allCompleted ? (
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                <Check className="w-5 h-5 text-green-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-bg">
+                <Check className="h-5 w-5 text-success" />
               </div>
             ) : hasFailed ? (
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-red-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-danger-bg">
+                <AlertCircle className="h-5 w-5 text-danger" />
               </div>
             ) : (
               <div className="w-10 h-10 rounded-full bg-action-primary/10 flex items-center justify-center">
@@ -233,11 +233,11 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
               className={clsx(
                 'h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none',
                 hasFailed
-                  ? 'bg-red-500'
+                  ? 'bg-danger'
                   : hasWarnings
-                  ? 'bg-amber-500'
+                  ? 'bg-warning'
                   : allCompleted
-                  ? 'bg-green-500'
+                  ? 'bg-success'
                   : 'bg-action-primary'
               )}
               style={{ width: `${overallProgress}%` }}
@@ -253,18 +253,18 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
               className={clsx(
                 'relative flex items-start gap-3 rounded-xl p-3 transition-colors',
                 step.status === 'running' && 'bg-action-primary/5 ring-1 ring-action-primary/20',
-                step.status === 'warning' && 'bg-amber-50 ring-1 ring-amber-200',
-                step.status === 'failed' && 'bg-red-50 ring-1 ring-red-200'
+                step.status === 'warning' && 'bg-warning-bg ring-1 ring-warning/30',
+                step.status === 'failed' && 'bg-danger-bg ring-1 ring-danger/30'
               )}
             >
               {/* Step Icon */}
               <div
                 className={clsx(
                   'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                  step.status === 'completed' && 'bg-green-100 text-green-600',
+                  step.status === 'completed' && 'bg-success-bg text-success',
                   step.status === 'running' && 'bg-action-primary/20 text-action-primary',
-                  step.status === 'warning' && 'bg-amber-100 text-amber-600',
-                  step.status === 'failed' && 'bg-red-100 text-red-600',
+                  step.status === 'warning' && 'bg-warning-bg text-warning',
+                  step.status === 'failed' && 'bg-danger-bg text-danger',
                   step.status === 'pending' && 'bg-bg-hover text-text-muted dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60'
                 )}
               >
@@ -300,7 +300,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
                         style={{ width: `${step.progress}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-text-muted mt-1 dark:text-dark-text-main/60">
+                    <span className="mt-1 text-xs text-text-muted">
                       {step.progress}%
                     </span>
                   </div>
@@ -308,7 +308,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
 
                 {/* Error message */}
                 {(step.status === 'failed' || step.status === 'warning') && step.error && (
-                  <p className={clsx('text-xs mt-1', step.status === 'failed' ? 'text-red-600' : 'text-amber-700')}>
+                  <p className={clsx('mt-1 text-xs', step.status === 'failed' ? 'text-danger' : 'text-warning-foreground')}>
                     {step.error}
                   </p>
                 )}
@@ -331,7 +331,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
               className={clsx(
                 'w-full py-2.5 rounded-lg text-sm font-medium transition-colors',
                 allCompleted
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  ? 'bg-action-primary text-action-on hover:bg-action-hover'
                   : 'bg-bg-hover hover:bg-border-light text-text-main dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-border dark:text-dark-text-main'
               )}
             >

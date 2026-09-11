@@ -9,6 +9,7 @@ const graphApiMocks = vi.hoisted(() => ({
   getGraphDataV2: vi.fn(),
   getTimelineDataV2: vi.fn(),
   getGraphEdgesPageV2: vi.fn(),
+  getGraphNodesPageV2: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -19,6 +20,7 @@ vi.mock('../api/v2/graph', () => ({
   getGraphDataV2: graphApiMocks.getGraphDataV2,
   getTimelineDataV2: graphApiMocks.getTimelineDataV2,
   getGraphEdgesPageV2: graphApiMocks.getGraphEdgesPageV2,
+  getGraphNodesPageV2: graphApiMocks.getGraphNodesPageV2,
 }));
 
 vi.mock('../hooks/useCommandPalette', () => ({
@@ -79,6 +81,7 @@ describe('App graph gating', () => {
     graphApiMocks.getGraphDataV2.mockReset();
     graphApiMocks.getTimelineDataV2.mockReset();
     graphApiMocks.getGraphEdgesPageV2.mockReset();
+    graphApiMocks.getGraphNodesPageV2.mockReset();
     graphApiMocks.getGraphDataV2.mockResolvedValue({
       nodes: [],
       edges: [],
@@ -98,6 +101,11 @@ describe('App graph gating', () => {
     });
     graphApiMocks.getGraphEdgesPageV2.mockResolvedValue({
       edges: [],
+      next_cursor: null,
+      version: 'active',
+    });
+    graphApiMocks.getGraphNodesPageV2.mockResolvedValue({
+      nodes: [],
       next_cursor: null,
       version: 'active',
     });
@@ -121,6 +129,7 @@ describe('App graph gating', () => {
       expect(graphApiMocks.getGraphDataV2).not.toHaveBeenCalled();
       expect(graphApiMocks.getTimelineDataV2).not.toHaveBeenCalled();
       expect(graphApiMocks.getGraphEdgesPageV2).not.toHaveBeenCalled();
+      expect(graphApiMocks.getGraphNodesPageV2).not.toHaveBeenCalled();
     });
   });
 
@@ -142,6 +151,7 @@ describe('App graph gating', () => {
       expect(graphApiMocks.getGraphDataV2).not.toHaveBeenCalled();
       expect(graphApiMocks.getTimelineDataV2).not.toHaveBeenCalled();
       expect(graphApiMocks.getGraphEdgesPageV2).not.toHaveBeenCalled();
+      expect(graphApiMocks.getGraphNodesPageV2).not.toHaveBeenCalled();
     });
   });
 

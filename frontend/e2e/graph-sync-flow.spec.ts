@@ -99,7 +99,7 @@ const timelinePayload = {
 const dataPayload = {
   items: graphPayload.nodes,
   count: 2,
-  limit: 2000,
+  limit: 200,
   offset: 0,
   version: 'v-test',
   generated_at: '2026-03-04T00:00:00Z',
@@ -156,6 +156,20 @@ const installApiMocks = async (page: Page) => {
     }
     if (pathname.endsWith('/api/v2/graph/edges')) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(edgesPayload) });
+      return;
+    }
+    if (pathname.endsWith('/api/v2/graph/nodes')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          nodes: graphPayload.nodes,
+          next_cursor: null,
+          version: 'v-test',
+          generated_at: '2026-03-04T00:00:00Z',
+          request_id: 'req-e2e-nodes',
+        }),
+      });
       return;
     }
     if (pathname.endsWith('/api/v2/data/repos')) {

@@ -28,7 +28,7 @@ const getLanguageColor = (language: string): string => {
     Dart: '#00B4AB',
     Lua: '#000080',
   };
-  return colors[language] || '#6B7280';
+  return colors[language] || '#8f8f8f';
 };
 
 export const useDashboardQuery = () => {

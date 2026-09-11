@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from nebula.core.config import get_app_settings
 from nebula.db import GraphSnapshot, User
 from nebula.infrastructure.repositories import SnapshotStoreRepository
-from nebula.schemas.graph import GraphData, GraphEdge, TimelineData
-from nebula.schemas.v2.graph import GraphEdgesPage
+from nebula.schemas.graph import GraphData, GraphEdge, GraphNode, TimelineData
+from nebula.schemas.v2.graph import GraphEdgesPage, GraphNodesPage
 from nebula.utils import get_logger
 
 from .graph_snapshot_service import GraphSnapshotBuilderService
@@ -97,6 +97,7 @@ class GraphQueryService:
         user: User,
         version: str = "active",
         include_edges: bool = True,
+        include_nodes: bool = True,
     ) -> GraphData:
         started = perf_counter()
         try:
@@ -106,11 +107,13 @@ class GraphQueryService:
                 db,
                 snapshot,
                 include_edges=include_edges,
+                include_nodes=include_nodes,
             )
             logger.info(
                 "Graph snapshot hydrated "
                 f"version={snapshot.version} "
                 f"include_edges={include_edges} "
+                f"include_nodes={include_nodes} "
                 f"nodes={graph_data.total_nodes} "
                 f"edges={graph_data.total_edges} "
                 f"hydrate_ms={((perf_counter() - hydrate_started) * 1000):.1f}"
@@ -122,6 +125,8 @@ class GraphQueryService:
 
         if not include_edges:
             graph_data.edges = []
+        if not include_nodes:
+            graph_data.nodes = []
 
         graph_data.request_id = str(uuid.uuid4())
         self._log_if_slow("get_graph_data_with_options", started, version=version)
@@ -214,6 +219,56 @@ class GraphQueryService:
         page.request_id = str(uuid.uuid4())
         self._log_if_slow(
             "get_edges_page",
+            started,
+            version=version,
+            cursor=cursor,
+            limit=limit,
+        )
+        return page
+
+    async def get_nodes_page(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        version: str = "active",
+        cursor: int = 0,
+        limit: int = 400,
+    ) -> GraphNodesPage:
+        started = perf_counter()
+        try:
+            snapshot = await self._resolve_snapshot(db, user, version)
+            hydrate_started = perf_counter()
+            node_payload, next_cursor = await self.snapshot_repo.get_nodes_page(
+                db,
+                snapshot_id=snapshot.id,
+                cursor=cursor,
+                limit=limit,
+            )
+            page = GraphNodesPage(
+                nodes=[GraphNode(**node) for node in node_payload],
+                next_cursor=next_cursor,
+                version=snapshot.version,
+                generated_at=snapshot.created_at.isoformat()
+                if snapshot.created_at
+                else None,
+            )
+            logger.info(
+                "Graph nodes page hydrated "
+                f"version={snapshot.version} "
+                f"cursor={cursor} "
+                f"limit={limit} "
+                f"returned_nodes={len(page.nodes)} "
+                f"next_cursor={page.next_cursor} "
+                f"hydrate_ms={((perf_counter() - hydrate_started) * 1000):.1f}"
+            )
+        except SnapshotVersionNotFoundError:
+            raise
+        except Exception as exc:
+            raise self._unavailable("nodes", exc) from exc
+        page.request_id = str(uuid.uuid4())
+        self._log_if_slow(
+            "get_nodes_page",
             started,
             version=version,
             cursor=cursor,

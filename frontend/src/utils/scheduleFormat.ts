@@ -58,9 +58,9 @@ export const getStatusDisplay = (
 ): { text: string; color: string } => {
   switch (status) {
     case 'success':
-      return { text: t('time.status.success'), color: 'text-green-600' };
+      return { text: t('time.status.success'), color: 'text-success' };
     case 'failed':
-      return { text: t('time.status.failed'), color: 'text-red-600' };
+      return { text: t('time.status.failed'), color: 'text-danger' };
     case 'running':
       return { text: t('time.status.running'), color: 'text-action-primary' };
     default:
