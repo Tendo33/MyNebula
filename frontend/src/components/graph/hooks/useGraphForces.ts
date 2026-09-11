@@ -121,5 +121,6 @@ export const useGraphForces = ({
 
     // Register custom force
     fg.d3Force('cluster', createClusterForce(clusterLayoutData));
+    fg.d3ReheatSimulation();
   }, [graphRef, clusterLayoutData]);
 };

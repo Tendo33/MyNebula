@@ -5,14 +5,27 @@ export const useResizeObserver = (ref: RefObject<HTMLElement>) => {
 
   useEffect(() => {
     if (!ref.current) return;
+    const el = ref.current;
+
+    const apply = (width: number, height: number) => {
+      const nextWidth = Math.max(1, Math.round(width));
+      const nextHeight = Math.max(1, Math.round(height));
+      setDimensions((prev) =>
+        prev.width === nextWidth && prev.height === nextHeight
+          ? prev
+          : { width: nextWidth, height: nextHeight }
+      );
+    };
+
+    apply(el.clientWidth, el.clientHeight);
 
     const observer = new ResizeObserver((entries) => {
       if (!entries || entries.length === 0) return;
       const { width, height } = entries[0].contentRect;
-      setDimensions({ width, height });
+      apply(width, height);
     });
 
-    observer.observe(ref.current);
+    observer.observe(el);
     return () => observer.disconnect();
   }, [ref]);
 

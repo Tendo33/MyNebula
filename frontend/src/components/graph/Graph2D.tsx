@@ -101,7 +101,7 @@ const Graph2D: React.FC = () => {
   useEffect(() => {
     if (reduceMotion) return;
     graphRef.current?.d3ReheatSimulation();
-  }, [layoutKey, reduceMotion]);
+  }, [layoutKey, processedLinks.length, processedNodes.length, reduceMotion]);
 
   const { tryAutoFit, getLiveNodeById, focusNodeById, markUserInteracted, skipNextFocusRef } =
     useGraphViewport({
@@ -306,8 +306,15 @@ const Graph2D: React.FC = () => {
         d3AlphaDecay={reduceMotion ? 0.05 : 0.008}
         d3VelocityDecay={0.28}
         cooldownTicks={reduceMotion ? 0 : 480}
+        cooldownTime={reduceMotion ? 0 : 20000}
         warmupTicks={reduceMotion ? 80 : 0}
         // After engine stops
+        onEngineTick={() => {
+          if (import.meta.env.DEV) {
+            const w = window as Window & { __nebulaGraphTicks?: number };
+            w.__nebulaGraphTicks = (w.__nebulaGraphTicks ?? 0) + 1;
+          }
+        }}
         onEngineStop={tryAutoFit}
       />
 
