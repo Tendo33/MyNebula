@@ -40,7 +40,9 @@
     "n_a": "暂无",
     "filter": "筛选",
     "no_description": "暂无描述",
-    "skip_to_content": "跳到主要内容"
+    "skip_to_content": "跳到主要内容",
+    "command_palette": "命令面板",
+    "search_command": "搜索"
   },
   "dashboard": {
     "title": "概览",
@@ -85,6 +87,7 @@
     "loading_data": "正在加载图谱数据…",
     "empty_title": "还没有图谱",
     "empty_hint": "先同步 GitHub 星标，再探索聚类和仓库关系。",
+    "search_placeholder": "搜索图谱…",
     "max_clusters": "最大聚类数（越小越粗）",
     "min_clusters": "最小聚类数（越大越细）",
     "recluster": "重新聚类",

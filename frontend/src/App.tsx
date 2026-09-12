@@ -7,6 +7,8 @@ import { GraphProvider, useGraph } from './contexts/GraphContext';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { ErrorFallback } from './components/ui/ErrorFallback';
 import CommandPalette from './components/ui/CommandPalette';
+import { Button } from './components/ui/button';
+import { TooltipProvider } from './components/ui/tooltip';
 import useCommandPalette from './hooks/useCommandPalette';
 import { ClusterInfo, GraphNode } from './types';
 
@@ -21,7 +23,9 @@ const NotFound = () => {
     <main id="main-content" className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="page-title">404</h1>
       <p className="text-text-muted">{t('errors.not_found', 'This page does not exist.')}</p>
-      <Link className="header-action" to="/">{t('sidebar.dashboard', 'Dashboard')}</Link>
+      <Button nativeButton={false} render={<Link to="/" />}>
+        {t('sidebar.dashboard', 'Dashboard')}
+      </Button>
     </main>
   );
 };
@@ -112,9 +116,11 @@ function AppContent() {
 function App() {
   return (
     <AdminAuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <TooltipProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </TooltipProvider>
     </AdminAuthProvider>
   );
 }

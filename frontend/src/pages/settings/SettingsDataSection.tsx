@@ -1,8 +1,21 @@
-import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { clsx } from 'clsx';
-import { AlertTriangle, Database, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Database, RefreshCw } from 'lucide-react';
 import type { SyncInfoResponse } from '../../api/v2/settings';
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 
 interface SettingsDataSectionProps {
   syncInfo: SyncInfoResponse | null;
@@ -26,53 +39,6 @@ export const SettingsDataSection = ({
   onConfirmRefresh,
 }: SettingsDataSectionProps) => {
   const { t } = useTranslation();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!showConfirmDialog) return;
-
-    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const focusTimer = window.setTimeout(() => {
-      cancelButtonRef.current?.focus();
-    }, 0);
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // The dialog owns its own dismissal: Escape handling used to live in the
-      // parent page while the focus trap lived here, splitting one behaviour
-      // across two files.
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onHideConfirm();
-        return;
-      }
-      if (event.key !== 'Tab' || !dialogRef.current) return;
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      window.removeEventListener('keydown', handleKeyDown);
-      previouslyFocusedRef.current?.focus();
-    };
-  }, [showConfirmDialog, onHideConfirm]);
 
   return (
     <>
@@ -80,10 +46,10 @@ export const SettingsDataSection = ({
         <h2 className="section-heading mb-4 select-none">
           {t('settings.data_management')}
         </h2>
-        <div className="space-y-2">
-          <div className="panel-subtle p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Database className="w-4 h-4 text-text-muted" />
+        <div className="flex flex-col gap-2">
+          <Card variant="muted" className="p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Database className="size-4 text-text-muted" />
               <label className="text-sm font-medium text-text-main">{t('settings.repo_stats')}</label>
             </div>
             <div className="grid grid-cols-2 gap-4 rounded-xl border border-border-light bg-bg-elevated p-4">
@@ -109,82 +75,60 @@ export const SettingsDataSection = ({
                 {t('settings.last_run')}: {new Date(syncInfo.last_sync_at).toLocaleString()}
               </div>
             )}
-          </div>
+          </Card>
 
-          <div className="panel-subtle p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <RefreshCw className="w-4 h-4 text-text-muted" />
+          <Card variant="muted" className="p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <RefreshCw className="size-4 text-text-muted" />
               <label className="text-sm font-medium text-text-main">{t('settings.full_refresh')}</label>
             </div>
-            <p className="text-xs text-text-muted mb-3">{t('settings.full_refresh_desc')}</p>
-            <button
+            <p className="mb-3 text-xs text-text-muted">{t('settings.full_refresh_desc')}</p>
+            <Button
               type="button"
+              variant="destructive"
               onClick={onShowConfirm}
               disabled={refreshLoading || syncing || reclusterLoading}
-              className={clsx('danger-button-soft', (refreshLoading || syncing || reclusterLoading) && 'cursor-not-allowed opacity-50')}
             >
-              {refreshLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t('settings.refreshing')}
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4" />
-                  {t('settings.execute_full_refresh')}
-                </>
-              )}
-            </button>
-          </div>
+              {refreshLoading ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
+              {refreshLoading ? t('settings.refreshing') : t('settings.execute_full_refresh')}
+            </Button>
+          </Card>
         </div>
       </section>
 
-      {showConfirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-          <div
-            ref={dialogRef}
-            className="panel-surface-strong mx-4 w-full max-w-md p-6"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="full-refresh-title"
-            aria-describedby="full-refresh-desc"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="rounded-md bg-danger-bg p-2">
-                <AlertTriangle className="h-6 w-6 text-danger" />
-              </div>
-              <h3 id="full-refresh-title" className="text-lg font-semibold text-text-main dark:text-dark-text-main">
-                {t('settings.confirm_full_refresh_title')}
-              </h3>
-            </div>
-            <p id="full-refresh-desc" className="text-sm text-text-muted mb-6 dark:text-dark-text-main/70">
+      <AlertDialog
+        open={showConfirmDialog}
+        onOpenChange={(open) => {
+          if (!open) onHideConfirm();
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogMedia className="bg-danger-bg text-danger">
+              <AlertTriangle />
+            </AlertDialogMedia>
+            <AlertDialogTitle>{t('settings.confirm_full_refresh_title')}</AlertDialogTitle>
+            <AlertDialogDescription>
               {t('settings.confirm_full_refresh_desc', { count: syncInfo?.total_repos ?? 0 })}
-            </p>
-            <ul className="text-sm text-text-muted mb-6 space-y-1 list-disc list-inside dark:text-dark-text-main/70">
-              <li>{t('settings.confirm_step_fetch')}</li>
-              <li>{t('settings.confirm_step_summarize')}</li>
-              <li>{t('settings.confirm_step_embed')}</li>
-              <li>{t('settings.confirm_step_cluster')}</li>
-            </ul>
-            <p className="mb-6 rounded-md border border-border-light bg-bg-hover p-3 text-xs text-text-muted">{t('settings.confirm_warning')}</p>
-            <div className="flex justify-end gap-3">
-              <button
-                ref={cancelButtonRef}
-                onClick={onHideConfirm}
-                className="header-action-ghost px-3"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                onClick={onConfirmRefresh}
-                className="danger-button-soft px-3"
-              >
-                {t('settings.execute_full_refresh')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="flex list-inside list-disc flex-col gap-1 text-sm text-muted-foreground">
+            <li>{t('settings.confirm_step_fetch')}</li>
+            <li>{t('settings.confirm_step_summarize')}</li>
+            <li>{t('settings.confirm_step_embed')}</li>
+            <li>{t('settings.confirm_step_cluster')}</li>
+          </ul>
+          <p className="rounded-md border border-border bg-muted p-3 text-xs text-muted-foreground">
+            {t('settings.confirm_warning')}
+          </p>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onConfirmRefresh}>
+              {t('settings.execute_full_refresh')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

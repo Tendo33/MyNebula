@@ -40,7 +40,9 @@
     "n_a": "N/A",
     "filter": "Filters",
     "no_description": "No description",
-    "skip_to_content": "Skip to content"
+    "skip_to_content": "Skip to content",
+    "command_palette": "Command Palette",
+    "search_command": "Search"
   },
   "dashboard": {
     "title": "Overview",
@@ -85,6 +87,7 @@
     "loading_data": "Loading graph data…",
     "empty_title": "No graph yet",
     "empty_hint": "Sync GitHub stars to start exploring clusters and relationships.",
+    "search_placeholder": "Search the graph…",
     "max_clusters": "Max Clusters (Smaller is coarser)",
     "min_clusters": "Min Clusters (Larger is finer)",
     "recluster": "Re-cluster",

@@ -4,7 +4,16 @@ import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 
 import type { DataClusterInfo, DataRepoItem } from '../../api/v2/data';
+import { Card } from '../../components/ui/card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../components/ui/table';
 import { ClusterBadge, SortableHeader } from './DataTableParts';
 import { formatDataDate, type SortConfig, type SortField } from './dataPageFilters';
 
@@ -27,12 +36,11 @@ export const DataRepoTable: React.FC<{
 
   return (
     <>
-    <div className="panel-surface hidden w-full overflow-hidden sm:block">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-border-light bg-bg-hover font-medium text-text-muted dark:border-dark-border dark:bg-dark-bg-sidebar/60 dark:text-dark-text-main/70">
-            <tr>
-              <th className="w-14 px-2 py-3 text-center text-xs text-text-muted/50">#</th>
+    <Card className="hidden w-full overflow-hidden py-0 sm:block">
+        <Table className="text-left">
+          <TableHeader className="bg-muted font-medium text-muted-foreground">
+            <TableRow>
+              <TableHead className="w-14 px-2 py-3 text-center text-xs text-muted-foreground/50">#</TableHead>
               <SortableHeader
                 label={t('data.repository')}
                 field="name"
@@ -80,16 +88,13 @@ export const DataRepoTable: React.FC<{
                 onSort={onSort}
                 align="center"
               />
-              <th className="hidden w-20 px-4 py-3">{t('data.description')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-light dark:divide-dark-border">
+              <TableHead className="hidden w-20 px-4 py-3">{t('data.description')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {repos.map((repo) => (
-              <tr
-                key={repo.id}
-                className="transition-colors hover:bg-bg-hover/50 dark:hover:bg-dark-bg-sidebar/60"
-              >
-                <td className="px-2 py-3 text-center">
+              <TableRow key={repo.id}>
+                <TableCell className="px-2 py-3 text-center">
                   {repo.owner_avatar_url ? (
                     <img
                       src={repo.owner_avatar_url}
@@ -105,8 +110,8 @@ export const DataRepoTable: React.FC<{
                       {repo.owner.charAt(0).toUpperCase()}
                     </div>
                   )}
-                </td>
-                <td className="max-w-xs px-4 py-3">
+                </TableCell>
+                <TableCell className="max-w-xs whitespace-normal px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Link
                       to={`/graph?node=${repo.id}`}
@@ -115,8 +120,8 @@ export const DataRepoTable: React.FC<{
                       {repo.full_name}
                     </Link>
                   </div>
-                </td>
-                <td className="max-w-md px-4 py-3">
+                </TableCell>
+                <TableCell className="max-w-md whitespace-normal px-4 py-3">
                   <p
                     className="line-clamp-2 text-sm text-text-muted"
                     title={repo.ai_summary || repo.description}
@@ -125,8 +130,8 @@ export const DataRepoTable: React.FC<{
                       <span className="italic text-text-muted">{t('data.no_summary')}</span>
                     )}
                   </p>
-                </td>
-                <td className="px-4 py-3 text-center">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-center">
                   {repo.language ? (
                     <span className="inline-flex items-center rounded-full bg-bg-hover px-2.5 py-1 text-xs font-medium text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
                       {repo.language}
@@ -134,35 +139,35 @@ export const DataRepoTable: React.FC<{
                   ) : (
                     <span className="italic text-text-muted">-</span>
                   )}
-                </td>
-                <td className="px-4 py-3 text-center font-mono tabular-nums text-text-muted">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-center font-mono tabular-nums text-text-muted">
                   {repo.stargazers_count.toLocaleString()}
-                </td>
-                <td className="px-4 py-3 text-center">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-center">
                   <ClusterBadge
                     cluster={repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined}
                     onClick={() => repo.cluster_id != null && onClusterFilter(repo.cluster_id)}
                   />
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-center text-xs text-text-muted">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-center text-xs text-text-muted">
                   {formatDataDate(repo.starred_at)}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-center text-xs text-text-muted">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-center text-xs text-text-muted">
                   {formatDataDate(repo.last_commit_time)}
-                </td>
-                <td className="hidden max-w-md px-4 py-3">
+                </TableCell>
+                <TableCell className="hidden max-w-md whitespace-normal px-4 py-3">
                   <p className="truncate text-xs text-text-muted">
                     {repo.description || (
                       <span className="italic text-text-muted">{t('data.no_description')}</span>
                     )}
                   </p>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
 
             {repos.length === 0 && (
-              <tr>
-                <td colSpan={8}>
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={8} className="whitespace-normal">
                   <EmptyState
                     title={hasActiveFilters ? t('data.no_results') : t('data.no_data')}
                     description={t('data.empty_hint')}
@@ -171,17 +176,16 @@ export const DataRepoTable: React.FC<{
                     actionType={hasActiveFilters ? 'button' : 'link'}
                     onAction={hasActiveFilters ? onClearFilters : undefined}
                   />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TableBody>
+        </Table>
+    </Card>
 
-    <div className="space-y-3 sm:hidden">
+    <div className="flex flex-col gap-3 sm:hidden">
       {repos.map((repo) => (
-        <div key={repo.id} className="panel-surface p-4">
+        <Card key={repo.id} className="p-4">
           <div className="flex items-start gap-3">
             {repo.owner_avatar_url ? (
               <img
@@ -231,7 +235,7 @@ export const DataRepoTable: React.FC<{
             <span>{t('data.starred_date')}: {formatDataDate(repo.starred_at)}</span>
             <span>{t('data.last_commit')}: {formatDataDate(repo.last_commit_time)}</span>
           </div>
-        </div>
+        </Card>
       ))}
 
       {repos.length === 0 && (

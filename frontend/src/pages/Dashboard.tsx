@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
-import { LanguageSwitch } from '../components/layout/LanguageSwitch';
-import { DashboardSkeleton } from '../components/ui/Skeleton';
+import { HeaderActions } from '../components/layout/HeaderActions';
+import { DashboardSkeleton } from '../components/ui/page-skeletons';
 import { ArrowRight } from 'lucide-react';
 import { useDashboardQuery } from '../features/dashboard/hooks/useDashboardQuery';
 import { EmptyState } from '../components/ui/EmptyState';
+import { Button } from '../components/ui/button';
 
 interface LanguageBarProps {
   language: string;
@@ -83,7 +84,7 @@ const Dashboard = () => {
       <main id="main-content" className="page-main">
         <header className="page-header">
           <h1 className="page-title">{t('sidebar.dashboard')}</h1>
-          <LanguageSwitch />
+          <HeaderActions />
         </header>
 
         <section className="page-content">
@@ -119,17 +120,17 @@ const Dashboard = () => {
                   {stats?.topLanguage ? ` · ${stats.topLanguage}` : ''}
                 </p>
                 <div className="mt-6 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => navigate('/graph')} className="header-action">
+                  <Button type="button" onClick={() => navigate('/graph')}>
                     {t('dashboard.explore_graph')}
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                  <button
+                    <ArrowRight data-icon="inline-end" />
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => navigate('/data')}
-                    className="header-action-ghost"
                   >
                     {t('dashboard.browse_table')}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -229,14 +230,14 @@ const Dashboard = () => {
                     <h3 className="font-heading text-sm font-semibold text-text-main">
                       {t('dashboard.top_clusters')}
                     </h3>
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() => navigate('/graph')}
-                      className="header-action-ghost"
                     >
                       {t('common.view_all')}
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
+                      <ArrowRight data-icon="inline-end" />
+                    </Button>
                   </div>
                   <ul className="mt-2 divide-y divide-border-light">
                     {stats.topClusters.map((cluster) => (

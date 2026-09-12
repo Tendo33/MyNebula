@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, X } from 'lucide-react';
-import { clsx } from 'clsx';
 import { useTranslation } from 'react-i18next';
+
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
 
 interface SearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   /** Callback when search value changes */
@@ -64,36 +70,29 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   }, [onSearch]);
 
   return (
-    <div className={clsx('group relative', className)}>
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-        <Search className="h-4 w-4 text-text-dim transition-colors group-focus-within:text-action-primary" />
-      </div>
-      <input
+    <InputGroup className={className}>
+      <InputGroupAddon>
+        <Search />
+      </InputGroupAddon>
+      <InputGroupInput
         type="search"
         value={localValue}
         onChange={handleChange}
-        className={clsx(
-          'field-surface block w-full pl-11 placeholder:text-text-muted',
-          // Only reserve the right gutter while the clear button actually
-          // exists. Reserving it unconditionally cost 44px of placeholder room
-          // on every empty field, which is what truncated the Chinese
-          // placeholder in narrow toolbars.
-          localValue ? 'pr-11' : 'pr-4'
-        )}
         placeholder={placeholder || t('dashboard.search_placeholder')}
         aria-label={computedAriaLabel}
         {...props}
       />
-      {localValue && (
-        <button
-          type="button"
-          onClick={handleClear}
-          aria-label={t('common.clear', 'Clear')}
-          className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-text-muted hover:text-text-main"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
-    </div>
+      {localValue ? (
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-xs"
+            onClick={handleClear}
+            aria-label={t('common.clear', 'Clear')}
+          >
+            <X />
+          </InputGroupButton>
+        </InputGroupAddon>
+      ) : null}
+    </InputGroup>
   );
 };

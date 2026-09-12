@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 import type { DataClusterInfo } from '../../api/v2/data';
+import { TableHead } from '../../components/ui/table';
 import { getClusterAccent } from '../../utils/clusterAccent';
 import type { SortConfig, SortField } from './dataPageFilters';
 
@@ -39,7 +40,7 @@ export const SortableHeader: React.FC<SortableHeaderProps> = ({
     : 'none';
 
   return (
-    <th className={`px-4 py-3 whitespace-nowrap ${className}`} scope="col" aria-sort={ariaSort}>
+    <TableHead className={`px-4 py-3 ${className}`} scope="col" aria-sort={ariaSort}>
       <button
         type="button"
         onClick={() => onSort(field)}
@@ -61,7 +62,7 @@ export const SortableHeader: React.FC<SortableHeaderProps> = ({
           />
         </span>
       </button>
-    </th>
+    </TableHead>
   );
 };
 

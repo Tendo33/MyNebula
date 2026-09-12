@@ -4,6 +4,8 @@ import { clsx } from 'clsx';
 import { FolderHeart, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useGraph } from '../../contexts/GraphContext';
 import { StarListInfo } from '../../types';
+import { Button } from '../ui/button';
+import { Card } from '../ui/card';
 
 // ============================================================================
 // Types
@@ -119,18 +121,14 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
   }
 
   return (
-    <div className={clsx(
-      'bg-bg-main border border-border-light rounded-xl shadow-sm overflow-hidden',
-      'transition-all duration-300',
-      'dark:bg-dark-bg-main dark:border-dark-border',
-      className
-    )}>
+    <Card className={clsx('overflow-hidden py-0', className)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-light dark:border-dark-border">
-        <button
+      <div className="flex items-center justify-between border-b border-border-light px-4 py-3 dark:border-dark-border">
+        <Button
           type="button"
+          variant="ghost"
           onClick={onToggleCollapsed}
-          className="flex min-h-[2.25rem] items-center justify-between gap-2 flex-1 text-left hover:bg-bg-hover/50 rounded-md px-2 py-1.5 -ml-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:hover:bg-dark-bg-sidebar/70"
+          className="-ml-2 h-9 flex-1 justify-between px-2"
           aria-expanded={!collapsed}
           aria-controls="starlist-panel-list"
         >
@@ -150,24 +148,25 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
               <ChevronUp className="w-4 h-4 text-text-muted dark:text-dark-text-main/60" />
             )
           )}
-        </button>
+        </Button>
 
         {hasSelectedLists && (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => clearStarListFilter?.()}
-            className="p-1 rounded hover:bg-bg-hover text-text-muted hover:text-text-main transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30 dark:text-dark-text-main/60 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70"
             title={t('common.clear_filter')}
             aria-label={t('common.clear_filter')}
-            type="button"
           >
-            <X className="w-4 h-4" />
-          </button>
+            <X />
+          </Button>
         )}
       </div>
 
       {/* Star list items */}
       {!collapsed && (
-        <div id="starlist-panel-list" className="max-h-60 overflow-y-auto p-2 space-y-1">
+        <div id="starlist-panel-list" className="flex max-h-60 flex-col gap-1 overflow-y-auto p-2">
           {starLists.map((list) => (
             <StarListItem
               key={list.id}
@@ -186,16 +185,13 @@ const StarListPanel: React.FC<StarListPanelProps> = ({
             <span className="text-xs text-text-muted dark:text-dark-text-main/70">
               {t('graph.showing_repos', { count: filteredData?.total_nodes || 0 })}
             </span>
-            <button
-              onClick={clearStarListFilter}
-              className="text-xs text-action-primary hover:text-action-hover transition-colors"
-            >
+            <Button type="button" variant="link" className="h-auto p-0 text-xs" onClick={clearStarListFilter}>
               {t('common.show_all')}
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 

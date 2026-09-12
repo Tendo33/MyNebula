@@ -48,10 +48,7 @@ describe('RepoDetailsPanel', () => {
     const githubLink = screen.getByRole('link', { name: /github/i });
 
     expect(githubLink).toHaveAttribute('href', node.html_url);
-    expect(githubLink).toHaveClass('bg-bg-hover');
-    expect(githubLink).toHaveClass('text-text-main');
-    expect(githubLink).toHaveClass('border-border-light');
-    expect(githubLink).not.toHaveClass('bg-text-main');
-    expect(githubLink).not.toHaveClass('text-bg-main');
+    expect(githubLink.className).toContain('border-border');
+    expect(githubLink.className).not.toContain('bg-primary');
   });
 });

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { clsx } from 'clsx';
 import {
   Clock,
   Code,
@@ -14,6 +13,9 @@ import {
 } from 'lucide-react';
 
 import { useGraph } from '../../contexts/GraphContext';
+import { Button } from './button';
+import { Kbd } from './kbd';
+import { ToggleGroup, ToggleGroupItem } from './toggle-group';
 import { CommandPaletteResultList } from './CommandPaletteResultList';
 import type {
   CommandPaletteProps,
@@ -178,41 +180,43 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             aria-label={t('search.placeholder', 'Search repos, clusters, languages, tags...')}
           />
           <div className="flex items-center gap-2">
-            <kbd className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-text-muted bg-bg-sidebar rounded border border-border-light">
-              <Command className="w-3 h-3" />K
-            </kbd>
-            <button
+            <Kbd className="hidden sm:inline-flex">
+              <Command />K
+            </Kbd>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={onClose}
               aria-label={t('common.close', 'Close')}
-              className="p-1 hover:bg-bg-hover rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30"
             >
-              <X className="w-5 h-5 text-text-muted" />
-            </button>
+              <X />
+            </Button>
           </div>
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-border-light bg-bg-sidebar/50">
-          {[
-            { key: 'all', label: t('search.all', 'All') },
-            { key: 'repos', label: t('search.repos', 'Repos') },
-            { key: 'clusters', label: t('search.clusters', 'Clusters') },
-            { key: 'languages', label: t('search.languages', 'Languages') },
-            { key: 'tags', label: t('search.tags', 'Tags') },
-          ].map(filter => (
-            <button
-              key={filter.key}
-              onClick={() => setActiveFilter(filter.key as FilterType)}
-              className={clsx(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary/30',
-                activeFilter === filter.key
-                  ? 'bg-bg-main text-text-main shadow-sm dark:bg-dark-bg-main dark:text-dark-text-main'
-                  : 'text-text-muted hover:text-text-main hover:bg-bg-hover dark:text-dark-text-main/70 dark:hover:text-dark-text-main dark:hover:bg-dark-bg-sidebar/70'
-              )}
-            >
-              {filter.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1 border-b border-border-light bg-bg-sidebar/50 px-4 py-2">
+          <ToggleGroup
+            value={[activeFilter]}
+            onValueChange={(next) => {
+              const value = next[0];
+              if (value) setActiveFilter(value as FilterType);
+            }}
+            className="flex flex-wrap"
+          >
+            {([
+              { key: 'all', label: t('search.all', 'All') },
+              { key: 'repos', label: t('search.repos', 'Repos') },
+              { key: 'clusters', label: t('search.clusters', 'Clusters') },
+              { key: 'languages', label: t('search.languages', 'Languages') },
+              { key: 'tags', label: t('search.tags', 'Tags') },
+            ] as const).map((filter) => (
+              <ToggleGroupItem key={filter.key} value={filter.key} size="sm">
+                {filter.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
 
         {/* Results / Empty State */}
@@ -321,11 +325,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               </div>
             </div>
           ) : remoteLoading && results.length === 0 ? (
-            <div className="py-12 text-center">
-              <Search className="w-12 h-12 text-text-dim mx-auto mb-3 animate-pulse" />
-              <p className="text-text-muted">
-                {t('common.loading', 'Loading...')}
-              </p>
+            <div className="px-4 py-8 text-sm text-muted-foreground">
+              {t('common.loading', 'Loading...')}
             </div>
           ) : results.length > 0 ? (
             <CommandPaletteResultList
@@ -335,12 +336,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             />
           ) : (
             // No results
-            <div className="py-12 text-center">
-              <Search className="w-12 h-12 text-text-dim mx-auto mb-3" />
-              <p className="text-text-muted">
+            <div className="px-4 py-8">
+              <p className="text-sm text-text-main">
                 {t('search.noResults', 'No results found for')} "{query}"
               </p>
-              <p className="text-sm text-text-muted mt-1">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {remoteError ?? t('search.tryDifferent', 'Try a different search term')}
               </p>
             </div>
@@ -351,15 +351,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         <div className="flex items-center justify-between px-4 py-2 border-t border-border-light bg-bg-sidebar/50 text-xs text-text-muted">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-bg-main rounded border border-border-light dark:bg-dark-bg-main dark:border-dark-border">↑↓</kbd>
+              <Kbd>↑↓</Kbd>
               {t('search.navigate', 'Navigate')}
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-bg-main rounded border border-border-light dark:bg-dark-bg-main dark:border-dark-border">↵</kbd>
+              <Kbd>↵</Kbd>
               {t('search.select', 'Select')}
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-bg-main rounded border border-border-light dark:bg-dark-bg-main dark:border-dark-border">esc</kbd>
+              <Kbd>esc</Kbd>
               {t('search.close', 'Close')}
             </span>
           </div>

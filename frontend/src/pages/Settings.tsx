@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
-import { AlertTriangle, Loader2, LogOut, RefreshCw, Server, Shield, Sparkles } from 'lucide-react';
+import { AlertTriangle, LogOut, RefreshCw, Server, Shield, Sparkles } from 'lucide-react';
+
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Separator } from '../components/ui/separator';
+import { Slider } from '../components/ui/slider';
+import { Spinner } from '../components/ui/spinner';
 
 import { Sidebar } from '../components/layout/Sidebar';
-import { LanguageSwitch } from '../components/layout/LanguageSwitch';
+import { HeaderActions } from '../components/layout/HeaderActions';
 import { SyncProgress } from '../components/ui/SyncProgress';
 import { useGraph } from '../contexts/GraphContext';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
@@ -108,22 +117,19 @@ const Settings = () => {
             <h1 className="page-title select-none">{t('settings.title')}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <LanguageSwitch />
+            <HeaderActions />
             {isAuthenticated && (
-              <button
-                onClick={auth.handleAdminLogout}
-                className="header-action-ghost"
-              >
-                <LogOut className="w-3.5 h-3.5" />
+              <Button variant="outline" onClick={auth.handleAdminLogout}>
+                <LogOut data-icon="inline-start" />
                 {t('app.logout')}
-              </button>
+              </Button>
             )}
           </div>
         </header>
 
         {isChecking ? (
-          <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-text-muted" />
+          <div className="flex flex-1 items-center justify-center">
+            <Spinner className="size-6 text-text-muted" />
           </div>
         ) : !isAuthenticated ? (
           <SettingsLoginForm
@@ -138,52 +144,46 @@ const Settings = () => {
           />
         ) : (
           <div className="page-content">
-            <div className="max-w-4xl space-y-12">
+            <div className="flex max-w-4xl flex-col gap-12">
               {error && (
-                <div className="status-banner" data-tone="error">
-                  <AlertTriangle className="w-4 h-4" />
-                  {error}
-                </div>
+                <Alert variant="destructive">
+                  <AlertTriangle />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
               {warning && (
-                <div className="status-banner" data-tone="warning">
-                  <AlertTriangle className="w-4 h-4" />
-                  {warning}
-                </div>
+                <Alert variant="warning">
+                  <AlertTriangle />
+                  <AlertDescription>{warning}</AlertDescription>
+                </Alert>
               )}
 
               <SettingsAppearance settings={settings} updateSettings={updateSettings} />
 
-              <hr className="border-t border-border-light/80" />
+              <Separator />
 
               <section>
                 <h2 className="section-heading mb-4 select-none">{t('settings.operations')}</h2>
-                <div className="space-y-4">
-                  <div className="panel-surface p-5">
+                <div className="flex flex-col gap-4">
+                  <Card className="p-5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-text-muted" />
+                        <Sparkles className="size-4 text-text-muted" />
                         <span className="text-sm font-medium text-text-main">
                           {t('dashboard.sync_button')}
                         </span>
                       </div>
-                      <button
+                      <Button
                         onClick={syncControls.handleSyncStars}
                         disabled={operationsBusy}
-                        className={clsx(
-                          'inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors',
-                          operationsBusy
-                            ? 'bg-bg-hover text-text-dim cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60'
-                            : 'bg-text-main text-bg-main hover:bg-text-main/90 shadow-sm'
-                        )}
                       >
-                        {syncing && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {syncing ? <Spinner data-icon="inline-start" /> : null}
                         {syncing ? t('dashboard.syncing') : t('dashboard.sync_button')}
-                      </button>
+                      </Button>
                     </div>
-                  </div>
+                  </Card>
 
-                  <div className="panel-surface space-y-3 p-5">
+                  <Card className="flex flex-col gap-3 p-5">
                     <div className="flex items-center gap-2">
                       <RefreshCw className="w-4 h-4 text-text-muted" />
                       <span className="text-sm font-medium text-text-main">
@@ -200,22 +200,21 @@ const Settings = () => {
                           {settings.maxClusters}
                         </span>
                       </div>
-                      <input
-                        id="settings-max-clusters"
-                        type="range"
+                      <Slider
                         min={2}
                         max={20}
                         step={1}
                         value={settings.maxClusters}
-                        onChange={(e) => {
-                          const nextMax = Number(e.target.value);
+                        onValueChange={(value) => {
+                          const nextMax = Array.isArray(value) ? value[0] : value;
+                          if (typeof nextMax !== 'number') return;
                           if (nextMax < settings.minClusters) {
                             updateSettings({ maxClusters: nextMax, minClusters: nextMax });
                             return;
                           }
                           updateSettings({ maxClusters: nextMax });
                         }}
-                        className="w-full mt-2"
+                        className="mt-2"
                       />
                     </div>
 
@@ -228,53 +227,45 @@ const Settings = () => {
                           {settings.minClusters}
                         </span>
                       </div>
-                      <input
-                        id="settings-min-clusters"
-                        type="range"
+                      <Slider
                         min={2}
                         max={20}
                         step={1}
                         value={settings.minClusters}
-                        onChange={(e) => {
-                          const nextMin = Number(e.target.value);
+                        onValueChange={(value) => {
+                          const nextMin = Array.isArray(value) ? value[0] : value;
+                          if (typeof nextMin !== 'number') return;
                           if (nextMin > settings.maxClusters) {
                             updateSettings({ minClusters: nextMin, maxClusters: nextMin });
                             return;
                           }
                           updateSettings({ minClusters: nextMin });
                         }}
-                        className="w-full mt-2"
+                        className="mt-2"
                       />
                     </div>
 
-                    <button
+                    <Button
+                      variant="outline"
                       onClick={syncControls.handleRecluster}
                       disabled={operationsBusy}
-                      className={clsx(
-                        'inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl border px-4 text-sm font-medium transition-colors',
-                        operationsBusy
-                          ? 'bg-bg-hover text-text-dim border-border-light cursor-not-allowed dark:bg-dark-bg-sidebar/70 dark:text-dark-text-main/60 dark:border-dark-border'
-                          : 'bg-bg-main text-text-main border-border-light hover:bg-bg-hover dark:bg-dark-bg-main dark:text-dark-text-main dark:border-dark-border dark:hover:bg-dark-bg-sidebar/70'
-                      )}
                       title={t('graph.recluster_hint')}
                     >
-                      {syncControls.reclusterLoading && (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      )}
+                      {syncControls.reclusterLoading ? <Spinner data-icon="inline-start" /> : null}
                       {syncControls.reclusterLoading
                         ? t('graph.reclustering')
                         : t('graph.recluster')}
-                    </button>
-                  </div>
+                    </Button>
+                  </Card>
                 </div>
               </section>
 
-              <hr className="border-t border-border-light/80" />
+              <Separator />
 
               <section>
                 <h2 className="section-heading mb-4 select-none">{t('settings.connection')}</h2>
-                <div className="space-y-2">
-                  <div className="panel-subtle p-4">
+                <div className="flex flex-col gap-2">
+                  <Card variant="muted" className="p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Server className="w-4 h-4 text-text-muted" />
                       <label
@@ -284,38 +275,40 @@ const Settings = () => {
                         {t('settings.api_endpoint')}
                       </label>
                     </div>
-                    <input
+                    <Input
                       id="settings-api-endpoint"
                       type="text"
                       value={API_BASE_URL}
                       readOnly
-                      className="w-full bg-bg-sidebar/50 border border-border-light rounded-md px-3 py-2 text-sm text-text-muted font-mono"
+                      className="font-mono text-muted-foreground"
                     />
-                  </div>
+                  </Card>
 
-                  <div className="panel-subtle flex items-center justify-between p-4 transition-colors">
+                  <Card variant="muted" className="flex flex-row items-center justify-between p-4 transition-colors">
                     <div className="flex items-center gap-2">
                       <Shield className="w-4 h-4 text-text-muted" />
                       <span className="text-sm font-medium text-text-main">
                         {t('settings.github_token_status')}
                       </span>
                     </div>
-                    <div
+                    <Badge
+                      variant={
+                        githubTokenStatus.state === 'connected'
+                          ? 'secondary'
+                          : githubTokenStatus.state === 'not_configured'
+                            ? 'outline'
+                            : 'ghost'
+                      }
                       className={clsx(
-                        'flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full border',
                         githubTokenStatus.state === 'connected' &&
                           'border-success/30 bg-success-bg text-success',
                         githubTokenStatus.state === 'not_configured' &&
-                          'border-warning/40 bg-warning-bg text-warning-foreground',
-                        githubTokenStatus.state === 'unknown' &&
-                          'text-text-muted bg-bg-hover border-border-light dark:text-dark-text-main/70 dark:bg-dark-bg-sidebar/70 dark:border-dark-border',
-                        githubTokenStatus.state === 'loading' &&
-                          'text-text-muted bg-bg-hover border-border-light dark:text-dark-text-main/60 dark:bg-dark-bg-sidebar/60 dark:border-dark-border'
+                          'border-warning/40 bg-warning-bg text-warning-foreground'
                       )}
                     >
-                      <div
+                      <span
                         className={clsx(
-                          'w-2 h-2 rounded-full',
+                          'size-2 rounded-full',
                           githubTokenStatus.state === 'connected' && 'bg-success animate-pulse',
                           githubTokenStatus.state === 'not_configured' && 'bg-warning',
                           githubTokenStatus.state === 'unknown' && 'bg-text-dim',
@@ -323,12 +316,12 @@ const Settings = () => {
                         )}
                       />
                       {githubTokenStatus.label}
-                    </div>
-                  </div>
+                    </Badge>
+                  </Card>
                 </div>
               </section>
 
-              <hr className="border-t border-border-light/80" />
+              <Separator />
 
               <SettingsSchedule
                 schedule={scheduleState.schedule}
@@ -337,7 +330,7 @@ const Settings = () => {
                 onTimeChange={scheduleState.handleTimeChange}
               />
 
-              <hr className="border-t border-border-light/80" />
+              <Separator />
 
               <SettingsDataSection
                 syncInfo={scheduleState.syncInfo}

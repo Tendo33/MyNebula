@@ -7,13 +7,12 @@ import {
   ChevronRight,
   ChevronUp,
   Layers,
-  Loader2,
   Tag,
   X,
 } from 'lucide-react';
 
 import { Sidebar } from '../components/layout/Sidebar';
-import { LanguageSwitch } from '../components/layout/LanguageSwitch';
+import { HeaderActions } from '../components/layout/HeaderActions';
 import { SearchInput } from '../components/ui/SearchInput';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { DataClusterInfo } from '../api/v2/data';
@@ -22,6 +21,10 @@ import { useDataPageUrlState } from './data/hooks/useDataPageUrlState';
 import { getClusterAccent } from '../utils/clusterAccent';
 import { PAGE_SIZES, type SortField } from './data/dataPageFilters';
 import { DataRepoTable } from './data/DataRepoTable';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
+import { NativeSelect } from '../components/ui/native-select';
+import { Spinner } from '../components/ui/spinner';
 
 const DataPage = () => {
   const { t } = useTranslation();
@@ -91,7 +94,7 @@ const DataPage = () => {
           </div>
 
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <div className="w-full sm:w-64 sm:flex-none">
+            <div className="min-w-0 w-full sm:max-w-sm sm:flex-1">
               <SearchInput
                 onSearch={handleSearch}
                 value={localSearch}
@@ -101,7 +104,7 @@ const DataPage = () => {
 
             <div className="flex items-center gap-2 sm:hidden">
               <label htmlFor="data-mobile-sort" className="text-sm text-text-muted">{t('data.sort', 'Sort')}:</label>
-              <select
+              <NativeSelect
                 id="data-mobile-sort"
                 value={sortConfig.field}
                 onChange={(event) => {
@@ -111,7 +114,7 @@ const DataPage = () => {
                   }));
                   setCurrentPage(1);
                 }}
-                className="field-surface flex-1"
+                className="flex-1"
               >
                 <option value="starred_at">{t('data.starred_date')}</option>
                 <option value="name">{t('data.repository')}</option>
@@ -120,9 +123,11 @@ const DataPage = () => {
                 <option value="cluster">{t('data.cluster')}</option>
                 <option value="summary">{t('data.summary')}</option>
                 <option value="last_commit_time">{t('data.last_commit')}</option>
-              </select>
-              <button
+              </NativeSelect>
+              <Button
                 type="button"
+                variant="outline"
+                size="icon"
                 onClick={() => {
                   setSortConfig((prev) => ({
                     field: prev.field,
@@ -130,36 +135,27 @@ const DataPage = () => {
                   }));
                   setCurrentPage(1);
                 }}
-                className="icon-button"
                 aria-label={t('data.sort_direction', 'Toggle sort direction')}
               >
-                {sortConfig.direction === 'asc' ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </button>
+                {sortConfig.direction === 'asc' ? <ChevronUp /> : <ChevronDown />}
+              </Button>
             </div>
 
             {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="header-action-ghost"
-              >
-                <X className="h-4 w-4" />
+              <Button type="button" variant="outline" onClick={clearFilters}>
+                <X data-icon="inline-start" />
                 {t('common.clear_filters')}
-              </button>
+              </Button>
             )}
 
-            <LanguageSwitch />
+            <HeaderActions showSearchHint={false} />
           </div>
         </header>
 
         <div className="page-content">
           {loading ? (
             <div className="flex h-64 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-text-muted" />
+              <Spinner className="size-8 text-text-muted" />
             </div>
           ) : error ? (
             <EmptyState
@@ -171,9 +167,9 @@ const DataPage = () => {
               }}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               {(clusters.length > 0 || monthFilter || topicFilter) && (
-                <div className="panel-subtle flex flex-wrap items-center gap-3 px-4 py-3">
+                <Card variant="muted" className="flex flex-row flex-wrap items-center gap-3 px-4 py-3">
                   {monthFilter && (
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 text-xs text-text-muted">
@@ -259,7 +255,7 @@ const DataPage = () => {
                       ))}
                     </div>
                   )}
-                </div>
+                </Card>
               )}
 
               <DataRepoTable
@@ -276,21 +272,20 @@ const DataPage = () => {
                 <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2 text-text-muted">
                     <label htmlFor="data-page-size">{t('data.rows_per_page')}:</label>
-                    <select
+                    <NativeSelect
                       id="data-page-size"
                       value={pageSize}
                       onChange={(event) => {
                         setPageSize(Number(event.target.value));
                         setCurrentPage(1);
                       }}
-                      className="field-surface"
                     >
                       {PAGE_SIZES.map((size) => (
                         <option key={size} value={size}>
                           {size}
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -303,29 +298,31 @@ const DataPage = () => {
                     </span>
 
                     <div className="flex items-center gap-1">
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="icon"
                         onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                         disabled={currentPage === 1}
-                        className="icon-button disabled:cursor-not-allowed disabled:opacity-30"
                         aria-label={t('data.previous_page', 'Previous page')}
                       >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
+                        <ChevronLeft />
+                      </Button>
 
                       <span className="px-3 py-1 font-medium text-text-main">
                         {currentPage} / {totalPages || 1}
                       </span>
 
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="icon"
                         onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                         disabled={currentPage === totalPages || totalPages === 0}
-                        className="icon-button disabled:cursor-not-allowed disabled:opacity-30"
                         aria-label={t('data.next_page', 'Next page')}
                       >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
+                        <ChevronRight />
+                      </Button>
                     </div>
                   </div>
                 </div>

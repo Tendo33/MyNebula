@@ -3,6 +3,8 @@ import { clsx } from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { Calendar, X } from 'lucide-react';
 import { useGraph } from '../../contexts/GraphContext';
+import { Button } from '../ui/button';
+import { Card } from '../ui/card';
 
 // ============================================================================
 // Types
@@ -180,27 +182,21 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
   }
 
   return (
-    <div className={clsx(
-      'bg-bg-main border border-border-light rounded-xl shadow-sm p-4 dark:bg-dark-bg-main dark:border-dark-border',
-      className
-    )}>
+    <Card className={clsx('p-4', className)}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-text-muted" />
-          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
+          <Calendar className="size-4 text-text-muted" />
+          <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
             {t('graph.timeline')}
           </span>
         </div>
 
         {currentRange && (
-          <button
-            onClick={handleClearSelection}
-            className="flex items-center gap-1 text-xs text-text-muted hover:text-text-main transition-colors"
-          >
-            <X className="w-3 h-3" />
-            <span>{t('common.clear')}</span>
-          </button>
+          <Button type="button" variant="ghost" className="h-7 px-2 text-xs" onClick={handleClearSelection}>
+            <X data-icon="inline-start" />
+            {t('common.clear')}
+          </Button>
         )}
       </div>
 
@@ -307,7 +303,7 @@ const Timeline: React.FC<TimelineProps> = ({ className }) => {
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 

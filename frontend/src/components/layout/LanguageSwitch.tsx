@@ -1,6 +1,9 @@
 import { Globe } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
 export const LanguageSwitch = () => {
   const { t, i18n } = useTranslation();
   const currentLanguage = i18n.resolvedLanguage || i18n.language;
@@ -11,15 +14,19 @@ export const LanguageSwitch = () => {
   };
 
   return (
-    <button
-      type="button"
-      onClick={toggleLanguage}
-      className="header-action-ghost group shrink-0 px-3"
-      title={t('settings.language')}
-      aria-label={t('settings.language', 'Switch language')}
-    >
-      <Globe className="h-3.5 w-3.5 text-text-dim transition-colors group-hover:text-text-main" />
-      <span>{isZh ? '中文' : 'EN'}</span>
-    </button>
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={toggleLanguage}
+          aria-label={t('settings.language', 'Switch language')}
+        >
+          <Globe data-icon="inline-start" />
+          <span>{isZh ? '中文' : 'EN'}</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{t('settings.language')}</TooltipContent>
+    </Tooltip>
   );
 };

@@ -1,7 +1,18 @@
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { clsx } from 'clsx';
-import { Loader2, Shield, User } from 'lucide-react';
+import { Shield, User } from 'lucide-react';
+
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@/components/ui/input-group';
+import { Spinner } from '@/components/ui/spinner';
 
 interface SettingsLoginFormProps {
   loginUsername: string;
@@ -28,77 +39,73 @@ export const SettingsLoginForm = ({
 
   return (
     <section className="flex flex-1 items-center justify-center px-6 py-10">
-      <div className="panel-surface-strong w-full max-w-lg p-7 sm:p-8">
-        <div className="mb-6 flex items-start gap-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border-light bg-bg-elevated text-text-main">
-            <Shield className="w-5 h-5 text-text-main dark:text-dark-text-main" />
+      <Card className="w-full max-w-lg p-7 sm:p-8">
+        <CardHeader className="mb-6 flex flex-row items-start gap-4 p-0">
+          <div className="flex size-8 items-center justify-center rounded-md border border-border bg-card text-foreground">
+            <Shield />
           </div>
           <div>
-            <h2 className="font-heading text-xl font-semibold text-text-main dark:text-dark-text-main">{t('settings.admin_access')}</h2>
-            <p className="mt-1 text-sm text-text-muted dark:text-dark-text-main/70">{t('settings.login_required_desc')}</p>
+            <CardTitle className="text-xl font-semibold">{t('settings.admin_access')}</CardTitle>
+            <CardDescription className="mt-1">{t('settings.login_required_desc')}</CardDescription>
           </div>
-        </div>
+        </CardHeader>
 
-        <form className="space-y-4" onSubmit={onSubmit}>
-          {adminAuthConfigured === false && (
-            <div className="status-banner" data-tone="warning">
-              {t('settings.admin_not_configured')}
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="admin-username" className="block text-xs text-text-muted mb-1 dark:text-dark-text-main/70">
-              {t('settings.username')}
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2 dark:text-dark-text-main/60" />
-              <input
-                id="admin-username"
-                type="text"
-                value={loginUsername}
-                onChange={(e) => onUsernameChange(e.target.value)}
-                className="field-surface w-full pl-9"
-                autoComplete="username"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="admin-password" className="block text-xs text-text-muted mb-1 dark:text-dark-text-main/70">
-              {t('settings.password')}
-            </label>
-            <input
-              id="admin-password"
-              type="password"
-              value={loginPassword}
-              onChange={(e) => onPasswordChange(e.target.value)}
-              className="field-surface w-full"
-              autoComplete="current-password"
-              required
-            />
-          </div>
-
-          {loginError && (
-            <div className="status-banner" data-tone="error">
-              {loginError}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loginLoading || adminAuthConfigured === false}
-            className={clsx(
-              'header-action w-full',
-              (loginLoading || adminAuthConfigured === false) &&
-                'cursor-not-allowed border border-border-light bg-bg-hover text-text-dim hover:bg-bg-hover'
+        <CardContent className="p-0">
+          <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+            {adminAuthConfigured === false && (
+              <Alert variant="warning">
+                <AlertDescription>{t('settings.admin_not_configured')}</AlertDescription>
+              </Alert>
             )}
-          >
-            {loginLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {t('app.login')}
-          </button>
-        </form>
-      </div>
+
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="admin-username">{t('settings.username')}</FieldLabel>
+                <InputGroup>
+                  <InputGroupAddon>
+                    <User />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id="admin-username"
+                    type="text"
+                    value={loginUsername}
+                    onChange={(e) => onUsernameChange(e.target.value)}
+                    autoComplete="username"
+                    required
+                  />
+                </InputGroup>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="admin-password">{t('settings.password')}</FieldLabel>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => onPasswordChange(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </Field>
+            </FieldGroup>
+
+            {loginError && (
+              <Alert variant="destructive">
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loginLoading || adminAuthConfigured === false}
+              className="w-full"
+            >
+              {loginLoading ? <Spinner data-icon="inline-start" /> : null}
+              {t('app.login')}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </section>
   );
 };

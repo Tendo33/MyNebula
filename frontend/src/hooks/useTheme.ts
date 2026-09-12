@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { runThemeViewTransition } from '../lib/themeTransition';
+
 export type ThemePreference = 'light' | 'dark' | 'system';
 
 const STORAGE_KEY = 'nebula_theme';
@@ -53,14 +55,28 @@ export const useTheme = () => {
     return () => media.removeEventListener('change', apply);
   }, [preference]);
 
-  const updatePreference = useCallback((next: ThemePreference) => {
-    setPreference(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Preference stays in memory for this session.
+  const updatePreference = useCallback((
+    next: ThemePreference,
+    origin?: { clientX: number; clientY: number }
+  ) => {
+    const apply = () => {
+      setPreference(next);
+      try {
+        localStorage.setItem(STORAGE_KEY, next);
+      } catch {
+        // Preference stays in memory for this session.
+      }
+    };
+
+    const currentResolved = resolveTheme(preference);
+    const nextResolved = resolveTheme(next);
+    if (currentResolved === nextResolved) {
+      apply();
+      return;
     }
-  }, []);
+
+    runThemeViewTransition(origin, apply);
+  }, [preference]);
 
   return { preference, resolved: resolveTheme(preference), setPreference: updatePreference };
 };

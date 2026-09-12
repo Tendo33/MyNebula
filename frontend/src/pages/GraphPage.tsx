@@ -10,8 +10,11 @@ import ClusterPanel from '../components/graph/ClusterPanel';
 import StarListPanel from '../components/graph/StarListPanel';
 import { SearchInput } from '../components/ui/SearchInput';
 import { RepoDetailsPanel } from '../components/graph/RepoDetailsPanel';
-import { LanguageSwitch } from '../components/layout/LanguageSwitch';
+import { HeaderActions } from '../components/layout/HeaderActions';
 import { useGraph } from '../contexts/GraphContext';
+import { Alert, AlertAction, AlertDescription } from '../components/ui/alert';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
 
 const GraphPage = () => {
   const { t } = useTranslation();
@@ -239,6 +242,7 @@ const GraphPage = () => {
     filters.timeRange !== null ||
     filters.minStars > 0 ||
     filters.languages.size > 0;
+  const hasGraphData = (rawData?.nodes.length ?? 0) > 0;
 
   return (
     <div className="page-shell h-screen overflow-hidden">
@@ -256,46 +260,51 @@ const GraphPage = () => {
           </div>
 
           <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-            <div className="order-last w-full min-w-0 sm:order-none sm:w-64 sm:flex-none">
-              <SearchInput onSearch={handleSearch} value={filters.searchQuery} />
+            <div className="order-last min-w-0 w-full sm:order-none sm:max-w-sm sm:flex-1">
+              <SearchInput
+                onSearch={handleSearch}
+                value={filters.searchQuery}
+                placeholder={t('graph.search_placeholder')}
+              />
             </div>
 
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon"
               onClick={() => setShowFilters(!showFilters)}
               aria-expanded={showFilters}
               aria-controls="graph-filters-panel"
               aria-label={t('common.filter')}
-              className={`header-action-ghost relative w-10 shrink-0 px-0 ${
-                showFilters ? 'bg-bg-hover' : ''
-              }`}
+              disabled={!hasGraphData}
+              className="relative shrink-0"
             >
-              <Filter aria-hidden="true" className="h-4 w-4" />
+              <Filter aria-hidden="true" />
               {hasActiveFilters && (
                 <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-link" />
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setShowNodeList((current) => !current)}
               aria-expanded={showNodeList}
               aria-pressed={showNodeList}
               aria-controls="graph-accessible-node-list"
-              className={`header-action-ghost shrink-0 whitespace-nowrap ${
-                showNodeList ? 'bg-bg-hover' : ''
-              }`}
+              disabled={!hasGraphData}
+              className="shrink-0 whitespace-nowrap"
             >
-              <List aria-hidden="true" className="h-4 w-4" />
+              <List aria-hidden="true" data-icon="inline-start" />
               <span className="sr-only sm:not-sr-only">{t('graph.browse_as_list', 'Browse as list')}</span>
-            </button>
+            </Button>
 
-            <LanguageSwitch />
+            <HeaderActions showSearchHint={false} />
           </div>
         </header>
 
         <section className="relative flex flex-1 overflow-hidden">
-          {isMobile && showFilters && (
+          {isMobile && showFilters && hasGraphData && (
             <button
               type="button"
               className="absolute inset-0 z-20 bg-overlay"
@@ -304,25 +313,26 @@ const GraphPage = () => {
             />
           )}
 
-          {showFilters && (
+          {showFilters && hasGraphData && (
             <aside
               id="graph-filters-panel"
               className={`${
                 isMobile ? 'absolute inset-y-0 left-0 w-[85vw] max-w-sm' : 'w-72 flex-shrink-0'
-              } relative z-30 space-y-4 overflow-y-auto border-r border-border-light bg-bg-sidebar p-4 dark:border-dark-border dark:bg-dark-bg-sidebar`}
+              } relative z-30 flex flex-col gap-4 overflow-y-auto border-r border-border-light bg-bg-sidebar p-4 dark:border-dark-border dark:bg-dark-bg-sidebar`}
             >
               {hasActiveFilters && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => {
                     clearFilters();
                     setSelectedNode(null);
                   }}
-                  className="header-action-ghost w-full justify-center"
+                  className="w-full"
                 >
-                  <X className="h-4 w-4" />
+                  <X data-icon="inline-start" />
                   {t('common.clear_all_filters')}
-                </button>
+                </Button>
               )}
 
               <StarListPanel
@@ -340,11 +350,11 @@ const GraphPage = () => {
           )}
 
           <div className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-bg-main/80 dark:bg-dark-bg-main/80">
-            {showNodeList && (
-              <section
+            {showNodeList && hasGraphData && (
+              <Card
                 id="graph-accessible-node-list"
                 aria-label={t('graph.repository_list', 'Repository list')}
-                className="panel-surface-strong absolute bottom-3 right-3 top-3 z-40 flex w-[min(92%,24rem)] flex-col overflow-hidden"
+                className="absolute bottom-3 right-3 top-3 z-40 flex w-[min(92%,24rem)] flex-col overflow-hidden py-0"
               >
                 <div className="flex items-center justify-between border-b border-border-light px-4 py-3 dark:border-dark-border">
                   <div>
@@ -358,14 +368,15 @@ const GraphPage = () => {
                       })}
                     </p>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="icon"
                     onClick={() => setShowNodeList(false)}
                     aria-label={t('common.close', 'Close')}
-                    className="icon-button"
                   >
-                    <X aria-hidden="true" className="h-4 w-4" />
-                  </button>
+                    <X aria-hidden="true" />
+                  </Button>
                 </div>
                 <ul className="min-h-0 flex-1 overflow-y-auto p-2">
                   {(filteredData?.nodes ?? []).slice(0, 50).map((node) => (
@@ -391,30 +402,31 @@ const GraphPage = () => {
                     </li>
                   )}
                 </ul>
-              </section>
+              </Card>
             )}
             {nodeAutoLoadHalted && (
-              <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
+              <Card className="absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 flex-row items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
                 <span>
                   {t('graph.node_load_paused', {
                     pages: loadedNodePages,
                     nodes: loadedNodePages * nodePageSize,
                   })}
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => {
                     void loadMoreNodes();
                   }}
                   disabled={!canLoadMoreNodes}
-                  className="header-action-ghost shrink-0"
+                  className="shrink-0"
                 >
                   {t('graph.load_more_nodes')}
-                </button>
-              </div>
+                </Button>
+              </Card>
             )}
             {autoLoadHalted && !nodeAutoLoadHalted && (
-              <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
+              <Card className="absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 flex-row items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
                 <span>
                   {t(
                     'graph.edge_load_paused',
@@ -425,31 +437,37 @@ const GraphPage = () => {
                     }
                   )}
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => {
                     void loadMoreEdges();
                   }}
                   disabled={!canLoadMoreEdges}
-                  className="header-action-ghost shrink-0"
+                  className="shrink-0"
                 >
                   {t('graph.load_more_edges', 'Load more edges')}
-                </button>
-              </div>
+                </Button>
+              </Card>
             )}
             {error && (
-              <div className="panel-surface-strong absolute left-1/2 top-3 z-20 flex w-[min(92%,28rem)] -translate-x-1/2 items-center justify-between gap-3 px-4 py-3">
-                <span className="text-sm text-text-main">{t('common.load_failed_graph')}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void Promise.all([loadData(), retryNodeLoading(), retryEdgeLoading()]);
-                  }}
-                  className="header-action shrink-0"
-                >
-                  {t('common.retry')}
-                </button>
-              </div>
+              <Alert
+                variant="destructive"
+                className="absolute left-1/2 top-3 z-20 w-[min(92%,28rem)] -translate-x-1/2"
+              >
+                <AlertDescription>{t('common.load_failed_graph')}</AlertDescription>
+                <AlertAction>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      void Promise.all([loadData(), retryNodeLoading(), retryEdgeLoading()]);
+                    }}
+                  >
+                    {t('common.retry')}
+                  </Button>
+                </AlertAction>
+              </Alert>
             )}
 
             <div className="relative h-full min-w-0 flex-1">

@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { clsx } from 'clsx';
 import { Eye, Link2, Monitor, Moon, Sun, Zap } from 'lucide-react';
 
 import { useTheme, type ThemePreference } from '../../hooks/useTheme';
 import type { GraphSettings } from '../../contexts/GraphContext';
+import { Card } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface SettingsAppearanceProps {
   settings: GraphSettings;
@@ -25,9 +28,9 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
       <h2 className="section-heading mb-4 select-none">
         {t('settings.appearance')}
       </h2>
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         {/* Theme */}
-        <div className="panel-subtle p-4 transition-all group">
+        <Card variant="muted" className="p-4 transition-all group">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
@@ -42,35 +45,33 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
                 </span>
               </div>
             </div>
-            <div
-              role="radiogroup"
+            <ToggleGroup
+              value={[preference]}
+              onValueChange={(next, eventDetails) => {
+                const value = next[0];
+                if (!value) return;
+                const nativeEvent = eventDetails?.event as MouseEvent | PointerEvent | undefined;
+                const origin =
+                  nativeEvent && 'clientX' in nativeEvent
+                    ? { clientX: nativeEvent.clientX, clientY: nativeEvent.clientY }
+                    : undefined;
+                setPreference(value as ThemePreference, origin);
+              }}
               aria-label={t('settings.theme', 'Theme')}
-              className="flex items-center gap-1 rounded-md border border-border-light bg-bg-elevated p-0.5 dark:border-dark-border"
+              className="rounded-md border border-border bg-card p-0.5"
             >
               {THEME_OPTIONS.map(({ value, label, Icon }) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={preference === value}
-                  onClick={() => setPreference(value)}
-                  className={clsx(
-                    'inline-flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-link',
-                    preference === value
-                      ? 'bg-bg-hover text-text-main dark:bg-dark-bg-sidebar dark:text-dark-text-main'
-                      : 'text-text-muted hover:bg-bg-hover hover:text-text-main dark:text-dark-text-main/70 dark:hover:bg-dark-bg-sidebar'
-                  )}
-                >
-                  <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                <ToggleGroupItem key={value} value={value} aria-label={label}>
+                  <Icon aria-hidden="true" data-icon="inline-start" />
                   {label}
-                </button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
           </div>
-        </div>
+        </Card>
 
         {/* HQ Rendering toggle */}
-        <div className="panel-subtle flex items-center justify-between p-4 transition-all group">
+        <Card variant="muted" className="flex flex-row items-center justify-between p-4 transition-all group">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Zap className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -80,26 +81,15 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
               <span className="text-xs text-text-muted">{t('settings.hq_rendering_desc')}</span>
             </div>
           </div>
-          <button
-            className={clsx('toggle-control')}
-            data-state={settings.hqRendering ? 'on' : 'off'}
-            type="button"
-            role="switch"
-            aria-checked={settings.hqRendering}
+          <Switch
+            checked={settings.hqRendering}
+            onCheckedChange={(checked) => updateSettings({ hqRendering: checked })}
             aria-label={t('settings.hq_rendering')}
-            onClick={() => updateSettings({ hqRendering: !settings.hqRendering })}
-          >
-            <span
-              className={clsx(
-                'toggle-handle',
-                settings.hqRendering ? 'translate-x-6' : 'translate-x-0.5'
-              )}
-            />
-          </button>
-        </div>
+          />
+        </Card>
 
         {/* Show Trajectories toggle */}
-        <div className="panel-subtle flex items-center justify-between p-4 transition-all group">
+        <Card variant="muted" className="flex flex-row items-center justify-between p-4 transition-all group">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Eye className="w-5 h-5 text-text-muted group-hover:text-text-main" />
@@ -109,26 +99,15 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
               <span className="text-xs text-text-muted">{t('settings.show_trajectories_desc')}</span>
             </div>
           </div>
-          <button
-            className={clsx('toggle-control')}
-            data-state={settings.showTrajectories ? 'on' : 'off'}
-            type="button"
-            role="switch"
-            aria-checked={settings.showTrajectories}
+          <Switch
+            checked={settings.showTrajectories}
+            onCheckedChange={(checked) => updateSettings({ showTrajectories: checked })}
             aria-label={t('settings.show_trajectories')}
-            onClick={() => updateSettings({ showTrajectories: !settings.showTrajectories })}
-          >
-            <span
-              className={clsx(
-                'toggle-handle',
-                settings.showTrajectories ? 'translate-x-6' : 'translate-x-0.5'
-              )}
-            />
-          </button>
-        </div>
+          />
+        </Card>
 
         {/* Related min semantic slider */}
-        <div className="panel-subtle space-y-3 p-4">
+        <Card variant="muted" className="flex flex-col gap-3 p-4">
           <div className="flex items-center gap-2">
             <Link2 className="w-4 h-4 text-text-muted" />
             <span className="text-sm font-medium text-text-main">
@@ -142,16 +121,19 @@ export const SettingsAppearance = ({ settings, updateSettings }: SettingsAppeara
               {settings.relatedMinSemantic.toFixed(2)}
             </span>
           </div>
-          <input
-            type="range"
+          <Slider
             min={0.5}
             max={0.9}
             step={0.01}
             value={settings.relatedMinSemantic}
-            onChange={(e) => updateSettings({ relatedMinSemantic: Number(e.target.value) })}
-            className="w-full"
+            onValueChange={(value) => {
+              const next = Array.isArray(value) ? value[0] : value;
+              if (typeof next === 'number') {
+                updateSettings({ relatedMinSemantic: next });
+              }
+            }}
           />
-        </div>
+        </Card>
       </div>
     </section>
   );

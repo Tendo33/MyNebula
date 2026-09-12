@@ -2,6 +2,9 @@ import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 import { useTranslation } from 'react-i18next';
+
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
   Loader2,
   Check,
@@ -151,13 +154,14 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
       <div className="absolute inset-0 bg-overlay" />
 
       {/* Modal */}
+      <Card className="relative w-full max-w-md overflow-hidden overscroll-contain py-0">
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="panel-surface-strong relative w-full max-w-md overflow-hidden overscroll-contain rounded-xl focus:outline-none"
+        className="focus:outline-none"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-light px-5 py-4 dark:border-dark-border">
@@ -200,14 +204,15 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
           </div>
 
           {canClose && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={onClose}
               aria-label={t('common.close', 'Close')}
-              className="rounded-xl p-2 transition-colors hover:bg-bg-hover dark:hover:bg-dark-bg-sidebar/70"
             >
-              <X className="w-5 h-5 text-text-muted dark:text-dark-text-main/70" />
-            </button>
+              <X />
+            </Button>
           )}
         </div>
 
@@ -325,21 +330,18 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({
         {/* Footer */}
         {(allCompleted || hasFailed) && (
           <div className="border-t border-border-light bg-bg-sidebar/30 px-5 py-4 dark:border-dark-border dark:bg-dark-bg-sidebar/60">
-            <button
+            <Button
               type="button"
+              variant={allCompleted ? 'default' : 'outline'}
+              className="w-full"
               onClick={onClose}
-              className={clsx(
-                'w-full py-2.5 rounded-lg text-sm font-medium transition-colors',
-                allCompleted
-                  ? 'bg-action-primary text-action-on hover:bg-action-hover'
-                  : 'bg-bg-hover hover:bg-border-light text-text-main dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-border dark:text-dark-text-main'
-              )}
             >
               {allCompleted ? t('sync.viewResults', 'View Results') : t('common.close', 'Close')}
-            </button>
+            </Button>
           </div>
         )}
       </div>
+      </Card>
     </div>,
     document.body
   );

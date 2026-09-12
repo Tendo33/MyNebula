@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { GraphNode } from '../../types';
 import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart, Link2, ChevronRight } from 'lucide-react';
 import { useGraph } from '../../contexts/GraphContext';
-import { clsx } from 'clsx';
 import { getRelatedRepos } from '../../api/repos';
+import { Button, buttonVariants } from '../ui/button';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
+import { cn } from '@/lib/utils';
 
 interface RepoDetailsPanelProps {
   node: GraphNode;
@@ -272,9 +274,9 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
   };
 
   return (
-    <div className="absolute inset-y-0 right-0 w-full max-w-full sm:static sm:w-[25rem] h-full bg-bg-main border-l border-border-light shadow-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-shrink-0 z-20 dark:bg-dark-bg-main dark:border-dark-border">
+    <div className="absolute inset-y-0 right-0 z-20 flex h-full w-full max-w-full flex-shrink-0 flex-col overflow-hidden border-l border-border-light bg-bg-main duration-300 animate-in fade-in slide-in-from-right-4 sm:static sm:w-[25rem] dark:border-dark-border dark:bg-dark-bg-main">
       {/* Header with Avatar */}
-      <div className="relative p-5 border-b border-border-light bg-gradient-to-b from-bg-sidebar to-bg-main dark:from-dark-bg-sidebar dark:to-dark-bg-main dark:border-dark-border">
+      <div className="relative border-b border-border-light p-5 dark:border-dark-border">
         <div className="flex items-start gap-3 pr-8">
             {/* Owner Avatar */}
             {node.owner_avatar_url ? (
@@ -309,14 +311,16 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
                 </p>
             </div>
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={onClose}
           aria-label={t('repoDetails.close')}
-          className="absolute top-4 right-4 p-1.5 rounded-md text-text-muted hover:bg-bg-hover hover:text-text-main transition-colors"
+          className="absolute top-4 right-4"
         >
-          <X className="w-5 h-5" />
-        </button>
+          <X />
+        </Button>
       </div>
 
       {/* Content */}
@@ -329,10 +333,10 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               href={node.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-bg-hover hover:bg-bg-sidebar text-text-main text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md border border-border-light dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-bg-sidebar dark:text-dark-text-main dark:border-dark-border"
+              className={cn(buttonVariants({ variant: 'outline' }), 'flex-1')}
             >
-              <ExternalLink className="w-4 h-4" />
-              <span>GitHub</span>
+              <ExternalLink data-icon="inline-start" />
+              GitHub
             </a>
 
             {/* Deep Wiki */}
@@ -340,19 +344,19 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               href={`https://deepwiki.com/${node.full_name}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-bg-hover hover:bg-bg-sidebar text-text-main text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md border border-border-light dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-bg-sidebar dark:text-dark-text-main dark:border-dark-border"
               title="View on DeepWiki"
+              className={buttonVariants({ variant: 'outline' })}
             >
               <img
                 src="https://deepwiki.com/favicon.ico"
-                alt="DeepWiki"
-                className="w-4 h-4 rounded-sm bg-bg-main"
+                alt=""
+                className="size-4 rounded-sm bg-bg-main"
                 loading="lazy"
                 decoding="async"
                 width={16}
                 height={16}
               />
-              <span>DeepWiki</span>
+              DeepWiki
             </a>
 
             {/* zRead */}
@@ -360,19 +364,19 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               href={`https://zread.ai/${node.full_name}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-bg-hover hover:bg-bg-sidebar text-text-main text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md border border-border-light dark:bg-dark-bg-sidebar/70 dark:hover:bg-dark-bg-sidebar dark:text-dark-text-main dark:border-dark-border"
               title="View on zRead"
+              className={buttonVariants({ variant: 'outline' })}
             >
               <img
                 src="https://zread.ai/favicon.ico"
-                alt="zRead"
-                className="w-4 h-4 rounded-sm bg-bg-main"
+                alt=""
+                className="size-4 rounded-sm bg-bg-main"
                 loading="lazy"
                 decoding="async"
                 width={16}
                 height={16}
               />
-              <span>zRead</span>
+              zRead
             </a>
           </div>
 
@@ -473,54 +477,30 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             </div>
           </div>
 
-          {/* Dimension Tabs */}
-          <div className="flex items-center gap-1 p-1.5 bg-bg-sidebar/80 rounded-xl border border-border-light/60 dark:bg-dark-bg-sidebar/80 dark:border-dark-border">
-            <button
-              onClick={() => setActiveTab('similar')}
-              className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
-                activeTab === 'similar'
-                  ? 'bg-bg-main shadow-sm text-text-main font-medium ring-1 ring-border-light/70 dark:bg-dark-bg-main dark:text-dark-text-main dark:ring-dark-border'
-                  : 'text-text-muted hover:text-text-main dark:text-dark-text-main/70 dark:hover:text-dark-text-main'
-              )}
-            >
-              <Link2 className="w-3 h-3" />
-              <span>{t('repoDetails.similar', 'Similar')}</span>
-              {tabCounts.similar > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/60">({tabCounts.similar})</span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('sameTags')}
-              className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
-                activeTab === 'sameTags'
-                  ? 'bg-bg-main shadow-sm text-text-main font-medium ring-1 ring-border-light/70 dark:bg-dark-bg-main dark:text-dark-text-main dark:ring-dark-border'
-                  : 'text-text-muted hover:text-text-main dark:text-dark-text-main/70 dark:hover:text-dark-text-main'
-              )}
-            >
-              <Tag className="w-3 h-3" />
-              <span>{t('repoDetails.sameTags', 'Tags')}</span>
-              {tabCounts.sameTags > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-muted">({tabCounts.sameTags})</span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('sameLang')}
-              className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all',
-                activeTab === 'sameLang'
-                  ? 'bg-bg-main shadow-sm text-text-main font-medium ring-1 ring-border-light/70 dark:bg-dark-bg-main dark:text-dark-text-main dark:ring-dark-border'
-                  : 'text-text-muted hover:text-text-main dark:text-dark-text-main/70 dark:hover:text-dark-text-main'
-              )}
-            >
-              <Code className="w-3 h-3" />
-              <span>{t('repoDetails.sameLang', 'Lang')}</span>
-              {tabCounts.sameLang > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-sidebar text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/60">({tabCounts.sameLang})</span>
-              )}
-            </button>
-          </div>
+          <ToggleGroup
+            value={[activeTab]}
+            onValueChange={(next) => {
+              const value = next[0];
+              if (value) setActiveTab(value as RelatedTab);
+            }}
+            className="rounded-md border border-border bg-muted p-1"
+          >
+            <ToggleGroupItem value="similar" size="sm" className="flex-1">
+              <Link2 data-icon="inline-start" />
+              {t('repoDetails.similar', 'Similar')}
+              {tabCounts.similar > 0 ? ` (${tabCounts.similar})` : ''}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="sameTags" size="sm" className="flex-1">
+              <Tag data-icon="inline-start" />
+              {t('repoDetails.sameTags', 'Tags')}
+              {tabCounts.sameTags > 0 ? ` (${tabCounts.sameTags})` : ''}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="sameLang" size="sm" className="flex-1">
+              <Code data-icon="inline-start" />
+              {t('repoDetails.sameLang', 'Lang')}
+              {tabCounts.sameLang > 0 ? ` (${tabCounts.sameLang})` : ''}
+            </ToggleGroupItem>
+          </ToggleGroup>
 
           {/* Related Repos List — independently scrollable, sized to remaining space */}
           {currentRelatedRepos.length > 0 ? (

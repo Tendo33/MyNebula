@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useResizeObserver } from '../../hooks/useResizeObserver';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
-import { GraphSkeleton } from '../ui/Skeleton';
+import { GraphSkeleton } from '../ui/page-skeletons';
 import { EmptyState } from '../ui/EmptyState';
 import { GraphHoverCard } from './GraphHoverCard';
 import type {

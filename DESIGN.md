@@ -60,8 +60,14 @@ Same system inverted: canvas `#0a0a0a`, ink `#ededed`, hairline `#2e2e2e`, prima
 
 ## Components
 
-Reuse `panel-surface` (12px, hairline, no glow), `header-action` / `header-action-ghost` (6px), `field-surface`, `EmptyState`.
+In-app chrome comes from shadcn on Base UI in `frontend/src/components/ui`, mapped to these tokens:
+
+- `Button` default / outline / icon — 6px squares, 40px tall (primary ink fill, ghost hairline)
+- `Card` default (12–16px elevated) and `muted` (settings rows)
+- `Input`, `InputGroup`, `NativeSelect`, `Switch`, `Slider`, `Table`, `Sheet`, `Alert`, `EmptyState`
+
+Do not add a second component library (Mantine, Ant, HeroUI, Radix Themes) on top of this stack. Cluster chips stay as `chip-button` because hues come from the graph.
 
 ## Motion
 
-150–220ms color/border only. No lift-on-hover. Honor `prefers-reduced-motion` without stripping focus rings.
+150–220ms color/border only, plus one product motion: a circular view-transition wipe when the user switches light/dark in Settings (Great UI circular-theme-provider, duration 220ms). No lift-on-hover. Honor `prefers-reduced-motion` by skipping the wipe and without stripping focus rings.

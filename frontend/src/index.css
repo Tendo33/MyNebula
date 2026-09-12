@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 @config "../tailwind.config.js";
 
 :root {
@@ -48,6 +52,42 @@
   --color-warning-foreground: #ab570a;
   --color-overlay: rgba(0, 0, 0, 0.4);
   --color-link: #0070f3;
+
+  /* shadcn aliases onto the Geist tokens above. */
+  --background: var(--color-bg-main);
+  --foreground: var(--color-text-main);
+  --card: var(--color-bg-elevated);
+  --card-foreground: var(--color-text-main);
+  --popover: var(--color-bg-elevated);
+  --popover-foreground: var(--color-text-main);
+  --primary: var(--color-action-primary);
+  --primary-foreground: var(--color-on-action);
+  --secondary: var(--color-bg-hover);
+  --secondary-foreground: var(--color-text-main);
+  --muted: var(--color-bg-hover);
+  --muted-foreground: var(--color-text-muted);
+  --accent: var(--color-bg-hover);
+  --accent-foreground: var(--color-text-main);
+  --destructive: var(--color-danger);
+  --border: var(--color-border-light);
+  --input: var(--color-border-light);
+  --ring: var(--color-link);
+  --chart-1: var(--color-text-dim);
+  --chart-2: var(--color-text-muted);
+  --chart-3: var(--color-text-main);
+  --chart-4: var(--color-link);
+  --chart-5: var(--color-action-primary);
+  --radius: 0.75rem;
+  --sidebar: var(--color-bg-sidebar);
+  --sidebar-foreground: var(--color-text-main);
+  --sidebar-primary: var(--color-action-primary);
+  --sidebar-primary-foreground: var(--color-on-action);
+  --sidebar-accent: var(--color-bg-hover);
+  --sidebar-accent-foreground: var(--color-text-main);
+  --sidebar-border: var(--color-border-light);
+  --sidebar-ring: var(--color-link);
+  --warning: var(--color-warning);
+  --warning-foreground: var(--color-warning-foreground);
 }
 
 html.dark {
@@ -103,6 +143,15 @@ body {
      link, which rendered dark-on-blue at 2.28:1. */
   a {
     color: inherit;
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }
 
@@ -202,6 +251,12 @@ button,
     accent-color: var(--color-link);
   }
 
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
   button:disabled,
   input:disabled,
   select:disabled,
@@ -211,36 +266,6 @@ button,
 }
 
 @layer components {
-  .panel-surface {
-    @apply rounded-xl border border-border-light bg-bg-elevated dark:border-dark-border;
-    box-shadow: none;
-  }
-
-  .panel-surface-strong {
-    @apply rounded-xl border border-border-light bg-bg-elevated dark:border-dark-border;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
-  }
-
-  .panel-subtle {
-    @apply rounded-md border border-border-light bg-bg-hover dark:border-dark-border dark:bg-dark-bg-hover;
-  }
-
-  .field-surface {
-    @apply h-10 rounded-md border border-border-light bg-bg-elevated px-3 text-sm text-text-main hover:border-text-dim focus:border-text-main dark:border-dark-border;
-  }
-
-  .icon-button {
-    @apply inline-flex h-10 min-h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border-light bg-bg-elevated px-0 text-sm font-medium text-text-main hover:bg-bg-hover dark:border-dark-border;
-  }
-
-  .header-action {
-    @apply inline-flex h-10 min-h-10 items-center justify-center gap-1.5 rounded-md bg-action-primary px-3 text-sm font-medium text-action-on hover:bg-action-hover dark:bg-dark-text-main dark:text-dark-bg-main;
-  }
-
-  .header-action-ghost {
-    @apply inline-flex h-10 min-h-10 items-center justify-center gap-1.5 rounded-md border border-border-light bg-bg-elevated px-3 text-sm font-medium text-text-main hover:bg-bg-hover dark:border-dark-border;
-  }
-
   .chip-button {
     @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-link hover:opacity-80;
     /* Cluster hues come from the database, so the readable variant is computed
@@ -251,10 +276,6 @@ button,
 
   html.dark .chip-button {
     color: var(--chip-text-dark, var(--color-text-main));
-  }
-
-  .danger-button-soft {
-    @apply inline-flex h-10 min-h-10 items-center justify-center gap-1.5 rounded-md border border-danger/30 bg-danger-bg px-3 text-sm font-medium text-danger-foreground;
   }
 
   .page-shell {
@@ -290,38 +311,6 @@ button,
     @apply text-sm font-semibold text-text-main dark:text-dark-text-main;
   }
 
-  .toolbar-badge {
-    @apply inline-flex items-center gap-2 rounded-full border border-border-light bg-bg-sidebar px-3 py-1 text-xs font-semibold text-text-muted dark:border-dark-border dark:bg-dark-bg-sidebar dark:text-dark-text-main;
-  }
-
-  .toggle-control {
-    @apply relative inline-flex h-7 w-12 items-center rounded-full border border-transparent transition-all focus-visible:ring-2 focus-visible:ring-action-primary;
-  }
-
-  .toggle-control[data-state="on"] {
-    @apply bg-text-main dark:bg-dark-text-main;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  }
-
-  .toggle-control[data-state="off"] {
-    @apply bg-border-light dark:bg-dark-border;
-  }
-
-  .toggle-handle {
-    @apply inline-block h-5 w-5 rounded-full bg-bg-main shadow-sm transition-transform dark:bg-dark-bg-main;
-  }
-
-  .status-banner {
-    @apply flex items-start gap-3 rounded-xl border border-border-light bg-bg-elevated p-4 text-sm dark:border-dark-border;
-  }
-
-  .status-banner[data-tone="error"] {
-    @apply border-danger/30 bg-danger-bg text-danger-foreground;
-  }
-
-  .status-banner[data-tone="warning"] {
-    @apply border-warning/40 bg-warning-bg text-warning-foreground;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -338,4 +327,50 @@ button,
   *:not(:focus):not(:focus-visible) {
     transition: none !important;
   }
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Geist Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+  --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
