@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-14
+
 ### Added
 - Graph nodes now load in snapshot pages (`GET /api/v2/graph/nodes`) the same
   way edges already did, with auto-load halt and a continue control.
@@ -15,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PRODUCT.md` and `DESIGN.md` capture the incumbent research-desk identity.
 - GIN trigram indexes on concatenated `topics` / `ai_tags` text, plus an
   explicit internet-facing demo-mode refusal unless `ALLOW_ANONYMOUS_DEMO=true`.
+- Dark mode with theme-aware colour tokens.
+- In-app chrome rebuilt on shadcn / Base UI.
 
 ### Changed
 - Frontend visual language switched to Vercel Geist (`npx getdesign@latest add vercel`):
@@ -26,10 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard drops the four icon metric cards for a single collection summary.
 - Split `sync_execution_service` into stars / embeddings / clustering modules
   behind the same public import surface.
+- Synchronized version metadata to `1.4.0`.
 
 ### Fixed
 - Internet-facing processes with empty admin credentials or `READ_ACCESS_MODE=demo`
   now fail closed at startup.
+- Force graph keeps simulating after node pages load.
+- Restored anchor text colours and made cluster chips meet AA.
+- Repaired layout defects found by a programmatic audit.
 
 ## [1.3.0] - 2026-08-09
 
@@ -277,7 +285,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Tendo33/mynebula/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Tendo33/mynebula/compare/v1.2.11...v1.3.0
 [1.2.11]: https://github.com/Tendo33/mynebula/compare/v1.2.10...v1.2.11
 [1.2.10]: https://github.com/Tendo33/mynebula/compare/v1.2.9...v1.2.10
