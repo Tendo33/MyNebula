@@ -37,7 +37,7 @@
   --color-bg-elevated: #ffffff;
   --color-text-main: #171717;
   --color-text-muted: #4d4d4d;
-  --color-text-dim: #737373;
+  --color-text-dim: #8f8f8f;
   --color-border-light: #ebebeb;
   --color-action-primary: #171717;
   --color-action-hover: #000000;
@@ -97,7 +97,7 @@ html.dark {
   --color-bg-elevated: #111111;
   --color-text-main: #ededed;
   --color-text-muted: #a1a1a1;
-  --color-text-dim: #737373;
+  --color-text-dim: #8f8f8f;
   --color-border-light: #2e2e2e;
   --color-action-primary: #ededed;
   --color-action-hover: #ffffff;
