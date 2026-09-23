@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { forceCollide, forceX, forceY } from 'd3-force';
 import type { ForceGraphMethods, LinkObject, NodeObject } from 'react-force-graph-2d';
 
@@ -19,7 +19,7 @@ import {
  * exercised without a live force-graph instance.
  */
 export const createClusterForce =
-  (clusterLayoutData: ClusterLayoutData) =>
+  (clusterLayoutData: ClusterLayoutData, forceScale = 1) =>
   (alpha: number): void => {
     if (alpha < 0.015) {
       return;
@@ -39,7 +39,7 @@ export const createClusterForce =
 
         // If clusters are too close, push them apart
         if (dist < MIN_CLUSTER_DISTANCE) {
-          const force = ((MIN_CLUSTER_DISTANCE - dist) / dist) * alpha * 2;
+          const force = ((MIN_CLUSTER_DISTANCE - dist) / dist) * alpha * 2 * forceScale;
           const fx = dx * force;
           const fy = dy * force;
           const cluster1Nodes = clusterLayoutData.clusterNodes.get(clusterId1) ?? [];
@@ -68,7 +68,7 @@ export const createClusterForce =
           return;
         }
 
-        const k = alpha * 0.2;
+        const k = alpha * 0.2 * forceScale;
         node.vx = (node.vx || 0) + (center.x - node.x) * k;
         node.vy = (node.vy || 0) + (center.y - node.y) * k;
       });
@@ -79,14 +79,18 @@ export const createClusterForce =
 export const useGraphForces = ({
   graphRef,
   clusterLayoutData,
-  enabled = true,
+  layoutKey,
+  forceScale,
 }: {
   graphRef: React.MutableRefObject<ForceGraphMethods | undefined>;
   clusterLayoutData: ClusterLayoutData;
-  enabled?: boolean;
+  layoutKey: string;
+  forceScale: number;
 }) => {
+  const reheatedLayoutRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!graphRef.current || !enabled) return;
+    if (!graphRef.current || forceScale <= 0) return;
 
     const fg = graphRef.current;
 
@@ -102,27 +106,36 @@ export const useGraphForces = ({
         const sourceCluster = typeof link.source === 'object' ? link.source.cluster_id : null;
         const targetCluster = typeof link.target === 'object' ? link.target.cluster_id : null;
         // Stronger links within same cluster, very weak for cross-cluster
-        return sourceCluster === targetCluster ? 0.7 : 0.05;
+        return (sourceCluster === targetCluster ? 0.7 : 0.05) * forceScale;
       });
 
     // Configure charge force (repulsion) - increased for more spacing
-    fg.d3Force('charge')?.strength(-150).distanceMax(250);
+    fg.d3Force('charge')?.strength(-150 * forceScale).distanceMax(250);
 
     // Gentle pull toward the origin to avoid disconnected groups drifting far apart
-    fg.d3Force('x', forceX(0).strength(CENTER_PULL_STRENGTH) as unknown as RegisteredForce);
-    fg.d3Force('y', forceY(0).strength(CENTER_PULL_STRENGTH) as unknown as RegisteredForce);
+    fg.d3Force(
+      'x',
+      forceX(0).strength(CENTER_PULL_STRENGTH * forceScale) as unknown as RegisteredForce
+    );
+    fg.d3Force(
+      'y',
+      forceY(0).strength(CENTER_PULL_STRENGTH * forceScale) as unknown as RegisteredForce
+    );
 
     // Add collision force to prevent overlap
     fg.d3Force(
       'collide',
       forceCollide<ProcessedNode>()
         .radius((node: ProcessedNode) => calculateNodeRadius(node.stargazers_count) * 2.4 + 10)
-        .strength(0.9)
-        .iterations(2) as unknown as RegisteredForce
+        .strength(Math.max(0.2, 0.9 * forceScale))
+        .iterations(forceScale < 1 ? 1 : 2) as unknown as RegisteredForce
     );
 
     // Register custom force
-    fg.d3Force('cluster', createClusterForce(clusterLayoutData));
-    fg.d3ReheatSimulation();
-  }, [enabled, graphRef, clusterLayoutData]);
+    fg.d3Force('cluster', createClusterForce(clusterLayoutData, forceScale));
+    if (reheatedLayoutRef.current !== layoutKey) {
+      reheatedLayoutRef.current = layoutKey;
+      fg.d3ReheatSimulation();
+    }
+  }, [clusterLayoutData, forceScale, graphRef, layoutKey]);
 };

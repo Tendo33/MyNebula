@@ -201,6 +201,26 @@ test.describe('graph + sync critical flows', () => {
     await expect(page.locator('canvas')).toBeVisible();
   });
 
+  test('projected graph positions settle briefly instead of freezing or drifting', async ({ page }) => {
+    await page.goto('/graph');
+    await expect(page.locator('canvas')).toBeVisible();
+
+    await expect.poll(
+      () => page.evaluate(() => (window as Window & { __nebulaGraphTicks?: number }).__nebulaGraphTicks ?? 0)
+    ).toBeGreaterThan(0);
+
+    await page.waitForTimeout(1800);
+    const settledTicks = await page.evaluate(
+      () => (window as Window & { __nebulaGraphTicks?: number }).__nebulaGraphTicks ?? 0
+    );
+    await page.waitForTimeout(500);
+    const finalTicks = await page.evaluate(
+      () => (window as Window & { __nebulaGraphTicks?: number }).__nebulaGraphTicks ?? 0
+    );
+
+    expect(finalTicks - settledTicks).toBeLessThanOrEqual(2);
+  });
+
   test('data filter links can navigate to graph detail route', async ({ page }) => {
     await page.goto('/data');
     await expect(page).toHaveURL(/\/data/);

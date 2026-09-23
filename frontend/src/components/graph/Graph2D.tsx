@@ -20,6 +20,7 @@ import {
   toProcessedNodes,
 } from './graph2dLayout';
 import { resolveLinkColor, resolveLinkWidth, resolveNodeColor } from './graph2dStyles';
+import { getGraphMotionProfile } from './graph2dMotion';
 import {
   drawClusterHulls,
   paintNodeOnCanvas,
@@ -95,6 +96,11 @@ const Graph2D: React.FC = () => {
     [rawData?.generated_at, rawData?.version]
   );
 
+  const motionProfile = useMemo(
+    () => getGraphMotionProfile(hasStablePositions, reduceMotion),
+    [hasStablePositions, reduceMotion]
+  );
+
   const clusterLayoutData = useMemo(
     () => buildClusterLayoutData(processedData.nodes),
     [processedData.nodes]
@@ -106,13 +112,9 @@ const Graph2D: React.FC = () => {
   useGraphForces({
     graphRef,
     clusterLayoutData,
-    enabled: !hasStablePositions && !reduceMotion,
+    layoutKey,
+    forceScale: motionProfile.forceScale,
   });
-
-  useEffect(() => {
-    if (reduceMotion || hasStablePositions) return;
-    graphRef.current?.d3ReheatSimulation();
-  }, [hasStablePositions, layoutKey, reduceMotion]);
 
   const { tryAutoFit, getLiveNodeById, focusNodeById, markUserInteracted, skipNextFocusRef } =
     useGraphViewport({
@@ -314,11 +316,11 @@ const Graph2D: React.FC = () => {
         // Pre-render callback for cluster hulls
         onRenderFramePre={paintClusterHulls}
         // Physics
-        d3AlphaDecay={hasStablePositions || reduceMotion ? 1 : 0.05}
-        d3VelocityDecay={hasStablePositions ? 0.9 : 0.28}
-        cooldownTicks={hasStablePositions || reduceMotion ? 0 : 160}
-        cooldownTime={hasStablePositions || reduceMotion ? 0 : 8000}
-        warmupTicks={reduceMotion ? 80 : 0}
+        d3AlphaDecay={motionProfile.alphaDecay}
+        d3VelocityDecay={motionProfile.velocityDecay}
+        cooldownTicks={motionProfile.cooldownTicks}
+        cooldownTime={motionProfile.cooldownTime}
+        warmupTicks={motionProfile.warmupTicks}
         // After engine stops
         onEngineTick={() => {
           if (import.meta.env.DEV) {
