@@ -240,4 +240,3 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                     task.error_message = str(exc)
                     task.completed_at = datetime.now(timezone.utc)
                     await db.commit()
-

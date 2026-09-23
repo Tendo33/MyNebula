@@ -12,6 +12,10 @@ export interface RepoRelatedItem {
   stargazers_count: number;
   ai_summary?: string;
   topics: string[];
+  cluster_id?: number | null;
+  coord_x?: number | null;
+  coord_y?: number | null;
+  coord_z?: number | null;
 }
 
 export interface RelatedScoreComponents {

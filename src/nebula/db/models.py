@@ -383,10 +383,16 @@ class RepoRelatedFeedback(Base):
         Integer, ForeignKey("users.id"), nullable=False, index=True
     )
     anchor_repo_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("starred_repos.id"), nullable=False, index=True
+        Integer,
+        ForeignKey("starred_repos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     candidate_repo_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("starred_repos.id"), nullable=False, index=True
+        Integer,
+        ForeignKey("starred_repos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     feedback: Mapped[str] = mapped_column(
         String(20), nullable=False
@@ -433,7 +439,10 @@ class RepoRelatedCache(Base):
         Integer, ForeignKey("users.id"), nullable=False, index=True
     )
     anchor_repo_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("starred_repos.id"), nullable=False, index=True
+        Integer,
+        ForeignKey("starred_repos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     cache_key: Mapped[str] = mapped_column(String(120), nullable=False)
     items: Mapped[list[dict]] = mapped_column(JSONB, nullable=False, default=list)

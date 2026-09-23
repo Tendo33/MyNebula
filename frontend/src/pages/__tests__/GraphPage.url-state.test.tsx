@@ -224,6 +224,22 @@ describe('GraphPage URL state', () => {
     });
   });
 
+  it('keeps a selected related repo that is outside the loaded node page', async () => {
+    graphState.selectedNode = { ...otherNode, id: 999 };
+
+    render(
+      <MemoryRouter initialEntries={['/graph?node=999']}>
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(graphState.setSelectedNode).not.toHaveBeenCalledWith(null);
+    });
+  });
+
   it('does not show loading copy when edge loading is paused', async () => {
     graphState.autoLoadHalted = true;
     graphState.canLoadMoreEdges = true;

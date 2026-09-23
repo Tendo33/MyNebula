@@ -38,7 +38,7 @@ export const useGraphViewport = ({
     autoFitKeyRef.current = layoutKey;
   }, [graphRef, layoutKey, nodeCount]);
 
-  // Reset auto-fit state when layout shape changes
+  // Pagination extends one snapshot; do not reset the user's viewport for it.
   useEffect(() => {
     autoFitKeyRef.current = null;
     hullCacheRef.current.clear();

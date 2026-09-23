@@ -22,8 +22,45 @@ interface RelatedRepoItemProps {
 
 type RelatedTab = 'similar' | 'sameTags' | 'sameLang';
 type RelatedGraphNode = GraphNode & { _score: number; _matchReason: string };
-type CachedRelatedItem = { repoId: number; score: number; matchReason: string };
+type CachedRelatedItem = { repo: GraphNode; score: number; matchReason: string };
 type LocalRelatedRepo = GraphNode | RelatedGraphNode;
+
+const relatedRepoToGraphNode = (repo: {
+  id: number;
+  github_repo_id: number;
+  full_name: string;
+  name: string;
+  owner: string;
+  description?: string;
+  language?: string;
+  html_url: string;
+  stargazers_count: number;
+  ai_summary?: string;
+  topics: string[];
+  cluster_id?: number | null;
+  coord_x?: number | null;
+  coord_y?: number | null;
+  coord_z?: number | null;
+}): GraphNode => ({
+  id: repo.id,
+  github_id: repo.github_repo_id,
+  full_name: repo.full_name,
+  name: repo.name,
+  description: repo.description,
+  language: repo.language,
+  html_url: repo.html_url,
+  owner: repo.owner,
+  x: repo.coord_x ?? 0,
+  y: repo.coord_y ?? 0,
+  z: repo.coord_z ?? 0,
+  cluster_id: repo.cluster_id ?? null,
+  color: '#8f8f8f',
+  size: 1,
+  star_list_id: null,
+  stargazers_count: repo.stargazers_count,
+  ai_summary: repo.ai_summary,
+  topics: repo.topics,
+});
 
 const normalizeTag = (tag: string): string => {
   return tag
@@ -41,7 +78,7 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-start gap-3 p-3 rounded-xl border border-transparent hover:bg-bg-hover hover:border-border-light/70 hover:shadow-sm transition-all text-left group dark:hover:bg-dark-bg-sidebar/70"
+      className="group flex w-full items-start gap-3 rounded-md border border-transparent p-3 text-left transition-colors hover:border-border-light/70 hover:bg-bg-hover dark:hover:bg-dark-bg-sidebar/70"
     >
       {/* Avatar */}
             {repo.owner_avatar_url ? (
@@ -67,7 +104,7 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm font-semibold text-text-main truncate">{repo.name}</span>
           {repo.language && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-bg-hover rounded-full text-text-muted flex-shrink-0 dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
+            <span className="flex-shrink-0 rounded-sm bg-bg-hover px-1.5 py-0.5 text-xs text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
               {repo.language}
             </span>
           )}
@@ -78,12 +115,12 @@ const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchR
         {(matchReason || score != null) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {matchReason && (
-              <span className="max-w-full text-[10px] px-1.5 py-0.5 rounded-full bg-action-primary/10 text-action-primary line-clamp-1">
+              <span className="line-clamp-1 max-w-full rounded-sm bg-action-primary/10 px-1.5 py-0.5 text-xs text-action-primary">
                 {matchReason}
               </span>
             )}
             {score != null && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700">
+              <span className="rounded-sm bg-success-bg px-1.5 py-0.5 text-xs text-link">
                 {(score * 100).toFixed(1)}%
               </span>
             )}
@@ -139,10 +176,10 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
     const mapCachedItems = (items: CachedRelatedItem[]): RelatedGraphNode[] => {
       const mapped: RelatedGraphNode[] = [];
       for (const item of items) {
-        const inGraph = byId.get(item.repoId);
-        if (!inGraph) continue;
+        const inGraph = byId.get(item.repo.id);
+        const repo = inGraph ?? item.repo;
         mapped.push({
-          ...inGraph,
+          ...repo,
           _score: item.score,
           _matchReason: item.matchReason,
         });
@@ -172,7 +209,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
             min_semantic: settings.relatedMinSemantic,
           }).then((items) => {
             const compact = items.map((item) => ({
-              repoId: item.repo.id,
+              repo: relatedRepoToGraphNode(item.repo),
               score: item.score,
               matchReason: item.reasons.join(' · '),
             }));
@@ -324,16 +361,16 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
       </div>
 
       {/* Content */}
-      <div className="p-5 flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain p-5">
 
-        <div className="flex flex-col gap-4 flex-[3] min-h-0 overflow-y-auto overscroll-contain pr-1 pb-2">
+        <div className="flex flex-col gap-4">
           {/* Quick Actions */}
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <a
               href={node.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(buttonVariants({ variant: 'outline' }), 'flex-1')}
+              className={cn(buttonVariants({ variant: 'outline' }), 'min-w-0')}
             >
               <ExternalLink data-icon="inline-start" />
               GitHub
@@ -345,7 +382,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               target="_blank"
               rel="noopener noreferrer"
               title="View on DeepWiki"
-              className={buttonVariants({ variant: 'outline' })}
+              className={cn(buttonVariants({ variant: 'outline' }), 'min-w-0')}
             >
               <img
                 src="https://deepwiki.com/favicon.ico"
@@ -365,7 +402,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               target="_blank"
               rel="noopener noreferrer"
               title="View on zRead"
-              className={buttonVariants({ variant: 'outline' })}
+              className={cn(buttonVariants({ variant: 'outline' }), 'min-w-0')}
             >
               <img
                 src="https://zread.ai/favicon.ico"
@@ -469,7 +506,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
         </div>
 
         {/* Related Repositories with Tabs */}
-        <div className="flex flex-col flex-[2] min-h-[200px] gap-2 pt-3 border-t border-border-light/60 dark:border-dark-border">
+        <div className="flex flex-col gap-2 border-t border-border-light/60 pt-4 dark:border-dark-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-action-primary uppercase tracking-wider">
               <Link2 className="w-3.5 h-3.5" />
@@ -504,7 +541,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
 
           {/* Related Repos List — independently scrollable, sized to remaining space */}
           {currentRelatedRepos.length > 0 ? (
-            <div className="bg-bg-sidebar/60 rounded-xl border border-border-light/60 divide-y divide-border-light/40 p-1.5 flex-1 min-h-0 overflow-y-auto overscroll-contain dark:bg-dark-bg-sidebar/60 dark:border-dark-border dark:divide-dark-border/60">
+            <div className="divide-y divide-border-light/40 rounded-md border border-border-light/60 bg-bg-sidebar/60 p-1.5 dark:divide-dark-border/60 dark:border-dark-border dark:bg-dark-bg-sidebar/60">
               {currentRelatedRepos.map((repo: LocalRelatedRepo) => (
                 <RelatedRepoItem
                   key={repo.id}
@@ -516,7 +553,7 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
               ))}
             </div>
           ) : (
-            <div className="px-4 py-6 text-center text-sm text-text-muted bg-bg-sidebar/60 rounded-xl border border-border-light/60 flex items-center justify-center flex-1 min-h-0 dark:text-dark-text-main/70 dark:bg-dark-bg-sidebar/60 dark:border-dark-border">
+            <div className="flex min-h-32 items-center justify-center rounded-md border border-border-light/60 bg-bg-sidebar/60 px-4 py-6 text-center text-sm text-text-muted dark:border-dark-border dark:bg-dark-bg-sidebar/60 dark:text-dark-text-main/70">
               {activeTab === 'similar' && (
                 similarLoading
                   ? t('common.loading', 'Loading...')

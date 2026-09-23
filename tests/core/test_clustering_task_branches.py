@@ -63,6 +63,7 @@ class _FakeDb:
         self.commits = 0
         self.statements: list[str] = []
         self.added: list[object] = []
+        self.flushes = 0
 
     async def __aenter__(self):
         return self
@@ -90,6 +91,7 @@ class _FakeDb:
         self.added.append(obj)
 
     async def flush(self):
+        self.flushes += 1
         return None
 
     async def commit(self):
@@ -210,6 +212,7 @@ async def test_incremental_assigns_new_repos_to_existing_clusters(monkeypatch):
     # real coordinates rather than staying unpositioned.
     assert fresh.cluster_id == 1
     assert fresh.coord_x is not None
+    assert db.flushes == 1
     # Incremental mode must never delete clusters.
     assert not any(s.startswith("delete") for s in db.statements)
     # Affected cluster repo_count is recomputed.

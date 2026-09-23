@@ -77,7 +77,9 @@ async def sync_stars_task(
             logger.info("[TASK PROGRESS] GitHub token found, fetching starred repos...")
             fetch_started = perf_counter()
             try:
-                async with _facade().GitHubClient(access_token=settings.github_token) as client:
+                async with _facade().GitHubClient(
+                    access_token=settings.github_token
+                ) as client:
                     repos, was_truncated = await client.get_starred_repos(
                         stop_before=stop_before
                     )
@@ -364,5 +366,3 @@ async def sync_stars_task(
                     task.error_message = str(exc)
                     task.completed_at = datetime.now(timezone.utc)
                     await db.commit()
-
-

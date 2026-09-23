@@ -83,9 +83,16 @@ const Graph2D: React.FC = () => {
     [processedLinks, processedNodes]
   );
 
+  const hasStablePositions = useMemo(
+    () => processedNodes.length > 0 && processedNodes.every(
+      (node) => Number.isFinite(node.x) && Number.isFinite(node.y)
+    ),
+    [processedNodes]
+  );
+
   const layoutKey = useMemo(
-    () => rawData?.version ?? processedNodes.map((node) => node.id).join(':'),
-    [processedNodes, rawData?.version]
+    () => rawData?.version ?? rawData?.generated_at ?? 'graph',
+    [rawData?.generated_at, rawData?.version]
   );
 
   const clusterLayoutData = useMemo(
@@ -96,12 +103,16 @@ const Graph2D: React.FC = () => {
   // Group clusters by id for hull drawing
   const clusterGroups = useMemo(() => buildClusterGroups(rawData), [rawData]);
 
-  useGraphForces({ graphRef, clusterLayoutData });
+  useGraphForces({
+    graphRef,
+    clusterLayoutData,
+    enabled: !hasStablePositions && !reduceMotion,
+  });
 
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion || hasStablePositions) return;
     graphRef.current?.d3ReheatSimulation();
-  }, [layoutKey, processedLinks.length, processedNodes.length, reduceMotion]);
+  }, [hasStablePositions, layoutKey, reduceMotion]);
 
   const { tryAutoFit, getLiveNodeById, focusNodeById, markUserInteracted, skipNextFocusRef } =
     useGraphViewport({
@@ -303,10 +314,10 @@ const Graph2D: React.FC = () => {
         // Pre-render callback for cluster hulls
         onRenderFramePre={paintClusterHulls}
         // Physics
-        d3AlphaDecay={reduceMotion ? 0.05 : 0.008}
-        d3VelocityDecay={0.28}
-        cooldownTicks={reduceMotion ? 0 : 480}
-        cooldownTime={reduceMotion ? 0 : 20000}
+        d3AlphaDecay={hasStablePositions || reduceMotion ? 1 : 0.05}
+        d3VelocityDecay={hasStablePositions ? 0.9 : 0.28}
+        cooldownTicks={hasStablePositions || reduceMotion ? 0 : 160}
+        cooldownTime={hasStablePositions || reduceMotion ? 0 : 8000}
         warmupTicks={reduceMotion ? 80 : 0}
         // After engine stops
         onEngineTick={() => {

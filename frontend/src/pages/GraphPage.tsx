@@ -64,7 +64,7 @@ const GraphPage = () => {
         const node = rawData.nodes.find((item) => item.id === parsedNodeId);
         if (node && selectedNode?.id !== node.id) {
           setSelectedNode(node);
-        } else if (!node && selectedNode) {
+        } else if (!node && selectedNode && selectedNode.id !== parsedNodeId) {
           setSelectedNode(null);
         }
       } else if (selectedNode) {

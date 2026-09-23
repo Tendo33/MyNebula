@@ -208,6 +208,11 @@ async def run_clustering_task(
                         repo.coord_z = coords[2]
                         repo.cluster_id = int(result_incr.new_labels[index])
 
+                    # Sessions run with autoflush disabled. Persist assignments
+                    # before counting, otherwise cluster.repo_count omits every
+                    # repository added by this incremental pass.
+                    await db.flush()
+
                     cluster_ids_to_update = {
                         int(label) for label in result_incr.new_labels
                     }
@@ -401,4 +406,3 @@ async def run_clustering_task(
                     task.error_message = str(exc)
                     task.completed_at = datetime.now(timezone.utc)
                     await db.commit()
-

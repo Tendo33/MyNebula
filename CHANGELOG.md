@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-23
+
+### Fixed
+- Cascade related-repository caches and feedback when an unstarred repository
+  is removed, preventing scheduled syncs from failing on foreign-key checks.
+- Keep server-projected graph positions stable instead of reheating the force
+  simulation as snapshot pages arrive.
+- Preserve related repositories outside the currently loaded graph page and
+  provide metadata-based recommendations while embeddings are unavailable.
+- Flush incremental cluster assignments before recomputing cluster counts.
+- Simplify the repository details panel to one responsive scroll region.
+
+### Changed
+- Moved the build-time `shadcn` CLI out of production dependencies.
+- Synchronized version metadata to `1.4.1`.
+
 ## [1.4.0] - 2026-09-14
 
 ### Added
@@ -285,7 +301,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/Tendo33/mynebula/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Tendo33/mynebula/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Tendo33/mynebula/compare/v1.2.11...v1.3.0
 [1.2.11]: https://github.com/Tendo33/mynebula/compare/v1.2.10...v1.2.11

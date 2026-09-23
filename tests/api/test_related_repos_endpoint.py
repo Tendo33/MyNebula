@@ -42,7 +42,7 @@ class DummyRepo:
 
 
 def _dummy_repo(
-    repo_id: int, embedding: list[float], tags: list[str], stars: int
+    repo_id: int, embedding: list[float] | None, tags: list[str], stars: int
 ) -> DummyRepo:
     return DummyRepo(
         id=repo_id,
@@ -120,6 +120,24 @@ def test_rank_related_candidates_filters_low_semantic_even_with_other_signals():
     )
 
     assert ranked == []
+
+
+def test_rank_related_candidates_falls_back_to_metadata_without_embeddings():
+    anchor = _dummy_repo(1, None, ["agent", "rag"], 10)
+    candidate = _dummy_repo(2, None, ["agent"], 5)
+
+    ranked = rank_related_candidates(
+        anchor_repo=anchor,
+        candidates=[candidate],
+        min_score=0.2,
+        min_semantic=0.0,
+        limit=5,
+        require_embedding=False,
+    )
+
+    assert [item.repo.id for item in ranked] == [2]
+    assert ranked[0].components.semantic == 0.0
+    assert "tags:overlap" in ranked[0].reasons
 
 
 def test_related_cache_key_is_stable_under_rounding():

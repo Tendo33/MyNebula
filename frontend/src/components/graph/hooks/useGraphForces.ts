@@ -79,12 +79,14 @@ export const createClusterForce =
 export const useGraphForces = ({
   graphRef,
   clusterLayoutData,
+  enabled = true,
 }: {
   graphRef: React.MutableRefObject<ForceGraphMethods | undefined>;
   clusterLayoutData: ClusterLayoutData;
+  enabled?: boolean;
 }) => {
   useEffect(() => {
-    if (!graphRef.current) return;
+    if (!graphRef.current || !enabled) return;
 
     const fg = graphRef.current;
 
@@ -122,5 +124,5 @@ export const useGraphForces = ({
     // Register custom force
     fg.d3Force('cluster', createClusterForce(clusterLayoutData));
     fg.d3ReheatSimulation();
-  }, [graphRef, clusterLayoutData]);
+  }, [enabled, graphRef, clusterLayoutData]);
 };

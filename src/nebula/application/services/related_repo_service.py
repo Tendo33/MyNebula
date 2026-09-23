@@ -30,7 +30,7 @@ from nebula.utils import get_logger
 
 logger = get_logger(__name__)
 
-RELATED_CACHE_VERSION = "related-v1"
+RELATED_CACHE_VERSION = "related-v2"
 
 
 def _build_related_cache_key(min_score: float, min_semantic: float, limit: int) -> str:
@@ -75,12 +75,13 @@ def rank_related_candidates(
     min_score: float,
     min_semantic: float,
     limit: int,
+    require_embedding: bool = True,
 ) -> list[RelatedRepoResponse]:
     ranked: list[RelatedRepoResponse] = []
     for candidate in candidates:
         if candidate.id == anchor_repo.id:
             continue
-        if candidate.embedding is None:
+        if require_embedding and candidate.embedding is None:
             continue
         score, components, reasons = _build_related_result_item(anchor_repo, candidate)
         if components.semantic < min_semantic:
@@ -195,8 +196,7 @@ async def get_related_repos(
 ) -> list[RelatedRepoResponse]:
     """Return related repos for *anchor_repo*, using cache when valid."""
 
-    if anchor_repo.embedding is None:
-        return []
+    has_anchor_embedding = bool(anchor_repo.embedding)
 
     cache_key = _build_related_cache_key(
         min_score=min_score,
@@ -243,27 +243,31 @@ async def get_related_repos(
             if restored:
                 return restored
 
-    # --- ANN query ---
+    # --- ANN query (or metadata fallback while embeddings are unavailable) ---
     ann_candidate_limit = min(limit * 5, 200)
-    candidate_result = await db.execute(
-        select(StarredRepo)
-        .where(
-            StarredRepo.user_id == user.id,
+    candidate_query = select(StarredRepo).where(
+        StarredRepo.user_id == user.id,
+        StarredRepo.id != anchor_repo.id,
+    )
+    if has_anchor_embedding:
+        candidate_query = candidate_query.where(
             StarredRepo.is_embedded == True,  # noqa: E712
             StarredRepo.embedding.isnot(None),
-            StarredRepo.id != anchor_repo.id,
+        ).order_by(StarredRepo.embedding.cosine_distance(anchor_repo.embedding))
+    else:
+        candidate_query = candidate_query.order_by(
+            StarredRepo.stargazers_count.desc(), StarredRepo.id.desc()
         )
-        .order_by(StarredRepo.embedding.cosine_distance(anchor_repo.embedding))
-        .limit(ann_candidate_limit)
-    )
+    candidate_result = await db.execute(candidate_query.limit(ann_candidate_limit))
     candidates = list(candidate_result.scalars().all())
 
     ranked = rank_related_candidates(
         anchor_repo=anchor_repo,
         candidates=candidates,
-        min_score=min_score,
-        min_semantic=min_semantic,
+        min_score=min_score if has_anchor_embedding else min(min_score, 0.2),
+        min_semantic=min_semantic if has_anchor_embedding else 0.0,
         limit=limit,
+        require_embedding=has_anchor_embedding,
     )
 
     # --- write-back cache ---

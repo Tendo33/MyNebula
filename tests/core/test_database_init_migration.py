@@ -107,6 +107,17 @@ def test_repo_related_cache_migration_creates_related_repo_tables():
     assert '"repo_related_caches"' in migration_source
 
 
+def test_related_repo_dependencies_cascade_when_starred_repo_is_deleted():
+    migration_path = (
+        ALEMBIC_VERSIONS_DIR / "20260922_1200_cascade_related_repo_dependencies.py"
+    )
+    migration_source = migration_path.read_text(encoding="utf-8")
+
+    assert 'revision: str = "c7d2e4f91a30"' in migration_source
+    assert 'ondelete="CASCADE"' in migration_source
+    assert migration_source.count("op.drop_constraint") == 2
+
+
 def test_search_indexes_use_a_dedicated_concurrent_migration():
     lease_migration = (
         ALEMBIC_VERSIONS_DIR / "20260808_1715_add_job_leases.py"
