@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-28
+
+### Changed
+- Rebuilt the app shell as a collapsible sidebar shared by Dashboard, Graph, Data, and Settings.
+- Graph is a resizable filters, canvas, and detail split. Unselected nodes stay neutral and unlabeled.
+- Data is a resizable filter and table split. Settings uses Sync, Data, and Appearance tabs after login.
+- Pointed `doc/` redirects and the README documentation map at the sections that still exist.
+
 ## [1.4.2] - 2026-09-23
 
 ### Fixed
@@ -308,7 +316,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Tendo33/mynebula/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/Tendo33/mynebula/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/Tendo33/mynebula/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Tendo33/mynebula/compare/v1.3.0...v1.4.0

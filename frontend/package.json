@@ -1,7 +1,7 @@
 {
   "name": "mynebula-frontend",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.5.0",
   "type": "module",
   "packageManager": "pnpm@10.26.1",
   "scripts": {
