@@ -126,6 +126,7 @@ const Graph2D: React.FC = () => {
     clusterLayoutData,
     layoutKey,
     forceScale: motionProfile.forceScale,
+    enabled: !loading && (filteredData?.nodes.length ?? 0) > 0,
   });
 
   const { tryAutoFit, getLiveNodeById, focusNodeById, markUserInteracted, skipNextFocusRef } =
@@ -359,7 +360,12 @@ const Graph2D: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full relative bg-bg-main dark:bg-dark-bg-main">
+    <div
+      ref={containerRef}
+      className="w-full h-full relative bg-bg-main dark:bg-dark-bg-main"
+      onPointerDown={markUserInteracted}
+      onWheel={markUserInteracted}
+    >
       <ForceGraph2D
         ref={graphRef}
         width={width}
@@ -372,7 +378,6 @@ const Graph2D: React.FC = () => {
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
-        onZoom={markUserInteracted}
         onNodeDragEnd={markUserInteracted}
         // Node rendering
         nodeCanvasObject={paintNode}

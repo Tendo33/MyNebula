@@ -4,7 +4,7 @@ import { Clock } from 'lucide-react';
 import type { ScheduleResponse } from '../../api/v2/settings';
 import { formatLastRunTime, formatNextRunTime, getStatusDisplay } from '../../utils/scheduleFormat';
 import { Card } from '@/components/ui/card';
-import { NativeSelect } from '@/components/ui/native-select';
+import { SelectField } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 
@@ -30,9 +30,9 @@ export const SettingsSchedule = ({
       </h2>
 
       <div className="flex flex-col gap-2">
-        <Card variant="muted" className="flex flex-row items-center justify-between p-4 transition-all group">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
+        <Card variant="muted" className="group flex flex-row items-center justify-between gap-3 p-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="shrink-0 p-2 rounded-md bg-bg-sidebar group-hover:bg-bg-main transition-colors dark:group-hover:bg-dark-bg-main">
               <Clock className="w-5 h-5 text-text-muted group-hover:text-text-main" />
             </div>
             <div className="flex flex-col">
@@ -52,43 +52,41 @@ export const SettingsSchedule = ({
         </Card>
 
         {schedule?.is_enabled && (
-          <Card variant="muted" className="ml-0 p-4 sm:ml-14">
+          <Card variant="muted" className="p-4">
             <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="text-sm text-text-muted">{t('settings.execution_time')}:</label>
-                <NativeSelect
-                  value={schedule.schedule_hour}
-                  onChange={(e) => onTimeChange(Number(e.target.value), schedule.schedule_minute)}
-                  disabled={scheduleLoading}
-                  aria-label={t('settings.execution_time')}
-                >
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i.toString().padStart(2, '0')}
-                    </option>
-                  ))}
-                </NativeSelect>
-                <span className="text-text-muted">:</span>
-                <NativeSelect
-                  value={schedule.schedule_minute}
-                  onChange={(e) => onTimeChange(schedule.schedule_hour, Number(e.target.value))}
-                  disabled={scheduleLoading}
-                  aria-label={t('settings.execution_time')}
-                >
-                  {[0, 15, 30, 45].map((m) => (
-                    <option key={m} value={m}>
-                      {m.toString().padStart(2, '0')}
-                    </option>
-                  ))}
-                </NativeSelect>
+                <div className="flex items-center gap-2">
+                  <SelectField
+                    value={String(schedule.schedule_hour)}
+                    onValueChange={(value) => onTimeChange(Number(value), schedule.schedule_minute)}
+                    disabled={scheduleLoading}
+                    aria-label={t('settings.execution_hour')}
+                    options={Array.from({ length: 24 }, (_, hour) => ({
+                      value: String(hour),
+                      label: String(hour).padStart(2, '0'),
+                    }))}
+                  />
+                  <span className="text-text-muted">:</span>
+                  <SelectField
+                    value={String(schedule.schedule_minute)}
+                    onValueChange={(value) => onTimeChange(schedule.schedule_hour, Number(value))}
+                    disabled={scheduleLoading}
+                    aria-label={t('settings.execution_minute')}
+                    options={[0, 15, 30, 45].map((minute) => ({
+                      value: String(minute),
+                      label: String(minute).padStart(2, '0'),
+                    }))}
+                  />
+                </div>
               </div>
               <span className="text-xs text-text-muted">({schedule.timezone})</span>
             </div>
           </Card>
         )}
 
-        <Card variant="muted" className="ml-0 flex flex-col gap-1 p-4 sm:ml-14">
-          <div className="flex items-center gap-2 text-xs text-text-muted">
+        <Card variant="muted" className="flex flex-col gap-1 p-4">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
             <span>{t('settings.last_run')}:</span>
             <span className="text-text-main">
               {schedule ? formatLastRunTime(schedule.last_run_at, t) : t('common.loading')}
@@ -100,7 +98,7 @@ export const SettingsSchedule = ({
             )}
           </div>
           {schedule?.is_enabled && schedule.next_run_at && (
-            <div className="flex items-center gap-2 text-xs text-text-muted">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
               <span>{t('settings.next_run')}:</span>
               <span className="text-text-main">
                 {formatNextRunTime(schedule.next_run_at, schedule.timezone, t)}

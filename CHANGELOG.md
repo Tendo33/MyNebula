@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-28
+
+### Changed
+- Move Data filters above the full-width repository table and keep pagination stable while queries load.
+- Replace native select menus with themed Base UI Select controls across Data and Settings.
+- Keep the Graph canvas full-width until a repository is selected, then mount the details panel on demand.
+- Keep snapshot-projected graph nodes static after load to prevent page-wide node movement.
+
 ## [1.5.0] - 2026-09-28
 
 ### Changed

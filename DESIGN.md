@@ -64,10 +64,10 @@ In-app chrome comes from shadcn on Base UI in `frontend/src/components/ui`, mapp
 
 - `Button` default / outline / icon — 6px squares, 40px tall (primary ink fill, ghost hairline)
 - `Card` default (12–16px elevated) and `muted` (settings rows)
-- `Input`, `InputGroup`, `NativeSelect`, `Switch`, `Slider`, `Table`, `Sheet`, `Alert`, `Empty`
+- `Input`, `InputGroup`, Base UI `Select`, `Switch`, `Slider`, `Table`, `Sheet`, `Alert`, `Empty`. Select menus use the same 6px corners, hairlines, and keyboard states as other in-app controls.
 - `Sidebar` (`collapsible="icon"`) is the shell for Dashboard, Graph, Data, and Settings. `Breadcrumb` sits in the inset header.
-- Graph is a horizontal `Resizable` split: filters about 18%, canvas, detail about 30%. Detail uses `Avatar`, one fact line, and `Tabs` (Overview / Related) inside `ScrollArea`.
-- Data is a horizontal `Resizable` split: filters about 22%, table filling the rest.
+- Graph uses a filter rail and a full-width canvas until a repository is selected. The detail panel is added on selection at about 30% width and uses `Avatar`, one fact line, and `Tabs` (Overview / Related) inside `ScrollArea`.
+- Data places search and filters above a full-width table. Cluster options wrap horizontally; the filter area has bounded height on narrow screens.
 - Settings after login is `Tabs`: Sync, Data, Appearance. The login form stays centered.
 - Unselected graph nodes are neutral and unlabeled. Hover or selection keeps hue and labels on that cluster and drops the others to about 0.18 opacity. No nebula background.
 

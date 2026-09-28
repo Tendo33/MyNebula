@@ -3,14 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { getGraphMotionProfile } from '../graph2dMotion';
 
 describe('getGraphMotionProfile', () => {
-  it('gently settles projected coordinates instead of freezing them', () => {
+  it('keeps snapshot-projected coordinates static', () => {
     const profile = getGraphMotionProfile(true, false);
 
-    expect(profile.cooldownTicks).toBeGreaterThan(0);
-    expect(profile.cooldownTicks).toBeLessThanOrEqual(80);
-    expect(profile.cooldownTime).toBeLessThanOrEqual(1500);
-    expect(profile.forceScale).toBeGreaterThan(0);
-    expect(profile.forceScale).toBeLessThan(0.25);
+    expect(profile.cooldownTicks).toBe(0);
+    expect(profile.cooldownTime).toBe(0);
+    expect(profile.forceScale).toBe(0);
   });
 
   it('keeps a longer layout pass when coordinates are missing', () => {

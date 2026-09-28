@@ -166,6 +166,8 @@
     "enable_scheduled_sync": "启用定时同步",
     "enable_scheduled_sync_desc": "每天自动增量更新星标数据",
     "execution_time": "执行时间",
+    "execution_hour": "执行小时",
+    "execution_minute": "执行分钟",
     "last_run": "上次运行",
     "next_run": "下次运行",
     "data_management": "数据管理",

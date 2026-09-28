@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { List, Network, X } from 'lucide-react';
+import { List, X } from 'lucide-react';
+import type { PanelImperativeHandle } from 'react-resizable-panels';
 
 import Graph2D from '../components/graph/Graph2D';
 import Timeline from '../components/graph/Timeline';
@@ -13,13 +14,6 @@ import { useGraph } from '../contexts/GraphContext';
 import { Alert, AlertAction, AlertDescription } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '../components/ui/empty';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -211,6 +205,8 @@ const GraphPage = () => {
 
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);
   const [starListPanelCollapsed, setStarListPanelCollapsed] = useState(false);
+  const graphPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const detailsPanelRef = useRef<PanelImperativeHandle | null>(null);
   const [showNodeList, setShowNodeList] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -237,6 +233,18 @@ const GraphPage = () => {
     filters.minStars > 0 ||
     filters.languages.size > 0;
   const hasGraphData = (rawData?.nodes.length ?? 0) > 0;
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (selectedNode) {
+        graphPanelRef.current?.resize('52%');
+        detailsPanelRef.current?.resize('30%');
+      } else {
+        graphPanelRef.current?.resize('82%');
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedNode]);
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -289,7 +297,11 @@ const GraphPage = () => {
           </aside>
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize="52%" minSize="30%">
+        <ResizablePanel
+          panelRef={graphPanelRef}
+          defaultSize={selectedNode ? '52%' : '82%'}
+          minSize="30%"
+        >
           <div className="relative h-full min-h-0 bg-background">
             {showNodeList && hasGraphData && (
               <Card
@@ -427,24 +439,16 @@ const GraphPage = () => {
             </div>
           </div>
         </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize="30%" minSize="20%">
-          <section aria-label={t('common.overview')} className="h-full min-h-0">
-            {selectedNode ? (
-              <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />
-            ) : (
-              <Empty className="h-full rounded-none border-0">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <Network />
-                  </EmptyMedia>
-                  <EmptyTitle>{t('graph.no_selection')}</EmptyTitle>
-                  <EmptyDescription>{t('graph.no_selection_hint')}</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
-          </section>
-        </ResizablePanel>
+        {selectedNode ? (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel panelRef={detailsPanelRef} defaultSize="30%" minSize="20%">
+              <section aria-label={t('common.overview')} className="h-full min-h-0">
+                <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />
+              </section>
+            </ResizablePanel>
+          </>
+        ) : null}
       </ResizablePanelGroup>
     </div>
   );

@@ -166,6 +166,8 @@
     "enable_scheduled_sync": "Enable Scheduled Sync",
     "enable_scheduled_sync_desc": "Automatically update star data incrementally every day",
     "execution_time": "Execution Time",
+    "execution_hour": "Execution hour",
+    "execution_minute": "Execution minute",
     "last_run": "Last Run",
     "next_run": "Next Run",
     "data_management": "Data Management",

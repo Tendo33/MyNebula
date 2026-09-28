@@ -201,6 +201,32 @@ describe('GraphPage URL state', () => {
     });
   });
 
+  it('only mounts the details panel after a node is selected', async () => {
+    const initial = render(
+      <MemoryRouter initialEntries={['/graph']}>
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(initial.queryByTestId('repo-details')).not.toBeInTheDocument();
+    initial.unmount();
+    graphState.selectedNode = sampleNode;
+
+    const selected = render(
+      <MemoryRouter initialEntries={['/graph?node=1']}>
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(selected.getByTestId('repo-details')).toHaveTextContent('1');
+    });
+  });
+
   it('prefers the incoming node query over a stale selected node in store state', async () => {
     graphState.selectedNode = sampleNode;
 

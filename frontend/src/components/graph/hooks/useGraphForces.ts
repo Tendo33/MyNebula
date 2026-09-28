@@ -81,16 +81,18 @@ export const useGraphForces = ({
   clusterLayoutData,
   layoutKey,
   forceScale,
+  enabled,
 }: {
   graphRef: React.MutableRefObject<ForceGraphMethods | undefined>;
   clusterLayoutData: ClusterLayoutData;
   layoutKey: string;
   forceScale: number;
+  enabled: boolean;
 }) => {
   const reheatedLayoutRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!graphRef.current || forceScale <= 0) return;
+    if (!enabled || !graphRef.current || forceScale <= 0) return;
 
     const fg = graphRef.current;
 
@@ -112,7 +114,7 @@ export const useGraphForces = ({
     // Configure charge force (repulsion) - increased for more spacing
     fg.d3Force('charge')?.strength(-150 * forceScale).distanceMax(250);
 
-    // Gentle pull toward the origin to avoid disconnected groups drifting far apart
+    // Gentle pull toward the origin to avoid disconnected groups drifting far apart.
     fg.d3Force(
       'x',
       forceX(0).strength(CENTER_PULL_STRENGTH * forceScale) as unknown as RegisteredForce
@@ -137,5 +139,5 @@ export const useGraphForces = ({
       reheatedLayoutRef.current = layoutKey;
       fg.d3ReheatSimulation();
     }
-  }, [clusterLayoutData, forceScale, graphRef, layoutKey]);
+  }, [clusterLayoutData, enabled, forceScale, graphRef, layoutKey]);
 };

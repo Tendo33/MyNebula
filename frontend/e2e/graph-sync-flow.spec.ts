@@ -201,24 +201,20 @@ test.describe('graph + sync critical flows', () => {
     await expect(page.locator('canvas')).toBeVisible();
   });
 
-  test('projected graph positions settle briefly instead of freezing or drifting', async ({ page }) => {
+  test('projected graph remains static after load and hover', async ({ page }) => {
     await page.goto('/graph');
     await expect(page.locator('canvas')).toBeVisible();
 
-    await expect.poll(
-      () => page.evaluate(() => (window as Window & { __nebulaGraphTicks?: number }).__nebulaGraphTicks ?? 0)
-    ).toBeGreaterThan(0);
-
-    await page.waitForTimeout(1800);
-    const settledTicks = await page.evaluate(
+    const initialTicks = await page.evaluate(
       () => (window as Window & { __nebulaGraphTicks?: number }).__nebulaGraphTicks ?? 0
     );
+    await page.locator('canvas').hover();
     await page.waitForTimeout(500);
     const finalTicks = await page.evaluate(
       () => (window as Window & { __nebulaGraphTicks?: number }).__nebulaGraphTicks ?? 0
     );
 
-    expect(finalTicks - settledTicks).toBeLessThanOrEqual(2);
+    expect(finalTicks - initialTicks).toBe(0);
   });
 
   test('data filter links can navigate to graph detail route', async ({ page }) => {
