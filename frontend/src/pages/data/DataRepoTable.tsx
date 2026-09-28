@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Star } from 'lucide-react';
 
 import type { DataClusterInfo, DataRepoItem } from '../../api/v2/data';
@@ -41,6 +41,10 @@ export const DataRepoTable: React.FC<{
   onClearFilters: () => void;
 }> = ({ repos, clusterMap, sortConfig, onSort, onClusterFilter, hasActiveFilters, onClearFilters }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const openGraphNode = (nodeId: number) => {
+    navigate(`/graph?node=${nodeId}`);
+  };
   const emptyList = (
     <Empty className="border-0">
       <EmptyHeader>
@@ -143,6 +147,10 @@ export const DataRepoTable: React.FC<{
                   <div className="flex items-center gap-2">
                     <Link
                       to={`/graph?node=${repo.id}`}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        openGraphNode(repo.id);
+                      }}
                       className="block min-h-[1.75rem] truncate py-1 font-medium text-text-main hover:text-action-primary hover:underline"
                     >
                       {repo.full_name}
@@ -228,6 +236,10 @@ export const DataRepoTable: React.FC<{
             <div className="min-w-0 flex-1">
               <Link
                 to={`/graph?node=${repo.id}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  openGraphNode(repo.id);
+                }}
                 className="block min-h-[1.75rem] truncate py-1 font-semibold text-text-main hover:text-action-primary"
               >
                 {repo.full_name}

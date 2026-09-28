@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-09-28
+
+### Fixed
+- Make repository links on the Data page navigate reliably to the selected Graph node.
+
 ## [1.6.0] - 2026-09-28
 
 ### Changed
