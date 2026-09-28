@@ -296,4 +296,27 @@ describe('GraphPage URL state', () => {
 
     expect(graphState.setSelectedNode).toHaveBeenCalledWith(sampleNode);
   });
+
+  it('keeps the filter column in the split, including when the URL restores a filter', () => {
+    const { getByRole, unmount } = render(
+      <MemoryRouter initialEntries={['/graph']}>
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(getByRole('complementary', { name: 'common.filter' })).toBeInTheDocument();
+    unmount();
+
+    const restored = render(
+      <MemoryRouter initialEntries={['/graph?cluster=2']}>
+        <Routes>
+          <Route path="/graph" element={<GraphPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(restored.getByRole('complementary', { name: 'common.filter' })).toBeInTheDocument();
+  });
 });

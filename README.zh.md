@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    <a href="#快速开始">快速开始</a>
+    <a href="#部署">部署</a>
     |
     <a href="#界面预览">界面预览</a>
     |
@@ -61,12 +61,13 @@ MyNebula 想做的，就是把这些零散的星标仓库整理成一张真正�
 - [工作方式](#工作方式)
 - [系统架构](#系统架构)
 - [技术栈](#技术栈)
-- [快速开始](#快速开始)
-  - [前置条件](#前置条件)
-  - [1. 克隆并配置](#1-克隆并配置)
-  - [2. 启动服务](#2-启动服务)
-  - [3. 打开应用](#3-打开应用)
-  - [4. 运行首次同步](#4-运行首次同步)
+- [部署](#部署)
+  - [环境](#环境)
+  - [配置](#配置)
+  - [启动](#启动)
+  - [打开](#打开)
+  - [发版前检查](#发版前检查)
+  - [首次同步](#首次同步)
 - [本地开发](#本地开发)
   - [后端](#后端)
   - [前端](#前端)
@@ -87,27 +88,21 @@ MyNebula 想做的，就是把这些零散的星标仓库整理成一张真正�
 - [参与贡献](#参与贡献)
 - [许可证](#许可证)
 
-## 界面预览
+## 当前界面
 
-MyNebula 当前已经包含几张界面资源，下面这块也专门留好了截图位置，方便你后面直接替换成更正式的展示图。
+`doc/images/` 里的图是旧的满屏 logo 图谱和长设置页，不要当成现在的界面。
 
-| 页面 | 截图 |
-| --- | --- |
-| 图谱探索 | <img src="doc/images/image1.png" alt="Graph exploration view" width="100%" /> |
-| 仓库详情 | <img src="doc/images/image2.png" alt="Repository detail view" width="100%" /> |
-| 设置与定时任务 | <img src="doc/images/image3.png" alt="Repository detail view" width="80%" /> |
+四个页面共用一个可收起的侧栏：仪表盘、图谱、数据、设置。收起后只留图标。
 
-建议最终在 README 中保留这几类截图：
-
-- 带有聚类标签的图谱总览
-- 带相关推荐的仓库详情页
-- 展示同步控制的设置页
-- 展示快照历史的时间线或仪表盘页面
+- 图谱：可拖动的三栏。筛选约 18%，画布撑满中间，详情约 30%。没有悬停或选中时，节点是中性灰且不显示标签。选中一个聚类后，只有这一簇保留颜色，其余节点变淡。详情里仓库名是唯一的大字，下面是一行事实，然后是概览 / 相关两个标签。没选中时详情是空状态。
+- 数据：可拖动的两栏。筛选约 22%，表格占满其余高度并在栏内滚动。
+- 设置：登录后分成同步、数据、外观三个标签。登录表单仍居中。
+- 仪表盘：上面四格数字，下面两列是聚类和语言。
 
 ## 核心亮点
 
 - **不是手动分类，而是语义聚类**：MyNebula 会根据内容语义对仓库自动归组，让你的 Stars 从平面列表变成主题集合。
-- **以图谱为核心的探索方式**：你可以在交互式星云图里浏览节点关系、按需加载边，并结合时间线回看演化过程。
+- **以图谱为核心的探索方式**：图谱在浅色操作台的中间一栏。选中或悬停一个聚类时才保留颜色和标签，边按需加载，时间线仍在筛选栏里。
 - **基于快照的稳定读取体验**：图谱读取接口基于版本化快照，前台体验更稳，后台同步也更容易持续演进。
 - **完整可用的同步流程**：增量同步、全量重建、重处理判断、定时任务这些实际使用会遇到的能力都已经考虑进去。
 - **可解释的相关推荐**：相关仓库不是黑盒推荐，而是尽量基于清晰、可理解的关联信号返回结果。
@@ -154,55 +149,64 @@ flowchart LR
 - **前端**：React 18、TypeScript、Vite、React Query、react-force-graph-2d、Tailwind CSS
 - **工程工具**：Docker Compose、uv、Ruff、Pytest、Vitest、Playwright
 
-## 快速开始
+## 部署
 
-### 前置条件
+### 环境
 
 - Docker 与 Docker Compose v2
-- GitHub Personal Access Token
-- Embedding 服务 API Key
-- 如果你希望启用摘要、标签或 AI 命名，还需要一个 LLM 服务 API Key
+- 不在部署机上编译。Compose 只拉取 `.env` 里的 `MYNEBULA_IMAGE`
+- 本机 Node.js 和 Python 只在下面的「本地开发」里需要
 
-### 1. 克隆并配置
+### 配置
 
 ```bash
-git clone https://github.com/Tendo33/MyNebula.git
-cd MyNebula
 cp .env.example .env
 ```
 
-至少需要在 `.env` 中配置这些值：
+至少填这些值：
 
 - `GITHUB_TOKEN`
 - `EMBEDDING_API_KEY`
 - `EMBEDDING_BASE_URL`
 - `EMBEDDING_MODEL`
-- 如果你要启用摘要、标签或 AI 命名，还需要配置 `LLM_API_KEY`
+- 启用摘要、标签或 AI 命名时再填 `LLM_API_KEY`
 - `ADMIN_PASSWORD`
 - `ADMIN_SESSION_SECRET`
-- 如果你不想使用默认值 `admin`，还需要修改 `ADMIN_USERNAME`
+- 不想用默认用户 `admin` 时再改 `ADMIN_USERNAME`
 - `READ_ACCESS_MODE`
-- `MYNEBULA_IMAGE`，必须指向由待部署源码版本构建并已发布的不可变标签或 digest
+- `MYNEBULA_IMAGE`：必须是待部署版本已经发布的不可变标签或 digest
 
-推荐配置：
+推荐：
 
 - 本地演示：`READ_ACCESS_MODE=demo`
-- 公网部署：`READ_ACCESS_MODE=authenticated`、`FORCE_SECURE_COOKIES=true`、`TRUST_PROXY_HEADERS=true`、`TRUSTED_PROXY_IPS=<反向代理 IP>`
+- 公网：`READ_ACCESS_MODE=authenticated`、`FORCE_SECURE_COOKIES=true`、`TRUST_PROXY_HEADERS=true`、`TRUSTED_PROXY_IPS=<反向代理 IP>`
 - 公网进程若仍是 demo 或管理员密码为空，启动会失败，除非设置 `ALLOW_ANONYMOUS_DEMO=true`
 
-### 2. 启动服务
+### 启动
 
 ```bash
 docker compose up -d
 ```
 
-### 3. 打开应用
+不要加 `--build`。`MYNEBULA_IMAGE` 为空时 Compose 会直接拒绝启动。
 
-- 应用地址：<http://localhost:8000>
+### 打开
+
+- 应用：<http://localhost:8000>
 - 健康检查：<http://localhost:8000/health>
-- OpenAPI 文档：<http://localhost:8000/docs>，仅在 `DEBUG=true` 时可用
+- OpenAPI：<http://localhost:8000/docs>，仅在 `DEBUG=true` 时可用
 
-### 4. 运行首次同步
+### 发版前检查
+
+```bash
+uv run ruff check .
+uv run pytest
+pnpm --prefix frontend run test
+pnpm --prefix frontend run lint
+pnpm --prefix frontend run build
+```
+
+### 首次同步
 
 1. 打开 `/settings`
 2. 使用 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 登录
@@ -258,6 +262,19 @@ uv run uvicorn nebula.main:app --reload --port 8000
 
 ## 文档地图
 
+`doc/` 里的旧地址只负责跳转，索引在 [`doc/INDEX.md`](doc/INDEX.md)。`doc/images/` 是历史截图，不是当前界面。
+
+| 想看什么 | 现在看 |
+| --- | --- |
+| 部署 | [部署](#部署) |
+| 环境变量和模型 | [配置概览](#配置概览)，模板是 [`.env.example`](.env.example) |
+| 本地开发 | [本地开发](#本地开发) |
+| 当前页面怎么排 | [当前界面](#当前界面) 和 [`DESIGN.md`](DESIGN.md) |
+| 接口 | [API 快速参考](#api-快速参考) |
+| 测试和发版检查 | [质量与测试](#质量与测试) |
+| 提交前钩子和 CI | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+| 清空数据库 | [`scripts/reset_db.py`](scripts/reset_db.py)，说明在贡献指南的数据库一节 |
+| 按日期的检查记录 | [`docs/health-check/`](docs/health-check/) |
 
 ## API 快速参考
 

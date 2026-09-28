@@ -64,7 +64,12 @@ In-app chrome comes from shadcn on Base UI in `frontend/src/components/ui`, mapp
 
 - `Button` default / outline / icon — 6px squares, 40px tall (primary ink fill, ghost hairline)
 - `Card` default (12–16px elevated) and `muted` (settings rows)
-- `Input`, `InputGroup`, `NativeSelect`, `Switch`, `Slider`, `Table`, `Sheet`, `Alert`, `EmptyState`
+- `Input`, `InputGroup`, `NativeSelect`, `Switch`, `Slider`, `Table`, `Sheet`, `Alert`, `Empty`
+- `Sidebar` (`collapsible="icon"`) is the shell for Dashboard, Graph, Data, and Settings. `Breadcrumb` sits in the inset header.
+- Graph is a horizontal `Resizable` split: filters about 18%, canvas, detail about 30%. Detail uses `Avatar`, one fact line, and `Tabs` (Overview / Related) inside `ScrollArea`.
+- Data is a horizontal `Resizable` split: filters about 22%, table filling the rest.
+- Settings after login is `Tabs`: Sync, Data, Appearance. The login form stays centered.
+- Unselected graph nodes are neutral and unlabeled. Hover or selection keeps hue and labels on that cluster and drops the others to about 0.18 opacity. No nebula background.
 
 Do not add a second component library (Mantine, Ant, HeroUI, Radix Themes) on top of this stack. Cluster chips stay as `chip-button` because hues come from the graph.
 

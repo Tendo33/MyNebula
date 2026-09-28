@@ -4,8 +4,15 @@ import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 
 import type { DataClusterInfo, DataRepoItem } from '../../api/v2/data';
+import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
-import { EmptyState } from '../../components/ui/EmptyState';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from '../../components/ui/empty';
 import {
   Table,
   TableBody,
@@ -14,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
+import { ScrollArea } from '../../components/ui/scroll-area';
 import { ClusterBadge, SortableHeader } from './DataTableParts';
 import { formatDataDate, type SortConfig, type SortField } from './dataPageFilters';
 
@@ -33,10 +41,30 @@ export const DataRepoTable: React.FC<{
   onClearFilters: () => void;
 }> = ({ repos, clusterMap, sortConfig, onSort, onClusterFilter, hasActiveFilters, onClearFilters }) => {
   const { t } = useTranslation();
+  const emptyList = (
+    <Empty className="border-0">
+      <EmptyHeader>
+        <EmptyTitle>{hasActiveFilters ? t('data.no_results') : t('data.no_data')}</EmptyTitle>
+        <EmptyDescription>{t('data.empty_hint')}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        {hasActiveFilters ? (
+          <Button type="button" variant="outline" onClick={onClearFilters}>
+            {t('common.clear_filters')}
+          </Button>
+        ) : (
+          <Button nativeButton={false} render={<Link to="/settings" />}>
+            {t('common.sync_now')}
+          </Button>
+        )}
+      </EmptyContent>
+    </Empty>
+  );
 
   return (
-    <>
-    <Card className="hidden w-full overflow-hidden py-0 sm:block">
+    <div className="h-full min-h-0">
+    <Card className="hidden h-full min-h-0 w-full overflow-hidden py-0 sm:flex">
+      <ScrollArea className="h-full min-h-0 w-full">
         <Table className="text-left">
           <TableHeader className="bg-muted font-medium text-muted-foreground">
             <TableRow>
@@ -168,22 +196,17 @@ export const DataRepoTable: React.FC<{
             {repos.length === 0 && (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={8} className="whitespace-normal">
-                  <EmptyState
-                    title={hasActiveFilters ? t('data.no_results') : t('data.no_data')}
-                    description={t('data.empty_hint')}
-                    actionTo={hasActiveFilters ? undefined : '/settings'}
-                    actionLabel={hasActiveFilters ? t('common.clear_filters') : t('common.sync_now')}
-                    actionType={hasActiveFilters ? 'button' : 'link'}
-                    onAction={hasActiveFilters ? onClearFilters : undefined}
-                  />
+                  {emptyList}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+      </ScrollArea>
     </Card>
 
-    <div className="flex flex-col gap-3 sm:hidden">
+    <ScrollArea className="h-full sm:hidden">
+    <div className="flex flex-col gap-3 p-3">
       {repos.map((repo) => (
         <Card key={repo.id} className="p-4">
           <div className="flex items-start gap-3">
@@ -238,17 +261,9 @@ export const DataRepoTable: React.FC<{
         </Card>
       ))}
 
-      {repos.length === 0 && (
-        <EmptyState
-          title={hasActiveFilters ? t('data.no_results') : t('data.no_data')}
-          description={t('data.empty_hint')}
-          actionTo={hasActiveFilters ? undefined : '/settings'}
-          actionLabel={hasActiveFilters ? t('common.clear_filters') : t('common.sync_now')}
-          actionType={hasActiveFilters ? 'button' : 'link'}
-          onAction={hasActiveFilters ? onClearFilters : undefined}
-        />
-      )}
+      {repos.length === 0 ? emptyList : null}
     </div>
-    </>
+    </ScrollArea>
+    </div>
   );
 };

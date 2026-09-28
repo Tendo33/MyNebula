@@ -60,6 +60,7 @@ export const useDashboardQuery = () => {
 
     return {
       totalRepos: dashboard.summary.total_repos,
+      embeddedRepos: dashboard.summary.embedded_repos,
       totalTopics: dashboard.summary.total_topics,
       totalClusters: dashboard.summary.total_clusters,
       totalEdges: dashboard.summary.total_edges,

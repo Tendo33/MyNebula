@@ -6,6 +6,11 @@ import {
 } from './graph2dUtils';
 import type { HullCache, ImageCache, ProcessedNode } from './graph2dTypes';
 
+const CANVAS_FONT_FAMILY = '"Geist Variable", Geist, sans-serif';
+
+/** Nodes outside the hovered or selected cluster. Filtered ghosts stay at 0.25. */
+export const UNFOCUSED_NODE_ALPHA = 0.18;
+
 /**
  * Pure canvas painting for the graph.
  *
@@ -23,7 +28,11 @@ export interface PaintNodeOptions {
   isVisible: boolean;
   isSelected: boolean;
   isHovered: boolean;
-  hqRendering: boolean;
+  isDimmed: boolean;
+  showLabel: boolean;
+  showClusterHue: boolean;
+  /** Owner avatars. Off keeps the same layout and draws ink circles. */
+  hqRendering?: boolean;
   imageCache: ImageCache;
   onAvatarLoaded: () => void;
 }
@@ -36,7 +45,10 @@ export const paintNodeOnCanvas = ({
   isVisible,
   isSelected,
   isHovered,
-  hqRendering,
+  isDimmed,
+  showLabel,
+  showClusterHue,
+  hqRendering = true,
   imageCache,
   onAvatarLoaded,
 }: PaintNodeOptions): void => {
@@ -47,14 +59,15 @@ export const paintNodeOnCanvas = ({
 
   ctx.save();
 
-  // Apply transparency for filtered out ghost nodes
   if (!isVisible && !isSelected && !isHovered) {
     ctx.globalAlpha = 0.25;
+  } else if (isDimmed && !isSelected && !isHovered) {
+    ctx.globalAlpha = UNFOCUSED_NODE_ALPHA;
   }
 
-  // Try to draw avatar image
+  // Avatars are the high-quality pass. The layout stays the same without them.
   let avatarDrawn = false;
-  if (owner_avatar_url) {
+  if (hqRendering && owner_avatar_url) {
     const cached = imageCache.get(owner_avatar_url);
 
     if (cached === undefined) {
@@ -83,7 +96,6 @@ export const paintNodeOnCanvas = ({
     }
   }
 
-  // Fallback: Draw solid color circle if no avatar
   if (!avatarDrawn) {
     ctx.beginPath();
     ctx.arc(
@@ -95,40 +107,29 @@ export const paintNodeOnCanvas = ({
     );
     ctx.fillStyle = color;
     ctx.fill();
-  } else if (color === COLORS.NODE_DIM && (isVisible || isSelected)) {
-    // Keep avatar nodes visually dimmed when not in focus.
-    ctx.save();
+  }
+
+  if (showClusterHue && !isDimmed && !isSelected && !isHovered) {
     ctx.beginPath();
-    ctx.arc(x, y, radius, 0, 2 * Math.PI);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // Draw border for selected/hovered nodes
-  if (isHovered || isSelected) {
-    ctx.strokeStyle = isSelected ? COLORS.NODE_SELECTED : COLORS.NODE_HOVER;
-    ctx.lineWidth = 2 / globalScale;
+    ctx.arc(x, y, radius + 1.5 / globalScale, 0, 2 * Math.PI);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.25 / globalScale;
     ctx.stroke();
-
-    // Draw outer glow if HQ rendering is enabled
-    if (hqRendering) {
-      ctx.beginPath();
-      ctx.arc(x, y, radius + 4 / globalScale, 0, 2 * Math.PI);
-      ctx.strokeStyle = isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(139, 92, 246, 0.3)';
-      ctx.lineWidth = 3 / globalScale;
-      ctx.stroke();
-    }
   }
 
-  // Draw label
+  if (isHovered || isSelected) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 1.5 / globalScale, 0, 2 * Math.PI);
+    ctx.strokeStyle = isSelected ? COLORS.NODE_SELECTED : COLORS.NODE_HOVER;
+    ctx.lineWidth = 1.5 / globalScale;
+    ctx.stroke();
+  }
+
   const fontSize = Math.max(10 / globalScale, 8);
-  // Hide label for ghost nodes unless hovered
-  const showLabel = isHovered || isSelected || (isVisible && (globalScale > 2 || radius > 15));
 
   if (showLabel) {
     const label = name;
-    ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.font = `500 ${fontSize}px ${CANVAS_FONT_FAMILY}`;
     const textWidth = ctx.measureText(label).width;
     const textHeight = fontSize;
     const padding = 3 / globalScale;
@@ -175,6 +176,7 @@ export interface DrawClusterHullsOptions {
   visibleNodeIds: Set<number>;
   clusterGroups: Map<number, ClusterInfo>;
   hullCache: HullCache;
+  focusedClusterIds: ReadonlySet<number>;
 }
 
 /** Group visible, positioned nodes by cluster. Exported for direct testing. */
@@ -206,11 +208,12 @@ export const drawClusterHulls = ({
   visibleNodeIds,
   clusterGroups,
   hullCache,
+  focusedClusterIds,
 }: DrawClusterHullsOptions): void => {
   const nodesByCluster = groupNodesByCluster(nodes, visibleNodeIds);
 
-  // Draw hull for each cluster with enough nodes
   nodesByCluster.forEach((clusterNodes, clusterId) => {
+    if (!focusedClusterIds.has(clusterId)) return;
     if (clusterNodes.length < 3) return;
 
     const cluster = clusterGroups.get(clusterId);
@@ -249,7 +252,7 @@ export const drawClusterHulls = ({
 
     if (globalScale > 0.5 && cluster.name) {
       const fontSize = Math.max(14 / globalScale, 10);
-      ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+      ctx.font = `600 ${fontSize}px ${CANVAS_FONT_FAMILY}`;
       ctx.fillStyle = baseColor + '60';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';

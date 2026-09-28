@@ -97,6 +97,7 @@ describe('RepoDetailsPanel', () => {
 
     render(<RepoDetailsPanel node={node} onClose={vi.fn()} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: 'repoDetails.relatedRepos' }));
     const related = await screen.findByRole('button', { name: /related-repo/i });
     fireEvent.click(related);
 

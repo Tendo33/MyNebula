@@ -47,7 +47,10 @@ describe('Dashboard v2 smoke', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('dashboard.collection_heading')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.total_repos')).toBeInTheDocument();
+    expect(screen.getByText('settings.synced')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.clusters')).toBeInTheDocument();
+    expect(screen.getByText('common.languages')).toBeInTheDocument();
     expect(screen.getByText('Cluster 1')).toBeInTheDocument();
     expect(screen.getByText('dashboard.explore_graph')).toBeInTheDocument();
   });

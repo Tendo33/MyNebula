@@ -13,7 +13,14 @@ const graphApiMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string, fallback?: string) => fallback ?? key }),
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => fallback ?? key,
+    i18n: {
+      language: 'en',
+      resolvedLanguage: 'en',
+      changeLanguage: () => Promise.resolve(),
+    },
+  }),
 }));
 
 vi.mock('../api/v2/graph', () => ({

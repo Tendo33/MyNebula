@@ -10,7 +10,6 @@
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light;
-  --sidebar-width: 240px;
   --space-2xs: 0.25rem;
   --space-xs: 0.5rem;
   --space-sm: 0.75rem;
@@ -279,12 +278,11 @@ button,
   }
 
   .page-shell {
-    @apply flex min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main;
+    @apply flex min-h-0 min-w-0 flex-1 flex-col bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main;
   }
 
   .page-main {
-    @apply flex min-w-0 flex-1 flex-col;
-    margin-left: var(--sidebar-width, 240px);
+    @apply flex min-h-0 min-w-0 flex-1 flex-col;
   }
 
   .page-header {

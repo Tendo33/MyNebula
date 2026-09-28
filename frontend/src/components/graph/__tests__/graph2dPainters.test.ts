@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { GRAPH_2D_COLORS as COLORS } from '../graph2dUtils';
 import {
+  UNFOCUSED_NODE_ALPHA,
   drawClusterHulls,
   groupNodesByCluster,
   hullSignature,
@@ -60,7 +61,9 @@ const basePaintOptions = {
   isVisible: true,
   isSelected: false,
   isHovered: false,
-  hqRendering: false,
+  isDimmed: false,
+  showLabel: false,
+  showClusterHue: false,
   onAvatarLoaded: () => {},
 };
 
@@ -135,6 +138,24 @@ describe('paintNodeOnCanvas', () => {
     expect(ctx.calls).toContain('drawImage');
   });
 
+  it('draws an ink circle instead of an avatar when high-quality rendering is off', () => {
+    const ctx = fakeCtx();
+    const cache = new Map() as ImageCache;
+    const image = Object.create(HTMLImageElement.prototype) as HTMLImageElement;
+    cache.set('https://avatars/octo', image);
+
+    paintNodeOnCanvas({
+      ...basePaintOptions,
+      node: node({ owner_avatar_url: 'https://avatars/octo' }),
+      ctx,
+      hqRendering: false,
+      imageCache: cache,
+    });
+
+    expect(ctx.calls).not.toContain('drawImage');
+    expect(ctx.calls).toContain('fill');
+  });
+
   it('marks an unseen avatar as loading exactly once', () => {
     const ctx = fakeCtx();
     const cache = new Map() as ImageCache;
@@ -167,29 +188,19 @@ describe('paintNodeOnCanvas', () => {
     expect(cache.get('https://avatars/octo')).toBe('error');
   });
 
-  it('strokes a border for the selected node and a glow only in HQ mode', () => {
-    const plain = fakeCtx();
+  it('strokes a single selection ring and does not paint a glow', () => {
+    const ctx = fakeCtx();
     paintNodeOnCanvas({
       ...basePaintOptions,
       node: node(),
-      ctx: plain,
+      ctx,
       isSelected: true,
       imageCache: new Map() as ImageCache,
     });
-    const plainStrokes = plain.calls.filter((call) => call === 'stroke').length;
 
-    const hq = fakeCtx();
-    paintNodeOnCanvas({
-      ...basePaintOptions,
-      node: node(),
-      ctx: hq,
-      isSelected: true,
-      hqRendering: true,
-      imageCache: new Map() as ImageCache,
-    });
-    const hqStrokes = hq.calls.filter((call) => call === 'stroke').length;
-
-    expect(hqStrokes).toBe(plainStrokes + 1);
+    expect(ctx.calls.filter((call) => call === 'stroke')).toHaveLength(1);
+    expect(ctx.strokeStyle).toBe(COLORS.NODE_SELECTED);
+    expect(String(ctx.strokeStyle)).not.toMatch(/rgba\(59,\s*130,\s*246/);
   });
 
   it('labels a hovered node even when it is filtered out', () => {
@@ -200,26 +211,28 @@ describe('paintNodeOnCanvas', () => {
       ctx,
       isVisible: false,
       isHovered: true,
+      showLabel: true,
       imageCache: new Map() as ImageCache,
     });
 
     expect(ctx.calls).toContain('fillText:nebula');
   });
 
-  it('hides the label for a small, unfocused node at low zoom', () => {
+  it('hides the label for a large visible node that is not selected, hovered, or a neighbor', () => {
     const ctx = fakeCtx();
     paintNodeOnCanvas({
       ...basePaintOptions,
-      node: node({ stargazers_count: 1 }),
+      node: node({ stargazers_count: 250000 }),
       ctx,
-      globalScale: 1,
+      globalScale: 4,
+      showLabel: false,
       imageCache: new Map() as ImageCache,
     });
 
     expect(ctx.calls.some((call) => call.startsWith('fillText'))).toBe(false);
   });
 
-  it('whitens a dimmed avatar node so it reads as out of focus', () => {
+  it('drops an unfocused node to low opacity without washing the avatar white', () => {
     const ctx = fakeCtx();
     const cache = new Map() as ImageCache;
     cache.set('https://avatars/octo', Object.create(HTMLImageElement.prototype));
@@ -229,10 +242,13 @@ describe('paintNodeOnCanvas', () => {
       node: node({ owner_avatar_url: 'https://avatars/octo' }),
       ctx,
       color: COLORS.NODE_DIM,
+      isDimmed: true,
       imageCache: cache,
     });
 
-    expect(ctx.calls.filter((call) => call === 'fill').length).toBeGreaterThan(0);
+    expect(ctx.globalAlpha).toBe(UNFOCUSED_NODE_ALPHA);
+    expect(ctx.calls).toContain('drawImage');
+    expect(ctx.calls.filter((call) => call === 'fill')).toHaveLength(0);
   });
 
   it('balances every save with a restore', () => {
@@ -245,7 +261,7 @@ describe('paintNodeOnCanvas', () => {
       node: node({ owner_avatar_url: 'https://avatars/octo' }),
       ctx,
       isSelected: true,
-      hqRendering: true,
+      showLabel: true,
       imageCache: cache,
     });
 
@@ -313,6 +329,7 @@ describe('drawClusterHulls', () => {
       visibleNodeIds: new Set([1, 2]),
       clusterGroups: new Map([[5, cluster(5)]]),
       hullCache: new Map() as HullCache,
+      focusedClusterIds: new Set([5]),
     });
 
     expect(ctx.calls).toEqual([]);
@@ -331,10 +348,30 @@ describe('drawClusterHulls', () => {
       visibleNodeIds: new Set([1, 2, 3]),
       clusterGroups: new Map([[5, cluster(5)]]),
       hullCache: new Map() as HullCache,
+      focusedClusterIds: new Set([5]),
     });
 
     expect(ctx.calls).toContain('closePath');
     expect(ctx.calls).toContain('fillText:Cluster 5');
+  });
+
+  it('does not paint a hull for a cluster that is not hovered or selected', () => {
+    const ctx = fakeCtx();
+    drawClusterHulls({
+      nodes: [
+        node({ id: 1, cluster_id: 5, x: 0, y: 0 }),
+        node({ id: 2, cluster_id: 5, x: 50, y: 0 }),
+        node({ id: 3, cluster_id: 5, x: 25, y: 40 }),
+      ],
+      ctx,
+      globalScale: 1,
+      visibleNodeIds: new Set([1, 2, 3]),
+      clusterGroups: new Map([[5, cluster(5)]]),
+      hullCache: new Map() as HullCache,
+      focusedClusterIds: new Set(),
+    });
+
+    expect(ctx.calls).toEqual([]);
   });
 
   it('reuses a cached hull when positions have not moved', () => {
@@ -350,6 +387,7 @@ describe('drawClusterHulls', () => {
       visibleNodeIds: new Set([1, 2, 3]),
       clusterGroups: new Map([[5, cluster(5)]]),
       hullCache: cache,
+      focusedClusterIds: new Set([5]),
     };
 
     drawClusterHulls({ ...options, ctx: fakeCtx() });
@@ -372,6 +410,7 @@ describe('drawClusterHulls', () => {
       visibleNodeIds: new Set([1, 2, 3]),
       clusterGroups: new Map(),
       hullCache: new Map() as HullCache,
+      focusedClusterIds: new Set([9]),
     });
 
     expect(ctx.calls).toEqual([]);
@@ -390,6 +429,7 @@ describe('drawClusterHulls', () => {
       visibleNodeIds: new Set([1, 2, 3]),
       clusterGroups: new Map([[5, cluster(5)]]),
       hullCache: new Map() as HullCache,
+      focusedClusterIds: new Set([5]),
     });
 
     expect(ctx.calls.some((call) => call.startsWith('fillText'))).toBe(false);

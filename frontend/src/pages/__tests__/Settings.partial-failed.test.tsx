@@ -170,6 +170,7 @@ describe('Settings partial failed warning', () => {
 
     await waitFor(() => expect(loadSettings).toHaveBeenCalled());
 
+    fireEvent.click(screen.getByRole('tab', { name: 'settings.tab_data' }));
     fireEvent.click(screen.getByText('trigger refresh'));
 
     await waitFor(() => {

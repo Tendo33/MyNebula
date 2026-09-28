@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GraphNode } from '../../types';
-import { X, Star, Code, ExternalLink, Sparkles, Tag, FolderHeart, Link2, ChevronRight } from 'lucide-react';
+import { X, Code, ExternalLink, Tag, Link2 } from 'lucide-react';
 import { useGraph } from '../../contexts/GraphContext';
 import { getRelatedRepos } from '../../api/repos';
 import { Button, buttonVariants } from '../ui/button';
-import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
 import { cn } from '@/lib/utils';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Badge } from '../ui/badge';
+import { Empty, EmptyDescription, EmptyHeader } from '../ui/empty';
+import { ScrollArea } from '../ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 
 interface RepoDetailsPanelProps {
   node: GraphNode;
@@ -62,6 +67,29 @@ const relatedRepoToGraphNode = (repo: {
   topics: repo.topics,
 });
 
+const summarySentence = (value: string | undefined, fallback: string): string => {
+  const source = (value ?? '').replace(/\s+/g, ' ').trim();
+  if (!source) return fallback;
+  const match = source.match(/^(.+?[.。！？!?])(?:\s|$)/);
+  const sentence = (match?.[1] ?? source).trim();
+  if (sentence.length <= 180) return sentence;
+  return `${sentence.slice(0, 177).trimEnd()}…`;
+};
+
+const factTopics = (topics: string[] | undefined, tags: string[] | undefined): string[] => {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const raw of [...(topics ?? []), ...(tags ?? [])]) {
+    const label = raw.trim();
+    const key = label.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    labels.push(label);
+    if (labels.length === 4) break;
+  }
+  return labels;
+};
+
 const normalizeTag = (tag: string): string => {
   return tag
     .trim()
@@ -75,67 +103,39 @@ const normalizeTag = (tag: string): string => {
 /** Related repository item component */
 const RelatedRepoItem: React.FC<RelatedRepoItemProps> = ({ repo, onClick, matchReason, score }) => {
   const { t } = useTranslation();
+  const stars = repo.stargazers_count >= 1000
+    ? `${(repo.stargazers_count / 1000).toFixed(1)}k`
+    : String(repo.stargazers_count);
   return (
     <button
       onClick={onClick}
-      className="group flex w-full items-start gap-3 rounded-md border border-transparent p-3 text-left transition-colors hover:border-border-light/70 hover:bg-bg-hover dark:hover:bg-dark-bg-sidebar/70"
+      className="flex w-full items-start gap-3 rounded-md px-2 py-2 text-left transition-colors duration-200 hover:bg-bg-hover motion-reduce:transition-none dark:hover:bg-dark-bg-sidebar/70"
     >
-      {/* Avatar */}
-            {repo.owner_avatar_url ? (
-        <img
-          src={repo.owner_avatar_url}
-          alt={repo.owner}
-          className="w-9 h-9 rounded-lg border border-border-light flex-shrink-0"
-          loading="lazy"
-          decoding="async"
-          width={36}
-          height={36}
-        />
-      ) : (
-        <div className="w-9 h-9 rounded-lg bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
-          <span className="text-text-muted text-xs font-medium dark:text-dark-text-main/60">
-            {repo.owner?.charAt(0).toUpperCase()}
-          </span>
-        </div>
-      )}
+      <Avatar size="sm" className="mt-0.5">
+        {repo.owner_avatar_url ? <AvatarImage src={repo.owner_avatar_url} alt="" /> : null}
+        <AvatarFallback>{repo.owner?.charAt(0).toUpperCase()}</AvatarFallback>
+      </Avatar>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-semibold text-text-main truncate">{repo.name}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span className="truncate text-sm font-medium text-text-main">{repo.name}</span>
           {repo.language && (
-            <span className="flex-shrink-0 rounded-sm bg-bg-hover px-1.5 py-0.5 text-xs text-text-muted dark:bg-dark-bg-sidebar dark:text-dark-text-main/70">
-              {repo.language}
-            </span>
+            <span className="shrink-0 text-xs text-text-dim">{repo.language}</span>
           )}
         </div>
-        <p className="text-xs text-text-muted line-clamp-1 mt-0.5">
+        <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">
           {repo.description || repo.ai_summary || t('data.no_description')}
         </p>
         {(matchReason || score != null) && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {matchReason && (
-              <span className="line-clamp-1 max-w-full rounded-sm bg-action-primary/10 px-1.5 py-0.5 text-xs text-action-primary">
-                {matchReason}
-              </span>
-            )}
-            {score != null && (
-              <span className="rounded-sm bg-success-bg px-1.5 py-0.5 text-xs text-link">
-                {(score * 100).toFixed(1)}%
-              </span>
-            )}
-          </div>
+          <p className="mt-0.5 truncate text-xs text-text-dim">
+            {matchReason}
+            {matchReason && score != null ? ' · ' : ''}
+            {score != null ? `${(score * 100).toFixed(1)}%` : ''}
+          </p>
         )}
       </div>
 
-      {/* Stars + Arrow */}
-      <div className="flex flex-col items-end justify-between h-full gap-2 flex-shrink-0 pl-1">
-        <div className="flex items-center gap-1 text-xs text-action-primary bg-action-primary/10 px-1.5 py-0.5 rounded-full">
-          <Star className="w-3 h-3 text-action-primary" fill="currentColor" />
-          <span>{repo.stargazers_count >= 1000 ? `${(repo.stargazers_count / 1000).toFixed(1)}k` : repo.stargazers_count}</span>
-        </div>
-        <ChevronRight className="w-4 h-4 text-text-dim opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
+      <span className="shrink-0 font-mono text-xs text-text-dim">{stars}</span>
     </button>
   );
 };
@@ -310,43 +310,49 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
     sameLang: relatedReposByDimension.sameLang.length,
   };
 
-  return (
-    <div className="absolute inset-y-0 right-0 z-20 flex h-full w-full max-w-full flex-shrink-0 flex-col overflow-hidden border-l border-border-light bg-bg-main duration-300 animate-in fade-in slide-in-from-right-4 sm:static sm:w-[25rem] dark:border-dark-border dark:bg-dark-bg-main">
-      {/* Header with Avatar */}
-      <div className="relative border-b border-border-light p-5 dark:border-dark-border">
-        <div className="flex items-start gap-3 pr-8">
-            {/* Owner Avatar */}
-            {node.owner_avatar_url ? (
-              <img
-                src={node.owner_avatar_url}
-                alt={node.owner}
-                className="w-10 h-10 rounded-lg border border-border-light flex-shrink-0"
-                loading="lazy"
-                decoding="async"
-                width={40}
-                height={40}
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-lg bg-border-light flex items-center justify-center flex-shrink-0 dark:bg-dark-border">
-                <span className="text-text-muted text-sm font-medium dark:text-dark-text-main/60">
-                  {node.owner?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
+  const summary = summarySentence(
+    node.ai_summary || node.description,
+    t('repoDetails.no_description')
+  );
+  const topics = factTopics(node.topics, node.ai_tags);
+  const starCount = node.stargazers_count?.toLocaleString() ?? '0';
+  const factLine = [
+    `${starCount} ${t('repoDetails.stars')}`,
+    node.language,
+    ...topics,
+    node.star_list_name,
+  ].filter(Boolean).join(' · ');
+  const ownerInitial = node.owner?.charAt(0).toUpperCase() || '?';
+  const fullSummary = (node.ai_summary || node.description || '').trim();
+  const relatedEmptyMessage =
+    activeTab === 'similar'
+      ? similarError
+        ? t('repoDetails.similarLoadFailed')
+        : t('repoDetails.noSimilar')
+      : activeTab === 'sameTags'
+        ? t('repoDetails.noSameTags')
+        : t('repoDetails.noSameLang');
 
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                    <a href={node.html_url} target="_blank" rel="noopener noreferrer" className="hover:underline decoration-text-muted underline-offset-4">
-                        <h2 className="text-base font-semibold text-text-main line-clamp-1 leading-snug dark:text-dark-text-main" title={node.full_name}>
-                        {node.name}
-                        </h2>
-                    </a>
-                </div>
-                <p className="text-xs text-text-muted dark:text-dark-text-main/60">{node.owner}</p>
-                <p className="text-sm text-text-muted leading-relaxed mt-1 dark:text-dark-text-main/70">
-                {node.description || t('repoDetails.no_description')}
-                </p>
-            </div>
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <div className="flex items-start gap-3 border-b px-4 py-4">
+        <Avatar>
+          {node.owner_avatar_url ? <AvatarImage src={node.owner_avatar_url} alt="" /> : null}
+          <AvatarFallback>{ownerInitial}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <a
+            href={node.html_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block hover:underline"
+          >
+            <h2 className="truncate font-heading text-xl font-semibold tracking-tight" title={node.full_name}>
+              {node.name}
+            </h2>
+          </a>
+          <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
+          <p className="mt-1 truncate text-sm text-muted-foreground">{factLine}</p>
         </div>
         <Button
           type="button"
@@ -354,223 +360,129 @@ export const RepoDetailsPanel: React.FC<RepoDetailsPanelProps> = ({ node, onClos
           size="icon-sm"
           onClick={onClose}
           aria-label={t('repoDetails.close')}
-          className="absolute top-4 right-4"
         >
           <X />
         </Button>
       </div>
 
-      {/* Content */}
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain p-5">
-
-        <div className="flex flex-col gap-4">
-          {/* Quick Actions */}
-          <div className="grid grid-cols-3 gap-2">
-            <a
-              href={node.html_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(buttonVariants({ variant: 'outline' }), 'min-w-0')}
-            >
-              <ExternalLink data-icon="inline-start" />
-              GitHub
-            </a>
-
-            {/* Deep Wiki */}
-            <a
-              href={`https://deepwiki.com/${node.full_name}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="View on DeepWiki"
-              className={cn(buttonVariants({ variant: 'outline' }), 'min-w-0')}
-            >
-              <img
-                src="https://deepwiki.com/favicon.ico"
-                alt=""
-                className="size-4 rounded-sm bg-bg-main"
-                loading="lazy"
-                decoding="async"
-                width={16}
-                height={16}
-              />
-              DeepWiki
-            </a>
-
-            {/* zRead */}
-            <a
-              href={`https://zread.ai/${node.full_name}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="View on zRead"
-              className={cn(buttonVariants({ variant: 'outline' }), 'min-w-0')}
-            >
-              <img
-                src="https://zread.ai/favicon.ico"
-                alt=""
-                className="size-4 rounded-sm bg-bg-main"
-                loading="lazy"
-                decoding="async"
-                width={16}
-                height={16}
-              />
-              zRead
-            </a>
-          </div>
-
-          {/* User's Star List Badge */}
-          {node.star_list_name && (
-            <div className="flex items-center gap-2">
-              <FolderHeart className="w-4 h-4 text-action-primary" />
-              <span className="text-xs font-medium text-action-primary bg-action-primary/10 px-2 py-1 rounded-full">
-                {node.star_list_name}
-              </span>
-            </div>
-          )}
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-main border border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
-                  <div className="p-1.5 bg-action-primary/10 rounded text-action-primary">
-                      <Star className="w-4 h-4" fill="currentColor" />
-                  </div>
-                  <div>
-                      <span className="block text-lg font-semibold text-text-main leading-none dark:text-dark-text-main">{node.stargazers_count?.toLocaleString() ?? 0}</span>
-                      <span className="text-xs text-text-muted capitalize dark:text-dark-text-main/70">{t('repoDetails.stars')}</span>
-                  </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-main border border-border-light shadow-sm dark:bg-dark-bg-main dark:border-dark-border">
-                   <div className="p-1.5 bg-action-primary/10 rounded text-action-primary">
-                      <Code className="w-4 h-4" />
-                  </div>
-                  <div>
-                      <span className="block text-lg font-semibold text-text-main leading-none truncate max-w-[100px] dark:text-dark-text-main" title={node.language || 'Unknown'}>{node.language || 'N/A'}</span>
-                      <span className="text-xs text-text-muted capitalize dark:text-dark-text-main/70">{t('repoDetails.language')}</span>
-                  </div>
-              </div>
-          </div>
-
-          {/* AI Tags */}
-          {node.ai_tags && node.ai_tags.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-action-primary uppercase tracking-wider">
-                  <Tag className="w-3.5 h-3.5" />
-                  <span>{t('repoDetails.aiTags', 'AI Tags')}</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {node.ai_tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs px-2 py-1 bg-action-primary/10 text-action-primary rounded-full"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* GitHub Topics */}
-          {node.topics && node.topics.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider dark:text-dark-text-main/70">
-                  {t('repoDetails.topics', 'Topics')}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {node.topics.slice(0, 8).map((topic) => (
-                  <span
-                    key={topic}
-                    className="text-xs px-2 py-1 bg-bg-hover text-text-muted rounded-full dark:bg-dark-bg-sidebar dark:text-dark-text-main/70"
-                  >
-                    {topic}
-                  </span>
-                ))}
-                {node.topics.length > 8 && (
-                  <span className="text-xs text-text-muted dark:text-dark-text-main/60">+{node.topics.length - 8}</span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* AI Summary */}
-          <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-action-primary uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{t('repoDetails.aiInsight', 'AI Insight')}</span>
-              </div>
-              <div className="bg-bg-sidebar p-3 rounded-lg border border-border-light/50 dark:bg-dark-bg-sidebar dark:border-dark-border">
-                   <p className="text-sm text-text-main leading-relaxed line-clamp-5 sm:line-clamp-6 dark:text-dark-text-main">
-                      {node.ai_summary || t('repoDetails.no_ai_summary')}
-                  </p>
-              </div>
-          </div>
-        </div>
-
-        {/* Related Repositories with Tabs */}
-        <div className="flex flex-col gap-2 border-t border-border-light/60 pt-4 dark:border-dark-border">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold text-action-primary uppercase tracking-wider">
-              <Link2 className="w-3.5 h-3.5" />
-              <span>{t('repoDetails.relatedRepos', 'Related Repositories')}</span>
-            </div>
-          </div>
-
-          <ToggleGroup
-            value={[activeTab]}
-            onValueChange={(next) => {
-              const value = next[0];
-              if (value) setActiveTab(value as RelatedTab);
-            }}
-            className="rounded-md border border-border bg-muted p-1"
-          >
-            <ToggleGroupItem value="similar" size="sm" className="flex-1">
-              <Link2 data-icon="inline-start" />
-              {t('repoDetails.similar', 'Similar')}
-              {tabCounts.similar > 0 ? ` (${tabCounts.similar})` : ''}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="sameTags" size="sm" className="flex-1">
-              <Tag data-icon="inline-start" />
-              {t('repoDetails.sameTags', 'Tags')}
-              {tabCounts.sameTags > 0 ? ` (${tabCounts.sameTags})` : ''}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="sameLang" size="sm" className="flex-1">
-              <Code data-icon="inline-start" />
-              {t('repoDetails.sameLang', 'Lang')}
-              {tabCounts.sameLang > 0 ? ` (${tabCounts.sameLang})` : ''}
-            </ToggleGroupItem>
-          </ToggleGroup>
-
-          {/* Related Repos List — independently scrollable, sized to remaining space */}
-          {currentRelatedRepos.length > 0 ? (
-            <div className="divide-y divide-border-light/40 rounded-md border border-border-light/60 bg-bg-sidebar/60 p-1.5 dark:divide-dark-border/60 dark:border-dark-border dark:bg-dark-bg-sidebar/60">
-              {currentRelatedRepos.map((repo: LocalRelatedRepo) => (
-                <RelatedRepoItem
-                  key={repo.id}
-                  repo={repo}
-                  onClick={() => handleRelatedRepoClick(repo)}
-                  matchReason={'_matchReason' in repo ? repo._matchReason : undefined}
-                  score={'_score' in repo ? repo._score : undefined}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex min-h-32 items-center justify-center rounded-md border border-border-light/60 bg-bg-sidebar/60 px-4 py-6 text-center text-sm text-text-muted dark:border-dark-border dark:bg-dark-bg-sidebar/60 dark:text-dark-text-main/70">
-              {activeTab === 'similar' && (
-                similarLoading
-                  ? t('common.loading', 'Loading...')
-                  : (
-                      similarError
-                        ? t('repoDetails.similarLoadFailed', 'Failed to load similar repos')
-                        : t('repoDetails.noSimilar', 'No similar repos found')
-                    )
-              )}
-              {activeTab === 'sameTags' && t('repoDetails.noSameTags', 'No repos with same tags')}
-              {activeTab === 'sameLang' && t('repoDetails.noSameLang', 'No repos with same language')}
-            </div>
-          )}
-        </div>
-
-
+      <div className="flex flex-wrap gap-2 border-b px-4 py-3">
+        <a
+          href={node.html_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+        >
+          <ExternalLink data-icon="inline-start" />
+          GitHub
+        </a>
+        <a
+          href={`https://deepwiki.com/${node.full_name}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View on DeepWiki"
+          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+        >
+          <img
+            src="https://deepwiki.com/favicon.ico"
+            alt=""
+            className="size-3.5 rounded-sm"
+            loading="lazy"
+            decoding="async"
+            width={14}
+            height={14}
+          />
+          DeepWiki
+        </a>
+        <a
+          href={`https://zread.ai/${node.full_name}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View on zRead"
+          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+        >
+          <img
+            src="https://zread.ai/favicon.ico"
+            alt=""
+            className="size-3.5 rounded-sm"
+            loading="lazy"
+            decoding="async"
+            width={14}
+            height={14}
+          />
+          zRead
+        </a>
       </div>
+
+      <Tabs defaultValue="overview" className="min-h-0 flex-1">
+        <div className="px-4 pt-3">
+          <TabsList>
+            <TabsTrigger value="overview">{t('common.overview')}</TabsTrigger>
+            <TabsTrigger value="related">{t('repoDetails.relatedRepos')}</TabsTrigger>
+          </TabsList>
+        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <TabsContent value="overview" className="flex flex-col gap-3 px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              {fullSummary || t('repoDetails.no_ai_summary')}
+            </p>
+            {topics.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {topics.map((topic) => (
+                  <Badge key={topic} variant="secondary">{topic}</Badge>
+                ))}
+              </div>
+            ) : null}
+          </TabsContent>
+          <TabsContent value="related" className="flex flex-col gap-3 px-4 py-3">
+            <ToggleGroup
+              value={[activeTab]}
+              onValueChange={(next) => {
+                const value = next[0];
+                if (value) setActiveTab(value as RelatedTab);
+              }}
+              className="w-full"
+            >
+              <ToggleGroupItem value="similar" size="sm" className="flex-1">
+                <Link2 data-icon="inline-start" />
+                {t('repoDetails.similar')}
+                {tabCounts.similar > 0 ? ` (${tabCounts.similar})` : ''}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="sameTags" size="sm" className="flex-1">
+                <Tag data-icon="inline-start" />
+                {t('repoDetails.sameTags')}
+                {tabCounts.sameTags > 0 ? ` (${tabCounts.sameTags})` : ''}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="sameLang" size="sm" className="flex-1">
+                <Code data-icon="inline-start" />
+                {t('repoDetails.sameLang')}
+                {tabCounts.sameLang > 0 ? ` (${tabCounts.sameLang})` : ''}
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+            {currentRelatedRepos.length > 0 ? (
+              <div className="flex flex-col">
+                {currentRelatedRepos.map((repo: LocalRelatedRepo) => (
+                  <RelatedRepoItem
+                    key={repo.id}
+                    repo={repo}
+                    onClick={() => handleRelatedRepoClick(repo)}
+                    matchReason={'_matchReason' in repo ? repo._matchReason : undefined}
+                    score={'_score' in repo ? repo._score : undefined}
+                  />
+                ))}
+              </div>
+            ) : activeTab === 'similar' && similarLoading ? (
+              <p className="px-1 py-6 text-sm text-muted-foreground">{t('common.loading')}</p>
+            ) : (
+              <Empty className="border-0">
+                <EmptyHeader>
+                  <EmptyDescription>{relatedEmptyMessage}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </TabsContent>
+        </ScrollArea>
+      </Tabs>
     </div>
   );
 };

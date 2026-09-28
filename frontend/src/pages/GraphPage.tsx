@@ -1,20 +1,31 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Filter, List, X } from 'lucide-react';
+import { List, Network, X } from 'lucide-react';
 
-import { Sidebar } from '../components/layout/Sidebar';
 import Graph2D from '../components/graph/Graph2D';
 import Timeline from '../components/graph/Timeline';
 import ClusterPanel from '../components/graph/ClusterPanel';
 import StarListPanel from '../components/graph/StarListPanel';
 import { SearchInput } from '../components/ui/SearchInput';
 import { RepoDetailsPanel } from '../components/graph/RepoDetailsPanel';
-import { HeaderActions } from '../components/layout/HeaderActions';
 import { useGraph } from '../contexts/GraphContext';
 import { Alert, AlertAction, AlertDescription } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../components/ui/empty';
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '../components/ui/resizable';
+import { ScrollArea } from '../components/ui/scroll-area';
 
 const GraphPage = () => {
   const { t } = useTranslation();
@@ -200,12 +211,6 @@ const GraphPage = () => {
 
   const [clusterPanelCollapsed, setClusterPanelCollapsed] = useState(false);
   const [starListPanelCollapsed, setStarListPanelCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
-  );
-  const [showFilters, setShowFilters] = useState(
-    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
-  );
   const [showNodeList, setShowNodeList] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -215,17 +220,6 @@ const GraphPage = () => {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
     );
   });
-
-  useEffect(() => {
-    const handleResize = () => {
-      const nextIsMobile = window.innerWidth < 1024;
-      setIsMobile(nextIsMobile);
-      setShowFilters((prev) => (nextIsMobile ? prev : true));
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const handleCloseDetails = useCallback(() => {
     setSelectedNode(null);
@@ -245,123 +239,68 @@ const GraphPage = () => {
   const hasGraphData = (rawData?.nodes.length ?? 0) > 0;
 
   return (
-    <div className="page-shell h-screen overflow-hidden">
-      <Sidebar />
-
-      <main id="main-content" className="page-main">
-        <header className="page-header sm:px-6">
-          <div className="page-header-inner select-none">
-            <h1 className="page-title">{t('sidebar.graph')}</h1>
-            {filteredData && filteredData.total_nodes > 0 ? (
-              <span className="hidden page-subtitle sm:inline">
-                {t('graph.showing_repos', { count: filteredData.total_nodes })}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-            <div className="order-last min-w-0 w-full sm:order-none sm:max-w-sm sm:flex-1">
+    <div className="relative min-h-0 flex-1">
+      <ResizablePanelGroup orientation="horizontal" className="absolute inset-0">
+        <ResizablePanel defaultSize="18%" minSize="12%" collapsible collapsedSize="0%">
+          <aside
+            id="graph-filters-panel"
+            aria-label={t('common.filter')}
+            className="flex h-full min-h-0 flex-col border-r bg-sidebar"
+          >
+            <div className="flex flex-col gap-3 border-b p-3">
               <SearchInput
                 onSearch={handleSearch}
                 value={filters.searchQuery}
                 placeholder={t('graph.search_placeholder')}
               />
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setShowFilters(!showFilters)}
-              aria-expanded={showFilters}
-              aria-controls="graph-filters-panel"
-              aria-label={t('common.filter')}
-              disabled={!hasGraphData}
-              className="relative shrink-0"
-            >
-              <Filter aria-hidden="true" />
-              {hasActiveFilters && (
-                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-link" />
-              )}
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowNodeList((current) => !current)}
-              aria-expanded={showNodeList}
-              aria-pressed={showNodeList}
-              aria-controls="graph-accessible-node-list"
-              disabled={!hasGraphData}
-              className="shrink-0 whitespace-nowrap"
-            >
-              <List aria-hidden="true" data-icon="inline-start" />
-              <span className="sr-only sm:not-sr-only">{t('graph.browse_as_list', 'Browse as list')}</span>
-            </Button>
-
-            <HeaderActions showSearchHint={false} />
-          </div>
-        </header>
-
-        <section className="relative flex flex-1 overflow-hidden">
-          {isMobile && showFilters && hasGraphData && (
-            <button
-              type="button"
-              className="absolute inset-0 z-20 bg-overlay"
-              onClick={() => setShowFilters(false)}
-              aria-label={t('common.close')}
-            />
-          )}
-
-          {showFilters && hasGraphData && (
-            <aside
-              id="graph-filters-panel"
-              className={`${
-                isMobile ? 'absolute inset-y-0 left-0 w-[85vw] max-w-sm' : 'w-72 flex-shrink-0'
-              } relative z-30 flex flex-col gap-4 overflow-y-auto border-r border-border-light bg-bg-sidebar p-4 dark:border-dark-border dark:bg-dark-bg-sidebar`}
-            >
-              {hasActiveFilters && (
+              {filteredData && filteredData.total_nodes > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {t('graph.showing_repos', { count: filteredData.total_nodes })}
+                </p>
+              ) : null}
+              {hasActiveFilters ? (
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={() => {
                     clearFilters();
                     setSelectedNode(null);
                   }}
-                  className="w-full"
                 >
                   <X data-icon="inline-start" />
                   {t('common.clear_all_filters')}
                 </Button>
-              )}
-
-              <StarListPanel
-                collapsed={starListPanelCollapsed}
-                onToggleCollapsed={() => setStarListPanelCollapsed(!starListPanelCollapsed)}
-              />
-
-              <ClusterPanel
-                collapsed={clusterPanelCollapsed}
-                onToggleCollapsed={() => setClusterPanelCollapsed(!clusterPanelCollapsed)}
-              />
-
-              <Timeline />
-            </aside>
-          )}
-
-          <div className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-bg-main/80 dark:bg-dark-bg-main/80">
+              ) : null}
+            </div>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="flex flex-col gap-4 p-3">
+                <StarListPanel
+                  collapsed={starListPanelCollapsed}
+                  onToggleCollapsed={() => setStarListPanelCollapsed(!starListPanelCollapsed)}
+                />
+                <ClusterPanel
+                  collapsed={clusterPanelCollapsed}
+                  onToggleCollapsed={() => setClusterPanelCollapsed(!clusterPanelCollapsed)}
+                />
+                <Timeline />
+              </div>
+            </ScrollArea>
+          </aside>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize="52%" minSize="30%">
+          <div className="relative h-full min-h-0 bg-background">
             {showNodeList && hasGraphData && (
               <Card
                 id="graph-accessible-node-list"
                 aria-label={t('graph.repository_list', 'Repository list')}
-                className="absolute bottom-3 right-3 top-3 z-40 flex w-[min(92%,24rem)] flex-col overflow-hidden py-0"
+                className="absolute top-3 right-3 bottom-3 z-40 flex w-[min(92%,24rem)] flex-col overflow-hidden py-0"
               >
-                <div className="flex items-center justify-between border-b border-border-light px-4 py-3 dark:border-dark-border">
+                <div className="flex items-center justify-between border-b px-4 py-3">
                   <div>
-                    <h2 className="text-sm font-semibold text-text-main dark:text-dark-text-main">
-                      {t('graph.repository_list', 'Repository list')}
-                    </h2>
-                    <p className="text-xs text-text-muted">
+                    <h2 className="text-sm font-semibold">{t('graph.repository_list', 'Repository list')}</h2>
+                    <p className="text-xs text-muted-foreground">
                       {t('graph.repository_list_count', {
                         count: filteredData?.nodes.length ?? 0,
                         defaultValue: `${filteredData?.nodes.length ?? 0} matching repositories`,
@@ -373,39 +312,53 @@ const GraphPage = () => {
                     variant="outline"
                     size="icon"
                     onClick={() => setShowNodeList(false)}
-                    aria-label={t('common.close', 'Close')}
+                    aria-label={t('common.close')}
                   >
-                    <X aria-hidden="true" />
+                    <X />
                   </Button>
                 </div>
                 <ul className="min-h-0 flex-1 overflow-y-auto p-2">
                   {(filteredData?.nodes ?? []).slice(0, 50).map((node) => (
                     <li key={node.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedNode(node)}
-                      aria-current={selectedNode?.id === node.id ? 'true' : undefined}
-                      className="w-full rounded-xl px-3 py-2 text-left hover:bg-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary dark:hover:bg-dark-bg-sidebar/70"
-                    >
-                      <span className="block truncate text-sm font-medium text-text-main dark:text-dark-text-main">
-                        {node.full_name}
-                      </span>
-                      <span className="block truncate text-xs text-text-muted">
-                        {node.description || node.ai_summary || t('common.no_description')}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNode(node)}
+                        aria-current={selectedNode?.id === node.id ? 'true' : undefined}
+                        className="w-full rounded-md px-3 py-2 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      >
+                        <span className="block truncate text-sm font-medium">{node.full_name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {node.description || node.ai_summary || t('common.no_description')}
+                        </span>
+                      </button>
                     </li>
                   ))}
                   {filteredData && filteredData.nodes.length > 50 && (
-                    <li className="px-3 py-2 text-xs text-text-muted">
+                    <li className="px-3 py-2 text-xs text-muted-foreground">
                       {t('graph.repository_list_limited')}
                     </li>
                   )}
                 </ul>
               </Card>
             )}
+            {!showNodeList && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowNodeList(true)}
+                aria-expanded={showNodeList}
+                aria-pressed={showNodeList}
+                aria-controls="graph-accessible-node-list"
+                disabled={!hasGraphData}
+                className="absolute right-3 bottom-3 z-30"
+              >
+                <List data-icon="inline-start" />
+                <span className="sr-only sm:not-sr-only">{t('graph.browse_as_list', 'Browse as list')}</span>
+              </Button>
+            )}
             {nodeAutoLoadHalted && (
-              <Card className="absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 flex-row items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
+              <Card className="absolute top-3 left-1/2 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 flex-row items-center justify-between gap-3 px-4 py-3 text-xs text-muted-foreground">
                 <span>
                   {t('graph.node_load_paused', {
                     pages: loadedNodePages,
@@ -426,7 +379,7 @@ const GraphPage = () => {
               </Card>
             )}
             {autoLoadHalted && !nodeAutoLoadHalted && (
-              <Card className="absolute left-1/2 top-3 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 flex-row items-center justify-between gap-3 px-4 py-3 text-xs text-text-muted">
+              <Card className="absolute top-3 left-1/2 z-20 flex w-[min(92%,42rem)] -translate-x-1/2 flex-row items-center justify-between gap-3 px-4 py-3 text-xs text-muted-foreground">
                 <span>
                   {t(
                     'graph.edge_load_paused',
@@ -453,7 +406,7 @@ const GraphPage = () => {
             {error && (
               <Alert
                 variant="destructive"
-                className="absolute left-1/2 top-3 z-20 w-[min(92%,28rem)] -translate-x-1/2"
+                className="absolute top-3 left-1/2 z-20 w-[min(92%,28rem)] -translate-x-1/2"
               >
                 <AlertDescription>{t('common.load_failed_graph')}</AlertDescription>
                 <AlertAction>
@@ -469,15 +422,30 @@ const GraphPage = () => {
                 </AlertAction>
               </Alert>
             )}
-
-            <div className="relative h-full min-w-0 flex-1">
+            <div className="h-full min-h-0">
               <Graph2D />
             </div>
-
-            {selectedNode && <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />}
           </div>
-        </section>
-      </main>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize="30%" minSize="20%">
+          <section aria-label={t('common.overview')} className="h-full min-h-0">
+            {selectedNode ? (
+              <RepoDetailsPanel node={selectedNode} onClose={handleCloseDetails} />
+            ) : (
+              <Empty className="h-full rounded-none border-0">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Network />
+                  </EmptyMedia>
+                  <EmptyTitle>{t('graph.no_selection')}</EmptyTitle>
+                  <EmptyDescription>{t('graph.no_selection_hint')}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </section>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 };

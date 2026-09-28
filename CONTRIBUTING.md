@@ -10,6 +10,9 @@
 
 如果你要改动接口、同步流程或数据库结构，再补读：
 
+- `README.zh.md` 的部署、配置概览和 API 快速参考
+- `.env.example`
+- 数据库重置：`scripts/reset_db.py`
 
 ## 本地开发环境
 

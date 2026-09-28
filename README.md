@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    <a href="#quick-start">Quick Start</a>
+    <a href="#deployment">Deployment</a>
     |
     <a href="#preview">Preview</a>
     |
@@ -61,12 +61,13 @@ It is built for people who star heavily, revisit often, and want their repositor
 - [How It Works](#how-it-works)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
-- [Quick Start](#quick-start)
-  - [Prerequisites](#prerequisites)
-  - [1. Clone and configure](#1-clone-and-configure)
-  - [2. Start the stack](#2-start-the-stack)
-  - [3. Open the app](#3-open-the-app)
-  - [4. Run the first sync](#4-run-the-first-sync)
+- [Deployment](#deployment)
+  - [Runtime](#runtime)
+  - [Configure](#configure)
+  - [Start](#start)
+  - [Open](#open)
+  - [Before release](#before-release)
+  - [First sync](#first-sync)
 - [Local Development](#local-development)
   - [Backend](#backend)
   - [Frontend](#frontend)
@@ -87,27 +88,21 @@ It is built for people who star heavily, revisit often, and want their repositor
 - [Contributing](#contributing)
 - [License](#license)
 
-## Preview
+## Current interface
 
-MyNebula already includes a few interface assets, and the layout below is ready for you to swap in better screenshots later.
+The pictures in `doc/images/` show the previous full-frame logo graph and the long settings page. They are not the current screens.
 
-| View | Screenshot |
-| --- | --- |
-| Graph exploration | <img src="doc/images/image1.png" alt="Graph exploration view" width="100%" /> |
-| Repository details | <img src="doc/images/image2.png" alt="Repository detail view" width="100%" /> |
-| Settings and scheduling | <img src="doc/images/image3.png" alt="Settings and scheduling view" width="80%" /> |
+All four pages share one collapsible sidebar: Dashboard, Graph, Data, and Settings. Collapsed, it keeps the icons.
 
-Recommended screenshot set for this README:
-
-- Graph overview with visible clusters and labels
-- Repository detail page with related recommendations
-- Settings page showing sync controls
-- Timeline or dashboard page showing snapshot history
+- Graph: a resizable split. Filters take about 18%, the canvas fills the middle, and detail takes about 30%. With nothing hovered or selected, nodes are neutral and unlabeled. Selecting a cluster keeps color on that cluster and fades the rest. The repository name is the only large type in the detail pane, followed by one fact line and Overview / Related tabs. An empty selection uses the empty state.
+- Data: a resizable split. Filters take about 22%. The table fills the rest and scrolls inside the pane.
+- Settings: after login, Sync, Data, and Appearance are tabs. The login form stays centered.
+- Dashboard: four figures on top, then clusters and languages in two columns.
 
 ## Highlights
 
 - **Semantic clustering, not manual folders**: MyNebula groups repositories by meaning so your stars become topics instead of a long flat list.
-- **Graph-first exploration**: Browse your collection as an interactive nebula with node relationships, progressive edge loading, and timeline replay.
+- **Graph-first exploration**: The graph sits in the middle pane of a light workbench. Color and labels stay on the hovered or selected cluster. Edges still load on demand, and the timeline stays in the filter pane.
 - **Snapshot-based reads**: Versioned graph snapshots keep the read experience stable while the sync pipeline continues to evolve in the background.
 - **Practical sync workflow**: Incremental sync, full rebuilds, reprocessing checks, and scheduled jobs are already built in.
 - **Explainable recommendations**: Related repositories are served with meaningful signals instead of opaque "you may also like" guesses.
@@ -154,56 +149,64 @@ flowchart LR
 - **Frontend**: React 18, TypeScript, Vite, React Query, react-force-graph-2d, Tailwind CSS 4
 - **Tooling**: Docker Compose, uv, Ruff, Pytest, Vitest, Playwright
 
-## Quick Start
+## Deployment
 
-### Prerequisites
+### Runtime
 
 - Docker and Docker Compose v2
-- A GitHub Personal Access Token
-- An embedding provider API key
-- An LLM provider API key if you want summaries, tags, or AI-assisted naming
+- Nothing is compiled on the deploy host. Compose only pulls `MYNEBULA_IMAGE` from `.env`
+- A local Node.js or Python toolchain is only needed for [Local Development](#local-development)
 
-### 1. Clone and configure
+### Configure
 
 ```bash
-git clone https://github.com/Tendo33/MyNebula.git
-cd MyNebula
 cp .env.example .env
 ```
 
-At minimum, update these values in `.env`:
+Fill at least:
 
 - `GITHUB_TOKEN`
 - `EMBEDDING_API_KEY`
 - `EMBEDDING_BASE_URL`
 - `EMBEDDING_MODEL`
-- `LLM_API_KEY` if you want summaries, tags, or AI-assisted naming
+- `LLM_API_KEY` when summaries, tags, or AI-assisted naming are enabled
 - `ADMIN_PASSWORD`
 - `ADMIN_SESSION_SECRET`
-- `ADMIN_USERNAME` if you do not want the default `admin`
+- `ADMIN_USERNAME` when you do not want the default `admin`
 - `READ_ACCESS_MODE`
-- `MYNEBULA_IMAGE`, set to a published immutable tag or digest built from the
-  source revision you intend to deploy
+- `MYNEBULA_IMAGE`: a published immutable tag or digest of the revision you intend to run
 
-Recommended defaults by deployment style:
+Recommended values:
 
 - Local demo: `READ_ACCESS_MODE=demo`
-- Internet-facing deployment: `READ_ACCESS_MODE=authenticated`, `FORCE_SECURE_COOKIES=true`, `TRUST_PROXY_HEADERS=true`, `TRUSTED_PROXY_IPS=<your reverse proxy IPs>`
-- Internet-facing processes refuse demo mode and empty admin credentials unless `ALLOW_ANONYMOUS_DEMO=true`
+- Internet-facing: `READ_ACCESS_MODE=authenticated`, `FORCE_SECURE_COOKIES=true`, `TRUST_PROXY_HEADERS=true`, `TRUSTED_PROXY_IPS=<your reverse proxy IPs>`
+- An internet-facing process refuses demo mode and an empty admin password unless `ALLOW_ANONYMOUS_DEMO=true`
 
-### 2. Start the stack
+### Start
 
 ```bash
 docker compose up -d
 ```
 
-### 3. Open the app
+Do not pass `--build`. Compose refuses to start when `MYNEBULA_IMAGE` is empty.
+
+### Open
 
 - App: <http://localhost:8000>
-- Health check: <http://localhost:8000/health>
-- OpenAPI docs: <http://localhost:8000/docs> when `DEBUG=true`
+- Health: <http://localhost:8000/health>
+- OpenAPI: <http://localhost:8000/docs> when `DEBUG=true`
 
-### 4. Run the first sync
+### Before release
+
+```bash
+uv run ruff check .
+uv run pytest
+pnpm --prefix frontend run test
+pnpm --prefix frontend run lint
+pnpm --prefix frontend run build
+```
+
+### First sync
 
 1. Open `/settings`
 2. Log in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`
@@ -259,6 +262,19 @@ If `frontend/dist` exists, FastAPI will serve the SPA and static assets directly
 
 ## Documentation Map
 
+Files under `doc/` are redirects from old addresses. The index is [`doc/INDEX.md`](doc/INDEX.md). Pictures in `doc/images/` are historical and are not the current screens.
+
+| Topic | Read |
+| --- | --- |
+| Deployment | [Deployment](#deployment) |
+| Environment variables and models | [Configuration Overview](#configuration-overview) and [`.env.example`](.env.example) |
+| Local development | [Local Development](#local-development) |
+| Current page structure | [Current interface](#current-interface) and [`DESIGN.md`](DESIGN.md) |
+| HTTP API | [API Quick Reference](#api-quick-reference) |
+| Tests and the release check | [Quality and Testing](#quality-and-testing) |
+| Hooks and CI | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+| Dropping the database | [`scripts/reset_db.py`](scripts/reset_db.py), described in the contributing guide |
+| Dated health checks | [`docs/health-check/`](docs/health-check/) |
 
 ## API Quick Reference
 

@@ -4,8 +4,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useResizeObserver } from '../../hooks/useResizeObserver';
 import { useGraph, useNodeNeighbors } from '../../contexts/GraphContext';
+import { Link } from 'react-router-dom';
+
 import { GraphSkeleton } from '../ui/page-skeletons';
-import { EmptyState } from '../ui/EmptyState';
+import { Button } from '../ui/button';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
+import { Network } from 'lucide-react';
 import { GraphHoverCard } from './GraphHoverCard';
 import type {
   HullCache,
@@ -19,7 +23,16 @@ import {
   toProcessedLinks,
   toProcessedNodes,
 } from './graph2dLayout';
-import { resolveLinkColor, resolveLinkWidth, resolveNodeColor } from './graph2dStyles';
+import {
+  collectFocusClusterIds,
+  resolveLinkColor,
+  resolveLinkWidth,
+  resolveNodeColor,
+  resolveNodeDimmed,
+  resolveShowClusterHue,
+  shouldShowNodeLabel,
+  type NodeColorContext,
+} from './graph2dStyles';
 import { getGraphMotionProfile } from './graph2dMotion';
 import {
   drawClusterHulls,
@@ -64,8 +77,7 @@ const Graph2D: React.FC = () => {
     return () => media.removeEventListener('change', onChange);
   }, []);
 
-  // Get neighbors of hovered node for highlighting
-  const hoverNeighbors = useNodeNeighbors(activeHoverNode?.id);
+  const selectedNeighbors = useNodeNeighbors(selectedNode?.id);
 
   // Visibility set
   const visibleNodeIds = useMemo(() => {
@@ -135,15 +147,33 @@ const Graph2D: React.FC = () => {
     focusNodeById,
   });
 
+  const nodeStyleContext = useMemo<NodeColorContext>(
+    () => ({
+      selectedNodeId: selectedNode?.id,
+      selectedClusterId: selectedNode?.cluster_id,
+      activeHoverNode,
+      selectedNeighbors,
+      visibleNodeIds,
+    }),
+    [activeHoverNode, selectedNeighbors, selectedNode?.cluster_id, selectedNode?.id, visibleNodeIds]
+  );
+
+  const focusedClusterIds = useMemo(
+    () => collectFocusClusterIds(selectedNode?.cluster_id, activeHoverNode?.cluster_id),
+    [activeHoverNode?.cluster_id, selectedNode?.cluster_id]
+  );
+
+  const clusterByNodeId = useMemo(() => {
+    const map = new Map<number, number | null>();
+    for (const node of processedNodes) {
+      map.set(node.id, node.cluster_id);
+    }
+    return map;
+  }, [processedNodes]);
+
   const getNodeColor = useCallback(
-    (node: ProcessedNode): string =>
-      resolveNodeColor(node, {
-        selectedNodeId: selectedNode?.id,
-        activeHoverNode,
-        hoverNeighbors,
-        visibleNodeIds,
-      }),
-    [selectedNode, activeHoverNode, hoverNeighbors, visibleNodeIds]
+    (node: ProcessedNode): string => resolveNodeColor(node, nodeStyleContext),
+    [nodeStyleContext]
   );
 
   const getLinkColor = useCallback(
@@ -153,8 +183,21 @@ const Graph2D: React.FC = () => {
         activeHoverNodeId: activeHoverNode?.id,
         visibleNodeIds,
         selectedNodeId: selectedNode?.id,
+        selectedClusterId: selectedNode?.cluster_id,
+        hoverClusterId: activeHoverNode?.cluster_id,
+        selectedNeighbors,
+        clusterByNodeId,
       }),
-    [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]
+    [
+      activeHoverNode?.cluster_id,
+      activeHoverNode?.id,
+      clusterByNodeId,
+      selectedNeighbors,
+      selectedNode?.cluster_id,
+      selectedNode?.id,
+      settings.showTrajectories,
+      visibleNodeIds,
+    ]
   );
 
   const getLinkWidth = useCallback(
@@ -164,21 +207,38 @@ const Graph2D: React.FC = () => {
         activeHoverNodeId: activeHoverNode?.id,
         visibleNodeIds,
         selectedNodeId: selectedNode?.id,
+        selectedClusterId: selectedNode?.cluster_id,
+        hoverClusterId: activeHoverNode?.cluster_id,
+        selectedNeighbors,
+        clusterByNodeId,
       }),
-    [activeHoverNode, settings.showTrajectories, visibleNodeIds, selectedNode]
+    [
+      activeHoverNode?.cluster_id,
+      activeHoverNode?.id,
+      clusterByNodeId,
+      selectedNeighbors,
+      selectedNode?.cluster_id,
+      selectedNode?.id,
+      settings.showTrajectories,
+      visibleNodeIds,
+    ]
   );
 
   const paintNode = useCallback(
     (nodeObject: NodeObject<NodeObject>, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const node = nodeObject as ProcessedNode;
+      const isVisible = visibleNodeIds.has(node.id);
       paintNodeOnCanvas({
         node,
         ctx,
         globalScale,
         color: getNodeColor(node),
-        isVisible: visibleNodeIds.has(node.id),
+        isVisible,
         isSelected: selectedNode?.id === node.id,
         isHovered: activeHoverNode?.id === node.id,
+        isDimmed: resolveNodeDimmed(node, nodeStyleContext),
+        showLabel: shouldShowNodeLabel(node.id, nodeStyleContext, isVisible),
+        showClusterHue: resolveShowClusterHue(node, nodeStyleContext),
         hqRendering: settings.hqRendering,
         imageCache: imageCacheRef.current,
         onAvatarLoaded: triggerAvatarRedraw,
@@ -187,6 +247,7 @@ const Graph2D: React.FC = () => {
     [
       getNodeColor,
       activeHoverNode,
+      nodeStyleContext,
       selectedNode,
       settings.hqRendering,
       triggerAvatarRedraw,
@@ -212,9 +273,10 @@ const Graph2D: React.FC = () => {
         visibleNodeIds,
         clusterGroups,
         hullCache: hullCacheRef.current,
+        focusedClusterIds,
       });
     },
-    [clusterGroups, processedData.nodes, visibleNodeIds]
+    [clusterGroups, focusedClusterIds, processedData.nodes, visibleNodeIds]
   );
 
   // Handle node click
@@ -278,12 +340,20 @@ const Graph2D: React.FC = () => {
         ref={containerRef}
         className="relative flex h-full w-full items-center justify-center bg-bg-hover/50 dark:bg-dark-bg-sidebar/60"
       >
-        <EmptyState
-          title={t('graph.empty_title')}
-          description={t('graph.empty_hint')}
-          actionTo="/settings"
-          actionLabel={t('common.sync_now')}
-        />
+        <Empty className="border-0 bg-transparent">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Network />
+            </EmptyMedia>
+            <EmptyTitle>{t('graph.empty_title')}</EmptyTitle>
+            <EmptyDescription>{t('graph.empty_hint')}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button nativeButton={false} render={<Link to="/settings" />}>
+              {t('common.sync_now')}
+            </Button>
+          </EmptyContent>
+        </Empty>
       </div>
     );
   }

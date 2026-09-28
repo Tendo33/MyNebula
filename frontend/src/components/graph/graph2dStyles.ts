@@ -4,59 +4,125 @@ import type { ProcessedLink, ProcessedNode } from './graph2dTypes';
 /**
  * Pure colour and width resolution for the graph canvas.
  *
- * Extracted from `Graph2D` so the visual rules are directly testable: inside
- * the component they closed over hover/selection state and could only be
- * exercised by rendering a canvas.
+ * Cluster hue is reserved for the hovered or selected cluster. Everything else
+ * stays neutral, and nodes outside that cluster are dimmed by the painter.
  */
 
 export interface NodeColorContext {
   selectedNodeId: number | undefined;
+  selectedClusterId: number | null | undefined;
   activeHoverNode: Pick<ProcessedNode, 'id' | 'cluster_id'> | null;
-  hoverNeighbors: Set<number>;
+  selectedNeighbors: Set<number>;
   visibleNodeIds: Set<number>;
 }
 
 export const GHOST_NODE_COLOR = 'rgba(200, 200, 200, 0.4)';
 export const GHOST_LINK_COLOR = 'rgba(200, 200, 200, 0.05)';
 
+const EMPTY_NEIGHBORS: ReadonlySet<number> = new Set();
+const EMPTY_CLUSTERS: ReadonlyMap<number, number | null> = new Map();
+
+export const collectFocusClusterIds = (
+  selectedClusterId: number | null | undefined,
+  hoverClusterId: number | null | undefined,
+): Set<number> => {
+  const ids = new Set<number>();
+  if (selectedClusterId != null) ids.add(selectedClusterId);
+  if (hoverClusterId != null) ids.add(hoverClusterId);
+  return ids;
+};
+
+export const nodeIsInFocusCluster = (
+  clusterId: number | null | undefined,
+  selectedClusterId: number | null | undefined,
+  hoverClusterId: number | null | undefined,
+): boolean =>
+  clusterId != null &&
+  (clusterId === selectedClusterId || clusterId === hoverClusterId);
+
+const focusIsActive = (context: NodeColorContext): boolean =>
+  context.selectedNodeId !== undefined || context.activeHoverNode != null;
+
 export const resolveNodeColor = (
   node: Pick<ProcessedNode, 'id' | 'cluster_id' | 'color'>,
-  { selectedNodeId, activeHoverNode, hoverNeighbors, visibleNodeIds }: NodeColorContext
+  context: NodeColorContext
 ): string => {
-  // Selected node ALWAYS visible
-  if (selectedNodeId !== undefined && selectedNodeId === node.id) {
-    return COLORS.NODE_SELECTED;
-  }
+  const isSelected = context.selectedNodeId !== undefined && context.selectedNodeId === node.id;
+  const isHovered = context.activeHoverNode != null && context.activeHoverNode.id === node.id;
+  const filteredOut = !context.visibleNodeIds.has(node.id);
 
-  // Hovered node
-  if (activeHoverNode && node.id === activeHoverNode.id) {
-    return COLORS.NODE_HOVER;
-  }
-
-  // Ghost mode for filtered out nodes.
-  // Dim gray if it doesn't have an avatar. If it has an avatar, the
-  // transparency is handled by globalAlpha in the node painter.
-  if (!visibleNodeIds.has(node.id)) {
+  if (filteredOut && !isSelected && !isHovered) {
     return GHOST_NODE_COLOR;
   }
 
-  // No hover - use cluster color
-  if (!activeHoverNode) {
+  if (isSelected) {
+    if (node.cluster_id != null && node.color) return node.color;
+    return COLORS.NODE_SELECTED;
+  }
+
+  if (isHovered) {
+    if (node.cluster_id != null && node.color) return node.color;
+    return COLORS.NODE_HOVER;
+  }
+
+  if (!focusIsActive(context)) {
+    return COLORS.NODE_DEFAULT;
+  }
+
+  if (
+    nodeIsInFocusCluster(
+      node.cluster_id,
+      context.selectedClusterId,
+      context.activeHoverNode?.cluster_id,
+    )
+  ) {
     return node.color || COLORS.NODE_DEFAULT;
   }
 
-  // Neighbor of hovered node
-  if (hoverNeighbors.has(node.id)) {
-    return COLORS.NODE_NEIGHBOR;
+  if (context.selectedNeighbors.has(node.id)) {
+    return COLORS.NODE_DEFAULT;
   }
 
-  // Same cluster as hovered
-  if (activeHoverNode.cluster_id != null && node.cluster_id === activeHoverNode.cluster_id) {
-    return node.color || COLORS.NODE_DEFAULT;
-  }
-
-  // Dim other nodes
   return COLORS.NODE_DIM;
+};
+
+/** Visible nodes outside the hovered/selected cluster (and their labeled neighbors) recede. */
+export const resolveNodeDimmed = (
+  node: Pick<ProcessedNode, 'id' | 'cluster_id'>,
+  context: NodeColorContext
+): boolean => {
+  if (!context.visibleNodeIds.has(node.id)) return false;
+  if (!focusIsActive(context)) return false;
+  if (context.selectedNodeId === node.id) return false;
+  if (context.activeHoverNode != null && context.activeHoverNode.id === node.id) return false;
+  if (context.selectedNeighbors.has(node.id)) return false;
+  return !nodeIsInFocusCluster(
+    node.cluster_id,
+    context.selectedClusterId,
+    context.activeHoverNode?.cluster_id,
+  );
+};
+
+export const resolveShowClusterHue = (
+  node: Pick<ProcessedNode, 'id' | 'cluster_id'>,
+  context: NodeColorContext
+): boolean =>
+  context.visibleNodeIds.has(node.id) &&
+  nodeIsInFocusCluster(
+    node.cluster_id,
+    context.selectedClusterId,
+    context.activeHoverNode?.cluster_id,
+  );
+
+/** Labels: the selected node, its immediate neighbors, and the hovered node. */
+export const shouldShowNodeLabel = (
+  nodeId: number,
+  context: NodeColorContext,
+  isVisible: boolean
+): boolean => {
+  if (nodeId === context.selectedNodeId) return true;
+  if (context.activeHoverNode != null && nodeId === context.activeHoverNode.id) return true;
+  return isVisible && context.selectedNeighbors.has(nodeId);
 };
 
 export interface LinkStyleContext {
@@ -64,6 +130,10 @@ export interface LinkStyleContext {
   activeHoverNodeId: number | undefined;
   visibleNodeIds: Set<number>;
   selectedNodeId: number | undefined;
+  selectedClusterId?: number | null;
+  hoverClusterId?: number | null;
+  selectedNeighbors?: ReadonlySet<number>;
+  clusterByNodeId?: ReadonlyMap<number, number | null>;
 }
 
 const linkEndpointVisibility = (
@@ -81,6 +151,37 @@ const linkEndpointVisibility = (
   };
 };
 
+const endpointEmphasized = (nodeId: number, context: LinkStyleContext): boolean => {
+  const focusActive =
+    context.selectedNodeId !== undefined || context.activeHoverNodeId !== undefined;
+  if (!focusActive) return true;
+  if (nodeId === context.selectedNodeId || nodeId === context.activeHoverNodeId) return true;
+  if ((context.selectedNeighbors ?? EMPTY_NEIGHBORS).has(nodeId)) return true;
+  const clusterId = (context.clusterByNodeId ?? EMPTY_CLUSTERS).get(nodeId);
+  return nodeIsInFocusCluster(clusterId, context.selectedClusterId, context.hoverClusterId);
+};
+
+const classifyLink = (
+  sourceId: number,
+  targetId: number,
+  context: LinkStyleContext
+) => {
+  const neighbors = context.selectedNeighbors ?? EMPTY_NEIGHBORS;
+  const touchesHover =
+    context.activeHoverNodeId !== undefined &&
+    (sourceId === context.activeHoverNodeId || targetId === context.activeHoverNodeId);
+  const touchesSelectedNeighbor =
+    context.selectedNodeId !== undefined &&
+    (sourceId === context.selectedNodeId || targetId === context.selectedNodeId) &&
+    (neighbors.has(sourceId) || neighbors.has(targetId));
+  return {
+    sourceOn: endpointEmphasized(sourceId, context),
+    targetOn: endpointEmphasized(targetId, context),
+    touchesHover,
+    touchesSelectedNeighbor,
+  };
+};
+
 export const resolveLinkColor = (
   link: Pick<ProcessedLink, 'source' | 'target'>,
   context: LinkStyleContext
@@ -90,13 +191,13 @@ export const resolveLinkColor = (
   const { sourceId, targetId, bothVisible } = linkEndpointVisibility(link, context);
   if (!bothVisible) return GHOST_LINK_COLOR;
 
-  if (context.activeHoverNodeId === undefined) return COLORS.LINK_DEFAULT;
-
-  // Highlight links connected to hovered node
-  if (sourceId === context.activeHoverNodeId || targetId === context.activeHoverNodeId) {
-    return COLORS.LINK_ACTIVE;
-  }
-
+  const { sourceOn, targetOn, touchesHover, touchesSelectedNeighbor } = classifyLink(
+    sourceId,
+    targetId,
+    context
+  );
+  if (touchesHover || touchesSelectedNeighbor) return COLORS.LINK_ACTIVE;
+  if (sourceOn && targetOn) return COLORS.LINK_DEFAULT;
   return COLORS.LINK_DIM;
 };
 
@@ -109,11 +210,12 @@ export const resolveLinkWidth = (
   const { sourceId, targetId, bothVisible } = linkEndpointVisibility(link, context);
   if (!bothVisible) return 0.2;
 
-  if (context.activeHoverNodeId === undefined) return 1;
-
-  if (sourceId === context.activeHoverNodeId || targetId === context.activeHoverNodeId) {
-    return 2;
-  }
-
+  const { sourceOn, targetOn, touchesHover, touchesSelectedNeighbor } = classifyLink(
+    sourceId,
+    targetId,
+    context
+  );
+  if (touchesHover || touchesSelectedNeighbor) return 2;
+  if (sourceOn && targetOn) return 1;
   return 0.5;
 };

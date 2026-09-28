@@ -7,6 +7,8 @@ import {
   resolveLinkColor,
   resolveLinkWidth,
   resolveNodeColor,
+  resolveNodeDimmed,
+  shouldShowNodeLabel,
 } from '../graph2dStyles';
 import type { ProcessedLink, ProcessedNode } from '../graph2dTypes';
 
@@ -18,16 +20,27 @@ const link = (source: number, target: number) =>
 
 const baseNodeContext = {
   selectedNodeId: undefined,
+  selectedClusterId: undefined,
   activeHoverNode: null,
-  hoverNeighbors: new Set<number>(),
+  selectedNeighbors: new Set<number>(),
   visibleNodeIds: new Set([1, 2, 3]),
 };
 
 describe('resolveNodeColor', () => {
-  it('gives the selected node priority over every other rule', () => {
-    // Selected must win even when filtered out and not hovered.
+  it('keeps a selected node in its cluster hue even when filtered out', () => {
     expect(
-      resolveNodeColor(node(9), {
+      resolveNodeColor(node(9, 4, '#abcdef'), {
+        ...baseNodeContext,
+        selectedNodeId: 9,
+        selectedClusterId: 4,
+        visibleNodeIds: new Set<number>(),
+      })
+    ).toBe('#abcdef');
+  });
+
+  it('uses the selection colour when the selected node has no cluster hue', () => {
+    expect(
+      resolveNodeColor(node(9, null, ''), {
         ...baseNodeContext,
         selectedNodeId: 9,
         visibleNodeIds: new Set<number>(),
@@ -35,9 +48,15 @@ describe('resolveNodeColor', () => {
     ).toBe(COLORS.NODE_SELECTED);
   });
 
-  it('colours the hovered node', () => {
+  it('colours a hovered node with its cluster hue', () => {
     expect(
-      resolveNodeColor(node(2), { ...baseNodeContext, activeHoverNode: node(2) })
+      resolveNodeColor(node(2, 7, '#445566'), { ...baseNodeContext, activeHoverNode: node(2, 7) })
+    ).toBe('#445566');
+  });
+
+  it('uses the hover colour when the hovered node has no cluster hue', () => {
+    expect(
+      resolveNodeColor(node(2, null, ''), { ...baseNodeContext, activeHoverNode: node(2, null) })
     ).toBe(COLORS.NODE_HOVER);
   });
 
@@ -47,22 +66,23 @@ describe('resolveNodeColor', () => {
     ).toBe(GHOST_NODE_COLOR);
   });
 
-  it('uses the cluster colour when nothing is hovered', () => {
-    expect(resolveNodeColor(node(1, 1, '#123456'), baseNodeContext)).toBe('#123456');
+  it('stays neutral when nothing is hovered or selected', () => {
+    expect(resolveNodeColor(node(1, 1, '#123456'), baseNodeContext)).toBe(COLORS.NODE_DEFAULT);
   });
 
   it('falls back to the default colour when a node has none', () => {
     expect(resolveNodeColor(node(1, 1, ''), baseNodeContext)).toBe(COLORS.NODE_DEFAULT);
   });
 
-  it('highlights neighbours of the hovered node', () => {
+  it('keeps an immediate neighbor of the selection readable outside the cluster', () => {
     expect(
-      resolveNodeColor(node(2), {
+      resolveNodeColor(node(2, 8, '#ff00aa'), {
         ...baseNodeContext,
-        activeHoverNode: node(1),
-        hoverNeighbors: new Set([2]),
+        selectedNodeId: 1,
+        selectedClusterId: 7,
+        selectedNeighbors: new Set([2]),
       })
-    ).toBe(COLORS.NODE_NEIGHBOR);
+    ).toBe(COLORS.NODE_DEFAULT);
   });
 
   it('keeps same-cluster nodes at their cluster colour while hovering', () => {
@@ -86,6 +106,38 @@ describe('resolveNodeColor', () => {
       resolveNodeColor(node(2, null), { ...baseNodeContext, activeHoverNode: node(1, null) })
     ).toBe(COLORS.NODE_DIM);
   });
+
+  it('gives the selected cluster its hue and dims every other cluster', () => {
+    const context = {
+      ...baseNodeContext,
+      selectedNodeId: 1,
+      selectedClusterId: 7,
+    };
+
+    expect(resolveNodeColor(node(2, 7, '#abcabc'), context)).toBe('#abcabc');
+    expect(resolveNodeColor(node(3, 8, '#111111'), context)).toBe(COLORS.NODE_DIM);
+    expect(resolveNodeDimmed(node(2, 7), context)).toBe(false);
+    expect(resolveNodeDimmed(node(3, 8), context)).toBe(true);
+  });
+});
+
+describe('shouldShowNodeLabel', () => {
+  it('labels only the selection, its immediate neighbors, and the hovered node', () => {
+    const context = {
+      ...baseNodeContext,
+      selectedNodeId: 1,
+      selectedClusterId: 7,
+      activeHoverNode: node(4, 8),
+      selectedNeighbors: new Set([2]),
+    };
+
+    expect(shouldShowNodeLabel(1, context, true)).toBe(true);
+    expect(shouldShowNodeLabel(2, context, true)).toBe(true);
+    expect(shouldShowNodeLabel(4, context, true)).toBe(true);
+    expect(shouldShowNodeLabel(3, context, true)).toBe(false);
+    expect(shouldShowNodeLabel(2, context, false)).toBe(false);
+    expect(shouldShowNodeLabel(1, context, false)).toBe(true);
+  });
 });
 
 const baseLinkContext = {
@@ -108,14 +160,50 @@ describe('resolveLinkColor', () => {
     ).toBe(GHOST_LINK_COLOR);
   });
 
-  it('treats the selected node as visible even when filtered out', () => {
+  it('does not ghost a link to a filtered-out selected node, but fades it outside the focus cluster', () => {
     expect(
       resolveLinkColor(link(1, 9), {
         ...baseLinkContext,
         visibleNodeIds: new Set([1]),
         selectedNodeId: 9,
+        clusterByNodeId: new Map<number, number | null>([
+          [1, 3],
+          [9, 4],
+        ]),
       })
-    ).toBe(COLORS.LINK_DEFAULT);
+    ).toBe(COLORS.LINK_DIM);
+  });
+
+  it('keeps edges inside the focused cluster and fades edges that leave it', () => {
+    const clusterByNodeId = new Map<number, number | null>([
+      [1, 7],
+      [2, 7],
+      [3, 8],
+    ]);
+    const context = {
+      ...baseLinkContext,
+      selectedNodeId: 1,
+      selectedClusterId: 7,
+      clusterByNodeId,
+    };
+
+    expect(resolveLinkColor(link(2, 1), context)).toBe(COLORS.LINK_DEFAULT);
+    expect(resolveLinkColor(link(1, 3), context)).toBe(COLORS.LINK_DIM);
+  });
+
+  it('highlights the edge from the selection to an immediate neighbor', () => {
+    expect(
+      resolveLinkColor(link(1, 2), {
+        ...baseLinkContext,
+        selectedNodeId: 1,
+        selectedClusterId: 7,
+        selectedNeighbors: new Set([2]),
+        clusterByNodeId: new Map<number, number | null>([
+          [1, 7],
+          [2, 9],
+        ]),
+      })
+    ).toBe(COLORS.LINK_ACTIVE);
   });
 
   it('highlights links touching the hovered node', () => {

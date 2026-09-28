@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
 import { GraphProvider, useGraph } from './contexts/GraphContext';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
+import { AppShell } from './components/layout/AppShell';
 import { ErrorFallback } from './components/ui/ErrorFallback';
 import CommandPalette from './components/ui/CommandPalette';
 import { Button } from './components/ui/button';
@@ -20,13 +21,13 @@ const Settings = lazy(() => import('./pages/Settings'));
 const NotFound = () => {
   const { t } = useTranslation();
   return (
-    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="page-title">404</h1>
-      <p className="text-text-muted">{t('errors.not_found', 'This page does not exist.')}</p>
+      <p className="text-muted-foreground">{t('errors.not_found')}</p>
       <Button nativeButton={false} render={<Link to="/" />}>
-        {t('sidebar.dashboard', 'Dashboard')}
+        {t('sidebar.dashboard')}
       </Button>
-    </main>
+    </div>
   );
 };
 
@@ -66,17 +67,11 @@ function GraphAppContent({
 
   return (
     <>
-      <div className="min-h-screen bg-bg-main text-text-main dark:bg-dark-bg-main dark:text-dark-text-main font-sans selection:bg-action-primary/20">
-        <a
-          href="#main-content"
-          className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-action-primary px-4 py-2 text-action-on transition-transform focus:translate-y-0"
-        >
-          {t('common.skip_to_content', 'Skip to content')}
-        </a>
+      <AppShell>
         <ErrorBoundary FallbackComponent={ErrorFallback}>
           <Suspense fallback={
-            <div className="flex min-h-screen items-center justify-center text-sm text-text-muted">
-              {t('common.loading', 'Loading…')}
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+              {t('common.loading')}
             </div>
           }>
             <Routes>
@@ -88,7 +83,7 @@ function GraphAppContent({
             </Routes>
           </Suspense>
         </ErrorBoundary>
-      </div>
+      </AppShell>
 
       <CommandPalette
         isOpen={isOpen}
