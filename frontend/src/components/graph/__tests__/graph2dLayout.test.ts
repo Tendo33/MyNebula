@@ -4,11 +4,12 @@ import type { GraphData, GraphEdge, GraphNode } from '../../../types';
 import {
   buildClusterGroups,
   buildClusterLayoutData,
+  resolveProjectedNodeOverlaps,
   toProcessedLinks,
   toProcessedNodes,
 } from '../graph2dLayout';
 import { POSITION_SCALE } from '../graph2dTypes';
-import { GRAPH_2D_COLORS as COLORS } from '../graph2dUtils';
+import { GRAPH_2D_COLORS as COLORS, calculateNodeRadius } from '../graph2dUtils';
 
 const node = (overrides: Partial<GraphNode> = {}): GraphNode =>
   ({
@@ -53,6 +54,34 @@ describe('toProcessedNodes', () => {
   it('falls back to the default colour', () => {
     const [processed] = toProcessedNodes([node({ color: '' })]);
     expect(processed.color).toBe(COLORS.NODE_DEFAULT);
+  });
+});
+
+describe('resolveProjectedNodeOverlaps', () => {
+  it('separates projected avatars without changing their snapshot coordinates', () => {
+    const original = toProcessedNodes([
+      node({ id: 1, x: 0, y: 0, z: -5, stargazers_count: 100 }),
+      node({ id: 2, x: 0, y: 0, z: 5, stargazers_count: 100 }),
+      node({ id: 3, x: 0.2, y: 0, z: 0, stargazers_count: 100 }),
+    ]);
+    const resolved = resolveProjectedNodeOverlaps(original);
+
+    expect(original[0]).toMatchObject({ x: 0, y: 0 });
+    expect(original[1]).toMatchObject({ x: 0, y: 0 });
+    for (let i = 0; i < resolved.length; i += 1) {
+      for (let j = i + 1; j < resolved.length; j += 1) {
+        const distance = Math.hypot(resolved[i].x! - resolved[j].x!, resolved[i].y! - resolved[j].y!);
+        const required = calculateNodeRadius(resolved[i].stargazers_count)
+          + calculateNodeRadius(resolved[j].stargazers_count);
+        expect(distance).toBeGreaterThanOrEqual(required);
+      }
+    }
+    expect(resolveProjectedNodeOverlaps(original)).toEqual(resolved);
+  });
+
+  it('leaves incomplete projected layouts to the normal force simulation', () => {
+    const original = toProcessedNodes([node(), node({ id: 2, x: NaN })]);
+    expect(resolveProjectedNodeOverlaps(original)).toBe(original);
   });
 });
 

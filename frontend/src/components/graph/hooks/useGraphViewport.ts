@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { ForceGraphMethods, NodeObject } from 'react-force-graph-2d';
 
 import { ZOOM_TO_FIT_PADDING, type HullCache, type ProcessedNode } from '../graph2dTypes';
@@ -17,6 +17,7 @@ export const useGraphViewport = ({
   nodeCount,
   width,
   height,
+  autoFitDuration = 400,
 }: {
   graphRef: React.MutableRefObject<ForceGraphMethods | undefined>;
   hullCacheRef: React.MutableRefObject<HullCache>;
@@ -24,6 +25,7 @@ export const useGraphViewport = ({
   nodeCount: number;
   width: number;
   height: number;
+  autoFitDuration?: number;
 }) => {
   const autoFitKeyRef = useRef<string | null>(null);
   const userInteractedRef = useRef<boolean>(false);
@@ -33,16 +35,29 @@ export const useGraphViewport = ({
     if (!graphRef.current || nodeCount === 0) return;
     if (autoFitKeyRef.current === layoutKey) return;
     if (userInteractedRef.current) return;
+    const liveGraph = graphRef.current as ForceGraphMethods & {
+      graphData?: () => { nodes: NodeObject[] };
+    };
+    if (liveGraph.graphData?.().nodes.length !== nodeCount) return;
 
-    graphRef.current.zoomToFit(400, ZOOM_TO_FIT_PADDING);
+    graphRef.current.zoomToFit(autoFitDuration, ZOOM_TO_FIT_PADDING);
     autoFitKeyRef.current = layoutKey;
-  }, [graphRef, layoutKey, nodeCount]);
+  }, [autoFitDuration, graphRef, layoutKey, nodeCount]);
 
   // Pagination extends one snapshot; do not reset the user's viewport for it.
-  useEffect(() => {
+  useLayoutEffect(() => {
     autoFitKeyRef.current = null;
     hullCacheRef.current.clear();
   }, [hullCacheRef, layoutKey]);
+
+  useLayoutEffect(() => {
+    if (width > 1 && height > 1) tryAutoFit();
+  }, [height, tryAutoFit, width]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(tryAutoFit);
+    return () => window.cancelAnimationFrame(frame);
+  }, [tryAutoFit]);
 
   // Fallback auto-fit after initial render in case engine-stop callback is delayed
   useEffect(() => {

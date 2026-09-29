@@ -27,7 +27,7 @@ const NAV_ITEMS = [
 export const AppSidebar = () => {
   const { t } = useTranslation();
   const location = useLocation();
-  const { setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, state } = useSidebar();
 
   useEffect(() => {
     setOpenMobile(false);
@@ -40,20 +40,22 @@ export const AppSidebar = () => {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              tooltip={t('app.title')}
               render={
                 <a
                   href="https://github.com/Tendo33/MyNebula"
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label={t('app.title')}
                 />
               }
             >
               <Github />
-              <span className="grid min-w-0 flex-1 text-left leading-tight">
-                <span className="truncate font-semibold">{t('app.title')}</span>
-                <span className="truncate text-xs text-muted-foreground">{t('sidebar.tagline')}</span>
-              </span>
+              {(state === 'expanded' || isMobile) && (
+                <span className="grid min-w-0 flex-1 text-left leading-tight">
+                  <span className="truncate font-semibold">{t('app.title')}</span>
+                  <span className="truncate text-xs text-muted-foreground">{t('sidebar.tagline')}</span>
+                </span>
+              )}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

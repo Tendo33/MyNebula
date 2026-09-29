@@ -1,5 +1,6 @@
 import type { ClusterInfo, GraphData, GraphEdge, GraphNode } from '../../types';
-import { GRAPH_2D_COLORS as COLORS } from './graph2dUtils';
+import { forceCollide, forceSimulation } from 'd3-force';
+import { GRAPH_2D_COLORS as COLORS, calculateNodeRadius } from './graph2dUtils';
 import {
   POSITION_SCALE,
   type ClusterCenter,
@@ -37,6 +38,34 @@ export const toProcessedNodes = (nodes: GraphNode[] | undefined): ProcessedNode[
     // Non-finite coordinates would propagate NaN into the canvas transform.
     x: Number.isFinite(n.x) ? n.x * POSITION_SCALE : undefined,
     y: Number.isFinite(n.y) ? n.y * POSITION_SCALE : undefined,
+  }));
+};
+
+/** Resolve 2D avatar collisions before the static graph receives its nodes. */
+export const resolveProjectedNodeOverlaps = (nodes: ProcessedNode[]): ProcessedNode[] => {
+  if (nodes.length < 2 || nodes.some((node) => !Number.isFinite(node.x) || !Number.isFinite(node.y))) {
+    return nodes;
+  }
+
+  const layoutNodes = nodes.map((node) => ({ ...node }));
+  const simulation = forceSimulation(layoutNodes)
+    .stop()
+    .force(
+      'collide',
+      forceCollide<ProcessedNode>()
+        .radius((node) => calculateNodeRadius(node.stargazers_count) + 1)
+        .strength(1)
+        .iterations(3)
+    );
+
+  for (let tick = 0; tick < 80; tick += 1) {
+    simulation.tick();
+  }
+
+  return nodes.map((node, index) => ({
+    ...node,
+    x: layoutNodes[index].x,
+    y: layoutNodes[index].y,
   }));
 };
 

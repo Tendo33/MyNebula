@@ -20,10 +20,12 @@ import type {
 import {
   buildClusterGroups,
   buildClusterLayoutData,
+  resolveProjectedNodeOverlaps,
   toProcessedLinks,
   toProcessedNodes,
 } from './graph2dLayout';
 import {
+  buildOverviewLinks,
   collectFocusClusterIds,
   resolveLinkColor,
   resolveLinkWidth,
@@ -58,6 +60,7 @@ const Graph2D: React.FC = () => {
 
   const hullCacheRef = useRef<HullCache>(new Map());
   const { imageCacheRef, triggerAvatarRedraw } = useAvatarImageCache();
+  const lastNodesRef = useRef<ProcessedNode[] | null>(null);
 
   // Global state
   const { filteredData, rawData, selectedNode, setSelectedNode, settings, loading, nodesLoading, error } = useGraph();
@@ -88,8 +91,46 @@ const Graph2D: React.FC = () => {
   // Process data for force-graph (from rawData to keep layout stable!)
   const rawNodes = rawData?.nodes;
   const rawEdges = rawData?.edges;
-  const processedNodes = useMemo(() => toProcessedNodes(rawNodes), [rawNodes]);
+  const projectedNodes = useMemo(() => toProcessedNodes(rawNodes), [rawNodes]);
+  const settledNodes = useMemo(
+    () => resolveProjectedNodeOverlaps(projectedNodes),
+    [projectedNodes]
+  );
+  const processedNodes = useMemo(() => {
+    if (reduceMotion || settledNodes.length === 0) return settledNodes;
+    if (settledNodes.some((node) => !Number.isFinite(node.x) || !Number.isFinite(node.y))) {
+      return projectedNodes;
+    }
+
+    const previous = lastNodesRef.current;
+    if (previous?.length) {
+      const previousById = new Map(previous.map((node) => [node.id, node]));
+      return projectedNodes.map((node, index) => {
+        const existing = previousById.get(node.id);
+        return {
+          ...node,
+          x: existing?.x ?? settledNodes[index].x,
+          y: existing?.y ?? settledNodes[index].y,
+        };
+      });
+    }
+
+    // Start slightly gathered so the collision and anchor forces have visible work to do.
+    const centerX = settledNodes.reduce((sum, node) => sum + node.x!, 0) / settledNodes.length;
+    const centerY = settledNodes.reduce((sum, node) => sum + node.y!, 0) / settledNodes.length;
+    return projectedNodes.map((node, index) => ({
+      ...node,
+      x: centerX + (settledNodes[index].x! - centerX) * 0.78,
+      y: centerY + (settledNodes[index].y! - centerY) * 0.78,
+    }));
+  }, [projectedNodes, reduceMotion, settledNodes]);
   const processedLinks = useMemo(() => toProcessedLinks(rawEdges), [rawEdges]);
+  const overviewLinks = useMemo(() => buildOverviewLinks(processedLinks), [processedLinks]);
+  const [motionReadyNodes, setMotionReadyNodes] = useState<ProcessedNode[] | null>(null);
+
+  useEffect(() => {
+    if (processedNodes.length) lastNodesRef.current = processedNodes;
+  }, [processedNodes]);
 
   const processedData = useMemo<ProcessedData>(
     () => ({ nodes: processedNodes, links: processedLinks }),
@@ -103,14 +144,25 @@ const Graph2D: React.FC = () => {
     [processedNodes]
   );
 
+  useEffect(() => {
+    if (reduceMotion || !hasStablePositions) {
+      setMotionReadyNodes(null);
+      return;
+    }
+    // Let avatars begin loading before the graph's short layout pass.
+    const timer = window.setTimeout(() => setMotionReadyNodes(processedNodes), 750);
+    return () => window.clearTimeout(timer);
+  }, [hasStablePositions, processedNodes, reduceMotion]);
+
   const layoutKey = useMemo(
     () => rawData?.version ?? rawData?.generated_at ?? 'graph',
     [rawData?.generated_at, rawData?.version]
   );
 
+  const waitingForAvatars = hasStablePositions && motionReadyNodes !== processedNodes;
   const motionProfile = useMemo(
-    () => getGraphMotionProfile(hasStablePositions, reduceMotion),
-    [hasStablePositions, reduceMotion]
+    () => getGraphMotionProfile(hasStablePositions, reduceMotion || waitingForAvatars),
+    [hasStablePositions, reduceMotion, waitingForAvatars]
   );
 
   const clusterLayoutData = useMemo(
@@ -123,9 +175,12 @@ const Graph2D: React.FC = () => {
 
   useGraphForces({
     graphRef,
+    nodes: processedNodes,
+    targetNodes: settledNodes,
     clusterLayoutData,
     layoutKey,
     forceScale: motionProfile.forceScale,
+    hasProjectedPositions: hasStablePositions,
     enabled: !loading && (filteredData?.nodes.length ?? 0) > 0,
   });
 
@@ -137,6 +192,7 @@ const Graph2D: React.FC = () => {
       nodeCount: processedData.nodes.length,
       width,
       height,
+      autoFitDuration: hasStablePositions ? 0 : 400,
     });
 
   const selectedNodeId = selectedNode?.id;
@@ -188,6 +244,7 @@ const Graph2D: React.FC = () => {
         hoverClusterId: activeHoverNode?.cluster_id,
         selectedNeighbors,
         clusterByNodeId,
+        overviewLinks,
       }),
     [
       activeHoverNode?.cluster_id,
@@ -198,6 +255,7 @@ const Graph2D: React.FC = () => {
       selectedNode?.id,
       settings.showTrajectories,
       visibleNodeIds,
+      overviewLinks,
     ]
   );
 
@@ -212,6 +270,7 @@ const Graph2D: React.FC = () => {
         hoverClusterId: activeHoverNode?.cluster_id,
         selectedNeighbors,
         clusterByNodeId,
+        overviewLinks,
       }),
     [
       activeHoverNode?.cluster_id,
@@ -222,6 +281,7 @@ const Graph2D: React.FC = () => {
       selectedNode?.id,
       settings.showTrajectories,
       visibleNodeIds,
+      overviewLinks,
     ]
   );
 

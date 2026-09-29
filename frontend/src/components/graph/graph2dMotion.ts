@@ -24,12 +24,12 @@ export const getGraphMotionProfile = (
 
   if (hasProjectedPositions) {
     return {
-      alphaDecay: 1,
-      velocityDecay: 0.9,
-      cooldownTicks: 0,
-      cooldownTime: 0,
+      alphaDecay: 0.06,
+      velocityDecay: 0.6,
+      cooldownTicks: 90,
+      cooldownTime: 1600,
       warmupTicks: 0,
-      forceScale: 0,
+      forceScale: 0.2,
     };
   }
 

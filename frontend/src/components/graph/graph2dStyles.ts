@@ -22,6 +22,21 @@ export const GHOST_LINK_COLOR = 'rgba(200, 200, 200, 0.05)';
 const EMPTY_NEIGHBORS: ReadonlySet<number> = new Set();
 const EMPTY_CLUSTERS: ReadonlyMap<number, number | null> = new Map();
 
+/** Keep a sparse, weight-ranked backbone so every connected node has a visible route. */
+export const buildOverviewLinks = (links: ProcessedLink[]): ReadonlySet<ProcessedLink> => {
+  const covered = new Set<number>();
+  const overview = new Set<ProcessedLink>();
+  for (const link of [...links].sort((left, right) => right.weight - left.weight)) {
+    const sourceId = getNodeId(link.source);
+    const targetId = getNodeId(link.target);
+    if (covered.has(sourceId) && covered.has(targetId)) continue;
+    overview.add(link);
+    covered.add(sourceId);
+    covered.add(targetId);
+  }
+  return overview;
+};
+
 export const collectFocusClusterIds = (
   selectedClusterId: number | null | undefined,
   hoverClusterId: number | null | undefined,
@@ -134,6 +149,7 @@ export interface LinkStyleContext {
   hoverClusterId?: number | null;
   selectedNeighbors?: ReadonlySet<number>;
   clusterByNodeId?: ReadonlyMap<number, number | null>;
+  overviewLinks?: ReadonlySet<ProcessedLink>;
 }
 
 const linkEndpointVisibility = (
@@ -190,6 +206,12 @@ export const resolveLinkColor = (
 
   const { sourceId, targetId, bothVisible } = linkEndpointVisibility(link, context);
   if (!bothVisible) return GHOST_LINK_COLOR;
+  if (
+    context.selectedNodeId === undefined &&
+    context.activeHoverNodeId === undefined &&
+    context.overviewLinks &&
+    !context.overviewLinks.has(link as ProcessedLink)
+  ) return 'rgba(0,0,0,0)';
 
   const { sourceOn, targetOn, touchesHover, touchesSelectedNeighbor } = classifyLink(
     sourceId,
@@ -209,6 +231,12 @@ export const resolveLinkWidth = (
 
   const { sourceId, targetId, bothVisible } = linkEndpointVisibility(link, context);
   if (!bothVisible) return 0.2;
+  if (
+    context.selectedNodeId === undefined &&
+    context.activeHoverNodeId === undefined &&
+    context.overviewLinks &&
+    !context.overviewLinks.has(link as ProcessedLink)
+  ) return 0;
 
   const { sourceOn, targetOn, touchesHover, touchesSelectedNeighbor } = classifyLink(
     sourceId,

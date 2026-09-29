@@ -67,6 +67,7 @@ In-app chrome comes from shadcn on Base UI in `frontend/src/components/ui`, mapp
 - `Input`, `InputGroup`, Base UI `Select`, `Switch`, `Slider`, `Table`, `Sheet`, `Alert`, `Empty`. Select menus use the same 6px corners, hairlines, and keyboard states as other in-app controls.
 - `Sidebar` (`collapsible="icon"`) is the shell for Dashboard, Graph, Data, and Settings. `Breadcrumb` sits in the inset header.
 - Graph uses a filter rail and a full-width canvas until a repository is selected. The detail panel is added on selection at about 30% width and uses `Avatar`, one fact line, and `Tabs` (Overview / Related) inside `ScrollArea`.
+- Graph layout runs bounded collision and link forces after avatars start loading, then rests. Dragging reheats the layout; reduced motion uses settled coordinates immediately. The overview shows a sparse strongest-edge backbone, while hover and selection reveal related edges.
 - Data places search and filters above a full-width table. Cluster options wrap horizontally; the filter area has bounded height on narrow screens.
 - Settings after login is `Tabs`: Sync, Data, Appearance. The login form stays centered.
 - Unselected graph nodes are neutral and unlabeled. Hover or selection keeps hue and labels on that cluster and drops the others to about 0.18 opacity. No nebula background.

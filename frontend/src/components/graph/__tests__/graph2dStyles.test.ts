@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GRAPH_2D_COLORS as COLORS } from '../graph2dUtils';
 import {
+  buildOverviewLinks,
   GHOST_LINK_COLOR,
   GHOST_NODE_COLOR,
   resolveLinkColor,
@@ -227,6 +228,27 @@ describe('resolveLinkColor', () => {
     expect(resolveLinkColor(objectLink, { ...baseLinkContext, activeHoverNodeId: 1 })).toBe(
       COLORS.LINK_ACTIVE
     );
+  });
+});
+
+describe('buildOverviewLinks', () => {
+  it('keeps a sparse strongest-edge backbone and restores hidden edges on focus', () => {
+    const links = [
+      { source: 1, target: 2, weight: 0.9 },
+      { source: 1, target: 3, weight: 0.8 },
+      { source: 2, target: 3, weight: 0.7 },
+      { source: 3, target: 4, weight: 0.6 },
+    ] as ProcessedLink[];
+    const overviewLinks = buildOverviewLinks(links);
+    expect(overviewLinks).toEqual(new Set([links[0], links[1], links[3]]));
+    const context = {
+      ...baseLinkContext,
+      visibleNodeIds: new Set([1, 2, 3, 4]),
+      overviewLinks,
+    };
+    expect(resolveLinkWidth(links[2], context)).toBe(0);
+    expect(resolveLinkColor(links[2], context)).toBe('rgba(0,0,0,0)');
+    expect(resolveLinkWidth(links[2], { ...context, activeHoverNodeId: 2 })).toBe(2);
   });
 });
 
