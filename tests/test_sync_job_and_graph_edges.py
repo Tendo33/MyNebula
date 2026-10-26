@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pytest
@@ -25,20 +25,20 @@ def test_calculate_progress_percent_handles_bounds():
 
 
 def test_estimate_eta_seconds_returns_none_for_invalid_progress():
-    started_at = datetime.now(timezone.utc) - timedelta(minutes=2)
+    started_at = datetime.now(UTC) - timedelta(minutes=2)
     assert estimate_eta_seconds(started_at, 0.0) is None
     assert estimate_eta_seconds(started_at, 100.0) is None
 
 
 def test_estimate_eta_seconds_estimates_remaining_time():
-    started_at = datetime.now(timezone.utc) - timedelta(seconds=120)
+    started_at = datetime.now(UTC) - timedelta(seconds=120)
     eta = estimate_eta_seconds(started_at, 50.0)
     assert eta is not None
     assert 100 <= eta <= 140
 
 
 def test_estimate_eta_seconds_handles_timezone_aware_started_at():
-    started_at = datetime.now(timezone.utc) - timedelta(seconds=120)
+    started_at = datetime.now(UTC) - timedelta(seconds=120)
     eta = estimate_eta_seconds(started_at, 50.0)
     assert eta is not None
     assert 100 <= eta <= 140
@@ -99,7 +99,7 @@ def test_calculate_next_run_time_returns_timezone_aware_utc():
     next_run = calculate_next_run_time(schedule)
 
     assert next_run is not None
-    assert next_run.tzinfo == timezone.utc
+    assert next_run.tzinfo == UTC
 
 
 def test_build_similarity_edges_knn_returns_unique_edges():

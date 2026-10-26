@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -31,7 +31,7 @@ class _FakeSessionContext:
 
 
 def test_apply_and_clear_job_lease_uses_unique_execution_token():
-    now = datetime(2026, 8, 8, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 8, 9, 0, tzinfo=UTC)
     record = SimpleNamespace()
 
     token = lifecycle.apply_job_lease(record, now=now)
@@ -62,7 +62,7 @@ async def test_renew_job_lease_does_not_revive_terminal_record():
 
 @pytest.mark.asyncio
 async def test_renew_job_lease_requires_current_unexpired_owner(monkeypatch):
-    now = datetime(2026, 8, 8, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 8, 9, 0, tzinfo=UTC)
     monkeypatch.setattr(lifecycle, "utcnow", lambda: now)
     session = _FakeSessionContext(rowcounts=(1,))
 

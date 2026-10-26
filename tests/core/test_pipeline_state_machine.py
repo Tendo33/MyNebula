@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -47,7 +47,7 @@ async def test_pipeline_marks_partial_failed_when_phase_has_failed_items(monkeyp
         id=1,
         user_id=9,
         worker_id="worker:test",
-        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        lease_expires_at=datetime.now(UTC) + timedelta(minutes=5),
     )
     monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
 
@@ -100,7 +100,7 @@ async def test_pipeline_records_last_error_for_partial_failure(monkeypatch):
         id=1,
         user_id=9,
         worker_id="worker:test",
-        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        lease_expires_at=datetime.now(UTC) + timedelta(minutes=5),
     )
     monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
 
@@ -155,7 +155,7 @@ async def test_pipeline_marks_failed_when_phase_raises(monkeypatch):
         id=1,
         user_id=9,
         worker_id="worker:test",
-        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        lease_expires_at=datetime.now(UTC) + timedelta(minutes=5),
     )
     monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
 
@@ -204,7 +204,7 @@ async def test_recluster_pipeline_runs_clustering_then_snapshot(monkeypatch):
         id=7,
         user_id=9,
         worker_id="worker:test",
-        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        lease_expires_at=datetime.now(UTC) + timedelta(minutes=5),
     )
     monkeypatch.setattr(pipeline_module, "get_db_context", lambda: _FakeDbContext(run))
 

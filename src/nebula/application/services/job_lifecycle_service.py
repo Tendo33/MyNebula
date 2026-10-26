@@ -7,7 +7,7 @@ import os
 import socket
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import uuid4
 
@@ -37,7 +37,7 @@ class JobLeaseLostError(RuntimeError):
 
 def utcnow() -> datetime:
     """Return an aware UTC timestamp."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def apply_job_lease(

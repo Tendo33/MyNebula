@@ -6,7 +6,7 @@ candidate selection, and timeline aggregation — sat at 19% in the 2026-08-18
 scan.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -17,7 +17,7 @@ from nebula.application.services.graph_snapshot_service import (
     GraphSnapshotBuilderService,
 )
 
-NOW = datetime(2026, 8, 18, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 18, tzinfo=UTC)
 
 
 def _repo(
@@ -272,19 +272,19 @@ async def test_timeline_aggregates_by_month_with_top_languages_and_topics():
     timeline_repos = [
         _repo(
             1,
-            starred_at=datetime(2026, 1, 5, tzinfo=timezone.utc),
+            starred_at=datetime(2026, 1, 5, tzinfo=UTC),
             language="Python",
             topics=("ai", "ml"),
         ),
         _repo(
             2,
-            starred_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            starred_at=datetime(2026, 1, 20, tzinfo=UTC),
             language="Python",
             topics=("ai",),
         ),
         _repo(
             3,
-            starred_at=datetime(2026, 3, 2, tzinfo=timezone.utc),
+            starred_at=datetime(2026, 3, 2, tzinfo=UTC),
             language="Rust",
             topics=("systems",),
         ),

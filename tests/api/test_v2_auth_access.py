@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -338,9 +338,9 @@ async def test_login_rate_limit_prunes_stale_buckets(monkeypatch):
 
     fake_db = _install_fake_rate_limit_helpers(monkeypatch, auth_api)
     fake_db.attempts = [
-        ("ip:127.0.0.1", datetime(2026, 1, 1, tzinfo=timezone.utc)),
-        ("user:owner", datetime(2026, 1, 1, tzinfo=timezone.utc)),
-        ("user:unrelated", datetime(2026, 1, 1, tzinfo=timezone.utc)),
+        ("ip:127.0.0.1", datetime(2026, 1, 1, tzinfo=UTC)),
+        ("user:owner", datetime(2026, 1, 1, tzinfo=UTC)),
+        ("user:unrelated", datetime(2026, 1, 1, tzinfo=UTC)),
     ]
 
     settings = AppSettings(
@@ -353,7 +353,7 @@ async def test_login_rate_limit_prunes_stale_buckets(monkeypatch):
     class _FrozenDateTime(datetime):
         @classmethod
         def now(cls, tz=None):
-            return datetime(2026, 1, 1, 0, 2, 0, tzinfo=tz or timezone.utc)
+            return datetime(2026, 1, 1, 0, 2, 0, tzinfo=tz or UTC)
 
     monkeypatch.setattr(auth_api, "datetime", _FrozenDateTime)
 
@@ -367,15 +367,15 @@ async def test_login_rate_limit_prunes_stale_buckets(monkeypatch):
 
     assert (
         "ip:127.0.0.1",
-        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 1, tzinfo=UTC),
     ) not in fake_db.attempts
     assert (
         "user:owner",
-        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 1, tzinfo=UTC),
     ) not in fake_db.attempts
     assert (
         "user:unrelated",
-        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 1, tzinfo=UTC),
     ) in fake_db.attempts
 
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from itertools import islice
 from typing import TypeVar
 
@@ -142,7 +142,7 @@ class SnapshotStoreRepository:
         if active_id is not None:
             protected_ids.add(active_id)
 
-        cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=max_age_days)
+        cutoff = (now or datetime.now(UTC)) - timedelta(days=max_age_days)
         candidate_query = select(GraphSnapshot.id).where(
             GraphSnapshot.user_id == user_id,
             GraphSnapshot.created_at < cutoff,
@@ -198,7 +198,7 @@ class SnapshotStoreRepository:
             .values(status="ready")
         )
         snapshot.status = "active"
-        snapshot.activated_at = datetime.now(timezone.utc)
+        snapshot.activated_at = datetime.now(UTC)
         user.active_graph_snapshot_id = snapshot.id
         await db.commit()
 

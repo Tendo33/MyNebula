@@ -1,6 +1,6 @@
 """V2 sync routes backed by pipeline runs."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,6 +126,6 @@ async def get_pipeline_status(
         retryable=run.status in {"failed", "interrupted"},
         **build_v2_metadata(
             version=f"pipeline-{run.id}",
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
         ),
     )

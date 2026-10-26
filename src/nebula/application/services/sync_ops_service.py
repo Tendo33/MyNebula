@@ -1,6 +1,6 @@
 """Operational sync services for status, schedule, and full-refresh."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import BackgroundTasks, HTTPException, status
@@ -52,8 +52,8 @@ def _to_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def calculate_progress_percent(total_items: int, processed_items: int) -> float:
@@ -74,7 +74,7 @@ def estimate_eta_seconds(
         return None
 
     started_at_utc = _to_utc(started_at)
-    now_ts = _to_utc(now) if now is not None else datetime.now(timezone.utc)
+    now_ts = _to_utc(now) if now is not None else datetime.now(UTC)
     if started_at_utc is None:
         return None
 
@@ -141,7 +141,7 @@ def calculate_next_run_time(schedule: SyncSchedule) -> datetime | None:
 
     try:
         tz = ZoneInfo(schedule.timezone)
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         now_local = now_utc.astimezone(tz)
         scheduled_today = now_local.replace(
             hour=schedule.schedule_hour,
@@ -153,7 +153,7 @@ def calculate_next_run_time(schedule: SyncSchedule) -> datetime | None:
         if now_local >= scheduled_today:
             scheduled_today += timedelta(days=1)
 
-        return scheduled_today.astimezone(timezone.utc)
+        return scheduled_today.astimezone(UTC)
     except Exception as exc:
         logger.warning(f"Error calculating next run time: {exc}")
         return None
@@ -310,7 +310,7 @@ async def full_refresh_task(user_id: int, task_id: int):
             task = await db.get(SyncTask, task_id, with_for_update=True)
             if not task:
                 raise JobLeaseLostError(f"Full refresh task {task_id} no longer exists")
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if (
                 task.worker_id != worker_id
                 or task.status
@@ -390,7 +390,7 @@ async def full_refresh_task(user_id: int, task_id: int):
         partial_failures: list[dict] = []
         task_exists = await _update_main_task(
             status="running",
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
             error_message=None,
             total_items=5,
             processed_items=0,
@@ -479,7 +479,7 @@ async def full_refresh_task(user_id: int, task_id: int):
         )
         await _update_main_task(
             status=terminal_status,
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
             processed_items=5,
             error_details={
                 "phase": "complete",
@@ -506,7 +506,7 @@ async def full_refresh_task(user_id: int, task_id: int):
             await _update_main_task(
                 status="failed",
                 error_message=str(exc),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
                 error_details={"phase": failed_phase},
             )
         except JobLeaseLostError:

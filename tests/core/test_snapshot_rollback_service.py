@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -9,7 +9,7 @@ from nebula.schemas.graph import GraphData, TimelineData
 
 class _BuilderStub:
     async def build_payload(self, _db, *, user=None):
-        now = datetime(2026, 3, 4, tzinfo=timezone.utc)
+        now = datetime(2026, 3, 4, tzinfo=UTC)
         return (
             "snapshot-v1",
             GraphData(
@@ -35,7 +35,7 @@ class _BuilderStub:
 class _InvalidSnapshotRepo:
     async def save_snapshot_payload(self, *_args, **_kwargs):
         return SimpleNamespace(
-            id=2, version="snapshot-v1", created_at=datetime.now(timezone.utc), meta={}
+            id=2, version="snapshot-v1", created_at=datetime.now(UTC), meta={}
         )
 
     async def validate_snapshot_consistency(self, *_args, **_kwargs):

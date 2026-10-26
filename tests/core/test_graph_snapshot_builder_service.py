@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from nebula.application.services.graph_snapshot_service import (
     GraphSnapshotBuilderService,
@@ -9,7 +9,7 @@ from nebula.schemas.graph import GraphData
 
 def test_build_version_contains_counts():
     service = GraphSnapshotBuilderService()
-    now = datetime(2026, 3, 3, 12, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 3, 12, 30, tzinfo=UTC)
     graph_data = GraphData(
         nodes=[],
         edges=[],
@@ -30,7 +30,7 @@ def test_build_version_contains_counts():
 
 def test_build_version_is_unique_for_same_second_and_graph_size():
     service = GraphSnapshotBuilderService()
-    now = datetime(2026, 3, 3, 12, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 3, 12, 30, tzinfo=UTC)
     graph_data = GraphData(
         nodes=[],
         edges=[],

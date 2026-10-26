@@ -1,7 +1,7 @@
 """V2 data/repository routes."""
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, asc, desc, func, or_, select
@@ -63,8 +63,8 @@ def _parse_month_window(month: str | None) -> tuple[datetime, datetime] | None:
     next_month = 1 if month_dt.month == 12 else month_dt.month + 1
     next_month_dt = month_dt.replace(year=next_month_year, month=next_month)
     return (
-        month_dt.replace(tzinfo=timezone.utc),
-        next_month_dt.replace(tzinfo=timezone.utc),
+        month_dt.replace(tzinfo=UTC),
+        next_month_dt.replace(tzinfo=UTC),
     )
 
 

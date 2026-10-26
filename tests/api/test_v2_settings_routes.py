@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import HTTPException
@@ -47,7 +47,7 @@ async def test_get_settings_returns_typed_payload(monkeypatch):
 
     async def fake_get_sync_info(*_args, **_kwargs):
         return SyncInfoResponse(
-            last_sync_at=datetime(2026, 3, 3, tzinfo=timezone.utc),
+            last_sync_at=datetime(2026, 3, 3, tzinfo=UTC),
             github_token_configured=True,
             single_user_mode=True,
             read_access_mode="demo",

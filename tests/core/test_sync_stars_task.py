@@ -9,7 +9,7 @@ Database interaction is faked here; the integration tier covers the persistence
 semantics these tests cannot reach (large `NOT IN`, cascade behaviour).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -18,7 +18,7 @@ from nebula.application.services import sync_execution_service
 from nebula.core.config import get_app_settings, get_sync_settings
 from nebula.core.github_client import GitHubRepo
 
-NOW = datetime(2026, 8, 18, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
 
 
 def _gh_repo(repo_id: int, **overrides) -> GitHubRepo:

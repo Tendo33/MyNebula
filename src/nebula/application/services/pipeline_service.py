@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -375,7 +375,7 @@ class SyncPipelineService:
             run = await db.get(PipelineRun, run_id, with_for_update=True)
             if run is None:
                 raise JobLeaseLostError(f"Pipeline run {run_id} no longer exists")
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if (
                 run.worker_id != worker_id
                 or run.status
@@ -396,14 +396,14 @@ class SyncPipelineService:
             if error:
                 run.last_error = error
             if status == PipelineStatus.running and run.started_at is None:
-                run.started_at = datetime.now(timezone.utc)
+                run.started_at = datetime.now(UTC)
             if status in {
                 PipelineStatus.completed,
                 PipelineStatus.partial_failed,
                 PipelineStatus.failed,
                 PipelineStatus.interrupted,
             }:
-                run.completed_at = datetime.now(timezone.utc)
+                run.completed_at = datetime.now(UTC)
                 clear_job_lease(run)
             await db.commit()
 

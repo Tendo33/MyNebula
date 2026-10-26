@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def build_v2_metadata(
@@ -14,6 +14,6 @@ def build_v2_metadata(
 ) -> dict[str, str | None]:
     return {
         "version": version,
-        "generated_at": generated_at or datetime.now(timezone.utc).isoformat(),
+        "generated_at": generated_at or datetime.now(UTC).isoformat(),
         "request_id": request_id or str(uuid.uuid4()),
     }

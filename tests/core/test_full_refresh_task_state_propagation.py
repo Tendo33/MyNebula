@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -68,8 +68,8 @@ class _FakeState:
                 processed_items=0,
                 failed_items=0,
                 worker_id="worker:full-refresh",
-                heartbeat_at=datetime.now(timezone.utc),
-                lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+                heartbeat_at=datetime.now(UTC),
+                lease_expires_at=datetime.now(UTC) + timedelta(minutes=5),
             )
         }
         self.next_task_id = 2
@@ -101,14 +101,14 @@ async def test_full_refresh_marks_parent_failed_when_subtask_sets_failed_status(
             task = state.tasks[task_id]
             task.status = "failed"
             task.error_message = message
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = datetime.now(UTC)
 
         return _fail
 
     async def complete_subtask(_user_id, task_id, *_args, **_kwargs):
         task = state.tasks[task_id]
         task.status = "completed"
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = datetime.now(UTC)
 
     async def fake_snapshot(db, *, user):
         state.snapshot_calls.append((db.state.user.id, user.id))
@@ -170,12 +170,12 @@ async def test_full_refresh_marks_parent_partial_failed_when_subtask_has_failed_
         task = state.tasks[task_id]
         task.status = "completed"
         task.failed_items = 2
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = datetime.now(UTC)
 
     async def _complete_subtask(_user_id, task_id, *_args, **_kwargs):
         task = state.tasks[task_id]
         task.status = "completed"
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = datetime.now(UTC)
 
     async def fake_snapshot(db, *, user):
         state.snapshot_calls.append((db.state.user.id, user.id))

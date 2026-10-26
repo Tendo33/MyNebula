@@ -1,6 +1,6 @@
 """Star fetch/persist execution for the sync pipeline."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import perf_counter
 
 from sqlalchemy import func, select
@@ -41,7 +41,7 @@ async def sync_stars_task(
                 return
 
             task.status = "running"
-            task.started_at = datetime.now(timezone.utc)
+            task.started_at = datetime.now(UTC)
             await db.commit()
 
             effective_mode = sync_mode
@@ -324,10 +324,10 @@ async def sync_stars_task(
                 user.total_stars = len(repos)
                 user.synced_stars = processed
 
-            user.last_sync_at = datetime.now(timezone.utc)
+            user.last_sync_at = datetime.now(UTC)
 
             task.status = "completed"
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = datetime.now(UTC)
             task.error_details = {
                 "sync_mode": effective_mode,
                 "new_repos": new_count,
@@ -364,5 +364,5 @@ async def sync_stars_task(
                 if task:
                     task.status = "failed"
                     task.error_message = str(exc)
-                    task.completed_at = datetime.now(timezone.utc)
+                    task.completed_at = datetime.now(UTC)
                     await db.commit()

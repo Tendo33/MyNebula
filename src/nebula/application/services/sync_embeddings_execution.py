@@ -1,6 +1,6 @@
 """Embedding execution for the sync pipeline."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import perf_counter
 
 from sqlalchemy import func, select
@@ -110,7 +110,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 return
 
             task.status = "running"
-            task.started_at = datetime.now(timezone.utc)
+            task.started_at = datetime.now(UTC)
             await db.commit()
 
             total_result = await db.execute(
@@ -125,7 +125,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
 
             if total_pending == 0:
                 task.status = "completed"
-                task.completed_at = datetime.now(timezone.utc)
+                task.completed_at = datetime.now(UTC)
                 await db.commit()
                 return
 
@@ -223,7 +223,7 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 )
             else:
                 task.status = "completed"
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = datetime.now(UTC)
             await db.commit()
 
             logger.info(
@@ -238,5 +238,5 @@ async def compute_embeddings_task(user_id: int, task_id: int):
                 if task:
                     task.status = "failed"
                     task.error_message = str(exc)
-                    task.completed_at = datetime.now(timezone.utc)
+                    task.completed_at = datetime.now(UTC)
                     await db.commit()

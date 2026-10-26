@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import perf_counter
 from uuid import uuid4
 
@@ -79,7 +79,7 @@ class GraphSnapshotBuilderService:
                 total_star_lists=0,
             )
             empty_timeline = TimelineData(points=[], total_stars=0, date_range=("", ""))
-            generated_at = datetime.now(timezone.utc)
+            generated_at = datetime.now(UTC)
             version = self._build_version(empty_graph, generated_at)
             empty_graph.version = version
             empty_graph.generated_at = generated_at.isoformat()
@@ -307,7 +307,7 @@ class GraphSnapshotBuilderService:
             )
         timeline_elapsed_ms = (perf_counter() - timeline_started) * 1000
 
-        generated_at = datetime.now(timezone.utc)
+        generated_at = datetime.now(UTC)
         version = self._build_version(graph_data, generated_at)
         graph_data.version = version
         graph_data.generated_at = generated_at.isoformat()

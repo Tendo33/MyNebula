@@ -8,7 +8,7 @@ async event loop.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -131,7 +131,7 @@ class SchedulerService:
                 if not schedules:
                     return
 
-                now_utc = datetime.now(timezone.utc)
+                now_utc = datetime.now(UTC)
 
                 for schedule in schedules:
                     try:

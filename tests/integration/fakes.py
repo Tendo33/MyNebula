@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import hashlib
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from nebula.core.github_client import GitHubRepo
 
-EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)
+EPOCH = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 def deterministic_embedding(

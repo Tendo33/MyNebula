@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -131,7 +131,7 @@ async def test_retention_protects_active_and_latest_snapshots():
     deleted = await repo.prune_snapshots(
         session,
         user_id=5,
-        now=datetime(2026, 8, 8, tzinfo=timezone.utc),
+        now=datetime(2026, 8, 8, tzinfo=UTC),
     )
 
     assert deleted == 2

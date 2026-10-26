@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -18,7 +18,7 @@ class _SnapshotRepoStub:
         return SimpleNamespace(
             id=2,
             version="snapshot-active",
-            created_at=datetime(2026, 3, 3, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 3, 3, 12, 0, tzinfo=UTC),
         )
 
     async def hydrate_graph_data(
@@ -64,7 +64,7 @@ class _SnapshotRepoStub:
         return SimpleNamespace(
             id=1,
             version="snapshot-previous",
-            created_at=datetime(2026, 3, 3, 11, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 3, 3, 11, 0, tzinfo=UTC),
         )
 
     async def activate_snapshot(self, _db, _user_id, snapshot):

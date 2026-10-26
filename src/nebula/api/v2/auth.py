@@ -2,7 +2,7 @@
 
 import hashlib
 import hmac
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
@@ -222,7 +222,7 @@ async def _reserve_login_attempt(
     username: str,
     settings: AppSettings,
 ) -> None:
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     cutoff = now_utc - timedelta(seconds=settings.admin_login_rate_limit_window_seconds)
     keys = _login_rate_limit_keys(request, username, settings)
     await _acquire_login_bucket_locks(db, keys=keys)

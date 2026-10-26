@@ -1,7 +1,7 @@
 """Clustering execution for the sync pipeline."""
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, func, select, update
 
@@ -81,7 +81,7 @@ async def run_clustering_task(
                 return
 
             task.status = "running"
-            task.started_at = datetime.now(timezone.utc)
+            task.started_at = datetime.now(UTC)
             await db.commit()
 
             result = await db.execute(
@@ -94,7 +94,7 @@ async def run_clustering_task(
 
             if not repos:
                 task.status = "completed"
-                task.completed_at = datetime.now(timezone.utc)
+                task.completed_at = datetime.now(UTC)
                 task.error_message = "No embedded repos found"
                 await db.commit()
                 return
@@ -129,7 +129,7 @@ async def run_clustering_task(
 
             if len(embeddings) < 5:
                 task.status = "completed"
-                task.completed_at = datetime.now(timezone.utc)
+                task.completed_at = datetime.now(UTC)
                 task.error_message = "Not enough embedded repos for clustering (min 5)"
                 await db.commit()
                 return
@@ -165,7 +165,7 @@ async def run_clustering_task(
                 if not new_repos:
                     logger.info("Incremental mode: no new repos to assign")
                     task.status = "completed"
-                    task.completed_at = datetime.now(timezone.utc)
+                    task.completed_at = datetime.now(UTC)
                     task.processed_items = 0
                     await db.commit()
                     return
@@ -229,7 +229,7 @@ async def run_clustering_task(
 
                     task.processed_items = len(new_repos)
                     task.status = "completed"
-                    task.completed_at = datetime.now(timezone.utc)
+                    task.completed_at = datetime.now(UTC)
                     await db.commit()
 
                     logger.info(
@@ -388,7 +388,7 @@ async def run_clustering_task(
 
             task.processed_items = len(repos_with_embeddings)
             task.status = "completed"
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = datetime.now(UTC)
             await db.commit()
 
             logger.info(
@@ -404,5 +404,5 @@ async def run_clustering_task(
                 if task:
                     task.status = "failed"
                     task.error_message = str(exc)
-                    task.completed_at = datetime.now(timezone.utc)
+                    task.completed_at = datetime.now(UTC)
                     await db.commit()
