@@ -327,7 +327,11 @@ async def require_admin_csrf(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="CSRF token required",
         )
-    if not hmac.compare_digest(cookie_token, header_token):
+    # Compare as bytes: compare_digest raises TypeError on non-ASCII str,
+    # which would turn a forged header into a 500 instead of a 403.
+    if not hmac.compare_digest(
+        cookie_token.encode("utf-8"), header_token.encode("utf-8")
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="CSRF token mismatch",

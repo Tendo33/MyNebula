@@ -176,7 +176,10 @@ def deserialize_related_results(
                     ),
                 )
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                f"Skipping malformed related-repo cache item for repo_id={repo_id}: {exc}"
+            )
             continue
 
         if len(restored) >= limit:

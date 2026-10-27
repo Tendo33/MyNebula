@@ -661,3 +661,30 @@ async def test_repo_search_cache_is_scoped_to_active_snapshot(monkeypatch):
     assert second == []
     assert embedding_service.calls == 2
     assert fake_db.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_require_admin_csrf_non_ascii_header_returns_403(monkeypatch):
+    from nebula.api.v2 import auth as auth_api
+
+    async def fake_session_version(_db):
+        return 1
+
+    monkeypatch.setattr(auth_api, "get_admin_session_version", fake_session_version)
+    monkeypatch.setattr(
+        auth_api, "_read_csrf_token", lambda *_args, **_kwargs: "valid-token"
+    )
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v2/settings",
+            "headers": [(b"x-csrf-token", "tök€n".encode())],
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth_api.require_admin_csrf(
+            request, settings=SimpleNamespace(), _="admin", db=object()
+        )
+    assert exc_info.value.status_code == 403
