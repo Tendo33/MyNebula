@@ -33,6 +33,18 @@ def test_verify_admin_credentials_plaintext_password():
     assert verify_admin_credentials("guest", "topsecret", settings) is False
 
 
+def test_verify_admin_credentials_non_ascii_does_not_raise():
+    settings = AppSettings(
+        admin_username="管理员",
+        admin_password="密码-topsecret",
+        admin_session_secret="session-secret",
+    )
+
+    assert verify_admin_credentials("管理员", "密码-topsecret", settings) is True
+    assert verify_admin_credentials("管理员", "错误", settings) is False
+    assert verify_admin_credentials("owner", "密码-topsecret", settings) is False
+
+
 def test_admin_auth_disabled_when_password_not_set():
     settings = AppSettings(
         admin_username="owner",

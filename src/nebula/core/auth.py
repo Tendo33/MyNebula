@@ -28,10 +28,15 @@ def verify_admin_credentials(
     if not is_admin_auth_enabled(settings):
         return False
 
-    if not hmac.compare_digest(username, settings.admin_username):
+    # Compare as UTF-8 bytes: compare_digest raises TypeError on non-ASCII str.
+    if not hmac.compare_digest(
+        username.encode("utf-8"), settings.admin_username.encode("utf-8")
+    ):
         return False
 
-    return hmac.compare_digest(password, settings.admin_password)
+    return hmac.compare_digest(
+        password.encode("utf-8"), settings.admin_password.encode("utf-8")
+    )
 
 
 def get_admin_session_username(
