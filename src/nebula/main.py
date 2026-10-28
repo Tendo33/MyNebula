@@ -203,6 +203,11 @@ def create_app() -> FastAPI:
             ):
                 return FileResponse(requested_file)
 
+            # Paths that look like files (robots.txt, sitemap.xml, wp-login.php…)
+            # must not fall back to the SPA shell with 200: that is a soft 404.
+            if Path(full_path).suffix:
+                return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
             return FileResponse(frontend_dist / "index.html")
 
         logger.info(f"Serving frontend static files from: {frontend_dist}")

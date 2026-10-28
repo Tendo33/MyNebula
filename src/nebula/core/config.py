@@ -11,9 +11,9 @@ from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_CONTENT_SECURITY_POLICY = (
-    "default-src 'self'; script-src 'self'; "
+    "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; "
     "style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; "
-    "connect-src 'self'; font-src 'self' data:; object-src 'none'; "
+    "connect-src 'self' https://cloudflareinsights.com; font-src 'self' data:; object-src 'none'; "
     "base-uri 'self'; frame-ancestors 'none'"
 )
 
