@@ -5,29 +5,15 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MyNebula</title>
+    <meta name="description" content="MyNebula: visualize your GitHub stars as a clustered knowledge nebula." />
+    <meta property="og:title" content="MyNebula" />
+    <meta property="og:description" content="Visualize your GitHub stars as a clustered knowledge nebula." />
+    <meta property="og:image" content="/logo.png" />
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Applied before the bundle loads: without this a dark-mode user gets a
-      // white flash on every navigation while React boots.
-      (function () {
-        try {
-          var stored = localStorage.getItem('nebula_theme') || 'system';
-          var dark =
-            stored === 'dark' ||
-            (stored === 'system' &&
-              window.matchMedia &&
-              window.matchMedia('(prefers-color-scheme: dark)').matches);
-          if (dark) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.style.colorScheme = 'dark';
-          }
-        } catch (e) {
-          /* no stored preference; fall through to light */
-        }
-      })();
-    </script>
+    <!-- External (not inline) so the strict CSP script-src 'self' allows it. -->
+    <script src="/theme-init.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
