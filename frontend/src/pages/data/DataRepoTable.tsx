@@ -68,7 +68,7 @@ export const DataRepoTable: React.FC<{
   return (
     <div className="h-full min-h-0">
     <Card className="hidden h-full min-h-0 w-full overflow-hidden py-0 sm:flex">
-      <ScrollArea className="h-full min-h-0 w-full">
+      <ScrollArea horizontal className="h-full min-h-0 w-full">
         <Table className="text-left">
           <TableHeader className="bg-muted font-medium text-muted-foreground">
             <TableRow>

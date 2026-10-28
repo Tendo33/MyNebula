@@ -6,8 +6,9 @@ import { cn } from "cn"
 function ScrollArea({
   className,
   children,
+  horizontal = false,
   ...props
-}: ScrollAreaPrimitive.Root.Props) {
+}: ScrollAreaPrimitive.Root.Props & { horizontal?: boolean }) {
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
@@ -21,6 +22,7 @@ function ScrollArea({
         {children}
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar />
+      {horizontal ? <ScrollBar orientation="horizontal" /> : null}
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
   )
