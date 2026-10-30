@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { deduplicateNames, detectCommunities, louvain, matchPrevious, sanitizeClusterName, tagNames } from './cluster.ts';
 import { adaptiveThreshold, analyze, buildEdges, normalizeTag, normalizeTags, scorePairs, tagOverlap, writeSite, type Edge } from './graph.ts';
 import { embeddingText, fallbackTags, parseSummaryJson, readmeSignal } from './remote.ts';
-import { assignClusters, contentHash, loadSettings, loadState, saveState, type Repo, type State } from './sync.ts';
+import { assignClusters, contentHash, loadSettings, loadState, markForEnrichment, saveState, type Repo, type State } from './sync.ts';
 
 const repo = (id: number, patch: Partial<Repo> = {}): Repo => ({
   id,
@@ -85,6 +85,22 @@ describe('text helpers', () => {
     expect(readmeSignal('# Title\nintro text\n## Features\nfast things\n## License\nMIT')).toBe('features: fast things');
     const text = embeddingText(repo(1, { full_name: 'o/r', language: 'Python', description: 'raw', ai_summary: 'smart', ai_tags: ['AI Agents'], topics: ['x'] }), null);
     expect(text).toBe('o/r\nLanguage: Python\nsmart\nTags: agent, AI Agents');
+  });
+
+  it('re-embeds without re-summarizing when only the embedding is missing', () => {
+    const digest = contentHash({ description: 'd', topics: [] });
+    const failedBatch = repo(1, { hash: digest, ai_summary: 'paid', ai_tags: ['x'] });
+    expect(markForEnrichment(failedBatch, digest, false)).toBe(true);
+    expect(failedBatch.ai_summary).toBe('paid');
+
+    const changed = repo(2, { hash: 'old', ai_summary: 'stale', embedding: [1] });
+    expect(markForEnrichment(changed, digest, false)).toBe(true);
+    expect(changed.ai_summary).toBeUndefined();
+
+    const fresh = repo(3, { hash: digest, ai_summary: 's', embedding: [1] });
+    expect(markForEnrichment(fresh, digest, false)).toBe(false);
+    expect(markForEnrichment(fresh, digest, true)).toBe(true);
+    expect(fresh.embedding).toBeUndefined();
   });
 
   it('hashes topics order-independently', () => {

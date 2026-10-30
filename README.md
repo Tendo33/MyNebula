@@ -76,7 +76,7 @@ Summaries and embeddings are cached, so a daily run only pays for what changed. 
 
 ### Free mode
 
-Leave `LLM_API_KEY` empty and the sync makes no chat-model calls: embeddings are built from the description, topics, and a README excerpt, and the details panel shows the original description. Embedding models such as `BAAI/bge-large-zh-v1.5` on SiliconFlow are free, so the whole pipeline can run at no cost.
+Leave `LLM_API_KEY` empty and the sync makes no chat-model calls: embeddings are built from the description, topics, and a README excerpt, and the details panel shows the original description. What remains is embeddings, which cost very little (models such as `BAAI/bge-m3` on SiliconFlow are priced near zero, though the account needs a positive balance to call them).
 
 ## Quick start
 

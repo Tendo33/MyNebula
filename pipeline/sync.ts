@@ -112,6 +112,22 @@ export const contentHash = (repo: Pick<Repo, 'description' | 'topics'>) =>
     .update(`${repo.description ?? ''}\x00${[...(repo.topics ?? [])].sort().join(',')}`)
     .digest('hex');
 
+/**
+ * Decide whether a repo needs enrichment, clearing only what is stale.
+ * Changed content (or `--full`) drops the summary, tags, and embedding; a repo
+ * that merely lost its embedding (a failed batch) keeps its paid summary.
+ */
+export const markForEnrichment = (repo: Repo, digest: string, full: boolean): boolean => {
+  const changed = full || repo.hash !== digest;
+  if (changed) {
+    delete repo.ai_summary;
+    delete repo.ai_tags;
+    delete repo.embedding;
+  }
+  repo.hash = digest;
+  return changed || !repo.embedding?.length;
+};
+
 /** Refresh metadata from GitHub; returns keys of repos that need enrichment. */
 const fetchStars = async (state: State, settings: Settings, full: boolean): Promise<string[]> => {
   if (!settings.githubToken) throw new Error('GITHUB_TOKEN is not set');
@@ -125,13 +141,7 @@ const fetchStars = async (state: State, settings: Settings, full: boolean): Prom
     const key = String(meta.id);
     const repo = { ...previous[key], ...meta } as Repo;
     const digest = contentHash(repo);
-    if (full || repo.hash !== digest || !repo.embedding?.length) {
-      delete repo.ai_summary;
-      delete repo.ai_tags;
-      delete repo.embedding;
-      dirty.push(key);
-    }
-    repo.hash = digest;
+    if (markForEnrichment(repo, digest, full)) dirty.push(key);
     repos[key] = repo;
   }
   const removed = Object.keys(previous).filter((k) => !(k in repos)).length;
@@ -163,7 +173,8 @@ const enrich = async (state: State, settings: Settings, keys: string[]): Promise
       settings.readmeConcurrency,
     );
     if (settings.llmApiKey) {
-      await pool(batch, settings.llmConcurrency, async (repo) => {
+      const unsummarized = batch.filter((repo) => !repo.ai_summary);
+      await pool(unsummarized, settings.llmConcurrency, async (repo) => {
         [repo.ai_summary, repo.ai_tags] = await model.summarize(repo, readmes.get(repo.full_name));
       });
     }

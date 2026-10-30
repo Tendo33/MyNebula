@@ -76,7 +76,7 @@ flowchart LR
 
 ### 免费模式
 
-`LLM_API_KEY` 留空时，同步不调用任何对话模型：向量由描述、话题和 README 片段生成，详情面板显示原始描述。SiliconFlow 上的 `BAAI/bge-large-zh-v1.5` 等 Embedding 模型是免费的，因此整条流水线可以零成本运行。
+`LLM_API_KEY` 留空时，同步不调用任何对话模型：向量由描述、话题和 README 片段生成，详情面板显示原始描述。剩下的只有 Embedding，费用很低（SiliconFlow 上的 `BAAI/bge-m3` 等模型价格接近零，但账号需要有余额才能调用）。
 
 ## 快速开始
 
