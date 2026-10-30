@@ -13,8 +13,6 @@ const STAR_LIST_WEIGHT = 0.1;
 const LANGUAGE_WEIGHT = 0.05;
 
 const EDGE_K = 8;
-/** Floor for the single "best neighbour" edge that keeps a node attached. */
-const MIN_ANCHOR_SCORE = 0.3;
 const RELATED_LIMIT = 30;
 const RELATED_MIN_SCORE = 0.4;
 /** Lowest value of the "related strictness" slider; the client filters upward. */
@@ -75,7 +73,10 @@ export const tagOverlap = (left: string[], right: string[]): number => {
 
 export interface Scores {
   n: number;
+  /** Raw-cosine blend: related repos and the similarity the site shows. */
   score: Float32Array;
+  /** Same blend on mean-centered embeddings: graph edges and clusters. */
+  link: Float32Array;
   semantic: Float32Array;
   overlap: Float32Array;
   sameList: (i: number, j: number) => boolean;
@@ -91,31 +92,45 @@ export const scorePairs = (repos: Repo[]): Scores => {
     const norm = Math.hypot(...vec) || 1;
     for (let d = 0; d < dim; d += 1) unit[i * dim + d] = vec[d] / norm;
   });
+  // Embeddings share a dominant direction (raw cosines bunch around 0.5-0.65).
+  // Removing the mean spreads them out, so neighbours separate from bystanders.
+  const mean = new Float32Array(dim);
+  for (let i = 0; i < n; i += 1) for (let d = 0; d < dim; d += 1) mean[d] += unit[i * dim + d] / n;
+  const centered = new Float32Array(n * dim);
+  for (let i = 0; i < n; i += 1) {
+    let norm = 0;
+    for (let d = 0; d < dim; d += 1) norm += (centered[i * dim + d] = unit[i * dim + d] - mean[d]) ** 2;
+    norm = Math.sqrt(norm) || 1;
+    for (let d = 0; d < dim; d += 1) centered[i * dim + d] /= norm;
+  }
   const tags = repos.map((r) => normalizeTags(r.ai_tags, r.topics));
   const sameList = (i: number, j: number) => repos[i].star_list_id != null && repos[i].star_list_id === repos[j].star_list_id;
   const sameLanguage = (i: number, j: number) => Boolean(repos[i].language) && repos[i].language === repos[j].language;
 
   const score = new Float32Array(n * n);
+  const link = new Float32Array(n * n);
   const semantic = new Float32Array(n * n);
   const overlap = new Float32Array(n * n);
   for (let i = 0; i < n; i += 1) {
-    score[i * n + i] = -1;
+    score[i * n + i] = link[i * n + i] = -1;
     semantic[i * n + i] = 1;
     for (let j = i + 1; j < n; j += 1) {
       let dot = 0;
-      for (let d = 0, a = i * dim, b = j * dim; d < dim; d += 1) dot += unit[a + d] * unit[b + d];
+      let centeredDot = 0;
+      for (let d = 0, a = i * dim, b = j * dim; d < dim; d += 1) {
+        dot += unit[a + d] * unit[b + d];
+        centeredDot += centered[a + d] * centered[b + d];
+      }
       const sem = Math.min(1, Math.max(0, dot));
       const tag = tagOverlap(tags[i], tags[j]);
-      const s = Math.min(
-        1,
-        SEMANTIC_WEIGHT * sem + TAG_OVERLAP_WEIGHT * tag + STAR_LIST_WEIGHT * +sameList(i, j) + LANGUAGE_WEIGHT * +sameLanguage(i, j),
-      );
+      const rest = TAG_OVERLAP_WEIGHT * tag + STAR_LIST_WEIGHT * +sameList(i, j) + LANGUAGE_WEIGHT * +sameLanguage(i, j);
       semantic[i * n + j] = semantic[j * n + i] = sem;
       overlap[i * n + j] = overlap[j * n + i] = tag;
-      score[i * n + j] = score[j * n + i] = s;
+      score[i * n + j] = score[j * n + i] = Math.min(1, SEMANTIC_WEIGHT * sem + rest);
+      link[i * n + j] = link[j * n + i] = Math.min(1, SEMANTIC_WEIGHT * Math.max(0, centeredDot) + rest);
     }
   }
-  return { n, score, semantic, overlap, sameList, sameLanguage };
+  return { n, score, link, semantic, overlap, sameList, sameLanguage };
 };
 
 const quantile = (values: number[], q: number): number => {
@@ -125,26 +140,28 @@ const quantile = (values: number[], q: number): number => {
   return sorted[lo] + (sorted[Math.min(lo + 1, sorted.length - 1)] - sorted[lo]) * (pos - lo);
 };
 
-/** Score cutoff that yields roughly `EDGE_K` edges per node, sampled on 200 repos. */
-export const adaptiveThreshold = ({ n, score }: Scores, sample = 200): number => {
+/**
+ * Link-score cutoff that yields roughly `EDGE_K` edges per node, sampled on 200
+ * repos. Purely rank-based: centered scores have no fixed scale to anchor a floor.
+ */
+export const adaptiveThreshold = ({ n, link }: Scores, sample = 200): number => {
   const m = Math.min(n, sample);
   if (m < 3) return 0.5;
   const upper: number[] = [];
-  for (let i = 0; i < m; i += 1) for (let j = i + 1; j < m; j += 1) upper.push(score[i * n + j]);
+  for (let i = 0; i < m; i += 1) for (let j = i + 1; j < m; j += 1) upper.push(link[i * n + j]);
   const degree = Math.max(1, Math.min(EDGE_K, m - 1));
-  const q = Math.max(0.05, Math.min(0.98, 1 - degree / (m - 1)));
-  return Math.max(0.35, Math.min(0.85, quantile(upper, q)));
+  return quantile(upper, Math.max(0.05, Math.min(0.98, 1 - degree / (m - 1))));
 };
 
 const rankRow = (scores: Scores, i: number) =>
   Array.from({ length: scores.n }, (_, j) => j)
     .filter((j) => j !== i)
-    .sort((a, b) => scores.score[i * scores.n + b] - scores.score[i * scores.n + a]);
+    .sort((a, b) => scores.link[i * scores.n + b] - scores.link[i * scores.n + a]);
 
 /**
  * Undirected per-node k-NN edges above the adaptive threshold. Every node also
- * keeps its best edge (if it clears MIN_ANCHOR_SCORE), so the force layout never
- * flings a weakly related repo off into space.
+ * keeps its best edge, so the force layout never flings a weakly related repo
+ * off into space.
  */
 export const buildEdges = (ids: number[], scores: Scores): Edge[] => {
   if (ids.length < 2) return [];
@@ -154,8 +171,8 @@ export const buildEdges = (ids: number[], scores: Scores): Edge[] => {
     rankRow(scores, i)
       .slice(0, EDGE_K)
       .every((j, rank) => {
-        const w = scores.score[i * scores.n + j];
-        if (w < threshold && !(rank === 0 && w >= MIN_ANCHOR_SCORE)) return false;
+        const w = scores.link[i * scores.n + j];
+        if (w <= 0 || (w < threshold && rank > 0)) return false;
         const [s, t] = ids[i] < ids[j] ? [ids[i], ids[j]] : [ids[j], ids[i]];
         pairs.set(`${s}:${t}`, [s, t, Math.round(w * 1e4) / 1e4]);
         return true;

@@ -59,14 +59,24 @@ describe('tags and scores', () => {
     expect(tagOverlap([], ['x'])).toBe(0);
   });
 
-  it('keeps edges undirected and the threshold clamped', () => {
+  it('keeps edges undirected and every node attached', () => {
     const scores = scorePairs(Object.values(syntheticState().repos));
-    const threshold = adaptiveThreshold(scores);
-    expect(threshold).toBeGreaterThanOrEqual(0.35);
-    expect(threshold).toBeLessThanOrEqual(0.85);
+    expect(adaptiveThreshold(scores)).toBeGreaterThan(0);
     const edges = buildEdges(Array.from({ length: 30 }, (_, i) => i + 1), scores);
     expect(edges.every(([s, t]) => s < t)).toBe(true);
     expect(new Set(edges.map(([s, t]) => `${s}:${t}`)).size).toBe(edges.length);
+    expect(new Set(edges.flatMap(([s, t]) => [s, t])).size).toBe(30);
+  });
+
+  it('separates neighbours that share a dominant embedding direction', () => {
+    // Every vector leans on one shared dimension, as real embeddings do; themes differ only slightly.
+    const crowded = Object.values(syntheticState().repos).map((r) =>
+      ({ ...r, language: null, topics: [], star_list_id: null, embedding: r.embedding!.map((x, d) => (d === 15 ? 40 : x / 5)) }));
+    const scores = scorePairs(crowded);
+    const theme = (i: number) => Math.floor(i / 10);
+    const edges = buildEdges(crowded.map((r) => r.id), scores);
+    expect(edges.every(([s, t]) => theme(s - 1) === theme(t - 1))).toBe(true);
+    expect(scores.semantic[1]).toBeGreaterThan(0.9);
   });
 });
 
