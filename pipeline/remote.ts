@@ -17,17 +17,33 @@ export const pool = async <T>(items: T[], limit: number, fn: (item: T) => Promis
 
 // ---- GitHub ----------------------------------------------------------------
 
+/**
+ * fetch with retries for network errors, 429, and 5xx. Other statuses return
+ * as-is so callers can treat 404 and friends as answers, not failures.
+ */
+export const fetchRetry = async (url: string, init: RequestInit, attempts = 3): Promise<Response> => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(30_000) });
+      if (response.status !== 429 && response.status < 500) return response;
+      if (attempt >= attempts) return response;
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+    }
+    await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+  }
+};
+
 export const github = (token: string) => {
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
   if (token) headers.Authorization = `Bearer ${token}`;
   const get = (path: string, accept?: string) =>
-    fetch(`https://api.github.com${path}`, { headers: accept ? { ...headers, Accept: accept } : headers, signal: AbortSignal.timeout(30_000) });
+    fetchRetry(`https://api.github.com${path}`, { headers: accept ? { ...headers, Accept: accept } : headers });
   const graphql = async (query: string, variables: object) => {
-    const response = await fetch('https://api.github.com/graphql', {
+    const response = await fetchRetry('https://api.github.com/graphql', {
       method: 'POST',
       headers,
       body: JSON.stringify({ query, variables }),
-      signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`GraphQL HTTP ${response.status}`);
     const payload = await response.json();
@@ -79,8 +95,8 @@ export const github = (token: string) => {
       return out;
     },
 
-    /** User-defined star lists with member repo ids; empty when unavailable. */
-    async starLists(): Promise<{ name: string; description: string | null; repo_ids: number[] }[]> {
+    /** User-defined star lists with member repo ids; null when they could not be read. */
+    async starLists(): Promise<{ name: string; description: string | null; repo_ids: number[] }[] | null> {
       try {
         const lists = [];
         for (let cursor: string | null = null; ; ) {
@@ -110,8 +126,8 @@ export const github = (token: string) => {
         }
         return lists;
       } catch (err) {
-        log('Star lists unavailable:', String(err));
-        return [];
+        log('Star lists unavailable, keeping the previous ones:', String(err));
+        return null;
       }
     },
   };

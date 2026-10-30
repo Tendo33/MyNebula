@@ -147,14 +147,17 @@ const fetchStars = async (state: State, settings: Settings, full: boolean): Prom
   const removed = Object.keys(previous).filter((k) => !(k in repos)).length;
   state.repos = repos;
 
-  const memberOf = new Map<number, number>();
-  state.star_lists = lists.map((list, i) => {
-    list.repo_ids.forEach((id) => memberOf.set(id, i + 1));
-    return { id: i + 1, name: list.name, description: list.description };
-  });
-  for (const repo of Object.values(repos)) repo.star_list_id = memberOf.get(repo.id) ?? null;
+  // A failed lists request must not wipe memberships; repos keep their previous ones.
+  if (lists) {
+    const memberOf = new Map<number, number>();
+    state.star_lists = lists.map((list, i) => {
+      list.repo_ids.forEach((id) => memberOf.set(id, i + 1));
+      return { id: i + 1, name: list.name, description: list.description };
+    });
+    for (const repo of Object.values(repos)) repo.star_list_id = memberOf.get(repo.id) ?? null;
+  }
 
-  log(`Stars: ${starred.length} total, ${dirty.length} need enrichment, ${removed} removed, ${lists.length} star lists`);
+  log(`Stars: ${starred.length} total, ${dirty.length} need enrichment, ${removed} removed, ${state.star_lists.length} star lists`);
   return dirty;
 };
 
