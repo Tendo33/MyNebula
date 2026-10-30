@@ -119,7 +119,7 @@
     "show_trajectories_desc": "Show connection paths between nodes",
     "sync": "Sync",
     "sync_desc": "The site is static. Data is rebuilt outside the browser, daily by GitHub Actions or on demand:",
-    "sync_flags": "Flags: --full re-summarizes everything, --llm-names names clusters with the LLM, --recluster resets cluster ids. Without LLM_API_KEY the sync runs free.",
+    "sync_flags": "Flags: --full re-summarizes everything, --llm-names names clusters with the LLM, --recluster resets cluster ids. Without LLM_API_KEY the sync skips chat models; only embeddings cost (very little).",
     "theme": "Theme",
     "theme_dark": "Dark",
     "theme_desc": "Follow the system, or pick one.",
