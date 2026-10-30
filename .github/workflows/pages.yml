@@ -1,0 +1,82 @@
+# Sync stars, rebuild the graph JSON, and publish the static site to GitHub Pages.
+#
+# One-time setup:
+#   - Settings -> Pages -> Source: "GitHub Actions"
+#   - Settings -> Secrets -> Actions: STARS_TOKEN (a PAT that can read your stars),
+#     EMBEDDING_API_KEY, and optionally LLM_API_KEY (omit it for a free sync)
+#   - Optional variables: EMBEDDING_BASE_URL, EMBEDDING_MODEL, LLM_BASE_URL, LLM_MODEL,
+#     LLM_OUTPUT_LANGUAGE, GRAPH_MAX_CLUSTERS, GRAPH_LLM_NAMES
+name: Sync and Deploy
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # daily, 09:00 Asia/Shanghai
+  workflow_dispatch:
+    inputs:
+      args:
+        description: "Extra sync flags, e.g. --full, --recluster, --llm-names"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.STARS_TOKEN }}
+      EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      EMBEDDING_BASE_URL: ${{ vars.EMBEDDING_BASE_URL }}
+      EMBEDDING_MODEL: ${{ vars.EMBEDDING_MODEL }}
+      LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+      LLM_MODEL: ${{ vars.LLM_MODEL }}
+      LLM_OUTPUT_LANGUAGE: ${{ vars.LLM_OUTPUT_LANGUAGE }}
+      GRAPH_MAX_CLUSTERS: ${{ vars.GRAPH_MAX_CLUSTERS }}
+      GRAPH_LLM_NAMES: ${{ vars.GRAPH_LLM_NAMES }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The cache holds summaries and embeddings, so reruns only pay for new stars.
+      # A fresh key per run plus a prefix restore keeps the newest copy rolling forward.
+      - uses: actions/cache@v4
+        with:
+          path: data/cache.json.gz
+          key: nebula-cache-${{ github.run_id }}
+          restore-keys: nebula-cache-
+
+      - name: Sync stars and export graph
+        env:
+          SYNC_ARGS: ${{ github.event.inputs.args }}
+        # Word-splitting SYNC_ARGS into flags is intended; it is never eval'd.
+        run: node pipeline/sync.ts sync $SYNC_ARGS
+
+      - run: pnpm build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

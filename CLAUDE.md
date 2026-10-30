@@ -6,31 +6,24 @@ This file is Claude Code's root entrypoint for MyNebula.
 
 1. Start at [AGENTS.md](AGENTS.md)
 
-## Claude-specific notes
-
-- Use [AGENTS.md](AGENTS.md) as the shared project entrypoint.
-
 ## Project guardrails
 
-- MyNebula turns GitHub Stars into a semantic knowledge graph; it is not a
-  generic Python template.
-- Preserve FastAPI `/api` and `/api/v2`, SQLAlchemy async,
-  PostgreSQL/pgvector, Alembic, sync pipeline state, graph snapshots, and
-  APScheduler boundaries.
-- Preserve admin authentication, CSRF protection, trusted proxy rules, and
-  `READ_ACCESS_MODE` demo/authenticated read behavior.
-- Frontend work must preserve Dashboard, Data, Graph, and Settings flows,
-  including React Query, GraphContext, shared search utilities, progressive
-  edge loading, and Settings polling lifecycle.
-- Frontend package management is pnpm with `frontend/pnpm-lock.yaml`.
+- MyNebula turns GitHub Stars into a semantic knowledge graph, published as a
+  static site built by an offline TypeScript pipeline.
+- Keep the pipeline incremental: summaries and embeddings are cached in
+  `data/cache.json.gz` and only new or changed repos may hit paid APIs.
+- Keep the JSON contract (`graph.json`, `related.json`) in sync between
+  `pipeline/graph.ts` and `frontend/src/types.ts`.
+- Frontend work must preserve Graph, Data, and Settings flows, URL state on
+  Graph and Data, the command palette, and en/zh locales.
+- One package, pnpm, `pnpm-lock.yaml` at the repo root.
 
 ## Commands
 
 ```bash
-uv run pytest -q -m "not integration"
-uv run ruff check src tests scripts alembic
-pnpm --prefix frontend test
-pnpm --prefix frontend lint
+pnpm lint
+pnpm test
+pnpm build
 ```
 
 ## Claude execution style

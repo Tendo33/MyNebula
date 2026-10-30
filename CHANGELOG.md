@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-30
+
+### Changed
+- Rebuild MyNebula as a static site plus an offline pipeline, one TypeScript package on Node 24. `pnpm sync` replaces the FastAPI server, PostgreSQL/pgvector, Alembic, APScheduler, and the Python code; summaries and embeddings are cached in `data/cache.json.gz`. The pipeline has no runtime dependencies.
+- Group repositories as Louvain communities of the similarity graph instead of PCA + Ward. Group ids, colours, and names carry over between syncs; names come from distinctive tags, or the LLM with `--llm-names`. Every repo keeps at least its strongest link.
+- Lay the graph out live in the browser from its links: nodes burst out per group, settle, and keep drifting gently; dim and highlight changes fade.
+- Rewrite the frontend in vanilla TypeScript (about 34 KB gzipped JS) and simplify it: Graph is the home page, a single top bar replaces the sidebar, the filter rail and details panel are flat, Data fits in one toolbar, Settings is one list.
+- Deploy through GitHub Pages with a daily scheduled sync; hash routing so deep links work on any static host. Node ids are now GitHub repository ids, so old `?node=` links do not resolve.
+- Without `LLM_API_KEY` the sync makes no chat-model calls (free mode).
+
+### Removed
+- Dashboard page (its counts live in Settings → Data).
+- Admin login, CSRF, trusted-proxy handling, and `READ_ACCESS_MODE`: a static build has no write surface. Use the hosting layer for private access.
+- Semantic (embedding) search fallback in the command palette; keyword search covers repos, groups, languages, and tags.
+- Related-repo feedback endpoint, snapshot rollback, Docker image, Docker Compose deployment, and `GRAPH_MIN_CLUSTERS`.
+
 ## [1.6.1] - 2026-09-28
 
 ### Fixed

@@ -2,18 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="icon" type="image/png" href="./logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MyNebula</title>
     <meta name="description" content="MyNebula: visualize your GitHub stars as a clustered knowledge nebula." />
     <meta property="og:title" content="MyNebula" />
     <meta property="og:description" content="Visualize your GitHub stars as a clustered knowledge nebula." />
-    <meta property="og:image" content="/logo.png" />
+    <meta property="og:image" content="./logo.png" />
+    <!-- Sets the theme class before first paint. External (not inline) so a strict
+         CSP script-src 'self' allows it; vite-ignore keeps it out of the bundle. -->
+    <script src="./theme-init.js" vite-ignore></script>
   </head>
   <body>
-    <div id="root"></div>
-    <!-- External (not inline) so the strict CSP script-src 'self' allows it. -->
-    <script src="/theme-init.js"></script>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -14,21 +14,14 @@
   </p>
 
   <p>
-    <a href="#deployment">Deployment</a>
-    |
-    <a href="#preview">Preview</a>
+    <a href="#quick-start">Quick start</a>
     |
     <a href="#architecture">Architecture</a>
-    |
-    <a href="#project-structure">Project Structure</a>
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+" />
-    <img src="https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
-    <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=0B0F19" alt="React 18" />
-    <img src="https://img.shields.io/badge/PostgreSQL-16%2B-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 16+" />
-    <img src="https://img.shields.io/badge/pgvector-enabled-4B8BBE?style=flat-square" alt="pgvector enabled" />
+    <img src="https://img.shields.io/badge/Node-24%2B-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24+" />
+    <img src="https://img.shields.io/badge/TypeScript-Vanilla-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2EA043?style=flat-square" alt="MIT License" /></a>
   </p>
 
@@ -52,351 +45,82 @@ MyNebula helps you turn that pile into a living map of what you care about: clus
 
 It is built for people who star heavily, revisit often, and want their repository collection to feel more like a knowledge space than a dumping ground.
 
-## Table of Contents
+## What you get
 
-- [Why MyNebula](#why-mynebula)
-- [Table of Contents](#table-of-contents)
-- [Preview](#preview)
-- [Highlights](#highlights)
-- [How It Works](#how-it-works)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Deployment](#deployment)
-  - [Runtime](#runtime)
-  - [Configure](#configure)
-  - [Start](#start)
-  - [Open](#open)
-  - [Before release](#before-release)
-  - [First sync](#first-sync)
-- [Local Development](#local-development)
-  - [Backend](#backend)
-  - [Frontend](#frontend)
-  - [Serve the built frontend from FastAPI](#serve-the-built-frontend-from-fastapi)
-- [Configuration Overview](#configuration-overview)
-- [Documentation Map](#documentation-map)
-- [API Quick Reference](#api-quick-reference)
-  - [Read endpoints](#read-endpoints)
-  - [Admin endpoints](#admin-endpoints)
-- [Project Structure](#project-structure)
-- [Quality and Testing](#quality-and-testing)
-  - [Backend](#backend-1)
-  - [Frontend](#frontend-1)
-  - [E2E](#e2e)
-  - [Offline quality checks](#offline-quality-checks)
-- [Troubleshooting](#troubleshooting)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Current interface
-
-The pictures in `doc/images/` show the previous full-frame logo graph and the long settings page. They are not the current screens.
-
-All four pages share one collapsible sidebar: Dashboard, Graph, Data, and Settings. Collapsed, it keeps the icons.
-
-- Graph: a resizable split. Filters take about 18%, the canvas fills the middle, and detail takes about 30%. With nothing hovered or selected, nodes are neutral and unlabeled. Selecting a cluster keeps color on that cluster and fades the rest. The repository name is the only large type in the detail pane, followed by one fact line and Overview / Related tabs. An empty selection uses the empty state.
-- Data: a resizable split. Filters take about 22%. The table fills the rest and scrolls inside the pane.
-- Settings: after login, Sync, Data, and Appearance are tabs. The login form stays centered.
-- Dashboard: four figures on top, then clusters and languages in two columns.
-
-## Highlights
-
-- **Semantic clustering, not manual folders**: MyNebula groups repositories by meaning so your stars become topics instead of a long flat list.
-- **Graph-first exploration**: The graph sits in the middle pane of a light workbench. Color and labels stay on the hovered or selected cluster. Edges still load on demand, and the timeline stays in the filter pane.
-- **Snapshot-based reads**: Versioned graph snapshots keep the read experience stable while the sync pipeline continues to evolve in the background.
-- **Practical sync workflow**: Incremental sync, full rebuilds, reprocessing checks, and scheduled jobs are already built in.
-- **Explainable recommendations**: Related repositories are served with meaningful signals instead of opaque "you may also like" guesses.
-- **Bilingual experience**: Frontend i18n and configurable LLM output language make it easier to use in both English and Chinese contexts.
-
-## How It Works
-
-At a high level, MyNebula turns starred repositories into a navigable knowledge graph:
-
-1. Fetch starred repositories and metadata from GitHub.
-2. Optionally enrich repositories with README-derived summaries or tags.
-3. Generate embeddings for semantic similarity.
-4. Cluster repositories into meaningful topic groups.
-5. Build a graph snapshot with coordinates and relationships.
-6. Serve that snapshot to the frontend for fast and stable exploration.
-
-The result is a system that feels closer to a personal map of interests than a bookmark archive.
+- **Graph** (home): a live force-directed canvas of your stars. Related repos pull together into groups, nodes drift gently, and hovering or selecting lights up a group and its links. Filter by group, star list, timeline range, or text (`stars:>1000` works too).
+- **Details**: AI summary, tags, links to GitHub / DeepWiki / zRead, and related repos (similar, same tags, same language).
+- **Data**: a sortable, filterable table of everything.
+- **Search** (`⌘K` / `Ctrl+K`) across repos, groups, languages, and tags. English and Chinese UI, light / dark / system theme.
 
 ## Architecture
 
-```mermaid
-graph TD
-    Browser["Browser (React + Vite)"] -->|HTTP /api| FastAPI["FastAPI Service"]
-    FastAPI -->|ORM| Postgres[("PostgreSQL + pgvector")]
-    FastAPI -->|Stars + Lists| GitHub["GitHub API / GraphQL"]
-    FastAPI -->|Embeddings + LLM| AI["OpenAI-compatible Providers"]
-    FastAPI -->|Scheduled jobs| APS["APScheduler"]
-```
+A static site plus an offline pipeline, all TypeScript on Node 24. No server, no database, and the pipeline has zero runtime dependencies.
 
 ```mermaid
 flowchart LR
-    A["Sync Stars"] --> B["Fetch README and metadata"]
-    B --> C["Optional LLM summary and tags"]
-    C --> D["Generate embeddings"]
-    D --> E["Cluster and position nodes"]
-    E --> F["Build graph snapshot"]
-    F --> G["Activate snapshot for /api/v2"]
+    GH["GitHub stars + lists"] --> P["pnpm sync"]
+    AI["OpenAI-compatible embeddings (+ optional LLM)"] --> P
+    P -->|cache| C[("data/cache.json.gz")]
+    P --> J["graph.json + related.json"]
+    J --> W["Static site (Vite, vanilla TS, d3-force)"]
 ```
 
-## Tech Stack
+The pipeline:
 
-- **Backend**: FastAPI, SQLAlchemy (async), asyncpg, Alembic, APScheduler
-- **Data and ML**: pgvector, NumPy, scikit-learn, custom relevance scoring
-- **Frontend**: React 18, TypeScript, Vite, React Query, react-force-graph-2d, Tailwind CSS 4
-- **Tooling**: Docker Compose, uv, Ruff, Pytest, Vitest, Playwright
+1. Fetches every starred repo and your star lists.
+2. For new or changed repos only: reads the README, optionally writes an LLM summary and tags, and embeds the result.
+3. Links each repo to its most related repos (semantic similarity, shared tags, same star list or language), then groups the graph into communities (Louvain). Group names come from their most distinctive tags, or from the LLM with `--llm-names`. Group ids and names stay stable across syncs.
+4. Precomputes related repos and the timeline into static JSON.
 
-## Deployment
+Summaries and embeddings are cached, so a daily run only pays for what changed. Layout is not stored: the browser runs the force simulation on the links.
 
-### Runtime
+### Free mode
 
-- Docker and Docker Compose v2
-- Nothing is compiled on the deploy host. Compose only pulls `MYNEBULA_IMAGE` from `.env`
-- A local Node.js or Python toolchain is only needed for [Local Development](#local-development)
+Leave `LLM_API_KEY` empty and the sync makes no chat-model calls: embeddings are built from the description, topics, and a README excerpt, and the details panel shows the original description. Embedding models such as `BAAI/bge-large-zh-v1.5` on SiliconFlow are free, so the whole pipeline can run at no cost.
 
-### Configure
+## Quick start
 
 ```bash
-cp .env.example .env
+pnpm install
+cp .env.example .env    # GITHUB_TOKEN, EMBEDDING_API_KEY, optional LLM_API_KEY
+pnpm sync               # writes frontend/public/data/*.json
+pnpm dev                # http://localhost:5173
 ```
 
-Fill at least:
-
-- `GITHUB_TOKEN`
-- `EMBEDDING_API_KEY`
-- `EMBEDDING_BASE_URL`
-- `EMBEDDING_MODEL`
-- `LLM_API_KEY` when summaries, tags, or AI-assisted naming are enabled
-- `ADMIN_PASSWORD`
-- `ADMIN_SESSION_SECRET`
-- `ADMIN_USERNAME` when you do not want the default `admin`
-- `READ_ACCESS_MODE`
-- `MYNEBULA_IMAGE`: a published immutable tag or digest of the revision you intend to run
-
-Recommended values:
-
-- Local demo: `READ_ACCESS_MODE=demo`
-- Internet-facing: `READ_ACCESS_MODE=authenticated`, `FORCE_SECURE_COOKIES=true`, `TRUST_PROXY_HEADERS=true`, `TRUSTED_PROXY_IPS=<your reverse proxy IPs>`
-- An internet-facing process refuses demo mode and an empty admin password unless `ALLOW_ANONYMOUS_DEMO=true`
-
-### Start
-
-```bash
-docker compose up -d
-```
-
-Do not pass `--build`. Compose refuses to start when `MYNEBULA_IMAGE` is empty.
-
-### Open
-
-- App: <http://localhost:8000>
-- Health: <http://localhost:8000/health>
-- OpenAPI: <http://localhost:8000/docs> when `DEBUG=true`
-
-### Before release
-
-```bash
-uv run ruff check .
-uv run pytest
-pnpm --prefix frontend run test
-pnpm --prefix frontend run lint
-pnpm --prefix frontend run build
-```
-
-### First sync
-
-1. Open `/settings`
-2. Log in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`
-3. Start the sync pipeline in `incremental` or `full` mode
-4. Wait for the snapshot stage to complete
-5. Open `/graph` and start exploring
-
-## Local Development
-
-### Backend
-
-```bash
-cp .env.example .env
-# Replace DATABASE_PASSWORD and configure the required API credentials in .env.
-uv sync --all-extras
-docker compose up -d db
-uv run alembic upgrade head
-uv run uvicorn nebula.main:app --reload --port 8000
-```
-
-### Frontend
-
-```bash
-pnpm --prefix frontend install
-VITE_API_BASE_URL=http://localhost:8000 pnpm --prefix frontend run dev
-```
-
-Then open <http://localhost:5173>.
-
-If `VITE_API_BASE_URL` is not set, the Vite dev server defaults to `http://localhost:8000`.
-
-### Serve the built frontend from FastAPI
-
-```bash
-pnpm --prefix frontend run build
-uv run uvicorn nebula.main:app --reload --port 8000
-```
-
-If `frontend/dist` exists, FastAPI will serve the SPA and static assets directly.
-
-## Configuration Overview
-
-| Category | Key Variables | Required | Notes |
-| --- | --- | --- | --- |
-| GitHub | `GITHUB_TOKEN` | Yes | Used for stars and lists sync |
-| Embedding | `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` | Yes | OpenAI-compatible embedding endpoint |
-| LLM | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_OUTPUT_LANGUAGE` | Optional | Used for summaries, tags, and cluster naming |
-| Admin auth | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `ADMIN_SESSION_TTL_HOURS` | Recommended | If password or session secret is empty, admin-protected APIs are disabled |
-| Database | `DATABASE_*`, `DATABASE_URL` | Yes | `DATABASE_URL` overrides split database fields |
-| Sync | `SYNC_BATCH_SIZE`, `SYNC_README_MAX_LENGTH`, `SYNC_DEFAULT_SYNC_MODE`, `SYNC_DETECT_UNSTARRED_ON_INCREMENTAL` | Optional | Controls throughput and cost. `SYNC_BATCH_SIZE` (10–500, default 100) sets both the embedding chunk committed per transaction and the texts per provider request |
-| Runtime | `DEBUG`, `API_PORT`, `SLOW_QUERY_LOG_MS`, `API_QUERY_TIMEOUT_SECONDS` | Optional | Debugging and observability settings |
-
-
-## Documentation Map
-
-Files under `doc/` are redirects from old addresses. The index is [`doc/INDEX.md`](doc/INDEX.md). Pictures in `doc/images/` are historical and are not the current screens.
-
-| Topic | Read |
+| Flag (`pnpm sync -- …`) | Effect |
 | --- | --- |
-| Deployment | [Deployment](#deployment) |
-| Environment variables and models | [Configuration Overview](#configuration-overview) and [`.env.example`](.env.example) |
-| Local development | [Local Development](#local-development) |
-| Current page structure | [Current interface](#current-interface) and [`DESIGN.md`](DESIGN.md) |
-| HTTP API | [API Quick Reference](#api-quick-reference) |
-| Tests and the release check | [Quality and Testing](#quality-and-testing) |
-| Hooks and CI | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
-| Dropping the database | [`scripts/reset_db.py`](scripts/reset_db.py), described in the contributing guide |
-| Dated health checks | [`docs/health-check/`](docs/health-check/) |
+| `--full` | Re-summarize and re-embed every repo |
+| `--recluster` | Forget previous group ids and names |
+| `--max-clusters N` | Cap on sizable groups, overrides `GRAPH_MAX_CLUSTERS` (default 12) |
+| `--llm-names` | Name new groups with the LLM, same as `GRAPH_LLM_NAMES=true` |
 
-## API Quick Reference
+`pnpm export` rebuilds links, groups, and JSON from the cache without fetching anything.
 
-Base prefix: `/api`
+## Deploy to GitHub Pages
 
-### Read endpoints
+`.github/workflows/pages.yml` syncs daily, on every push to `main`, and on demand, then publishes `frontend/dist`.
 
-- `GET /health`
-- `GET /api/v2/dashboard`
-- `GET /api/v2/graph?version=active&include_edges=false`
-- `GET /api/v2/graph/edges?version=active&cursor=0&limit=1000`
-- `GET /api/v2/graph/timeline?version=active`
-- `GET /api/v2/data/repos`
-- `GET /api/v2/repos/{repo_id}/related`
-- `POST /api/v2/repos/search`
+1. Settings → Pages → Source: **GitHub Actions**.
+2. Add secrets: `STARS_TOKEN` (a PAT that can read your stars), `EMBEDDING_API_KEY`, and optionally `LLM_API_KEY`.
+3. Optionally add variables: `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_OUTPUT_LANGUAGE`, `GRAPH_MAX_CLUSTERS`, `GRAPH_LLM_NAMES`.
+4. Run **Sync and Deploy** from the Actions tab. Pass `--full` or `--recluster` in the input when needed.
 
-### Admin endpoints
+The published site is public, and so is your star data. To keep it private, host `frontend/dist` behind an access layer such as Cloudflare Access. Any static host works: the build uses relative paths and hash routing.
 
-- `POST /api/v2/auth/login`
-- `POST /api/v2/sync/start?mode=incremental|full`
-- `GET /api/v2/sync/jobs/{run_id}`
-- `POST /api/v2/settings/schedule`
-- `POST /api/v2/settings/full-refresh`
-- `POST /api/v2/graph/rebuild`
-
-The public application API is v2-only. Unknown and retired legacy `/api/*`
-paths return API errors and never fall through to the SPA.
-
-Current API contract notes:
-
-- `/api/v2/data/repos` now returns lightweight cluster metadata and `total_repos`, so the Data page no longer needs an extra graph snapshot request.
-- `/api/v2/dashboard` now carries summary, top languages, top topics, and top clusters directly; only timeline data is fetched separately for activity charts.
-- Data and Graph share the same literal search fields and `stars:>N` search syntax; Command Palette keeps those local filters and falls back to semantic repo search when local repo matches are insufficient.
-- Active sync jobs use persisted leases and heartbeats. Work left behind by a
-  stopped process becomes retryable `interrupted` state on the next startup.
-- Graph reads remain snapshot-backed. Snapshot hydration failures return a
-  bounded `503` with a request ID; they do not trigger an implicit live rebuild.
-- Snapshot cleanup always preserves the active snapshot and newest 30 successful
-  snapshots, and only removes other snapshots older than 90 days.
-
-## Project Structure
+## Project structure
 
 ```text
-MyNebula/
-|-- src/nebula/
-|   |-- api/                   # v2 route layer
-|   |-- application/services/  # sync pipeline and snapshot query services
-|   |-- core/                  # config, auth, embedding, llm, clustering, scheduler
-|   |-- db/                    # SQLAlchemy models and session lifecycle
-|   |-- domain/                # pipeline and snapshot lifecycle enums
-|   `-- infrastructure/        # snapshot persistence repositories
-|-- frontend/                  # React + TypeScript SPA
-|-- alembic/                   # database migrations
-|-- tests/                     # backend tests
-|-- scripts/                   # automation, evaluation, and maintenance scripts
-|-- doc/                       # compatibility pages and README image assets
-|-- docker-compose.yml
-`-- .env.example
+pipeline/          sync.ts (CLI, cache), remote.ts (GitHub + models), graph.ts (scores, links, output), cluster.ts (Louvain, naming)
+frontend/src/      main.ts shell, store, router, palette, pages/, graph/ (canvas + styles)
+.github/workflows/ ci.yml (types, tests, build), pages.yml (sync + deploy)
 ```
 
-## Quality and Testing
-
-### Backend
+## Development
 
 ```bash
-uv sync --all-extras
-uv run ruff format
-uv run ruff check --fix
-uv run pytest
+pnpm lint && pnpm test && pnpm build
 ```
-
-If your environment cannot write to the default uv cache, use
-`UV_CACHE_DIR=.uv-cache uv run pytest`.
-
-### Frontend
-
-```bash
-pnpm --prefix frontend run lint
-pnpm --prefix frontend run test
-pnpm --prefix frontend run build
-```
-
-### E2E
-
-```bash
-RUN_E2E=1 pnpm --prefix frontend run test:e2e
-```
-
-### Offline quality checks
-
-```bash
-uv run python scripts/evals/run_all_quality_checks.py
-```
-
-
-## Troubleshooting
-
-- **The graph is empty**
-  Check that `GITHUB_TOKEN` and `EMBEDDING_API_KEY` are valid, then run a sync from `/settings` and wait for snapshot completion.
-- **You cannot log in**
-  Set `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` in `.env`, restart the service, and try again.
-- **`/docs` is missing**
-  Set `DEBUG=true`.
-- **Frontend dev server cannot reach the backend**
-  Start the frontend with `VITE_API_BASE_URL=http://localhost:8000`.
-- **Large graph responses feel slow**
-  Use paged edge loading through `/api/v2/graph/edges` and tune `API_QUERY_TIMEOUT_SECONDS`.
-
-## Roadmap
-
-- Richer explainability for recommendations and graph relationships
-- Better export and sharing options for snapshots and reports
-- A more complete multi-user and auth model beyond the current single-user-first setup
-- Stronger evaluation datasets and benchmarking workflows
-
-## Contributing
-
-Issues and pull requests are welcome.
-
-- Contribution guide: `CONTRIBUTING.md`
-- Changelog: `CHANGELOG.md`
 
 ## License
 
-Released under the MIT License. See `LICENSE`.
+MIT, see [LICENSE](LICENSE).

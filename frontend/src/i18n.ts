@@ -1,45 +1,55 @@
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
+import en from './locales/en.json';
+import zh from './locales/zh.json';
 
-import enTranslation from './locales/en/translation.json';
-import zhTranslation from './locales/zh/translation.json';
+type Dict = { [key: string]: string | Dict };
+export type Lang = 'en' | 'zh';
 
-i18n
-  // load translation using http -> see /public/locales (i.e. https://github.com/i18next/react-i18next/tree/master/example/react/public/locales)
-  // learn more: https://github.com/i18next/i18next-http-backend
-  // .use(Backend)
-  // detect user language
-  // learn more: https://github.com/i18next/i18next-browser-languageDetector
-  .use(LanguageDetector)
-  // pass the i18n instance to react-i18next.
-  .use(initReactI18next)
-  // init i18next
-  // for all options read: https://www.i18next.com/overview/configuration-options
-  .init({
-    resources: {
-      en: {
-        translation: enTranslation,
-      },
-      zh: {
-        translation: zhTranslation,
-      },
-    },
-    fallbackLng: 'en',
-    debug: import.meta.env.DEV,
+const DICTS: Record<Lang, Dict> = { en, zh };
+// Same key the previous i18next detector used, so a saved choice carries over.
+const STORAGE_KEY = 'i18nextLng';
+const listeners = new Set<() => void>();
 
-    interpolation: {
-      escapeValue: false, // not needed for react as it escapes by default
-    },
-  });
-
-const syncDocumentLanguage = (language: string) => {
-  if (typeof document !== 'undefined') {
-    document.documentElement.lang = language.split('-')[0];
+const detect = (): Lang => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return stored.startsWith('zh') ? 'zh' : 'en';
+  } catch {
+    // Storage blocked: fall back to the browser language.
   }
+  return navigator.language?.startsWith('zh') ? 'zh' : 'en';
 };
 
-syncDocumentLanguage(i18n.resolvedLanguage ?? i18n.language ?? 'en');
-i18n.on('languageChanged', syncDocumentLanguage);
+let current: Lang = detect();
+document.documentElement.lang = current;
 
-export default i18n;
+const lookup = (dict: Dict, key: string): string | undefined => {
+  let node: string | Dict | undefined = dict;
+  for (const part of key.split('.')) {
+    if (typeof node !== 'object') return undefined;
+    node = node[part];
+  }
+  return typeof node === 'string' ? node : undefined;
+};
+
+export const t = (key: string, params: Record<string, string | number> = {}): string => {
+  const template = lookup(DICTS[current], key) ?? lookup(DICTS.en, key) ?? key;
+  return template.replace(/\{\{(\w+)\}\}/g, (_, name) => String(params[name] ?? ''));
+};
+
+export const getLang = (): Lang => current;
+
+export const setLang = (lang: Lang): void => {
+  current = lang;
+  document.documentElement.lang = lang;
+  try {
+    localStorage.setItem(STORAGE_KEY, lang);
+  } catch {
+    // Choice stays for this session only.
+  }
+  listeners.forEach((fn) => fn());
+};
+
+export const onLangChange = (fn: () => void): (() => void) => {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+};
