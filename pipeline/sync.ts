@@ -75,15 +75,15 @@ export const loadSettings = (): Settings => {
     githubToken: env('GITHUB_TOKEN'),
     embeddingApiKey: env('EMBEDDING_API_KEY'),
     embeddingBaseUrl: env('EMBEDDING_BASE_URL', 'https://api.siliconflow.cn/v1'),
-    embeddingModel: env('EMBEDDING_MODEL', 'BAAI/bge-large-zh-v1.5'),
+    embeddingModel: env('EMBEDDING_MODEL', 'BAAI/bge-m3'),
     llmApiKey: env('LLM_API_KEY'),
     llmBaseUrl: env('LLM_BASE_URL', 'https://api.siliconflow.cn/v1'),
-    llmModel: env('LLM_MODEL', 'Qwen/Qwen2.5-7B-Instruct'),
+    llmModel: env('LLM_MODEL', 'Qwen/Qwen3-30B-A3B-Instruct-2507'),
     outputLanguage: env('LLM_OUTPUT_LANGUAGE', 'zh') === 'en' ? 'en' : 'zh',
     batchSize: int('SYNC_BATCH_SIZE', 100),
     readmeMaxLength: int('SYNC_README_MAX_LENGTH', 10000),
-    readmeConcurrency: int('SYNC_README_FETCH_CONCURRENCY', 6),
-    llmConcurrency: int('SYNC_LLM_ENHANCEMENT_CONCURRENCY', 4),
+    readmeConcurrency: 6,
+    llmConcurrency: int('SYNC_LLM_CONCURRENCY', 4),
     maxClusters: int('GRAPH_MAX_CLUSTERS', 12),
     llmClusterNames: ['1', 'true', 'yes'].includes(env('GRAPH_LLM_NAMES').toLowerCase()),
     cachePath: env('NEBULA_CACHE', 'data/cache.json.gz'),
@@ -240,6 +240,8 @@ export const assignClusters = async (
 
 const main = async () => {
   const { values, positionals } = parseArgs({
+    // Some runners forward a literal `--`; drop it so flags after it still parse.
+    args: process.argv.slice(2).filter((arg) => arg !== '--'),
     allowPositionals: true,
     options: {
       full: { type: 'boolean', default: false },
@@ -249,7 +251,7 @@ const main = async () => {
     },
   });
   const command = positionals[0];
-  if (command !== 'sync' && command !== 'export') {
+  if ((command !== 'sync' && command !== 'export') || positionals.length > 1) {
     console.error('usage: node pipeline/sync.ts <sync|export> [--full] [--recluster] [--llm-names] [--max-clusters N]');
     process.exit(2);
   }

@@ -1,11 +1,11 @@
-# Sync stars, rebuild the graph JSON, and publish the static site to GitHub Pages.
+# Sync stars, rebuild the graph data, and publish the static site to GitHub Pages.
 #
-# One-time setup:
-#   - Settings -> Pages -> Source: "GitHub Actions"
-#   - Settings -> Secrets -> Actions: STARS_TOKEN (a PAT that can read your stars),
-#     EMBEDDING_API_KEY, and optionally LLM_API_KEY (omit it for a free sync)
-#   - Optional variables: EMBEDDING_BASE_URL, EMBEDDING_MODEL, LLM_BASE_URL, LLM_MODEL,
-#     LLM_OUTPUT_LANGUAGE, GRAPH_MAX_CLUSTERS, GRAPH_LLM_NAMES
+# One-time setup (README › Deploy to GitHub Pages has the details):
+#   - Settings › Pages › Source: "GitHub Actions"
+#   - Secrets: STARS_TOKEN (GitHub token), EMBEDDING_API_KEY, optional LLM_API_KEY
+#   - Variables (all optional, same meaning as in .env.example): EMBEDDING_BASE_URL,
+#     EMBEDDING_MODEL, LLM_BASE_URL, LLM_MODEL, LLM_OUTPUT_LANGUAGE, GRAPH_LLM_NAMES,
+#     GRAPH_MAX_CLUSTERS, SYNC_LLM_CONCURRENCY
 name: Sync and Deploy
 
 on:
@@ -43,6 +43,7 @@ jobs:
       LLM_OUTPUT_LANGUAGE: ${{ vars.LLM_OUTPUT_LANGUAGE }}
       GRAPH_MAX_CLUSTERS: ${{ vars.GRAPH_MAX_CLUSTERS }}
       GRAPH_LLM_NAMES: ${{ vars.GRAPH_LLM_NAMES }}
+      SYNC_LLM_CONCURRENCY: ${{ vars.SYNC_LLM_CONCURRENCY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
