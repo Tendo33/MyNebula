@@ -76,7 +76,6 @@ describe('tags and scores', () => {
     const theme = (i: number) => Math.floor(i / 10);
     const edges = buildEdges(crowded.map((r) => r.id), scores);
     expect(edges.every(([s, t]) => theme(s - 1) === theme(t - 1))).toBe(true);
-    expect(scores.semantic[1]).toBeGreaterThan(0.9);
   });
 });
 
@@ -164,7 +163,6 @@ describe('end to end', () => {
     await assignClusters(state, analyze(state), settings(), { reset: false, llmNames: false });
     const meta = writeSite(state, analyze(state), dir);
     const graph = JSON.parse(readFileSync(join(dir, 'graph.json'), 'utf8'));
-    const related = JSON.parse(readFileSync(join(dir, 'related.json'), 'utf8'));
 
     expect(meta).toMatchObject({ nodes: 30, clusters: 3 });
     const ids = new Set(graph.nodes.map((n: { id: number }) => n.id));
@@ -174,7 +172,6 @@ describe('end to end', () => {
     expect([...languagesByCluster.values()].every((s) => s.size === 1)).toBe(true);
     expect(graph.star_lists.map((l: { id: number }) => l.id)).toEqual([1, -1]);
     expect(graph.timeline.map((p: { date: string }) => p.date)).toEqual(['2025-01', '2025-02', '2025-03']);
-    expect(related['1'].every((item: number[]) => item[0] !== 1 && item[2] >= 0.5)).toBe(true);
 
     const before = Object.keys(state.clusters).sort();
     state.repos['99'] = { ...state.repos['1'], id: 99, full_name: 'o/new' };

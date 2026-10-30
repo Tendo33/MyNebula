@@ -70,13 +70,8 @@
     "sameLang": "Lang",
     "sameTags": "Tags",
     "similar": "Similar",
-    "similarLoadFailed": "Failed to load similar repos",
     "stars": "Stars",
-    "reason_very_similar": "very similar",
-    "reason_similar": "similar",
-    "reason_tags": "shared tags",
-    "reason_list": "same list",
-    "reason_language": "same language"
+    "reason_list": "same list"
   },
   "search": {
     "all": "All",
@@ -112,8 +107,6 @@
     "hq_rendering_desc": "Draw repository owner avatars on the graph",
     "language": "Language",
     "language_desc": "Change the language of the interface",
-    "related_min_semantic": "Related Similarity Strictness",
-    "related_min_semantic_desc": "Raise this to keep only highly similar repositories in the Similar tab",
     "repos": "Repositories",
     "show_trajectories": "Show Trajectories",
     "show_trajectories_desc": "Show connection paths between nodes",

@@ -19,6 +19,7 @@ import {
   buildOverviewLinks,
   classifyLink,
   convexHull,
+  focusClusterId,
   nodeColor,
   nodeDimmed,
   nodeRadius,
@@ -609,10 +610,8 @@ export class GraphCanvas {
     ctx.setTransform(this.dpr * tf.k, 0, 0, this.dpr * tf.k, this.dpr * tf.x, this.dpr * tf.y);
 
     const hover = this.hoverId == null ? null : (this.nodeById.get(this.hoverId) ?? null);
-    const selected = this.view.selectedId == null ? undefined : this.nodeById.get(this.view.selectedId);
     const focus: FocusContext = {
       selectedId: this.view.selectedId ?? undefined,
-      selectedClusterId: selected?.cluster_id,
       hover,
       neighbors: this.view.neighbors,
       visible: this.view.visible,
@@ -648,31 +647,30 @@ export class GraphCanvas {
   }
 
   private drawHulls(focus: FocusContext, scale: number): void {
-    const focused = new Set([focus.selectedClusterId, focus.hover?.cluster_id].filter((id) => id != null));
-    for (const clusterId of focused) {
-      const cluster = this.clusters.get(clusterId!);
-      const members = this.nodes.filter((n) => n.cluster_id === clusterId && focus.visible.has(n.id));
-      if (!cluster || members.length < 3) continue;
-      const hull = convexHull(members.map((n) => ({ x: n.x!, y: n.y! })));
-      if (hull.length < 3) continue;
-      const { ctx } = this;
-      ctx.beginPath();
-      hull.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.closePath();
-      ctx.fillStyle = `${cluster.color}10`;
-      ctx.fill();
-      ctx.strokeStyle = `${cluster.color}30`;
-      ctx.lineWidth = 1 / scale;
-      ctx.stroke();
-      if (scale > 0.5 && cluster.name) {
-        const cx = members.reduce((s, n) => s + n.x!, 0) / members.length;
-        const cy = members.reduce((s, n) => s + n.y!, 0) / members.length;
-        ctx.font = `600 ${Math.max(14 / scale, 10)}px ${FONT}`;
-        ctx.fillStyle = `${cluster.color}60`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(cluster.name, cx, cy);
-      }
+    const clusterId = focusClusterId(focus);
+    const cluster = clusterId == null ? undefined : this.clusters.get(clusterId);
+    if (!cluster) return;
+    const members = this.nodes.filter((n) => n.cluster_id === clusterId && focus.visible.has(n.id));
+    if (members.length < 3) return;
+    const hull = convexHull(members.map((n) => ({ x: n.x!, y: n.y! })));
+    if (hull.length < 3) return;
+    const { ctx } = this;
+    ctx.beginPath();
+    hull.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.fillStyle = `${cluster.color}10`;
+    ctx.fill();
+    ctx.strokeStyle = `${cluster.color}30`;
+    ctx.lineWidth = 1 / scale;
+    ctx.stroke();
+    if (scale > 0.5 && cluster.name) {
+      const cx = members.reduce((s, n) => s + n.x!, 0) / members.length;
+      const cy = members.reduce((s, n) => s + n.y!, 0) / members.length;
+      ctx.font = `600 ${Math.max(14 / scale, 10)}px ${FONT}`;
+      ctx.fillStyle = `${cluster.color}60`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cluster.name, cx, cy);
     }
   }
 

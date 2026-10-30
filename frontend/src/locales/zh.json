@@ -70,13 +70,8 @@
     "sameLang": "语言",
     "sameTags": "标签",
     "similar": "相似",
-    "similarLoadFailed": "加载相似仓库失败",
     "stars": "星标",
-    "reason_very_similar": "高度相似",
-    "reason_similar": "相似",
-    "reason_tags": "共同标签",
-    "reason_list": "同一列表",
-    "reason_language": "同一语言"
+    "reason_list": "同一列表"
   },
   "search": {
     "all": "全部",
@@ -112,8 +107,6 @@
     "hq_rendering_desc": "在图谱上绘制仓库头像",
     "language": "语言",
     "language_desc": "切换界面显示语言",
-    "related_min_semantic": "相似推荐严格度",
-    "related_min_semantic_desc": "提高该值后，仅保留语义更接近的仓库",
     "repos": "仓库",
     "show_trajectories": "显示轨迹",
     "show_trajectories_desc": "显示节点之间的连接轨迹",

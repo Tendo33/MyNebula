@@ -57,6 +57,3 @@ export interface GraphPayload {
   timeline: TimelinePoint[];
 }
 
-/** [id, score, semantic, tag_overlap, flags(bit0 same list, bit1 same language)] */
-export type RelatedItem = [number, number, number, number, number];
-export type RelatedPayload = Record<string, RelatedItem[]>;

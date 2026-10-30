@@ -1,4 +1,4 @@
-/** Similarity scoring, graph edges, related repos, timeline, and the JSON the site reads. */
+/** Similarity scoring, graph edges, timeline, and the JSON the site reads. */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,10 +13,6 @@ const STAR_LIST_WEIGHT = 0.1;
 const LANGUAGE_WEIGHT = 0.05;
 
 const EDGE_K = 8;
-const RELATED_LIMIT = 30;
-const RELATED_MIN_SCORE = 0.4;
-/** Lowest value of the "related strictness" slider; the client filters upward. */
-const RELATED_MIN_SEMANTIC = 0.5;
 const UNCATEGORIZED_LIST_ID = -1;
 
 export const CLUSTER_COLORS = [
@@ -73,64 +69,50 @@ export const tagOverlap = (left: string[], right: string[]): number => {
 
 export interface Scores {
   n: number;
-  /** Raw-cosine blend: related repos and the similarity the site shows. */
   score: Float32Array;
-  /** Same blend on mean-centered embeddings: graph edges and clusters. */
-  link: Float32Array;
-  semantic: Float32Array;
-  overlap: Float32Array;
-  sameList: (i: number, j: number) => boolean;
-  sameLanguage: (i: number, j: number) => boolean;
 }
 
+/**
+ * Blend of embedding similarity, tag overlap, star list, and language for every
+ * pair. Embeddings share a dominant direction (raw cosines bunch around
+ * 0.5-0.65), so they are mean-centered first to separate neighbours from bystanders.
+ */
 export const scorePairs = (repos: Repo[]): Scores => {
   const n = repos.length;
   const dim = repos[0]?.embedding?.length ?? 0;
   const unit = new Float32Array(n * dim);
+  const mean = new Float32Array(dim);
   repos.forEach((repo, i) => {
     const vec = repo.embedding!;
     const norm = Math.hypot(...vec) || 1;
-    for (let d = 0; d < dim; d += 1) unit[i * dim + d] = vec[d] / norm;
+    for (let d = 0; d < dim; d += 1) mean[d] += (unit[i * dim + d] = vec[d] / norm) / n;
   });
-  // Embeddings share a dominant direction (raw cosines bunch around 0.5-0.65).
-  // Removing the mean spreads them out, so neighbours separate from bystanders.
-  const mean = new Float32Array(dim);
-  for (let i = 0; i < n; i += 1) for (let d = 0; d < dim; d += 1) mean[d] += unit[i * dim + d] / n;
-  const centered = new Float32Array(n * dim);
   for (let i = 0; i < n; i += 1) {
     let norm = 0;
-    for (let d = 0; d < dim; d += 1) norm += (centered[i * dim + d] = unit[i * dim + d] - mean[d]) ** 2;
+    for (let d = 0; d < dim; d += 1) norm += (unit[i * dim + d] -= mean[d]) ** 2;
     norm = Math.sqrt(norm) || 1;
-    for (let d = 0; d < dim; d += 1) centered[i * dim + d] /= norm;
+    for (let d = 0; d < dim; d += 1) unit[i * dim + d] /= norm;
   }
   const tags = repos.map((r) => normalizeTags(r.ai_tags, r.topics));
   const sameList = (i: number, j: number) => repos[i].star_list_id != null && repos[i].star_list_id === repos[j].star_list_id;
   const sameLanguage = (i: number, j: number) => Boolean(repos[i].language) && repos[i].language === repos[j].language;
 
   const score = new Float32Array(n * n);
-  const link = new Float32Array(n * n);
-  const semantic = new Float32Array(n * n);
-  const overlap = new Float32Array(n * n);
   for (let i = 0; i < n; i += 1) {
-    score[i * n + i] = link[i * n + i] = -1;
-    semantic[i * n + i] = 1;
+    score[i * n + i] = -1;
     for (let j = i + 1; j < n; j += 1) {
       let dot = 0;
-      let centeredDot = 0;
-      for (let d = 0, a = i * dim, b = j * dim; d < dim; d += 1) {
-        dot += unit[a + d] * unit[b + d];
-        centeredDot += centered[a + d] * centered[b + d];
-      }
-      const sem = Math.min(1, Math.max(0, dot));
-      const tag = tagOverlap(tags[i], tags[j]);
-      const rest = TAG_OVERLAP_WEIGHT * tag + STAR_LIST_WEIGHT * +sameList(i, j) + LANGUAGE_WEIGHT * +sameLanguage(i, j);
-      semantic[i * n + j] = semantic[j * n + i] = sem;
-      overlap[i * n + j] = overlap[j * n + i] = tag;
-      score[i * n + j] = score[j * n + i] = Math.min(1, SEMANTIC_WEIGHT * sem + rest);
-      link[i * n + j] = link[j * n + i] = Math.min(1, SEMANTIC_WEIGHT * Math.max(0, centeredDot) + rest);
+      for (let d = 0, a = i * dim, b = j * dim; d < dim; d += 1) dot += unit[a + d] * unit[b + d];
+      score[i * n + j] = score[j * n + i] = Math.min(
+        1,
+        SEMANTIC_WEIGHT * Math.max(0, dot) +
+          TAG_OVERLAP_WEIGHT * tagOverlap(tags[i], tags[j]) +
+          STAR_LIST_WEIGHT * +sameList(i, j) +
+          LANGUAGE_WEIGHT * +sameLanguage(i, j),
+      );
     }
   }
-  return { n, score, link, semantic, overlap, sameList, sameLanguage };
+  return { n, score };
 };
 
 const quantile = (values: number[], q: number): number => {
@@ -144,11 +126,11 @@ const quantile = (values: number[], q: number): number => {
  * Link-score cutoff that yields roughly `EDGE_K` edges per node, sampled on 200
  * repos. Purely rank-based: centered scores have no fixed scale to anchor a floor.
  */
-export const adaptiveThreshold = ({ n, link }: Scores, sample = 200): number => {
+export const adaptiveThreshold = ({ n, score }: Scores, sample = 200): number => {
   const m = Math.min(n, sample);
   if (m < 3) return 0.5;
   const upper: number[] = [];
-  for (let i = 0; i < m; i += 1) for (let j = i + 1; j < m; j += 1) upper.push(link[i * n + j]);
+  for (let i = 0; i < m; i += 1) for (let j = i + 1; j < m; j += 1) upper.push(score[i * n + j]);
   const degree = Math.max(1, Math.min(EDGE_K, m - 1));
   return quantile(upper, Math.max(0.05, Math.min(0.98, 1 - degree / (m - 1))));
 };
@@ -156,7 +138,7 @@ export const adaptiveThreshold = ({ n, link }: Scores, sample = 200): number => 
 const rankRow = (scores: Scores, i: number) =>
   Array.from({ length: scores.n }, (_, j) => j)
     .filter((j) => j !== i)
-    .sort((a, b) => scores.link[i * scores.n + b] - scores.link[i * scores.n + a]);
+    .sort((a, b) => scores.score[i * scores.n + b] - scores.score[i * scores.n + a]);
 
 /**
  * Undirected per-node k-NN edges above the adaptive threshold. Every node also
@@ -171,7 +153,7 @@ export const buildEdges = (ids: number[], scores: Scores): Edge[] => {
     rankRow(scores, i)
       .slice(0, EDGE_K)
       .every((j, rank) => {
-        const w = scores.link[i * scores.n + j];
+        const w = scores.score[i * scores.n + j];
         if (w <= 0 || (w < threshold && rank > 0)) return false;
         const [s, t] = ids[i] < ids[j] ? [ids[i], ids[j]] : [ids[j], ids[i]];
         pairs.set(`${s}:${t}`, [s, t, Math.round(w * 1e4) / 1e4]);
@@ -179,32 +161,6 @@ export const buildEdges = (ids: number[], scores: Scores): Edge[] => {
       });
   }
   return [...pairs.values()].sort((a, b) => b[2] - a[2]);
-};
-
-/** Per anchor: [id, score, semantic, tag_overlap, flags(bit0 same list, bit1 same language)]. */
-export const buildRelated = (repos: Repo[], scores: Scores): Record<string, number[][]> => {
-  const { n, score, semantic, overlap } = scores;
-  const round = (v: number) => Math.round(v * 1e4) / 1e4;
-  const related: Record<string, number[][]> = {};
-  repos.forEach((repo, i) => {
-    related[String(repo.id)] = Array.from({ length: n }, (_, j) => j)
-      .filter((j) => j !== i && semantic[i * n + j] >= RELATED_MIN_SEMANTIC && score[i * n + j] >= RELATED_MIN_SCORE)
-      .sort(
-        (a, b) =>
-          score[i * n + b] - score[i * n + a] ||
-          semantic[i * n + b] - semantic[i * n + a] ||
-          repos[b].stargazers_count - repos[a].stargazers_count,
-      )
-      .slice(0, RELATED_LIMIT)
-      .map((j) => [
-        repos[j].id,
-        round(score[i * n + j]),
-        round(semantic[i * n + j]),
-        round(overlap[i * n + j]),
-        +scores.sameList(i, j) | (+scores.sameLanguage(i, j) << 1),
-      ]);
-  });
-  return related;
 };
 
 const topCounts = (values: string[], limit: number) => {
@@ -238,24 +194,15 @@ export const buildTimeline = (repos: Repo[]) => {
 export interface Analysis {
   repos: Repo[];
   edges: Edge[];
-  related: Record<string, number[][]>;
 }
 
-/** Score every embedded repo pair once; derive edges and related repos from it. */
+/** Score every embedded repo pair once and link each repo to its closest neighbours. */
 export const analyze = (state: State): Analysis => {
   const repos = Object.values(state.repos)
     .filter((r) => r.embedding?.length)
     .sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
-  if (!repos.length) return { repos, edges: [], related: {} };
-  const scores = scorePairs(repos);
-  return {
-    repos,
-    edges: buildEdges(
-      repos.map((r) => r.id),
-      scores,
-    ),
-    related: buildRelated(repos, scores),
-  };
+  if (!repos.length) return { repos, edges: [] };
+  return { repos, edges: buildEdges(repos.map((r) => r.id), scorePairs(repos)) };
 };
 
 const NODE_FIELDS = [
@@ -310,6 +257,5 @@ export const writeSite = (state: State, analysis: Analysis, outputDir: string) =
   };
   mkdirSync(outputDir, { recursive: true });
   writeFileSync(join(outputDir, 'graph.json'), JSON.stringify(graph));
-  writeFileSync(join(outputDir, 'related.json'), JSON.stringify(analysis.related));
   return { version: graph.version, nodes: nodes.length, edges: edges.length, clusters: clusters.length };
 };

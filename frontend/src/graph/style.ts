@@ -1,8 +1,9 @@
 /**
  * Pure colour, width, and visibility rules for the graph canvas.
  *
- * Cluster hue is reserved for the hovered or selected cluster. Everything else
- * stays neutral, and nodes outside that cluster are dimmed.
+ * Selecting a repository lights it and the repositories it links to; hovering
+ * with nothing selected previews the hovered cluster. Everything else stays
+ * neutral and dims.
  */
 
 export const COLORS = {
@@ -20,7 +21,7 @@ export const COLORS = {
   TRANSPARENT: 'rgba(0,0,0,0)',
 } as const;
 
-/** Nodes outside the hovered or selected cluster. Filtered ghosts stay at 0.25. */
+/** Nodes outside the current focus. Filtered ghosts stay at 0.25. */
 export const UNFOCUSED_NODE_ALPHA = 0.18;
 
 const NODE_BASE_SIZE = 5;
@@ -43,14 +44,17 @@ export interface StyleLink {
 
 export interface FocusContext {
   selectedId: number | undefined;
-  selectedClusterId: number | null | undefined;
   hover: Pick<StyleNode, 'id' | 'cluster_id'> | null;
   neighbors: ReadonlySet<number>;
   visible: ReadonlySet<number>;
 }
 
+/** Only a hover with nothing selected focuses a whole cluster. */
+export const focusClusterId = (ctx: FocusContext): number | null =>
+  ctx.selectedId === undefined ? (ctx.hover?.cluster_id ?? null) : null;
+
 const inFocusCluster = (clusterId: number | null | undefined, ctx: FocusContext): boolean =>
-  clusterId != null && (clusterId === ctx.selectedClusterId || clusterId === ctx.hover?.cluster_id);
+  clusterId != null && clusterId === focusClusterId(ctx);
 
 const focusActive = (ctx: FocusContext): boolean => ctx.selectedId !== undefined || ctx.hover != null;
 
@@ -62,11 +66,11 @@ export const nodeColor = (node: StyleNode, ctx: FocusContext): string => {
   if (hovered) return node.cluster_id != null && node.color ? node.color : COLORS.NODE_HOVER;
   if (!focusActive(ctx)) return COLORS.NODE_DEFAULT;
   if (inFocusCluster(node.cluster_id, ctx)) return node.color || COLORS.NODE_DEFAULT;
-  if (ctx.neighbors.has(node.id)) return COLORS.NODE_DEFAULT;
+  if (ctx.neighbors.has(node.id)) return node.color || COLORS.NODE_DEFAULT;
   return COLORS.NODE_DIM;
 };
 
-/** Visible nodes outside the focused cluster (and not neighbours) recede. */
+/** Visible nodes outside the focused cluster or the selection's links recede. */
 export const nodeDimmed = (node: StyleNode, ctx: FocusContext): boolean => {
   if (!ctx.visible.has(node.id) || !focusActive(ctx)) return false;
   if (ctx.selectedId === node.id || ctx.hover?.id === node.id || ctx.neighbors.has(node.id)) return false;
@@ -74,7 +78,7 @@ export const nodeDimmed = (node: StyleNode, ctx: FocusContext): boolean => {
 };
 
 export const showClusterHue = (node: StyleNode, ctx: FocusContext): boolean =>
-  ctx.visible.has(node.id) && inFocusCluster(node.cluster_id, ctx);
+  ctx.visible.has(node.id) && (inFocusCluster(node.cluster_id, ctx) || ctx.neighbors.has(node.id));
 
 /** Labels: the selected node, its immediate neighbours, and the hovered node. */
 export const showLabel = (id: number, ctx: FocusContext): boolean =>

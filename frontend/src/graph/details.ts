@@ -6,7 +6,7 @@ import { store } from '../store';
 import type { GraphNode } from '../types';
 
 export type RelatedTab = 'similar' | 'sameTags' | 'sameLang';
-type RelatedEntry = { repo: GraphNode; reason?: string; score?: number };
+type RelatedEntry = { repo: GraphNode; reason?: string };
 
 const factTopics = (topics: string[] = [], tags: string[] = []): string[] => {
   const seen = new Set<string>();
@@ -21,30 +21,21 @@ const factTopics = (topics: string[] = [], tags: string[] = []): string[] => {
   return labels;
 };
 
-const RELATED_LIMIT = 20;
-
-/** Readable reasons for a precomputed related item, same thresholds the API used. */
-const reasonsFor = (semantic: number, overlap: number, flags: number): string[] => {
-  const reasons: string[] = [];
-  if (semantic >= 0.78) reasons.push(t('repoDetails.reason_very_similar'));
-  else if (semantic >= 0.65) reasons.push(t('repoDetails.reason_similar'));
-  if (overlap > 0) reasons.push(t('repoDetails.reason_tags'));
-  if (flags & 1) reasons.push(t('repoDetails.reason_list'));
-  if (flags & 2) reasons.push(t('repoDetails.reason_language'));
-  return reasons;
-};
-
 export const relatedFor = (node: GraphNode): Record<RelatedTab, RelatedEntry[]> => {
-  const similar: RelatedEntry[] = (store.related?.[String(node.id)] ?? [])
-    .filter(([, , semantic]) => semantic >= store.settings.relatedMinSemantic)
-    .slice(0, RELATED_LIMIT)
-    .flatMap(([id, score, semantic, overlap, flags]) => {
-      const repo = store.nodeById.get(id);
-      return repo ? [{ repo, score, reason: reasonsFor(semantic, overlap, flags).join(' · ') }] : [];
-    });
-
   const tagsOf = (n: GraphNode) => new Set([...(n.ai_tags ?? []), ...(n.topics ?? [])].map(normalizeTag).filter(Boolean));
   const nodeTags = tagsOf(node);
+
+  // Exactly the repos this node is linked to on the canvas, strongest link first.
+  const similar: RelatedEntry[] = (store.data?.edges ?? [])
+    .flatMap(([s, t, score]) => (s === node.id ? [{ id: t, score }] : t === node.id ? [{ id: s, score }] : []))
+    .sort((a, b) => b.score - a.score)
+    .flatMap(({ id }) => {
+      const repo = store.nodeById.get(id);
+      if (!repo) return [];
+      const shared = [...tagsOf(repo)].filter((tag) => nodeTags.has(tag)).slice(0, 2).join(', ');
+      const sameList = node.star_list_id != null && node.star_list_id !== -1 && repo.star_list_id === node.star_list_id;
+      return [{ repo, reason: [shared, sameList ? t('repoDetails.reason_list') : ''].filter(Boolean).join(' · ') }];
+    });
   const sameTags: RelatedEntry[] = nodeTags.size
     ? store.nodes
         .filter((n) => n.id !== node.id)
@@ -78,16 +69,14 @@ const avatar = (node: GraphNode, size: 'sm' | 'md') => {
     : html`<span class="avatar avatar-${size} avatar-fallback">${node.owner.charAt(0).toUpperCase()}</span>`;
 };
 
-const relatedItem = ({ repo, reason, score }: RelatedEntry): Raw => {
+const relatedItem = ({ repo, reason }: RelatedEntry): Raw => {
   const stars = repo.stargazers_count >= 1000 ? `${(repo.stargazers_count / 1000).toFixed(1)}k` : String(repo.stargazers_count);
   return html`<button class="related-item" data-act="select" data-id="${repo.id}">
     ${avatar(repo, 'sm')}
     <span class="related-body">
       <span class="related-title"><span class="truncate strong">${repo.name}</span>${repo.language ? html`<span class="dim small">${repo.language}</span>` : ''}</span>
       <span class="muted small clamp-1">${repo.description || repo.ai_summary || t('common.no_description')}</span>
-      ${reason || score != null
-        ? html`<span class="dim small truncate">${reason ?? ''}${reason && score != null ? ' · ' : ''}${score != null ? `${(score * 100).toFixed(1)}%` : ''}</span>`
-        : ''}
+      ${reason ? html`<span class="dim small truncate">${reason}</span>` : ''}
     </span>
     <span class="mono dim small">${stars}</span>
   </button>`;
@@ -105,12 +94,9 @@ export const renderDetails = (node: GraphNode, state: DetailsState): Raw => {
   const summary = (node.ai_summary || node.description || '').trim();
   const related = relatedFor(node);
   const current = related[state.relatedTab];
-  const loading = state.relatedTab === 'similar' && !store.related && !store.relatedError;
   const emptyMessage =
     state.relatedTab === 'similar'
-      ? store.relatedError
-        ? t('repoDetails.similarLoadFailed')
-        : t('repoDetails.noSimilar')
+      ? t('repoDetails.noSimilar')
       : state.relatedTab === 'sameTags'
         ? t('repoDetails.noSameTags')
         : t('repoDetails.noSameLang');
@@ -151,7 +137,7 @@ export const renderDetails = (node: GraphNode, state: DetailsState): Raw => {
         </div>
         ${current.length
           ? html`<div class="related-list">${current.map(relatedItem)}</div>`
-          : html`<p class="muted small related-empty">${loading ? t('common.loading') : emptyMessage}</p>`}
+          : html`<p class="muted small related-empty">${emptyMessage}</p>`}
       </section>
     </div>
   </div>`;

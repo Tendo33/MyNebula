@@ -196,7 +196,6 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
     const region = el('[data-region="details"]');
     const node = store.selected;
     root.querySelector('.graph-page')?.classList.toggle('has-details', Boolean(node));
-    if (node) void store.loadRelated();
     region.innerHTML = node ? renderDetails(node, details).value : '';
   };
 
@@ -250,7 +249,6 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
       updateCanvas();
       renderDetailsRegion();
     }),
-    store.subscribe(['related'], () => canvas && renderDetailsRegion()),
     onRoute((route) => (route.path === '/' || route.path === '/graph') && applyRoute(route)),
   );
 

@@ -1,20 +1,18 @@
-import type { GraphNode, GraphPayload, RelatedPayload } from './types';
+import type { GraphNode, GraphPayload } from './types';
 import { buildAdjacency, emptyFilters, filterNodes, type Filters } from './filters';
 import { buildRepoSearchText } from './search';
 
 export interface Settings {
   showTrajectories: boolean;
   hqRendering: boolean;
-  relatedMinSemantic: number;
 }
 
-export type Topic = 'data' | 'filters' | 'selection' | 'settings' | 'related';
+export type Topic = 'data' | 'filters' | 'selection' | 'settings';
 
 const SETTINGS_KEY = 'nebula_graph_settings';
 const DEFAULT_SETTINGS: Settings = {
   showTrajectories: true,
   hqRendering: true,
-  relatedMinSemantic: 0.65,
 };
 
 const loadSettings = (): Settings => {
@@ -38,8 +36,6 @@ class Store {
   data: GraphPayload | null = null;
   loading = true;
   error: string | null = null;
-  related: RelatedPayload | null = null;
-  relatedError = false;
   selectedId: number | null = null;
   filters: Filters = emptyFilters();
   settings: Settings = loadSettings();
@@ -49,7 +45,6 @@ class Store {
   private searchText = new Map<number, string>();
   private visibleCache: { filters: Filters; data: GraphPayload; nodes: GraphNode[] } | null = null;
   private listeners = new Map<Topic, Set<() => void>>();
-  private relatedRequest: Promise<void> | null = null;
 
   subscribe(topics: Topic[], fn: () => void): () => void {
     topics.forEach((topic) => {
@@ -91,28 +86,6 @@ class Store {
     this.searchText = new Map(data?.nodes.map((node) => [node.id, buildRepoSearchText(node)]) ?? []);
     this.visibleCache = null;
     this.emit('data');
-  }
-
-  /** Related repos are a separate, lazily fetched file. */
-  loadRelated(): Promise<void> {
-    if (this.related || this.relatedRequest) return this.relatedRequest ?? Promise.resolve();
-    this.relatedRequest = fetch(dataUrl('related.json'), { cache: 'no-cache' })
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
-      })
-      .then((payload: RelatedPayload) => {
-        this.related = payload;
-        this.relatedError = false;
-      })
-      .catch(() => {
-        this.relatedError = true;
-      })
-      .finally(() => {
-        this.relatedRequest = null;
-        this.emit('related');
-      });
-    return this.relatedRequest;
   }
 
   get nodes(): GraphNode[] {

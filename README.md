@@ -29,9 +29,9 @@ It ships as a static site plus an offline sync. There is no server and no databa
 
 ## Features
 
-- **Graph** (home): a live force-directed canvas. Groups burst out on load, settle, and drift gently. Hover or select a repository to light up its group and links.
+- **Graph** (home): a live force-directed canvas. Groups burst out on load, settle, and drift gently. Hover a repository to preview its group; select one to light up just the repositories it links to.
 - **Filters**: group, GitHub star list, timeline range, and text search (`stars:>1000` works too). Every filter and selection lives in the URL, so views are shareable.
-- **Details**: summary, tags, links to GitHub / DeepWiki / zRead, and related repositories ranked by similarity, shared tags, and language.
+- **Details**: summary, tags, links to GitHub / DeepWiki / zRead, and related repositories: the ones it links to on the graph, strongest first, plus same-tag and same-language lists.
 - **Data**: a sortable, filterable table of every repository.
 - **Search** with `⌘K` / `Ctrl+K` across repositories, groups, languages, and tags.
 - English and Chinese UI, light / dark / system theme, keyboard and reduced-motion support.
@@ -44,7 +44,7 @@ flowchart LR
     E["Embedding API"] --> S
     L["LLM API (optional)"] --> S
     S -->|incremental cache| C[("data/cache.json.gz")]
-    S --> J["graph.json + related.json"]
+    S --> J["graph.json"]
     J --> W["Static site"]
 ```
 

@@ -275,8 +275,6 @@ kbd {
 .switch[aria-checked='true'] { background: var(--primary); }
 .switch[aria-checked='true'] span { transform: translateX(1rem); background: var(--on-primary); }
 
-.range { width: 9rem; accent-color: var(--text); }
-.range-field { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 14px; color: var(--text-muted); }
 
 .dot {
   width: 0.5rem;

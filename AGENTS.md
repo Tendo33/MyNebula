@@ -10,7 +10,7 @@ A static site plus an offline pipeline, one TypeScript package on Node 24 (pnpm)
   deps). `pnpm sync` fetches stars, writes optional LLM summaries/tags and
   embeddings for new or changed repos, links related repos, groups them as
   Louvain communities (ids matched to the previous run), and writes
-  `frontend/public/data/graph.json` + `related.json`. State lives in
+  `frontend/public/data/graph.json`. State lives in
   `data/cache.json.gz`; reruns must stay incremental.
 - `frontend/` (Vite, vanilla TypeScript, d3-force): Graph (home), Data,
   Settings, and the Cmd/Ctrl+K palette. Hash routing so any static host works.

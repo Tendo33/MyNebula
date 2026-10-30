@@ -65,18 +65,19 @@ describe('graph filters', () => {
 describe('graph style', () => {
   const ctx: FocusContext = {
     selectedId: 1,
-    selectedClusterId: 7,
     hover: null,
     neighbors: new Set([3]),
     visible: new Set([1, 2, 3, 4]),
   };
 
-  it('colors by focus: selected, focused cluster, neighbour, dimmed, ghost', () => {
+  it('colors by focus: selected, linked neighbour, dimmed cluster-mate, ghost', () => {
     expect(nodeColor({ id: 1, cluster_id: 7, color: '#f00' }, ctx)).toBe('#f00');
-    expect(nodeColor({ id: 2, cluster_id: 7, color: '#f00' }, ctx)).toBe('#f00');
-    expect(nodeColor({ id: 3, cluster_id: 9, color: '#0f0' }, ctx)).toBe(COLORS.NODE_DEFAULT);
+    expect(nodeColor({ id: 2, cluster_id: 7, color: '#f00' }, ctx)).toBe(COLORS.NODE_DIM);
+    expect(nodeColor({ id: 3, cluster_id: 9, color: '#0f0' }, ctx)).toBe('#0f0');
     expect(nodeColor({ id: 4, cluster_id: 9, color: '#0f0' }, ctx)).toBe(COLORS.NODE_DIM);
     expect(nodeColor({ id: 5, cluster_id: 9, color: '#0f0' }, ctx)).toBe(COLORS.GHOST_NODE);
+    const hovering = { ...ctx, selectedId: undefined, neighbors: new Set<number>(), hover: { id: 1, cluster_id: 7 } };
+    expect(nodeColor({ id: 2, cluster_id: 7, color: '#f00' }, hovering)).toBe('#f00');
   });
 
   it('shows only the backbone when nothing is focused', () => {
@@ -87,7 +88,7 @@ describe('graph style', () => {
     ];
     const overview = buildOverviewLinks(links);
     expect(overview.has(links[2])).toBe(false);
-    const idle = { ...ctx, selectedId: undefined, selectedClusterId: undefined, neighbors: new Set<number>(), showTrajectories: true, clusterOf: new Map() };
+    const idle = { ...ctx, selectedId: undefined, neighbors: new Set<number>(), showTrajectories: true, clusterOf: new Map() };
     expect(classifyLink(links[2], idle, false)).toBe('hidden');
     expect(classifyLink(links[0], idle, true)).toBe('default');
     expect(classifyLink(links[0], { ...idle, showTrajectories: false }, true)).toBe('hidden');

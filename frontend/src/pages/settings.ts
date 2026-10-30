@@ -34,12 +34,6 @@ export const mountSettings = (root: HTMLElement): (() => void) => {
         ]))}
         ${row(t('settings.hq_rendering'), t('settings.hq_rendering_desc'), toggleSwitch('hqRendering', settings.hqRendering, t('settings.hq_rendering')))}
         ${row(t('settings.show_trajectories'), t('settings.show_trajectories_desc'), toggleSwitch('showTrajectories', settings.showTrajectories, t('settings.show_trajectories')))}
-        ${row(
-          t('settings.related_min_semantic'),
-          t('settings.related_min_semantic_desc'),
-          html`<span class="range-field"><input type="range" class="range" min="0.5" max="0.9" step="0.01" value="${settings.relatedMinSemantic}"
-            data-semantic aria-label="${t('settings.related_min_semantic')}" /><output class="tabular" data-region="semantic">${settings.relatedMinSemantic.toFixed(2)}</output></span>`,
-        )}
       </div>
 
       <h2>${t('settings.data')}</h2>
@@ -73,16 +67,8 @@ export const mountSettings = (root: HTMLElement): (() => void) => {
       button.setAttribute('aria-checked', String(store.settings[key]));
     },
   });
-  const onInput = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    if (!target.matches('[data-semantic]')) return;
-    store.updateSettings({ relatedMinSemantic: Number(target.value) });
-    root.querySelector('[data-region="semantic"]')!.textContent = Number(target.value).toFixed(2);
-  };
-  root.addEventListener('input', onInput);
   return () => {
     unsubscribe();
     offClick();
-    root.removeEventListener('input', onInput);
   };
 };
