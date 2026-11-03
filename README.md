@@ -121,11 +121,22 @@ Flags for `pnpm sync` and `pnpm export` (pass them after `--`, e.g. `pnpm sync -
 
 The workflow in `.github/workflows/pages.yml` syncs daily at 01:00 UTC, on every push to `main`, and on demand, then publishes the site.
 
-1. Fork this repository.
+Before you start, have two keys ready:
+
+- A GitHub token: [create a classic token with `repo` and `user` scopes](https://github.com/settings/tokens/new?scopes=repo,user&description=MyNebula).
+- An embedding API key, for example from [SiliconFlow](https://cloud.siliconflow.cn/account/ak). The same key works as `LLM_API_KEY`.
+
+1. Fork this repository, then open the **Actions** tab of your fork and enable workflows.
 2. **Settings › Pages**: set the source to **GitHub Actions**.
 3. **Settings › Secrets and variables › Actions**, under **Secrets**: add `STARS_TOKEN` (your GitHub token), `EMBEDDING_API_KEY`, and optionally `LLM_API_KEY`.
 4. Under **Variables**, add any setting from the table above that differs from its default, for example `LLM_BASE_URL`, `LLM_MODEL`, or `GRAPH_LLM_NAMES=true`.
 5. **Actions › Sync and Deploy › Run workflow**. The input field accepts sync flags such as `--full`.
+
+When the run finishes, the site is at `https://<your-username>.github.io/MyNebula/`.
+
+To pick up new versions of MyNebula, click **Sync fork** on your fork's page. That pushes to `main`, which redeploys the site with the new code.
+
+GitHub pauses scheduled workflows in public repositories after 60 days without activity. If the daily sync stops, re-enable it from the **Actions** tab, or click **Sync fork**.
 
 The sync cache is kept in the Actions cache, so scheduled runs stay incremental. If the cache is evicted, the next run rebuilds it and pays for one full sync.
 

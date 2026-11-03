@@ -121,11 +121,22 @@ pnpm dev               # http://localhost:5173
 
 `.github/workflows/pages.yml` 会在每天 UTC 01:00（北京时间 09:00）、每次推送到 `main`、以及手动触发时运行同步，然后发布站点。
 
-1. Fork 本仓库。
+开始前准备好两个 key：
+
+- GitHub token：[创建一个勾选 `repo` 和 `user` 权限的 classic token](https://github.com/settings/tokens/new?scopes=repo,user&description=MyNebula)。
+- Embedding API key，例如在 [SiliconFlow](https://cloud.siliconflow.cn/account/ak) 创建。同一个 key 也可以当 `LLM_API_KEY` 用。
+
+1. Fork 本仓库，然后打开你 fork 的 **Actions** 页启用 workflows。
 2. **Settings › Pages**：Source 选 **GitHub Actions**。
 3. **Settings › Secrets and variables › Actions** 的 **Secrets** 里添加：`STARS_TOKEN`（你的 GitHub token）、`EMBEDDING_API_KEY`，可选 `LLM_API_KEY`。
 4. 在 **Variables** 里添加与默认值不同的配置，例如 `LLM_BASE_URL`、`LLM_MODEL`、`GRAPH_LLM_NAMES=true`。
 5. **Actions › Sync and Deploy › Run workflow**。输入框可以填同步参数，例如 `--full`。
+
+运行完成后，站点地址是 `https://<你的用户名>.github.io/MyNebula/`。
+
+MyNebula 有新版本时，在你 fork 的页面点 **Sync fork**。这会推送到 `main`，站点随即用新代码重新部署。
+
+公开仓库连续 60 天没有活动时，GitHub 会暂停定时 workflow。如果每日同步停了，到 **Actions** 页重新启用，或者点一次 **Sync fork**。
 
 同步缓存保存在 Actions cache 里，所以定时运行始终是增量的。如果缓存被清理，下一次运行会重建缓存，相当于付费跑一次全量同步。
 
