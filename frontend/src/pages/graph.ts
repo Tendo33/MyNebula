@@ -50,7 +50,8 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
   let hoverId: number | null = null;
   let previewRange: [number, number] | null = null;
   let showList = window.innerWidth < 1024 || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let filtersOpen = window.innerWidth >= 768;
+  // Below 900px the rail overlays the canvas, so it starts closed there.
+  let filtersOpen = window.innerWidth >= 900;
   const details: DetailsState = { relatedTab: 'similar' };
   const cleanups: (() => void)[] = [];
 

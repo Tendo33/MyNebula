@@ -32,52 +32,42 @@ MyNebula 读取你的 GitHub 星标，为每个仓库写一段简短摘要，并
 - **图谱**（首页）：实时力导向画布。加载时各个聚类向外展开，随后落定并缓慢漂浮。悬停仓库时预览它所在的聚类，选中仓库时只点亮与它相连的仓库。
 - **筛选**：按聚类、GitHub 星标列表、时间区间或文本筛选，也支持 `stars:>1000`。所有筛选和选中状态都写在 URL 里，可以直接分享。
 - **详情**：摘要、标签、GitHub / DeepWiki / zRead 链接，以及相关仓库：图上与它相连的仓库（按连线强度排序），以及同标签、同语言的仓库。
-- **数据**：可排序、可筛选的完整仓库表格。
+- **数据**：可排序、可筛选的完整仓库表格。点仓库名，在表格旁边直接看详情。
 - **搜索**：`⌘K` / `Ctrl+K` 搜索仓库、聚类、语言和标签。
 - 中英文界面，浅色 / 深色 / 跟随系统主题，支持键盘操作和「减少动态效果」。
 
-## 工作方式
+## 部署你自己的星图
 
-```mermaid
-flowchart LR
-    GH["GitHub 星标 + 星标列表"] --> S["pnpm sync"]
-    E["Embedding API"] --> S
-    L["LLM API（可选）"] --> S
-    S -->|增量缓存| C[("data/cache.json.gz")]
-    S --> J["graph.json"]
-    J --> W["静态站点"]
-```
+不需要 clone。Fork 本仓库后，GitHub Actions 会替你构建并托管站点：每天 UTC 01:00（北京时间 09:00）、每次推送到 `main`、以及手动触发时都会同步。
 
-1. **拉取**全部星标仓库和你的星标列表。
-2. **加工**：只处理新增或有变化的仓库。读取 README，可选地用 LLM 生成摘要和标签，再计算向量。
-3. **连线**：把每个仓库连向最相关的几个仓库。相关度由向量相似度（65%）、共同标签（20%）、同一星标列表（10%）和同一语言（5%）组成。
-4. **分组**：在连线图上做社区发现（Louvain）。聚类编号、颜色和名字在多次同步之间保持稳定。
-5. **导出**静态 JSON。布局由浏览器根据连线实时计算，不存储任何坐标。
+先准备好两个 key：
 
-流水线大约 1,200 行 TypeScript，由 Node 24 直接运行，没有任何运行时依赖。站点只依赖 `d3-force`。
+- GitHub token：[创建一个勾选 `repo` 和 `user` 权限的 classic token](https://github.com/settings/tokens/new?scopes=repo,user&description=MyNebula)。
+- Embedding API key，例如在 [SiliconFlow](https://cloud.siliconflow.cn/account/ak) 创建。同一个 key 也可以当 `LLM_API_KEY` 用。
 
-## 快速开始
+然后：
 
-需要 Node 24+、pnpm、一个 GitHub token 和一个 embedding API key。
+1. Fork 本仓库，然后打开你 fork 的 **Actions** 页启用 workflows。
+2. **Settings › Pages**：Source 选 **GitHub Actions**。
+3. **Settings › Secrets and variables › Actions** 的 **Secrets** 里添加：`STARS_TOKEN`（你的 GitHub token）、`EMBEDDING_API_KEY`，可选 `LLM_API_KEY`。
+4. 可选：在 **Variables** 里覆盖[配置](#配置)中列出的模型相关设置。
+5. **Actions › Sync and Deploy › Run workflow**。输入框可以填同步参数，例如 `--full`（见[同步参数](#同步参数)）。
 
-```bash
-git clone https://github.com/Tendo33/MyNebula.git
-cd MyNebula
-pnpm install
-cp .env.example .env   # 填 GITHUB_TOKEN 和 EMBEDDING_API_KEY，可选 LLM_API_KEY
-pnpm sync              # 生成 frontend/public/data/
-pnpm dev               # http://localhost:5173
-```
+运行完成后，站点地址是 `https://<你的用户名>.github.io/MyNebula/`。
 
-作为参考：225 个星标、带 LLM 摘要的首次同步大约 5 分钟；第二次同步全部复用缓存，几秒完成，没有任何付费调用。
+**更新**：MyNebula 有新版本时，在你 fork 的页面点 **Sync fork**。这会推送到 `main`，站点随即用新代码重新部署。
+
+**保持运行**：公开仓库连续 60 天没有活动时，GitHub 会暂停定时 workflow。如果每日同步停了，到 **Actions** 页重新启用，或者点一次 **Sync fork**。同步缓存保存在 Actions cache 里，所以定时运行始终是增量的；如果缓存被清理，下一次运行会重建缓存，相当于付费跑一次全量同步。
+
+**隐私**：发布出去的站点是公开的，包括你星标仓库的摘要。如果要私有，可以把 `frontend/dist` 部署在 Cloudflare Access 之类的访问控制后面。任何静态托管都能用，构建产物使用相对路径和 hash 路由。
 
 ## 配置
 
-所有配置都来自环境变量，`.env.example` 里逐项有注释。
+在 GitHub Actions 上，key 放在 **Secrets** 里（GitHub token 在那里叫 `STARS_TOKEN`），workflow 会读取这些 **Variables**：`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`、`LLM_BASE_URL`、`LLM_MODEL`、`LLM_OUTPUT_LANGUAGE`、`GRAPH_MAX_CLUSTERS`、`GRAPH_LLM_NAMES`、`SYNC_LLM_CONCURRENCY`。本地运行时全部写在 `.env` 里，`.env.example` 逐项有注释。
 
 | 变量 | 默认值 | 作用 |
 | --- | --- | --- |
-| `GITHUB_TOKEN` | 必填 | 读取你的星标和星标列表。 |
+| `GITHUB_TOKEN` | 必填 | 读取你的星标和星标列表。在 Actions 上存为 `STARS_TOKEN` secret。 |
 | `EMBEDDING_API_KEY` | 必填 | Embedding 服务的 key。 |
 | `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | 任何兼容 OpenAI 接口的服务。 |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | 多语言模型，中英文混合效果好。 |
@@ -99,16 +89,9 @@ pnpm dev               # http://localhost:5173
 - **不用 LLM**：`LLM_API_KEY` 留空。仓库按描述、话题和 README 计算向量，聚类按最有区分度的标签命名，只有 embedding 产生费用。
 - **Ollama**（仅本地）：把 `EMBEDDING_BASE_URL` 指向 `http://localhost:11434/v1`，模型用 `nomic-embed-text` 等。GitHub Actions 上不可用。
 
-## 命令
+### 同步参数
 
-| 命令 | 作用 |
-| --- | --- |
-| `pnpm sync` | 拉取、加工新增或变化的星标、连线、分组，并写出站点数据。 |
-| `pnpm export` | 只用缓存重新计算连线、分组和站点数据，不调用任何 API。 |
-| `pnpm dev` / `pnpm build` | 运行或构建站点。 |
-| `pnpm lint` / `pnpm test` | 类型检查和测试。 |
-
-`pnpm sync` 和 `pnpm export` 的参数写在 `--` 后面，例如 `pnpm sync -- --full`：
+在 Actions 上填到 **Run workflow** 的输入框里；本地运行时写在 `--` 后面，例如 `pnpm sync -- --full`：
 
 | 参数 | 作用 |
 | --- | --- |
@@ -117,30 +100,25 @@ pnpm dev               # http://localhost:5173
 | `--recluster` | 丢弃之前的聚类编号和名字。 |
 | `--max-clusters N` | 覆盖 `GRAPH_MAX_CLUSTERS`。 |
 
-## 部署到 GitHub Pages
+## 工作方式
 
-`.github/workflows/pages.yml` 会在每天 UTC 01:00（北京时间 09:00）、每次推送到 `main`、以及手动触发时运行同步，然后发布站点。
+```mermaid
+flowchart LR
+    GH["GitHub 星标 + 星标列表"] --> S["pnpm sync"]
+    E["Embedding API"] --> S
+    L["LLM API（可选）"] --> S
+    S -->|增量缓存| C[("data/cache.json.gz")]
+    S --> J["graph.json"]
+    J --> W["静态站点"]
+```
 
-开始前准备好两个 key：
+1. **拉取**全部星标仓库和你的星标列表。
+2. **加工**：只处理新增或有变化的仓库。读取 README，可选地用 LLM 生成摘要和标签，再计算向量。
+3. **连线**：把每个仓库连向最相关的几个仓库。相关度由向量相似度（65%）、共同标签（20%）、同一星标列表（10%）和同一语言（5%）组成。
+4. **分组**：在连线图上做社区发现（Louvain）。聚类编号、颜色和名字在多次同步之间保持稳定。
+5. **导出**静态 JSON。布局由浏览器根据连线实时计算，不存储任何坐标。
 
-- GitHub token：[创建一个勾选 `repo` 和 `user` 权限的 classic token](https://github.com/settings/tokens/new?scopes=repo,user&description=MyNebula)。
-- Embedding API key，例如在 [SiliconFlow](https://cloud.siliconflow.cn/account/ak) 创建。同一个 key 也可以当 `LLM_API_KEY` 用。
-
-1. Fork 本仓库，然后打开你 fork 的 **Actions** 页启用 workflows。
-2. **Settings › Pages**：Source 选 **GitHub Actions**。
-3. **Settings › Secrets and variables › Actions** 的 **Secrets** 里添加：`STARS_TOKEN`（你的 GitHub token）、`EMBEDDING_API_KEY`，可选 `LLM_API_KEY`。
-4. 在 **Variables** 里添加与默认值不同的配置，例如 `LLM_BASE_URL`、`LLM_MODEL`、`GRAPH_LLM_NAMES=true`。
-5. **Actions › Sync and Deploy › Run workflow**。输入框可以填同步参数，例如 `--full`。
-
-运行完成后，站点地址是 `https://<你的用户名>.github.io/MyNebula/`。
-
-MyNebula 有新版本时，在你 fork 的页面点 **Sync fork**。这会推送到 `main`，站点随即用新代码重新部署。
-
-公开仓库连续 60 天没有活动时，GitHub 会暂停定时 workflow。如果每日同步停了，到 **Actions** 页重新启用，或者点一次 **Sync fork**。
-
-同步缓存保存在 Actions cache 里，所以定时运行始终是增量的。如果缓存被清理，下一次运行会重建缓存，相当于付费跑一次全量同步。
-
-**隐私**：发布出去的站点是公开的，包括你星标仓库的摘要。如果要私有，可以把 `frontend/dist` 部署在 Cloudflare Access 之类的访问控制后面。任何静态托管都能用，构建产物使用相对路径和 hash 路由。
+流水线大约 1,200 行 TypeScript，由 Node 24 直接运行，没有任何运行时依赖。站点只依赖 `d3-force`。
 
 ## 常见问题
 
@@ -151,21 +129,37 @@ MyNebula 有新版本时，在你 fork 的页面点 **Sync fork**。这会推送
 | 返回 `402` / `balance is insufficient` | 服务商账户没有余额，充值或换服务商。 |
 | 生成摘要时出现 `429` | 调低 `SYNC_LLM_CONCURRENCY`。 |
 | 星标列表缺失 | 列表请求重试后仍失败，会保留上一次的列表，下次同步自动补上。权限较少的 token 可能读不到列表；实测可用的是带 `repo` 和 `user` 权限的 classic token。 |
-| 图谱是空的 | 还没有站点数据。运行 `pnpm sync`，或检查 token 能否读取你的星标。 |
+| 图谱是空的 | 还没有站点数据。运行一次 workflow（或在本地运行 `pnpm sync`），或检查 token 能否读取你的星标。 |
 
-## 项目结构
+## 本地开发
+
+只有想修改 MyNebula，或者想在自己机器上跑同步时才需要 clone。需要 Node 24+、pnpm、一个 GitHub token 和一个 embedding API key。
+
+```bash
+git clone https://github.com/Tendo33/MyNebula.git
+cd MyNebula
+pnpm install
+cp .env.example .env   # 填 GITHUB_TOKEN 和 EMBEDDING_API_KEY，可选 LLM_API_KEY
+pnpm sync              # 生成 frontend/public/data/
+pnpm dev               # http://localhost:5173
+```
+
+作为参考：225 个星标、带 LLM 摘要的首次同步大约 5 分钟；第二次同步全部复用缓存，几秒完成，没有任何付费调用。
+
+| 命令 | 作用 |
+| --- | --- |
+| `pnpm sync` | 拉取、加工新增或变化的星标、连线、分组，并写出站点数据。 |
+| `pnpm export` | 只用缓存重新计算连线、分组和站点数据，不调用任何 API。 |
+| `pnpm dev` / `pnpm build` | 运行或构建站点。 |
+| `pnpm lint` / `pnpm test` | 类型检查和测试。 |
+
+提交 PR 前运行 `pnpm lint && pnpm test && pnpm build`。
 
 ```text
 pipeline/          sync.ts（CLI、缓存）、remote.ts（GitHub 与模型调用）、
                    graph.ts（打分、连线、输出）、cluster.ts（Louvain、命名）
 frontend/src/      main.ts（外壳）、store、router、palette、pages/、graph/（画布与样式）
 .github/workflows/ ci.yml（类型、测试、构建）、pages.yml（同步与部署）
-```
-
-## 开发
-
-```bash
-pnpm lint && pnpm test && pnpm build
 ```
 
 设计规范见 [DESIGN.md](DESIGN.md)，产品背景见 [PRODUCT.md](PRODUCT.md)，给 AI 助手的协作说明见 [AGENTS.md](AGENTS.md)。

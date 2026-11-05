@@ -14,6 +14,9 @@ import {
 import { store } from './store';
 import type { ClusterInfo, GraphNode } from './types';
 
+/** The palette shortcut as this platform writes it (the handler accepts both keys). */
+export const shortcutLabel = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+
 type FilterType = 'all' | 'repos' | 'clusters' | 'languages' | 'tags';
 type Result =
   | { type: 'repo'; id: number; title: string; subtitle?: string | null; meta: string; data: GraphNode }
@@ -191,16 +194,15 @@ export const initPalette = (): void => {
         <div>
           <span class="eyebrow">${t('search.quickFilters')}</span>
           <div class="chips">${buildLanguageFacets(nodes, 5).map(
-            ([lang, count]) => html`<button class="chip chip-accent" data-act="fill" data-value="${lang}">${icon('code')}${lang}<span>(${count})</span></button>`,
+            ([lang, count]) => html`<button class="chip chip-accent" data-act="fill" data-value="${lang}">${icon('code')}${lang}<span class="chip-count">${count}</span></button>`,
           )}</div>
           <div class="chips">${buildTagFacets(nodes, 6).map(
-            ([tag, count]) => html`<button class="chip chip-accent" data-act="fill" data-value="${tag}">${icon('tag')}${tag}<span>(${count})</span></button>`,
+            ([tag, count]) => html`<button class="chip chip-accent" data-act="fill" data-value="${tag}">${icon('tag')}${tag}<span class="chip-count">${count}</span></button>`,
           )}</div>
           <div class="chips">${STAR_RANGES.map(
             (min) => html`<button class="chip chip-accent" data-act="stars" data-value="${min}">${icon('star')}${min / 1000}k+</button>`,
           )}</div>
         </div>
-        <p class="muted xsmall palette-tip">${t('search.tip')}</p>
       </div>`.value;
       return;
     }
@@ -213,7 +215,7 @@ export const initPalette = (): void => {
               <span class="palette-item-title"><span class="truncate strong">${result.title}</span><span class="type-tag">${t(TYPE_LABELS[result.type])}</span></span>
               ${result.subtitle ? html`<span class="muted small truncate">${result.subtitle}</span>` : ''}
             </span>
-            <span class="stars muted xsmall nowrap">${result.type === 'repo' ? icon('star') : ''}${result.meta}</span>
+            <span class="stars palette-meta muted xsmall nowrap tabular">${result.type === 'repo' ? icon('star') : ''}${result.meta}</span>
             <span class="palette-arrow">${icon('arrowRight')}</span>
           </button>`,
         )}`.value
@@ -235,7 +237,7 @@ export const initPalette = (): void => {
         <div class="palette-input">
           ${icon('search')}
           <input type="text" data-input placeholder="${t('search.placeholder')}" aria-label="${t('search.placeholder')}" />
-          <kbd class="hide-sm">⌘K</kbd>
+          <kbd class="hide-sm">${shortcutLabel}</kbd>
           <button class="btn btn-ghost btn-icon btn-sm" data-act="close" aria-label="${t('common.close')}">${icon('x')}</button>
         </div>
         <div class="palette-filters toggle-group">${filters.map(

@@ -1,7 +1,8 @@
+import { renderDetails, type DetailsState } from '../graph/details';
 import { avatarUrl, html, onAction, qs, type Raw } from '../html';
 import { t } from '../i18n';
 import { icon } from '../icons';
-import { currentRoute, href, navigate, onRoute } from '../router';
+import { currentRoute, navigate, onRoute } from '../router';
 import { filterRepos, nextSort, sortRepos, type DataQuery, type SortConfig, type SortField } from './dataQuery';
 import { store } from '../store';
 import type { ClusterInfo, GraphNode } from '../types';
@@ -33,6 +34,11 @@ const clusterTag = (cluster: ClusterInfo | undefined): Raw =>
       </button>`
     : html`<span class="dim">—</span>`;
 
+const parseNode = (params: URLSearchParams): number | null => {
+  const id = Number.parseInt(params.get('node') ?? '', 10);
+  return Number.isFinite(id) ? id : null;
+};
+
 const repoAvatar = (repo: GraphNode, size: number) => {
   const url = avatarUrl(repo.owner_avatar_url, size * 2);
   return url
@@ -51,6 +57,9 @@ export const mountData = (root: HTMLElement): (() => void) => {
     month: route.params.get('month'),
     topic: route.params.get('topic'),
   };
+  // The open details panel; kept in the URL so a shared Data link reopens it.
+  let selectedId = parseNode(route.params);
+  const details: DetailsState = { relatedTab: 'similar', graphLink: true };
 
   const el = (selector: string) => qs<HTMLElement>(root, selector);
 
@@ -62,14 +71,15 @@ export const mountData = (root: HTMLElement): (() => void) => {
     else if (clusters.length > 1) params.set('clusters', clusters.join(','));
     if (q.month) params.set('month', q.month);
     if (q.topic) params.set('topic', q.topic);
+    if (selectedId != null) params.set('node', String(selectedId));
     navigate('/data', params, true);
   };
 
   const activeFilters = () => Boolean(q.clusters.size || q.query.trim() || q.month || q.topic);
 
-  const sortHeader = (label: string, field: SortField, align = '') => {
+  const sortHeader = (label: string, field: SortField, cls = '') => {
     const active = sort.field === field;
-    return html`<th scope="col" class="${align}" aria-sort="${active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}">
+    return html`<th scope="col" class="${cls}" aria-sort="${active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}">
       <button class="sort-btn ${active ? 'on' : ''}" data-act="sort" data-field="${field}">
         ${label}${icon(active && sort.direction === 'asc' ? 'chevronUp' : 'chevronDown', 'icon sort-icon')}
       </button>
@@ -80,6 +90,7 @@ export const mountData = (root: HTMLElement): (() => void) => {
     if (store.loading) return void (root.innerHTML = loadingState().value);
     if (store.error) return void (root.innerHTML = errorState().value);
     root.innerHTML = html`<div class="data-page">
+      <div class="data-main">
       <div class="data-toolbar">
         <label class="search-input data-search">
           ${icon('search')}
@@ -96,9 +107,29 @@ export const mountData = (root: HTMLElement): (() => void) => {
       <div class="data-chips" data-region="chips"></div>
       <div class="data-body" data-region="table"></div>
       <div class="data-pager" data-region="pager"></div>
+      </div>
+      <section class="data-details" id="data-details" data-region="details" aria-label="${t('common.overview')}"></section>
     </div>`.value;
     (el('[data-search]') as HTMLInputElement).value = q.query;
     renderResults();
+    renderDetailsRegion();
+  };
+
+  const renderDetailsRegion = () => {
+    const region = root.querySelector<HTMLElement>('[data-region="details"]');
+    if (!region) return;
+    const node = selectedId != null ? store.nodeById.get(selectedId) : undefined;
+    root.querySelector('.data-page')?.classList.toggle('has-details', Boolean(node));
+    region.innerHTML = node ? renderDetails(node, details).value : '';
+  };
+
+  // Selection only restyles rows, so the table keeps its scroll position.
+  const select = (id: number | null) => {
+    if (id !== selectedId) details.relatedTab = 'similar';
+    selectedId = id;
+    root.querySelectorAll<HTMLElement>('[data-row]').forEach((row) => row.classList.toggle('is-selected', Number(row.dataset.row) === id));
+    syncUrl();
+    renderDetailsRegion();
   };
 
   const renderResults = () => {
@@ -141,29 +172,30 @@ export const mountData = (root: HTMLElement): (() => void) => {
         : html`<a class="btn btn-primary" href="#/settings">${t('common.sync_now')}</a>`}
     </div>`;
 
-    const nodeLink = (repo: GraphNode) => href('/', { node: String(repo.id) });
+    const repoButton = (repo: GraphNode) =>
+      html`<button class="repo-link" data-act="select" data-id="${repo.id}" aria-controls="data-details">${repoAvatar(repo, 20)}<span class="truncate">${repo.full_name}</span></button>`;
     el('[data-region="table"]').innerHTML = html`
       <div class="table-scroll desktop-only">
         <table class="table">
           <thead><tr>
-            ${sortHeader(t('data.repository'), 'name')}
+            ${sortHeader(t('data.repository'), 'name', 'col-name')}
             ${sortHeader(t('data.summary'), 'summary')}
-            ${sortHeader(t('data.language'), 'language')}
-            ${sortHeader(t('data.stars'), 'stargazers_count', 'num')}
-            ${sortHeader(t('data.cluster'), 'cluster')}
-            ${sortHeader(t('data.starred_date'), 'starred_at', 'num')}
-            ${sortHeader(t('data.last_commit'), 'last_commit_time', 'num')}
+            ${sortHeader(t('data.language'), 'language', 'col-language col-opt')}
+            ${sortHeader(t('data.stars'), 'stargazers_count', 'num col-stars')}
+            ${sortHeader(t('data.cluster'), 'cluster', 'col-cluster')}
+            ${sortHeader(t('data.starred_date'), 'starred_at', 'num col-date')}
+            ${sortHeader(t('data.last_commit'), 'last_commit_time', 'num col-date col-opt')}
           </tr></thead>
           <tbody>
             ${rows.map(
-              (repo) => html`<tr>
-                <td class="col-name"><a class="repo-link" href="${nodeLink(repo)}">${repoAvatar(repo, 20)}<span class="truncate">${repo.full_name}</span></a></td>
-                <td class="col-summary"><p class="clamp-2 muted" title="${repo.ai_summary || repo.description || ''}">${repo.ai_summary || repo.description || '—'}</p></td>
-                <td class="muted">${repo.language || '—'}</td>
+              (repo) => html`<tr data-row="${repo.id}" class="${repo.id === selectedId ? 'is-selected' : ''}">
+                <td>${repoButton(repo)}</td>
+                <td><p class="clamp-2 muted" title="${repo.ai_summary || repo.description || ''}">${repo.ai_summary || repo.description || '—'}</p></td>
+                <td class="muted truncate col-opt">${repo.language || '—'}</td>
                 <td class="num tabular">${repo.stargazers_count.toLocaleString()}</td>
-                <td class="col-cluster">${clusterTag(repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined)}</td>
+                <td>${clusterTag(repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined)}</td>
                 <td class="num muted tabular">${formatDate(repo.starred_at)}</td>
-                <td class="num muted tabular">${formatDate(repo.last_commit_time)}</td>
+                <td class="num muted tabular col-opt">${formatDate(repo.last_commit_time)}</td>
               </tr>`,
             )}
           </tbody>
@@ -172,8 +204,8 @@ export const mountData = (root: HTMLElement): (() => void) => {
       </div>
       <ul class="repo-list mobile-only">
         ${rows.map(
-          (repo) => html`<li>
-            <a class="repo-link" href="${nodeLink(repo)}">${repoAvatar(repo, 20)}<span class="truncate">${repo.full_name}</span></a>
+          (repo) => html`<li data-row="${repo.id}" class="${repo.id === selectedId ? 'is-selected' : ''}">
+            ${repoButton(repo)}
             <p class="clamp-2 muted small">${repo.ai_summary || repo.description || t('data.no_summary')}</p>
             <div class="repo-meta small muted">
               <span class="stars tabular">${icon('star')}${repo.stargazers_count.toLocaleString()}</span>
@@ -217,11 +249,19 @@ export const mountData = (root: HTMLElement): (() => void) => {
       q.topic = next.params.get('topic');
       const search = root.querySelector<HTMLInputElement>('[data-search]');
       if (search) search.value = q.query;
+      selectedId = parseNode(next.params);
       page = 1;
       renderResults();
+      renderDetailsRegion();
     }),
     onAction(root, 'click', {
       retry: () => void store.load(),
+      select: (button) => select(Number(button.dataset.id)),
+      'close-details': () => select(null),
+      'related-tab': (button) => {
+        details.relatedTab = button.dataset.tab as DetailsState['relatedTab'];
+        renderDetailsRegion();
+      },
       sort: (button) => {
         sort = nextSort(sort, button.dataset.field as SortField);
         update();
@@ -281,7 +321,12 @@ export const mountData = (root: HTMLElement): (() => void) => {
       update();
     }
   };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || selectedId == null || document.querySelector('.palette')) return;
+    select(null);
+  };
   root.addEventListener('input', onInput);
+  document.addEventListener('keydown', onKey);
   root.addEventListener('change', onChange);
 
   return () => {
@@ -289,5 +334,6 @@ export const mountData = (root: HTMLElement): (() => void) => {
     cleanups.forEach((fn) => fn());
     root.removeEventListener('input', onInput);
     root.removeEventListener('change', onChange);
+    document.removeEventListener('keydown', onKey);
   };
 };

@@ -6,7 +6,7 @@ import { icon } from './icons';
 import { currentRoute, href, onRoute, type Route } from './router';
 import { store } from './store';
 import { initTheme } from './theme';
-import { initPalette, openPalette } from './palette';
+import { initPalette, openPalette, shortcutLabel } from './palette';
 import { mountGraph } from './pages/graph';
 import { mountData } from './pages/data';
 import { mountSettings } from './pages/settings';
@@ -30,7 +30,6 @@ const mountNotFound: Mount = (root) => {
 };
 
 const app = document.getElementById('app')!;
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 let unmountPage: (() => void) | null = null;
 let mountedKey: string | null = null;
 
@@ -48,7 +47,7 @@ const renderShell = (active: string | undefined) => {
       </nav>
       <button class="search-hint" data-act="palette" aria-label="${t('common.command_palette')}">
         ${icon('search')}<span class="hide-sm">${t('common.search_command')}</span>
-        <kbd class="hide-sm">${isMac ? '⌘K' : 'Ctrl K'}</kbd>
+        <kbd class="hide-sm">${shortcutLabel}</kbd>
       </button>
     </header>
     <main id="main-content" class="page" tabindex="-1"></main>`.value;

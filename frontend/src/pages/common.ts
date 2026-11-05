@@ -20,5 +20,9 @@ export const emptyState = (iconName: string, title: string, hint: string): Raw =
     <a class="btn btn-primary" href="#/settings">${t('common.sync_now')}</a>
   </div>`;
 
-export const formatDate = (value: string | null | undefined): string =>
-  value ? new Date(value).toLocaleDateString(getLang(), { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+/** Table dates: zh as 2026/10/30 so columns line up; en keeps the short month. */
+export const formatDate = (value: string | null | undefined): string => {
+  if (!value) return '—';
+  const zh = getLang() === 'zh';
+  return new Date(value).toLocaleDateString(getLang(), { year: 'numeric', month: zh ? '2-digit' : 'short', day: zh ? '2-digit' : 'numeric' });
+};

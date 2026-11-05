@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-05
+
+### Added
+- Read a repository's details on the Data page: clicking a name opens the details panel beside the table (kept in the URL as `node`, closed with Esc), with an "Open in graph" button.
+
+### Changed
+- Refine layout across Graph, Data, and Settings: one page edge for the top bar, rail, and page columns; Data centres a capped column with fixed table widths and wrapping cluster chips; Settings sets each section title beside its list.
+- Show table dates as `2026/10/30` in Chinese so the columns line up.
+- Slide the filter rail and details panel in as they open, and glide the graph back to centre when a panel opens or closes instead of jumping.
+- Drop the palette tip that repeated its footer, and count quick filters the same way as Data chips.
+- Rewrite the READMEs around forking and deploying first; cloning moves to Local development.
+
+### Fixed
+- Show the graph canvas below 900px wide (it was blank on phones and tablets).
+- On narrow screens, start with the filter rail closed and let details take its place instead of covering the whole canvas.
+- Remove the rail's horizontal scrollbar caused by timeline tooltips.
+- Show `Ctrl K` instead of `⌘K` in the palette on non-Apple platforms.
+- Align numeric table headers, rail rows, the details close button, and related-repo star counts.
+
 ## [2.0.0] - 2026-10-30
 
 ### Changed
@@ -345,7 +364,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/Tendo33/mynebula/compare/v1.6.1...v2.1.0
 [1.5.0]: https://github.com/Tendo33/mynebula/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/Tendo33/mynebula/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/Tendo33/mynebula/compare/v1.4.0...v1.4.1

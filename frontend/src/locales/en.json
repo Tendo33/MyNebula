@@ -71,7 +71,8 @@
     "sameTags": "Tags",
     "similar": "Similar",
     "stars": "Stars",
-    "reason_list": "same list"
+    "reason_list": "same list",
+    "view_in_graph": "Open in graph"
   },
   "search": {
     "all": "All",
@@ -91,7 +92,6 @@
     "results": "results",
     "select": "Select",
     "tags": "Tags",
-    "tip": "Tip: Type to search, use arrow keys to navigate, Enter to select",
     "tryDifferent": "Try a different search term",
     "type_repo": "repo",
     "type_cluster": "cluster",

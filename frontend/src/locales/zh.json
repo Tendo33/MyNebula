@@ -71,7 +71,8 @@
     "sameTags": "标签",
     "similar": "相似",
     "stars": "星标",
-    "reason_list": "同一列表"
+    "reason_list": "同一列表",
+    "view_in_graph": "在图谱中查看"
   },
   "search": {
     "all": "全部",
@@ -91,7 +92,6 @@
     "results": "条结果",
     "select": "选择",
     "tags": "标签",
-    "tip": "提示：输入关键词，方向键选择，回车确认",
     "tryDifferent": "试试其他关键词",
     "type_repo": "仓库",
     "type_cluster": "聚类",

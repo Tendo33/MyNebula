@@ -20,7 +20,8 @@ const segmented = (act: string, label: string, current: string, options: [string
 export const mountSettings = (root: HTMLElement): (() => void) => {
   const render = () => {
     const { settings, data } = store;
-    root.innerHTML = html`<section class="settings">
+    root.innerHTML = html`<div class="settings">
+      <section class="settings-section">
       <h2>${t('settings.appearance')}</h2>
       <div class="setting-list">
         ${row(t('settings.theme'), t('settings.theme_desc'), segmented('theme', t('settings.theme'), getTheme(), [
@@ -35,21 +36,26 @@ export const mountSettings = (root: HTMLElement): (() => void) => {
         ${row(t('settings.hq_rendering'), t('settings.hq_rendering_desc'), toggleSwitch('hqRendering', settings.hqRendering, t('settings.hq_rendering')))}
         ${row(t('settings.show_trajectories'), t('settings.show_trajectories_desc'), toggleSwitch('showTrajectories', settings.showTrajectories, t('settings.show_trajectories')))}
       </div>
+      </section>
 
+      <section class="settings-section">
       <h2>${t('settings.data')}</h2>
       <dl class="setting-list facts-list">
         <div><dt>${t('settings.generated_at')}</dt><dd>${data ? new Date(data.generated_at).toLocaleString(getLang(), { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</dd></div>
         <div><dt>${t('settings.repos')}</dt><dd class="tabular">${data ? `${data.nodes.length.toLocaleString()} / ${data.total_repos.toLocaleString()}` : '—'}</dd></div>
         <div><dt>${t('settings.groups_links')}</dt><dd class="tabular">${data ? `${data.clusters.length} · ${data.edges.length.toLocaleString()}` : '—'}</dd></div>
       </dl>
+      </section>
 
+      <section class="settings-section">
       <h2>${t('settings.sync')}</h2>
       <div class="sync-help">
         <p class="muted">${t('settings.sync_desc')}</p>
         <pre class="code">pnpm sync</pre>
         <p class="muted small">${t('settings.sync_flags')}</p>
       </div>
-    </section>`.value;
+      </section>
+    </div>`.value;
   };
 
   render();

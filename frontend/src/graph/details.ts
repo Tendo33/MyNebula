@@ -1,6 +1,7 @@
 import { avatarUrl, html, type Raw } from '../html';
 import { t } from '../i18n';
 import { icon } from '../icons';
+import { href } from '../router';
 import { normalizeTag } from '../search';
 import { store } from '../store';
 import type { GraphNode } from '../types';
@@ -78,12 +79,14 @@ const relatedItem = ({ repo, reason }: RelatedEntry): Raw => {
       <span class="muted small clamp-1">${repo.description || repo.ai_summary || t('common.no_description')}</span>
       ${reason ? html`<span class="dim small truncate">${reason}</span>` : ''}
     </span>
-    <span class="mono dim small">${stars}</span>
+    <span class="related-stars dim small tabular">${stars}</span>
   </button>`;
 };
 
 export interface DetailsState {
   relatedTab: RelatedTab;
+  /** Outside the graph (the Data page), lead the links with a way back to the node on the graph. */
+  graphLink?: boolean;
 }
 
 /** Summary, facts, links, then related repos — one scroll, no tabs. */
@@ -123,6 +126,7 @@ export const renderDetails = (node: GraphNode, state: DetailsState): Raw => {
       </dl>
       <p class="details-summary">${summary || t('repoDetails.no_ai_summary')}</p>
       ${topics.length ? html`<div class="badges">${topics.map((topic) => html`<span class="badge">${topic}</span>`)}</div>` : ''}
+      ${state.graphLink ? html`<a class="btn btn-outline btn-sm details-graph-link" href="${href('/', { node: String(node.id) })}">${t('repoDetails.view_in_graph')}</a>` : ''}
       <div class="details-links">
         <a href="${node.html_url}" target="_blank" rel="noopener noreferrer">GitHub ${icon('external')}</a>
         <a href="https://deepwiki.com/${node.full_name}" target="_blank" rel="noopener noreferrer">DeepWiki ${icon('external')}</a>

@@ -169,6 +169,9 @@ export class GraphCanvas {
   private animation: { from: Transform; to: Transform; start: number; duration: number } | null = null;
   private width = 0;
   private height = 0;
+  /** Host left edge and window width at the last resize; an unchanged window means a panel moved. */
+  private left = 0;
+  private viewportWidth = 0;
   private dpr = 1;
   private frame = 0;
   private lastDraw = 0;
@@ -392,20 +395,30 @@ export class GraphCanvas {
   }
 
   private resize(): void {
-    const previous = { width: this.width, height: this.height };
+    const previous = { width: this.width, height: this.height, left: this.left, viewportWidth: this.viewportWidth };
     this.measure();
+    this.left = this.host.getBoundingClientRect().left;
+    this.viewportWidth = window.innerWidth;
     this.dpr = window.devicePixelRatio || 1;
     this.canvas.width = Math.max(1, Math.round(this.width * this.dpr));
     this.canvas.height = Math.max(1, Math.round(this.height * this.dpr));
     this.canvas.style.width = `${this.width}px`;
     this.canvas.style.height = `${this.height}px`;
     // Keep the same world point centred when panels open or the window resizes.
-    this.transform = {
+    const centred = {
       ...this.transform,
       x: this.transform.x + (this.width - previous.width) / 2,
       y: this.transform.y + (this.height - previous.height) / 2,
     };
-    this.requestDraw();
+    if (previous.width && previous.viewportWidth === this.viewportWidth && !this.animation) {
+      // A panel opened or closed: hold every node where it is on screen, then glide
+      // to the centred view instead of jumping by half the panel width.
+      this.transform = { ...this.transform, x: this.transform.x + previous.left - this.left };
+      this.animateTo(centred, this.reduceMotion ? 0 : 320);
+    } else {
+      this.transform = centred;
+      this.requestDraw();
+    }
   }
 
   private onVisibility = () => {

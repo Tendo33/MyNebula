@@ -92,13 +92,15 @@ In-app chrome is hand-written CSS in `frontend/src/styles.css`, mapped to these 
 - `.search-input`, `.select`, `.switch`, `.range`, `.toggle-group`, `.table`, `.chip`. Native selects keep the same 6px corners and hairlines.
 - The shell is one 48px top bar: wordmark, Graph / Data / Settings tabs with an ink underline, and the search trigger. No sidebar, no breadcrumb.
 - Graph is the home page: a flat filter rail (Clusters, My Lists, Timeline as hairline sections, rows without checkboxes) and a full-width canvas. Selecting a repository adds a ~23rem details panel: name, a two-column facts grid, summary, tags, text links, then related repos in one scroll with no tabs.
+- Below 900px the rail and details overlay the canvas instead of taking columns; the rail starts closed and gives way while details are open, so the canvas is never fully covered.
 - Graph layout is a live force simulation on the similarity edges: after avatars start loading, nodes burst out one wedge per cluster, settle into communities, then keep a slow drift. Dragging reheats the layout; dim and highlight changes fade. Reduced motion computes the resting layout up front with no drift. The overview shows a sparse strongest-edge backbone, while hover and selection reveal related edges.
-- Data is one toolbar row (search, count, clear), one horizontally scrolling row of cluster chips, a full-bleed hairline table, and a pager holding rows-per-page.
-- Settings is one centred hairline list: Appearance, Data, Sync.
+- Page edge: the top bar, the graph rail's text, and the Data and Settings columns all start at one `--gutter` (20px, 16px on phones). Data centres an `--content-max` (88rem) column, so wide screens add margin instead of stretching the gaps between columns.
+- Data is one toolbar row (search, count, clear), cluster chips that wrap (one swipeable row on phones), a hairline table with fixed column widths where the summary takes the remaining space, and a pager holding rows-per-page. Selecting a repository name opens the same details panel as Graph beside the table (kept in the URL as `node`, closed with Esc), leading with an "Open in graph" button; language and last commit step aside while it is open. Table dates are numeric in zh (`2026/10/30`) so the columns line up.
+- Settings is a centred column of sections (Appearance, Data, Sync), each with its title in a narrow left column beside its hairline list; the sections stack on phones.
 - Unselected graph nodes are neutral and unlabeled. Hover or selection keeps hue and labels on that cluster and drops the others to about 0.18 opacity. No nebula background.
 
 Do not add a UI framework or component library. Cluster chips take their hue inline because colours come from the graph.
 
 ## Motion
 
-150–220ms color/border only, plus two product motions: the graph's burst-then-drift layout (pauses in hidden tabs), and a circular view-transition wipe when the user switches light/dark in Settings (Great UI circular-theme-provider, duration 220ms). No lift-on-hover. Honor `prefers-reduced-motion` by skipping the wipe and without stripping focus rings.
+150–220ms color/border only, plus panels (rail and details) sliding in 12px with a fade over 200ms as they open, and two product motions: the graph's burst-then-drift layout (pauses in hidden tabs), and a circular view-transition wipe when the user switches light/dark in Settings (Great UI circular-theme-provider, duration 220ms). No lift-on-hover. Honor `prefers-reduced-motion` by skipping the wipe and without stripping focus rings.
