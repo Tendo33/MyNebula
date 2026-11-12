@@ -69,10 +69,10 @@ On GitHub Actions, keys go in **Secrets** (the GitHub token is named `STARS_TOKE
 | --- | --- | --- |
 | `GITHUB_TOKEN` | required | Reads your stars and star lists. Stored as the `STARS_TOKEN` secret on Actions. |
 | `EMBEDDING_API_KEY` | required | Key for the embedding endpoint. |
-| `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | Any OpenAI-compatible endpoint. |
+| `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | Any OpenAI-compatible endpoint. Actions only calls hosts named in `ALLOWED_API_HOSTS` in `.github/workflows/pages.yml`; add another provider's host there. |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | Multilingual, works well for mixed Chinese and English. |
 | `LLM_API_KEY` | empty | Enables summaries, tags, and LLM cluster names. Leave empty to skip. |
-| `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | Any OpenAI-compatible chat endpoint. |
+| `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | Any OpenAI-compatible chat endpoint. Same Actions host list as the embedding URL. |
 | `LLM_MODEL` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Chat model for summaries and names. |
 | `LLM_OUTPUT_LANGUAGE` | `zh` | `zh` or `en` for generated text. |
 | `GRAPH_LLM_NAMES` | `false` | Name new clusters with the LLM instead of their top tags. |

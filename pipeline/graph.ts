@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { TAG_SYNONYMS } from './prompts.ts';
+import { TAG_SYNONYMS } from './synonyms.ts';
 import type { Repo, State } from './sync.ts';
 
 // Fixed weights (locked by product decision).
@@ -13,7 +13,8 @@ const STAR_LIST_WEIGHT = 0.1;
 const LANGUAGE_WEIGHT = 0.05;
 
 const EDGE_K = 8;
-const UNCATEGORIZED_LIST_ID = -1;
+/** Repos in no star list. Must match `UNCATEGORIZED_LIST_ID` in frontend/src/types.ts. */
+const UNCATEGORIZED_LIST_ID = 'uncategorized';
 
 export const CLUSTER_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
@@ -56,10 +57,10 @@ export const normalizeTags = (...sources: (string[] | null | undefined)[]): stri
 };
 
 /** Weighted Jaccard: tags are unique per repo, so shared ones weigh 1/2, the rest 1. */
-export const tagOverlap = (left: string[], right: string[]): number => {
+export const tagOverlap = (left: string[], right: string[], leftSet: ReadonlySet<string> = new Set(left)): number => {
   if (!left.length || !right.length) return 0;
-  const set = new Set(left);
-  const inter = right.filter((t) => set.has(t)).length;
+  let inter = 0;
+  for (const tag of right) if (leftSet.has(tag)) inter += 1;
   if (!inter) return 0;
   const symDiff = left.length + right.length - 2 * inter;
   return inter / (inter + 2 * symDiff);
@@ -84,7 +85,9 @@ export const scorePairs = (repos: Repo[]): Scores => {
   const mean = new Float32Array(dim);
   repos.forEach((repo, i) => {
     const vec = repo.embedding!;
-    const norm = Math.hypot(...vec) || 1;
+    let sum = 0;
+    for (const value of vec) sum += value * value;
+    const norm = Math.sqrt(sum) || 1;
     for (let d = 0; d < dim; d += 1) mean[d] += (unit[i * dim + d] = vec[d] / norm) / n;
   });
   for (let i = 0; i < n; i += 1) {
@@ -94,7 +97,14 @@ export const scorePairs = (repos: Repo[]): Scores => {
     for (let d = 0; d < dim; d += 1) unit[i * dim + d] /= norm;
   }
   const tags = repos.map((r) => normalizeTags(r.ai_tags, r.topics));
-  const sameList = (i: number, j: number) => repos[i].star_list_id != null && repos[i].star_list_id === repos[j].star_list_id;
+  const tagSets = tags.map((row) => new Set(row));
+  const listSets = repos.map((r) => new Set(r.star_list_ids));
+  const sameList = (i: number, j: number) => {
+    const left = listSets[i];
+    const right = repos[j].star_list_ids;
+    if (!left.size || !right.length) return false;
+    return right.some((id) => left.has(id));
+  };
   const sameLanguage = (i: number, j: number) => Boolean(repos[i].language) && repos[i].language === repos[j].language;
 
   const score = new Float32Array(n * n);
@@ -106,7 +116,7 @@ export const scorePairs = (repos: Repo[]): Scores => {
       score[i * n + j] = score[j * n + i] = Math.min(
         1,
         SEMANTIC_WEIGHT * Math.max(0, dot) +
-          TAG_OVERLAP_WEIGHT * tagOverlap(tags[i], tags[j]) +
+          TAG_OVERLAP_WEIGHT * tagOverlap(tags[i], tags[j], tagSets[i]) +
           STAR_LIST_WEIGHT * +sameList(i, j) +
           LANGUAGE_WEIGHT * +sameLanguage(i, j),
       );
@@ -207,7 +217,7 @@ export const analyze = (state: State): Analysis => {
 
 const NODE_FIELDS = [
   'id', 'full_name', 'name', 'owner', 'owner_avatar_url', 'description', 'language', 'html_url',
-  'stargazers_count', 'ai_summary', 'ai_tags', 'topics', 'starred_at', 'last_commit_time', 'star_list_id',
+  'stargazers_count', 'ai_summary', 'ai_tags', 'topics', 'starred_at', 'last_commit_time',
 ] as const;
 
 export const writeSite = (state: State, analysis: Analysis, outputDir: string) => {
@@ -229,9 +239,9 @@ export const writeSite = (state: State, analysis: Analysis, outputDir: string) =
 
   const starLists = state.star_lists.map((list) => ({
     ...list,
-    repo_count: repos.filter((r) => r.star_list_id === list.id).length,
+    repo_count: repos.filter((r) => r.star_list_ids.includes(list.id)).length,
   }));
-  const uncategorized = repos.filter((r) => r.star_list_id == null).length;
+  const uncategorized = repos.filter((r) => r.star_list_ids.length === 0).length;
   if (starLists.length && uncategorized) {
     starLists.push({ id: UNCATEGORIZED_LIST_ID, name: 'Uncategorized', description: null, repo_count: uncategorized });
   }
@@ -239,7 +249,11 @@ export const writeSite = (state: State, analysis: Analysis, outputDir: string) =
   const nodes = repos.map((repo) => {
     const node: Record<string, unknown> = Object.fromEntries(NODE_FIELDS.map((f) => [f, repo[f] ?? null]));
     node.cluster_id = clusterOf.get(repo.id) ?? null;
-    if (starLists.length && node.star_list_id == null) node.star_list_id = UNCATEGORIZED_LIST_ID;
+    node.star_list_ids = repo.star_list_ids.length
+      ? repo.star_list_ids
+      : starLists.length
+        ? [UNCATEGORIZED_LIST_ID]
+        : [];
     return node;
   });
 

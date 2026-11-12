@@ -34,8 +34,11 @@ export interface Repo {
   stargazers_count: number;
   starred_at: string | null;
   last_commit_time: string | null;
-  star_list_id: number | null;
+  /** GitHub star-list ids. A repo may belong to several lists. */
+  star_list_ids: string[];
   hash?: string;
+  /** Blob id of the README GitHub would serve. Cache-only; absent until a lookup succeeds. */
+  readme_sha?: string | null;
   ai_summary?: string;
   ai_tags?: string[];
   embedding?: number[];
@@ -45,7 +48,7 @@ export interface State {
   version: number;
   repos: Record<string, Repo>;
   clusters: Record<string, ClusterInfo>;
-  star_lists: { id: number; name: string; description: string | null }[];
+  star_lists: { id: string; name: string; description: string | null }[];
 }
 
 export interface Settings {
@@ -91,10 +94,23 @@ export const loadSettings = (): Settings => {
   };
 };
 
+/** Older caches stored one numeric list id per repo, assigned by list order. */
+const migrateLists = (state: State & { repos: Record<string, Repo & { star_list_id?: number | null }> }): State => {
+  state.star_lists = state.star_lists.map((list) => ({ ...list, id: String(list.id) }));
+  for (const repo of Object.values(state.repos)) {
+    if (!Array.isArray(repo.star_list_ids)) {
+      const legacy = repo.star_list_id;
+      repo.star_list_ids = legacy != null && legacy !== -1 ? [String(legacy)] : [];
+    }
+    delete repo.star_list_id;
+  }
+  return state;
+};
+
 export const loadState = (path: string): State => {
   if (existsSync(path)) {
     const state = JSON.parse(gunzipSync(readFileSync(path)).toString('utf8'));
-    if (state.version === CACHE_VERSION) return state;
+    if (state.version === CACHE_VERSION) return migrateLists(state);
     log(`Ignoring cache with unknown version: ${path}`);
   }
   return { version: CACHE_VERSION, repos: {}, clusters: {}, star_lists: [] };
@@ -102,15 +118,68 @@ export const loadState = (path: string): State => {
 
 export const saveState = (state: State, path: string) => {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(`${path}.tmp`, gzipSync(JSON.stringify(state)));
-  renameSync(`${path}.tmp`, path);
+  // A private temp name so two local syncs cannot overwrite one half-written file.
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, gzipSync(JSON.stringify(state)));
+  renameSync(tmp, path);
 };
 
-/** Description + topics fingerprint; a change triggers re-summarize and re-embed. */
-export const contentHash = (repo: Pick<Repo, 'description' | 'topics'>) =>
+const fingerprint = (repo: Pick<Repo, 'description' | 'topics'>, readmeSha: string) =>
   createHash('md5')
-    .update(`${repo.description ?? ''}\x00${[...(repo.topics ?? [])].sort().join(',')}`)
+    .update(`${repo.description ?? ''}\x00${[...(repo.topics ?? [])].sort().join(',')}${readmeSha}`)
     .digest('hex');
+
+/** Description + topics fingerprint already stored in caches from before README tracking. */
+export const legacyContentHash = (repo: Pick<Repo, 'description' | 'topics'>) => fingerprint(repo, '');
+
+/** Description + topics + README blob id. A README edit retriggers summarize and embed. */
+export const contentHash = (repo: Pick<Repo, 'description' | 'topics' | 'readme_sha'>) =>
+  fingerprint(repo, `\x00${repo.readme_sha ?? ''}`);
+
+/**
+ * Record the content fingerprint. The first successful README lookup adopts the
+ * new fingerprint without discarding a summary that was already paid for.
+ * A lookup that did not run leaves the previous fingerprint alone.
+ */
+export const applyContentHash = (repo: Repo, observed: boolean, full: boolean): boolean => {
+  const legacy = legacyContentHash(repo);
+  // Until one lookup succeeds, the old fingerprint stays, even across description edits.
+  const tracked = observed || repo.readme_sha !== undefined;
+  const digest = tracked ? contentHash(repo) : legacy;
+  if (!full && observed && repo.hash === legacy && digest !== legacy) {
+    repo.hash = digest;
+    return !repo.embedding?.length;
+  }
+  return markForEnrichment(repo, digest, full);
+};
+
+const hostAllowlist = (raw: string | undefined): string[] =>
+  (raw ?? '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+
+/** Refuse to send a key to a host the workflow did not name. Local runs stay open for Ollama. */
+export const assertAllowedApiHost = (label: string, baseUrl: string, allowlist: string[]) => {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error(`${label} is not a valid URL`);
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new Error(`${label} must be https and must not contain credentials`);
+  }
+  const host = url.hostname.toLowerCase().replace(/\.$/, '');
+  if (!allowlist.includes(host)) throw new Error(`${label} host "${host}" is not in ALLOWED_API_HOSTS`);
+};
+
+export const checkApiHosts = (
+  settings: Pick<Settings, 'embeddingApiKey' | 'embeddingBaseUrl' | 'llmApiKey' | 'llmBaseUrl'>,
+  opts: { ci: boolean; allowlist: string[] },
+) => {
+  if (!opts.ci && opts.allowlist.length === 0) return;
+  if (opts.allowlist.length === 0) throw new Error('ALLOWED_API_HOSTS is empty; refusing to send API keys');
+  if (settings.embeddingApiKey) assertAllowedApiHost('EMBEDDING_BASE_URL', settings.embeddingBaseUrl, opts.allowlist);
+  if (settings.llmApiKey) assertAllowedApiHost('LLM_BASE_URL', settings.llmBaseUrl, opts.allowlist);
+};
 
 /**
  * Decide whether a repo needs enrichment, clearing only what is stale.
@@ -137,11 +206,20 @@ const fetchStars = async (state: State, settings: Settings, full: boolean): Prom
   const previous = state.repos;
   const repos: Record<string, Repo> = {};
   const dirty: string[] = [];
+  const names = starred.flatMap((meta) => (meta.full_name?.includes('/') ? [meta.full_name] : []));
+  let identities: Map<string, string | null> | null = null;
+  try {
+    identities = await gh.readmeShas(names);
+  } catch (err) {
+    log('README identities unavailable, hashing description and topics only:', String(err));
+  }
   for (const meta of starred) {
     const key = String(meta.id);
-    const repo = { ...previous[key], ...meta } as Repo;
-    const digest = contentHash(repo);
-    if (markForEnrichment(repo, digest, full)) dirty.push(key);
+    const prior = previous[key];
+    const repo = { ...prior, ...meta, star_list_ids: prior?.star_list_ids ?? [] } as Repo;
+    const observed = identities?.has(repo.full_name) ?? false;
+    if (observed) repo.readme_sha = identities?.get(repo.full_name) ?? null;
+    if (applyContentHash(repo, observed, full)) dirty.push(key);
     repos[key] = repo;
   }
   const removed = Object.keys(previous).filter((k) => !(k in repos)).length;
@@ -149,12 +227,16 @@ const fetchStars = async (state: State, settings: Settings, full: boolean): Prom
 
   // A failed lists request must not wipe memberships; repos keep their previous ones.
   if (lists) {
-    const memberOf = new Map<number, number>();
-    state.star_lists = lists.map((list, i) => {
-      list.repo_ids.forEach((id) => memberOf.set(id, i + 1));
-      return { id: i + 1, name: list.name, description: list.description };
+    const memberOf = new Map<number, string[]>();
+    state.star_lists = lists.map((list) => {
+      list.repo_ids.forEach((id) => {
+        const membership = memberOf.get(id) ?? [];
+        if (!membership.includes(list.id)) membership.push(list.id);
+        memberOf.set(id, membership);
+      });
+      return { id: list.id, name: list.name, description: list.description };
     });
-    for (const repo of Object.values(repos)) repo.star_list_id = memberOf.get(repo.id) ?? null;
+    for (const repo of Object.values(repos)) repo.star_list_ids = memberOf.get(repo.id) ?? [];
   }
 
   log(`Stars: ${starred.length} total, ${dirty.length} need enrichment, ${removed} removed, ${state.star_lists.length} star lists`);
@@ -256,6 +338,7 @@ const main = async () => {
     process.exit(2);
   }
   const settings = loadSettings();
+  checkApiHosts(settings, { ci: process.env.GITHUB_ACTIONS === 'true', allowlist: hostAllowlist(process.env.ALLOWED_API_HOSTS) });
   if (values['max-clusters']) settings.maxClusters = Number(values['max-clusters']);
   const state = loadState(settings.cachePath);
 

@@ -6,6 +6,8 @@
 #   - Variables (all optional, same meaning as in .env.example): EMBEDDING_BASE_URL,
 #     EMBEDDING_MODEL, LLM_BASE_URL, LLM_MODEL, LLM_OUTPUT_LANGUAGE, GRAPH_LLM_NAMES,
 #     GRAPH_MAX_CLUSTERS, SYNC_LLM_CONCURRENCY
+#   - ALLOWED_API_HOSTS below is committed. A variable may choose a URL, but the
+#     key is only sent to a host named in that list.
 name: Sync and Deploy
 
 on:
@@ -44,6 +46,7 @@ jobs:
       GRAPH_MAX_CLUSTERS: ${{ vars.GRAPH_MAX_CLUSTERS }}
       GRAPH_LLM_NAMES: ${{ vars.GRAPH_LLM_NAMES }}
       SYNC_LLM_CONCURRENCY: ${{ vars.SYNC_LLM_CONCURRENCY }}
+      ALLOWED_API_HOSTS: api.siliconflow.cn,api.deepseek.com
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

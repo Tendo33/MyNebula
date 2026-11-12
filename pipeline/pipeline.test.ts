@@ -1,12 +1,13 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
 import { deduplicateNames, detectCommunities, louvain, matchPrevious, sanitizeClusterName, tagNames } from './cluster.ts';
 import { adaptiveThreshold, analyze, buildEdges, normalizeTag, normalizeTags, scorePairs, tagOverlap, writeSite, type Edge } from './graph.ts';
-import { embeddingText, fallbackTags, parseSummaryJson, readmeSignal } from './remote.ts';
-import { assignClusters, contentHash, loadSettings, loadState, markForEnrichment, saveState, type Repo, type State } from './sync.ts';
+import { embeddingText, fallbackTags, parseSummaryJson, pickReadmeOid, readmeSignal } from './remote.ts';
+import { applyContentHash, assertAllowedApiHost, assignClusters, checkApiHosts, contentHash, legacyContentHash, loadSettings, loadState, markForEnrichment, saveState, type Repo, type State } from './sync.ts';
 
 const repo = (id: number, patch: Partial<Repo> = {}): Repo => ({
   id,
@@ -21,7 +22,7 @@ const repo = (id: number, patch: Partial<Repo> = {}): Repo => ({
   stargazers_count: 100 - id,
   starred_at: null,
   last_commit_time: null,
-  star_list_id: null,
+  star_list_ids: [],
   ...patch,
 });
 
@@ -37,11 +38,11 @@ const syntheticState = (): State => {
       language: ['Go', 'Rust', 'Python'][theme],
       topics: [`t${theme}`],
       starred_at: `2025-0${theme + 1}-01T00:00:00Z`,
-      star_list_id: i < 5 ? 1 : null,
+      star_list_ids: i < 5 ? ['fav'] : [],
       embedding,
     });
   }
-  return { version: 1, repos, clusters: {}, star_lists: [{ id: 1, name: 'Fav', description: null }] };
+  return { version: 1, repos, clusters: {}, star_lists: [{ id: 'fav', name: 'Fav', description: null }] };
 };
 
 const settings = () => ({ ...loadSettings(), llmApiKey: '', maxClusters: 12, llmClusterNames: false });
@@ -71,7 +72,7 @@ describe('tags and scores', () => {
   it('separates neighbours that share a dominant embedding direction', () => {
     // Every vector leans on one shared dimension, as real embeddings do; themes differ only slightly.
     const crowded = Object.values(syntheticState().repos).map((r) =>
-      ({ ...r, language: null, topics: [], star_list_id: null, embedding: r.embedding!.map((x, d) => (d === 15 ? 40 : x / 5)) }));
+      ({ ...r, language: null, topics: [], star_list_ids: [], embedding: r.embedding!.map((x, d) => (d === 15 ? 40 : x / 5)) }));
     const scores = scorePairs(crowded);
     const theme = (i: number) => Math.floor(i / 10);
     const edges = buildEdges(crowded.map((r) => r.id), scores);
@@ -114,6 +115,65 @@ describe('text helpers', () => {
 
   it('hashes topics order-independently', () => {
     expect(contentHash({ description: 'd', topics: ['a', 'b'] })).toBe(contentHash({ description: 'd', topics: ['b', 'a'] }));
+    expect(contentHash({ description: 'd', topics: [], readme_sha: 'abc' })).not.toBe(legacyContentHash({ description: 'd', topics: [] }));
+  });
+
+  it('records a README id without discarding the summary already paid for', () => {
+    const legacy = legacyContentHash({ description: 'd', topics: [] });
+    const kept = repo(1, { description: 'd', hash: legacy, ai_summary: 'paid', embedding: [1], readme_sha: 'abc' });
+    expect(applyContentHash(kept, true, false)).toBe(false);
+    expect(kept.ai_summary).toBe('paid');
+    expect(kept.hash).toBe(contentHash(kept));
+
+    kept.readme_sha = 'def';
+    expect(applyContentHash(kept, true, false)).toBe(true);
+    expect(kept.ai_summary).toBeUndefined();
+  });
+
+  it('leaves the old fingerprint alone when the README lookup does not run', () => {
+    const legacy = legacyContentHash({ description: 'd', topics: [] });
+    const kept = repo(1, { description: 'd', hash: legacy, ai_summary: 'paid', embedding: [1] });
+    expect(applyContentHash(kept, false, false)).toBe(false);
+    expect(kept.hash).toBe(legacy);
+    expect(kept.ai_summary).toBe('paid');
+  });
+
+  it('adopts the README id after a description edit made while the lookup was down', () => {
+    const kept = repo(1, { description: 'd', hash: legacyContentHash({ description: 'd', topics: [] }), ai_summary: 'paid', embedding: [1] });
+    kept.description = 'e';
+    expect(applyContentHash(kept, false, false)).toBe(true);
+    Object.assign(kept, { ai_summary: 'fresh', embedding: [1] });
+
+    kept.readme_sha = 'abc';
+    expect(applyContentHash(kept, true, false)).toBe(false);
+    expect(kept.ai_summary).toBe('fresh');
+  });
+
+  it('picks the README GitHub would serve', () => {
+    expect(pickReadmeOid([
+      { name: 'README', oid: 'plain', type: 'blob' },
+      { name: 'README.md', oid: 'md', type: 'blob' },
+      { name: 'docs', oid: 'dir', type: 'tree' },
+    ])).toBe('md');
+    expect(pickReadmeOid([{ name: 'lib', oid: 'x', type: 'blob' }])).toBeNull();
+  });
+
+  it('sends API keys only to hosts the workflow names', () => {
+    const allow = ['api.siliconflow.cn', 'api.deepseek.com'];
+    expect(() => assertAllowedApiHost('EMBEDDING_BASE_URL', 'https://api.siliconflow.cn/v1', allow)).not.toThrow();
+    expect(() => assertAllowedApiHost('LLM_BASE_URL', 'https://api.deepseek.com', allow)).not.toThrow();
+    expect(() => assertAllowedApiHost('EMBEDDING_BASE_URL', 'https://evil.example/v1', allow)).toThrow(/ALLOWED_API_HOSTS/);
+    expect(() => assertAllowedApiHost('EMBEDDING_BASE_URL', 'http://api.siliconflow.cn/v1', allow)).toThrow(/https/);
+    expect(() => assertAllowedApiHost('EMBEDDING_BASE_URL', 'https://user:k@api.siliconflow.cn/v1', allow)).toThrow(/credentials/);
+    const settings = {
+      embeddingApiKey: 'k',
+      embeddingBaseUrl: 'http://localhost:11434/v1',
+      llmApiKey: '',
+      llmBaseUrl: 'http://localhost:11434/v1',
+    };
+    expect(() => checkApiHosts(settings, { ci: false, allowlist: [] })).not.toThrow();
+    expect(() => checkApiHosts(settings, { ci: true, allowlist: [] })).toThrow(/ALLOWED_API_HOSTS/);
+    expect(() => checkApiHosts(settings, { ci: true, allowlist: allow })).toThrow(/https/);
   });
 });
 
@@ -170,7 +230,9 @@ describe('end to end', () => {
     const languagesByCluster = new Map<number, Set<string>>();
     for (const n of graph.nodes) languagesByCluster.set(n.cluster_id, (languagesByCluster.get(n.cluster_id) ?? new Set()).add(n.language));
     expect([...languagesByCluster.values()].every((s) => s.size === 1)).toBe(true);
-    expect(graph.star_lists.map((l: { id: number }) => l.id)).toEqual([1, -1]);
+    expect(graph.star_lists.map((l: { id: string }) => l.id)).toEqual(['fav', 'uncategorized']);
+    expect(graph.nodes.find((n: { id: number }) => n.id === 1).star_list_ids).toEqual(['fav']);
+    expect(graph.nodes.find((n: { id: number }) => n.id === 6).star_list_ids).toEqual(['uncategorized']);
     expect(graph.timeline.map((p: { date: string }) => p.date)).toEqual(['2025-01', '2025-02', '2025-03']);
 
     const before = Object.keys(state.clusters).sort();
@@ -181,5 +243,32 @@ describe('end to end', () => {
 
     saveState(state, join(dir, 'cache.json.gz'));
     expect(loadState(join(dir, 'cache.json.gz')).repos['99'].full_name).toBe('o/new');
+  });
+
+  it('keeps a repo on every star list and reads a legacy numeric cache', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nebula-'));
+    const state = syntheticState();
+    state.star_lists.push({ id: 'beta', name: 'Beta', description: null });
+    state.repos['1'].star_list_ids = ['fav', 'beta'];
+    writeSite(state, analyze(state), dir);
+    const written = JSON.parse(readFileSync(join(dir, 'graph.json'), 'utf8'));
+    expect(written.nodes.find((n: { id: number }) => n.id === 1).star_list_ids).toEqual(['fav', 'beta']);
+    expect(written.star_lists.find((list: { id: string }) => list.id === 'fav').repo_count).toBe(5);
+    expect(written.star_lists.find((list: { id: string }) => list.id === 'beta').repo_count).toBe(1);
+
+    const legacy = repo(1);
+    delete (legacy as { star_list_ids?: string[] }).star_list_ids;
+    (legacy as { star_list_id?: number }).star_list_id = 3;
+    const cache = join(dir, 'legacy.json.gz');
+    writeFileSync(cache, gzipSync(JSON.stringify({
+      version: 1,
+      repos: { '1': legacy },
+      clusters: {},
+      star_lists: [{ id: 3, name: 'Old', description: null }],
+    })));
+    const loaded = loadState(cache);
+    expect(loaded.repos['1'].star_list_ids).toEqual(['3']);
+    expect(loaded.star_lists[0].id).toBe('3');
+    expect('star_list_id' in loaded.repos['1']).toBe(false);
   });
 });

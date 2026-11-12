@@ -69,10 +69,10 @@ MyNebula 读取你的 GitHub 星标，为每个仓库写一段简短摘要，并
 | --- | --- | --- |
 | `GITHUB_TOKEN` | 必填 | 读取你的星标和星标列表。在 Actions 上存为 `STARS_TOKEN` secret。 |
 | `EMBEDDING_API_KEY` | 必填 | Embedding 服务的 key。 |
-| `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | 任何兼容 OpenAI 接口的服务。 |
+| `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | 任何兼容 OpenAI 接口的服务。Actions 只请求 `.github/workflows/pages.yml` 里 `ALLOWED_API_HOSTS` 列出的主机；换用其他服务时把它的主机加进去。 |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | 多语言模型，中英文混合效果好。 |
 | `LLM_API_KEY` | 空 | 开启摘要、标签和 LLM 聚类命名。留空则完全不调用对话模型。 |
-| `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | 任何兼容 OpenAI 接口的对话服务。 |
+| `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | 任何兼容 OpenAI 接口的对话服务。Actions 上的主机限制与 embedding 相同。 |
 | `LLM_MODEL` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | 生成摘要和组名的模型。 |
 | `LLM_OUTPUT_LANGUAGE` | `zh` | 生成内容的语言：`zh` 或 `en`。 |
 | `GRAPH_LLM_NAMES` | `false` | 新聚类用 LLM 命名，而不是取高频标签。 |

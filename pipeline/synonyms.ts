@@ -1,0 +1,28 @@
+/** Canonical tag spellings. The site and the pipeline must import this same map. */
+export const TAG_SYNONYMS: Record<string, string> = {
+  "agent-memory": "agent-memory",
+  "agent_memory": "agent-memory",
+  "long-term-memory": "agent-memory",
+  "longterm-memory": "agent-memory",
+  "rag-memory": "agent-memory",
+  "memory-augmented": "agent-memory",
+  "mem0": "agent-memory",
+  "记忆": "agent-memory",
+  "长期记忆": "agent-memory",
+  "retrieval-augmented-generation": "rag",
+  "retrieval-augmented": "rag",
+  "检索增强": "rag",
+  "检索增强生成": "rag",
+  "ai-agent": "agent",
+  "ai-agents": "agent",
+  "agents": "agent",
+  "智能体": "agent",
+  "agentic": "agent",
+  "large-language-model": "llm",
+  "大语言模型": "llm",
+  "distributed-training-framework": "distributed-training",
+  "distributed-systems": "distributed-training",
+  "deepspeed": "distributed-training",
+  "fsdp": "distributed-training",
+  "megatron": "distributed-training"
+};
