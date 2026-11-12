@@ -8,6 +8,15 @@ export interface Route {
 }
 
 const listeners = new Set<(route: Route) => void>();
+const locationListeners = new Set<(route: Route) => void>();
+
+const emitLocation = (route: Route) => locationListeners.forEach((fn) => fn(route));
+
+/** Fires for hash changes and silent replaceState, so chrome can follow the URL. */
+export const onLocation = (fn: (route: Route) => void): (() => void) => {
+  locationListeners.add(fn);
+  return () => locationListeners.delete(fn);
+};
 
 export const currentRoute = (): Route => {
   const hash = location.hash.replace(/^#/, '') || '/';
@@ -24,8 +33,9 @@ export const navigate = (path: string, params?: URLSearchParams | Record<string,
   const target = href(path, params);
   if (target === location.hash || (target === '#/' && !location.hash)) return;
   if (replace) {
-    // Silent: used to mirror page state into the URL, not to navigate.
+    // Silent for pages: used to mirror page state into the URL, not to navigate.
     history.replaceState(null, '', target);
+    emitLocation(currentRoute());
   } else {
     location.hash = target;
   }
@@ -39,4 +49,5 @@ export const onRoute = (fn: (route: Route) => void): (() => void) => {
 window.addEventListener('hashchange', () => {
   const route = currentRoute();
   listeners.forEach((fn) => fn(route));
+  emitLocation(route);
 });

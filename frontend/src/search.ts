@@ -1,3 +1,4 @@
+import { TAG_SYNONYMS } from '../../pipeline/synonyms.ts';
 import type { ClusterInfo, GraphNode } from './types';
 
 /**
@@ -14,19 +15,21 @@ export const parseStarsThreshold = (query: string | null | undefined): number | 
   return match ? Number.parseInt(match[1], 10) : null;
 };
 
-export const buildRepoSearchText = (repo: GraphNode): string =>
-  [
+export const buildRepoSearchText = (repo: GraphNode): string => {
+  const tags = [...(repo.ai_tags ?? []), ...(repo.topics ?? [])];
+  return [
     repo.name,
     repo.full_name,
     repo.description,
     repo.ai_summary,
     repo.language,
-    ...(repo.ai_tags ?? []),
-    ...(repo.topics ?? []),
+    ...tags,
+    ...tags.map((tag) => normalizeTag(tag)),
   ]
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
     .join('\n')
     .toLowerCase();
+};
 
 export const matchesRepoSearch = (
   repo: GraphNode,
@@ -67,6 +70,25 @@ export const buildLanguageFacets = (nodes: GraphNode[], limit = 10): [string, nu
   return ranked(counts, limit);
 };
 
+/** Topics first, then AI tags, capped at four. Only GitHub topics can drive the exact topic filter. */
+export const detailTopicLabels = (
+  topics: string[] = [],
+  tags: string[] = [],
+): { label: string; filterable: boolean }[] => {
+  const topicKeys = new Set(topics.map((value) => value.trim().toLowerCase()).filter(Boolean));
+  const seen = new Set<string>();
+  const labels: { label: string; filterable: boolean }[] = [];
+  for (const raw of [...topics, ...tags]) {
+    const label = raw.trim();
+    const key = label.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    labels.push({ label, filterable: topicKeys.has(key) });
+    if (labels.length === 4) break;
+  }
+  return labels;
+};
+
 /** AI tags and GitHub topics pooled into one "tag" facet. */
 export const buildTagFacets = (nodes: GraphNode[], limit = 20): [string, number][] => {
   const counts = new Map<string, number>();
@@ -78,12 +100,17 @@ export const buildTagFacets = (nodes: GraphNode[], limit = 20): [string, number]
   return ranked(counts, limit);
 };
 
-/** Mirrors the pipeline's tag canonicalization closely enough for client-side overlap. */
-export const normalizeTag = (tag: string): string =>
-  tag
+/** A palette choice stays on Data. Settings and the graph both open it on the graph. */
+export const paletteTarget = (path: string): '/' | '/data' => (path === '/data' ? '/data' : '/');
+
+/** Same cleaning and synonym map the pipeline uses when it scores tag overlap. */
+export const normalizeTag = (tag: string): string => {
+  const cleaned = tag
     .trim()
     .toLowerCase()
     .replace(/_/g, '-')
     .replace(/[^a-z0-9\-\u4e00-\u9fff]+/g, '-')
     .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replace(/^-+|-+$/g, '');
+  return cleaned ? (TAG_SYNONYMS[cleaned] ?? cleaned) : '';
+};

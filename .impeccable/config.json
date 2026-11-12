@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-11-12T06:15:57.577Z",
+        "reason": "DESIGN.md mandates Geist for this Operate surface; the detector flag is a known false positive"
+      }
+    ]
+  }
+}

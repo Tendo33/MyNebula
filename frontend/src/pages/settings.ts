@@ -17,6 +17,9 @@ const segmented = (act: string, label: string, current: string, options: [string
     ([value, text]) => html`<button class="toggle-item" data-act="${act}" data-value="${value}" aria-pressed="${current === value}">${text}</button>`,
   )}</div>`;
 
+/** Survives the settings remount that a language change triggers. */
+let restoreSettingsFocus: { act: string; value: string } | null = null;
+
 export const mountSettings = (root: HTMLElement): (() => void) => {
   const render = () => {
     const { settings, data } = store;
@@ -40,11 +43,14 @@ export const mountSettings = (root: HTMLElement): (() => void) => {
 
       <section class="settings-section">
       <h2>${t('settings.data')}</h2>
+      <div>
       <dl class="setting-list facts-list">
         <div><dt>${t('settings.generated_at')}</dt><dd>${data ? new Date(data.generated_at).toLocaleString(getLang(), { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</dd></div>
         <div><dt>${t('settings.repos')}</dt><dd class="tabular">${data ? `${data.nodes.length.toLocaleString()} / ${data.total_repos.toLocaleString()}` : '—'}</dd></div>
         <div><dt>${t('settings.groups_links')}</dt><dd class="tabular">${data ? `${data.clusters.length} · ${data.edges.length.toLocaleString()}` : '—'}</dd></div>
       </dl>
+      ${data && data.total_repos > data.nodes.length ? html`<p class="muted small settings-note">${t('settings.missing_repos', { count: data.total_repos - data.nodes.length })}</p>` : ''}
+      </div>
       </section>
 
       <section class="settings-section">
@@ -56,6 +62,12 @@ export const mountSettings = (root: HTMLElement): (() => void) => {
       </div>
       </section>
     </div>`.value;
+    const pending = restoreSettingsFocus;
+    restoreSettingsFocus = null;
+    if (!pending) return;
+    [...root.querySelectorAll<HTMLElement>('[data-act]')].find(
+      (button) => button.dataset.act === pending.act && button.dataset.value === pending.value,
+    )?.focus({ preventScroll: true });
   };
 
   render();
@@ -63,18 +75,36 @@ export const mountSettings = (root: HTMLElement): (() => void) => {
   const offClick = onAction(root, 'click', {
     theme: (button, event) => {
       const { clientX: x, clientY: y } = event as MouseEvent;
+      restoreSettingsFocus = { act: 'theme', value: button.dataset.value ?? '' };
       setTheme(button.dataset.value as ThemePreference, x || y ? { x, y } : undefined);
       render();
     },
-    lang: (button) => setLang(button.dataset.value as 'en' | 'zh'),
+    lang: (button) => {
+      restoreSettingsFocus = { act: 'lang', value: button.dataset.value ?? '' };
+      setLang(button.dataset.value as 'en' | 'zh');
+    },
     switch: (button) => {
       const key = button.dataset.key as 'hqRendering' | 'showTrajectories';
       store.updateSettings({ [key]: !store.settings[key] });
       button.setAttribute('aria-checked', String(store.settings[key]));
     },
   });
+  const onKey = (event: KeyboardEvent) => {
+    if ((event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') || event.altKey || event.metaKey || event.ctrlKey) return;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !root.contains(active)) return;
+    if (active.dataset.act !== 'theme' && active.dataset.act !== 'lang') return;
+    const items = [...(active.parentElement?.querySelectorAll<HTMLElement>('.toggle-item') ?? [])];
+    const index = items.indexOf(active);
+    if (index < 0 || items.length < 2) return;
+    event.preventDefault();
+    const step = event.key === 'ArrowRight' ? 1 : items.length - 1;
+    items[(index + step) % items.length]?.click();
+  };
+  root.addEventListener('keydown', onKey);
   return () => {
     unsubscribe();
     offClick();
+    root.removeEventListener('keydown', onKey);
   };
 };

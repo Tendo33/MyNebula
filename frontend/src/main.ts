@@ -3,7 +3,8 @@ import './styles.css';
 import { html, onAction, qs } from './html';
 import { onLangChange, t } from './i18n';
 import { icon } from './icons';
-import { currentRoute, href, onRoute, type Route } from './router';
+import { sharedViewParams } from './graph/route';
+import { currentRoute, href, onLocation, onRoute, type Route } from './router';
 import { store } from './store';
 import { initTheme } from './theme';
 import { initPalette, openPalette, shortcutLabel } from './palette';
@@ -35,14 +36,28 @@ let mountedKey: string | null = null;
 
 const pageFor = (path: string) => PAGES.find((p) => p.paths.includes(path));
 
+const tabHref = (pagePath: string, route: Route): string => {
+  if (pagePath === '/settings') return href('/settings');
+  if (pageFor(route.path)?.paths[0] === pagePath) return href(pagePath, route.params);
+  return href(pagePath, sharedViewParams(route.params));
+};
+
+const syncTabs = (route: Route) => {
+  for (const anchor of app.querySelectorAll<HTMLAnchorElement>('.tabs-nav a[data-path]')) {
+    const path = anchor.dataset.path;
+    if (path) anchor.href = tabHref(path, route);
+  }
+};
+
 const renderShell = (active: string | undefined) => {
+  const route = currentRoute();
   app.innerHTML = html`
     <a class="skip-link" href="#main-content" data-act="skip">${t('common.skip_to_content')}</a>
     <header class="topbar">
       <a class="wordmark" href="#/" aria-label="MyNebula">MyNebula</a>
       <nav class="tabs-nav" aria-label="${t('nav.label')}">
         ${PAGES.map(
-          (p) => html`<a href="${href(p.paths[0])}" ${p.key === active ? html`aria-current="page"` : ''}>${t(p.label)}</a>`,
+          (p) => html`<a href="${tabHref(p.paths[0], route)}" data-path="${p.paths[0]}" ${p.key === active ? html`aria-current="page"` : ''}>${t(p.label)}</a>`,
         )}
       </nav>
       <button class="search-hint" data-act="palette" aria-label="${t('common.command_palette')}">
@@ -74,5 +89,6 @@ onAction(app, 'click', {
 });
 mountPage(currentRoute());
 onRoute((route) => mountPage(route));
+onLocation(syncTabs);
 onLangChange(() => mountPage(currentRoute(), true));
 void store.load();

@@ -1,15 +1,19 @@
 import { html, type Raw } from '../html';
 import { getLang, t } from '../i18n';
 import { icon } from '../icons';
+import { loadErrorDetail } from '../loadError';
 
 export const loadingState = (): Raw =>
   html`<div class="center-state" role="status"><span class="spinner"></span><span class="muted">${t('common.loading')}</span></div>`;
 
-export const errorState = (): Raw =>
-  html`<div class="center-state">
+export const errorState = (message?: string | null): Raw => {
+  const detail = loadErrorDetail(message);
+  return html`<div class="center-state" role="alert">
     <p>${t('common.load_failed')}</p>
+    ${detail ? html`<p class="muted">${detail}</p>` : ''}
     <button class="btn btn-primary" data-act="retry">${t('common.retry')}</button>
   </div>`;
+};
 
 /** Empty collection: point at the sync instructions on the Settings page. */
 export const emptyState = (iconName: string, title: string, hint: string): Raw =>

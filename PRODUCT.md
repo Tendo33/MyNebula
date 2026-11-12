@@ -48,7 +48,7 @@ Ivory/indigo “research desk” leftovers, gimmicky space visuals, Inter/Roboto
 
 ## Evidence on Hand
 
-- `doc/images/logo.png` and `doc/images/banner.png`. There are no current interface screenshots.
+- `doc/images/logo.png`, `doc/images/screenshot-graph.webp`, and `doc/images/screenshot-details.webp`.
 - No testimonials, user counts, benchmarks, or case studies exist. Do not invent them.
 
 ## Product Principles

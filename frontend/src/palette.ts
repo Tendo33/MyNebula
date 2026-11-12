@@ -1,7 +1,7 @@
 import { avatarUrl, html, onAction, type Raw } from './html';
 import { t } from './i18n';
 import { icon } from './icons';
-import { navigate } from './router';
+import { currentRoute, navigate } from './router';
 import {
   buildLanguageFacets,
   buildTagFacets,
@@ -9,6 +9,7 @@ import {
   matchesFacetSearch,
   matchesRepoSearch,
   normalizeSearchQuery,
+  paletteTarget,
   parseStarsThreshold,
 } from './search';
 import { store } from './store';
@@ -157,19 +158,21 @@ export const initPalette = (): void => {
     previousFocus?.focus();
   };
 
+  const go = (params: Record<string, string>) => navigate(paletteTarget(currentRoute().path), params);
+
   const goSearch = (value: string, facet: 'search' | 'language' = 'search') => {
     addRecent(query || value);
     close();
-    navigate('/', facet === 'language' ? { language: value } : { q: value });
+    go(facet === 'language' ? { language: value } : { q: value });
   };
 
   const choose = (result: Result) => {
     addRecent(query);
     close();
-    if (result.type === 'repo') navigate('/', { node: String(result.data.id) });
-    else if (result.type === 'cluster') navigate('/', { cluster: String(result.data.id) });
-    else if (result.type === 'language') navigate('/', { language: result.title });
-    else navigate('/', { q: result.title });
+    if (result.type === 'repo') go({ node: String(result.data.id) });
+    else if (result.type === 'cluster') go({ cluster: String(result.data.id) });
+    else if (result.type === 'language') go({ language: result.title });
+    else go({ q: result.title });
   };
 
   const renderBody = () => {
@@ -262,6 +265,7 @@ export const initPalette = (): void => {
     isOpen = true;
     previousFocus = document.activeElement as HTMLElement | null;
     query = '';
+    filter = 'all';
     selected = 0;
     render();
   };

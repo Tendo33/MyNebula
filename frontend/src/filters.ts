@@ -3,7 +3,7 @@ import { matchesRepoSearch, normalizeSearchQuery } from './search';
 
 export interface Filters {
   clusters: Set<number>;
-  lists: Set<number>;
+  lists: Set<string>;
   query: string;
   /** Inclusive indexes into the timeline points. */
   timeRange: [number, number] | null;
@@ -39,7 +39,7 @@ export const filterNodes = (
     if (filters.clusters.size && (node.cluster_id == null || !filters.clusters.has(node.cluster_id))) {
       return false;
     }
-    if (filters.lists.size && (node.star_list_id == null || !filters.lists.has(node.star_list_id))) {
+    if (filters.lists.size && !node.star_list_ids.some((id) => filters.lists.has(id))) {
       return false;
     }
     if (query && !matchesRepoSearch(node, query, searchText.get(node.id))) return false;
@@ -52,6 +52,50 @@ export const filterNodes = (
     }
     return true;
   });
+};
+
+/**
+ * Nodes for one rail's counts. That rail's own selection is ignored, and so is
+ * the search box: the rail is not rebuilt while the query changes.
+ */
+export const facetNodes = (
+  nodes: GraphNode[],
+  timeline: TimelinePoint[],
+  filters: Filters,
+  except: 'clusters' | 'lists' | 'languages',
+): GraphNode[] => {
+  const base = { ...filters, query: '' };
+  if (except === 'clusters') return filterNodes(nodes, timeline, { ...base, clusters: new Set() }, new Map());
+  if (except === 'lists') return filterNodes(nodes, timeline, { ...base, lists: new Set() }, new Map());
+  return filterNodes(nodes, timeline, { ...base, languages: new Set() }, new Map());
+};
+
+/** Per-month counts for the timeline. The selected window and the search box are ignored. */
+export const timelineFacets = (
+  nodes: GraphNode[],
+  timeline: TimelinePoint[],
+  filters: Filters,
+): { count: number; topLanguages: string[] }[] => {
+  const scoped = filterNodes(nodes, timeline, { ...filters, query: '', timeRange: null }, new Map());
+  const counts = timeline.map(() => 0);
+  const languages = timeline.map(() => new Map<string, number>());
+  const index = new Map(timeline.map((point, i) => [point.date, i]));
+  for (const node of scoped) {
+    const month = node.starred_at?.slice(0, 7);
+    if (!month) continue;
+    const at = index.get(month);
+    if (at == null) continue;
+    counts[at] += 1;
+    if (!node.language) continue;
+    languages[at].set(node.language, (languages[at].get(node.language) ?? 0) + 1);
+  }
+  return counts.map((count, i) => ({
+    count,
+    topLanguages: [...languages[i].entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 3)
+      .map(([language]) => language),
+  }));
 };
 
 /** Undirected node -> neighbour ids. */

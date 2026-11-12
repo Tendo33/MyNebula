@@ -2,25 +2,88 @@ import { avatarUrl, html, type Raw } from '../html';
 import { t } from '../i18n';
 import { icon } from '../icons';
 import { href } from '../router';
-import { normalizeTag } from '../search';
+import { detailTopicLabels, normalizeTag } from '../search';
 import { store } from '../store';
-import type { GraphNode } from '../types';
+import { UNCATEGORIZED_LIST_ID, type GraphNode } from '../types';
 
 export type RelatedTab = 'similar' | 'sameTags' | 'sameLang';
-type RelatedEntry = { repo: GraphNode; reason?: string };
+const RELATED_TABS: RelatedTab[] = ['similar', 'sameTags', 'sameLang'];
 
-const factTopics = (topics: string[] = [], tags: string[] = []): string[] => {
-  const seen = new Set<string>();
-  const labels: string[] = [];
-  for (const raw of [...topics, ...tags]) {
-    const label = raw.trim();
-    if (!label || seen.has(label.toLowerCase())) continue;
-    seen.add(label.toLowerCase());
-    labels.push(label);
-    if (labels.length === 4) break;
-  }
-  return labels;
+/** Keep the keyboard on the related-tab control after the details panel is rebuilt. */
+export const focusRelatedTab = (root: ParentNode, tab: RelatedTab): void => {
+  const match = [...root.querySelectorAll<HTMLElement>('[data-region="details"] [data-act="related-tab"]')].find(
+    (button) => button.dataset.tab === tab,
+  );
+  match?.focus({ preventScroll: true });
 };
+
+/** Left and right move between the related-repo tabs. Returns the tab to select. */
+export const moveRelatedTab = (event: KeyboardEvent): RelatedTab | null => {
+  if ((event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') || event.altKey || event.metaKey || event.ctrlKey) return null;
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || active.dataset.act !== 'related-tab') return null;
+  const index = RELATED_TABS.indexOf(active.dataset.tab as RelatedTab);
+  if (index < 0) return null;
+  event.preventDefault();
+  const step = event.key === 'ArrowRight' ? 1 : RELATED_TABS.length - 1;
+  return RELATED_TABS[(index + step) % RELATED_TABS.length];
+};
+
+const focusItem = (item: HTMLElement) => {
+  item.focus({ preventScroll: true });
+  item.scrollIntoView({ block: 'nearest' });
+};
+
+/** After opening a related repository, keep the keyboard on the new list. */
+export const focusRelatedItem = (root: ParentNode): void => {
+  const region = root.querySelector('[data-region="details"]');
+  if (!(region instanceof HTMLElement)) return;
+  const item = region.querySelector<HTMLElement>('.related-item');
+  if (item) {
+    focusItem(item);
+    return;
+  }
+  region.querySelector<HTMLElement>('[data-act="related-tab"][aria-pressed="true"]')?.focus({ preventScroll: true });
+};
+
+/** Up and down move through the related repositories under the focused one. */
+export const moveRelatedItem = (event: KeyboardEvent, root: ParentNode): boolean => {
+  const key = event.key;
+  if (key !== 'ArrowDown' && key !== 'ArrowUp' && key !== 'Home' && key !== 'End') return false;
+  if (event.altKey || event.metaKey || event.ctrlKey) return false;
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || !root.contains(active)) return false;
+  if (active.dataset.act === 'related-tab' && key === 'ArrowDown') {
+    const item = active.closest('[data-region="details"]')?.querySelector<HTMLElement>('.related-item');
+    if (!item) return false;
+    event.preventDefault();
+    focusItem(item);
+    return true;
+  }
+  if (!active.classList.contains('related-item')) return false;
+  const list = active.closest('.related-list');
+  if (!(list instanceof HTMLElement)) return false;
+  const items = [...list.querySelectorAll<HTMLButtonElement>('.related-item')];
+  if (!items.length) return false;
+  const index = items.indexOf(active as HTMLButtonElement);
+  if (key === 'ArrowUp' && index <= 0) {
+    const tab = list.closest('.details-related')?.querySelector<HTMLElement>('[data-act="related-tab"][aria-pressed="true"]');
+    if (!tab) return false;
+    event.preventDefault();
+    tab.focus({ preventScroll: true });
+    return true;
+  }
+  const next =
+    key === 'Home' ? 0
+    : key === 'End' ? items.length - 1
+    : key === 'ArrowDown' ? (index < 0 ? 0 : Math.min(items.length - 1, index + 1))
+    : Math.max(0, index - 1);
+  event.preventDefault();
+  if (next !== index) focusItem(items[next]);
+  return true;
+};
+
+type RelatedEntry = { repo: GraphNode; reason?: string };
 
 export const relatedFor = (node: GraphNode): Record<RelatedTab, RelatedEntry[]> => {
   const tagsOf = (n: GraphNode) => new Set([...(n.ai_tags ?? []), ...(n.topics ?? [])].map(normalizeTag).filter(Boolean));
@@ -34,7 +97,8 @@ export const relatedFor = (node: GraphNode): Record<RelatedTab, RelatedEntry[]> 
       const repo = store.nodeById.get(id);
       if (!repo) return [];
       const shared = [...tagsOf(repo)].filter((tag) => nodeTags.has(tag)).slice(0, 2).join(', ');
-      const sameList = node.star_list_id != null && node.star_list_id !== -1 && repo.star_list_id === node.star_list_id;
+      const lists = new Set(node.star_list_ids.filter((id) => id !== UNCATEGORIZED_LIST_ID));
+      const sameList = repo.star_list_ids.some((id) => lists.has(id));
       return [{ repo, reason: [shared, sameList ? t('repoDetails.reason_list') : ''].filter(Boolean).join(' · ') }];
     });
   const sameTags: RelatedEntry[] = nodeTags.size
@@ -87,13 +151,27 @@ export interface DetailsState {
   relatedTab: RelatedTab;
   /** Outside the graph (the Data page), lead the links with a way back to the node on the graph. */
   graphLink?: boolean;
+  /** Clusters currently filtered, so the fact button can show pressed. */
+  clusters?: ReadonlySet<number>;
+  /** Languages currently filtered, so the fact button can show pressed. */
+  languages?: ReadonlySet<string>;
+  /** Lists currently filtered. Omit it to keep list names as text. */
+  lists?: ReadonlySet<string>;
+  /**
+   * When set, GitHub topic badges toggle this exact filter. Null means the
+   * control is available and nothing is selected. Omit it to keep badges as labels.
+   */
+  topic?: string | null;
 }
 
 /** Summary, facts, links, then related repos — one scroll, no tabs. */
 export const renderDetails = (node: GraphNode, state: DetailsState): Raw => {
-  const listName = store.data?.star_lists.find((l) => l.id === node.star_list_id && l.id !== -1)?.name;
+  const lists = (store.data?.star_lists ?? []).filter(
+    (list) => list.id !== UNCATEGORIZED_LIST_ID && node.star_list_ids.includes(list.id),
+  );
   const cluster = store.data?.clusters.find((c) => c.id === node.cluster_id);
-  const topics = factTopics(node.topics ?? [], node.ai_tags ?? []);
+  const topics = detailTopicLabels(node.topics ?? [], node.ai_tags ?? []);
+  const selectedTopic = state.topic?.trim().toLowerCase() ?? '';
   const summary = (node.ai_summary || node.description || '').trim();
   const related = relatedFor(node);
   const current = related[state.relatedTab];
@@ -120,12 +198,30 @@ export const renderDetails = (node: GraphNode, state: DetailsState): Raw => {
     <div class="details-body">
       <dl class="facts">
         <div><dt>${t('repoDetails.stars')}</dt><dd class="tabular">${node.stargazers_count.toLocaleString()}</dd></div>
-        ${node.language ? html`<div><dt>${t('data.language')}</dt><dd>${node.language}</dd></div>` : ''}
-        ${cluster ? html`<div><dt>${t('data.cluster')}</dt><dd><span class="dot" style="--dot:${cluster.color}"></span>${cluster.name}</dd></div>` : ''}
-        ${listName ? html`<div><dt>${t('graph.my_lists')}</dt><dd>${listName}</dd></div>` : ''}
+        ${node.language
+          ? html`<div><dt>${t('data.language')}</dt><dd><button class="cluster-tag" data-act="language" data-id="${node.language}" aria-pressed="${state.languages?.has(node.language) ?? false}" title="${t('search.filter_by_language', { language: node.language })}">${node.language}</button></dd></div>`
+          : ''}
+        ${cluster
+          ? html`<div><dt>${t('data.cluster')}</dt><dd><button class="cluster-tag" data-act="cluster" data-id="${cluster.id}" aria-pressed="${state.clusters?.has(cluster.id) ?? false}" title="${t('search.filter_by_cluster', { cluster: cluster.name })}"><span class="dot" style="--dot:${cluster.color}"></span><span class="truncate">${cluster.name}</span></button></dd></div>`
+          : ''}
+        ${lists.length
+          ? html`<div><dt>${t('graph.my_lists')}</dt><dd>${
+              state.lists
+                ? lists.map(
+                    (list) => html`<button class="cluster-tag" data-act="list" data-id="${list.id}" aria-pressed="${state.lists?.has(list.id) ?? false}" title="${list.name}">${list.name}</button>`,
+                  )
+                : lists.map((list) => list.name).join(' · ')
+            }</dd></div>`
+          : ''}
       </dl>
       <p class="details-summary">${summary || t('repoDetails.no_ai_summary')}</p>
-      ${topics.length ? html`<div class="badges">${topics.map((topic) => html`<span class="badge">${topic}</span>`)}</div>` : ''}
+      ${topics.length
+        ? html`<div class="badges">${topics.map(({ label, filterable }) =>
+            state.topic !== undefined && filterable
+              ? html`<button class="badge" data-act="topic" data-id="${label}" aria-pressed="${selectedTopic === label.toLowerCase()}" title="${t('search.filter_by_topic', { topic: label })}">${label}</button>`
+              : html`<span class="badge">${label}</span>`,
+          )}</div>`
+        : ''}
       ${state.graphLink ? html`<a class="btn btn-outline btn-sm details-graph-link" href="${href('/', { node: String(node.id) })}">${t('repoDetails.view_in_graph')}</a>` : ''}
       <div class="details-links">
         <a href="${node.html_url}" target="_blank" rel="noopener noreferrer">GitHub ${icon('external')}</a>

@@ -1,48 +1,49 @@
 import { GraphCanvas } from '../graph/canvas';
-import { renderDetails, renderHoverCard, type DetailsState } from '../graph/details';
+import { renderDetails, renderHoverCard, focusRelatedItem, focusRelatedTab, moveRelatedItem, moveRelatedTab, type DetailsState } from '../graph/details';
+import { monthsFromTimeRange, readGraphLink, sharedViewParams, timeRangeFromMonths, writeGraphLink } from '../graph/route';
 import { attachTimelineBrush, renderTimeline } from '../graph/timeline';
-import { hasActiveFilters } from '../filters';
+import { facetNodes, hasActiveFilters, timelineFacets } from '../filters';
 import { html, onAction, qs } from '../html';
 import { t } from '../i18n';
 import { icon } from '../icons';
 import { currentRoute, navigate, onRoute, type Route } from '../router';
 import { store } from '../store';
+import { UNCATEGORIZED_LIST_ID } from '../types';
 import { emptyState, errorState, loadingState } from './common';
 
-const LIST_LIMIT = 50;
-
-const parseIds = (params: URLSearchParams): number[] =>
-  (params.get('clusters') ?? params.get('cluster') ?? '')
-    .split(',')
-    .map((value) => Number.parseInt(value, 10))
-    .filter(Number.isFinite);
-
-/** Graph state <-> URL: node, cluster(s), language, q (with legacy `tag`). */
+/** Graph state <-> URL: node, cluster(s), lists, language, q, and a month window. */
 const applyRoute = (route: Route) => {
   const data = store.data;
   if (!data) return;
-  const { params } = route;
-  const clusters = parseIds(params).filter((id) => data.clusters.some((c) => c.id === id));
-  const language = params.get('language');
+  const link = readGraphLink(route.params);
+  const knownLists = new Set(data.star_lists.map((list) => list.id));
+  const knownLanguages = new Set(data.nodes.flatMap((node) => (node.language ? [node.language] : [])));
   store.setFilters({
-    clusters: new Set(clusters),
-    languages: new Set(language ? [language] : []),
-    query: params.get('q') ?? params.get('tag') ?? '',
+    clusters: new Set(link.clusters.filter((id) => data.clusters.some((cluster) => cluster.id === id))),
+    lists: new Set(link.lists.filter((id) => knownLists.has(id))),
+    languages: new Set(link.languages.filter((language) => knownLanguages.has(language))),
+    query: link.query,
+    timeRange: timeRangeFromMonths(data.timeline, link.from, link.to),
   });
-  const nodeId = Number.parseInt(params.get('node') ?? '', 10);
-  store.select(store.nodeById.has(nodeId) ? nodeId : null);
+  store.select(link.nodeId != null && store.nodeById.has(link.nodeId) ? link.nodeId : null);
 };
 
 const writeRoute = () => {
-  const params = new URLSearchParams();
   const { filters } = store;
-  if (store.selectedId != null) params.set('node', String(store.selectedId));
-  const clusters = [...filters.clusters].sort((a, b) => a - b);
-  if (clusters.length === 1) params.set('cluster', String(clusters[0]));
-  else if (clusters.length > 1) params.set('clusters', clusters.join(','));
-  if (filters.languages.size === 1) params.set('language', [...filters.languages][0]);
-  if (filters.query.trim()) params.set('q', filters.query.trim());
-  navigate('/', params, true);
+  const months = monthsFromTimeRange(store.data?.timeline ?? [], filters.timeRange);
+  navigate(
+    '/',
+    writeGraphLink({
+      nodeId: store.selectedId,
+      clusters: [...filters.clusters],
+      lists: [...filters.lists],
+      languages: [...filters.languages],
+      query: filters.query,
+      from: months.from,
+      to: months.to,
+    }),
+    true,
+  );
 };
 
 export const mountGraph = (root: HTMLElement): (() => void) => {
@@ -61,7 +62,7 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
     canvas?.destroy();
     canvas = null;
     if (store.loading) return void (root.innerHTML = loadingState().value);
-    if (store.error) return void (root.innerHTML = errorState().value);
+    if (store.error) return void (root.innerHTML = errorState(store.error).value);
     if (!store.data || store.data.nodes.length === 0) {
       root.innerHTML = emptyState('network', t('graph.empty_title'), t('graph.empty_hint')).value;
       return;
@@ -94,6 +95,8 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
         renderHover();
       },
     });
+    canvas.canvas.setAttribute('role', 'img');
+    canvas.canvas.setAttribute('aria-label', t('graph.canvas_label'));
     canvas.setData(store.data.nodes, store.data.edges, store.data.clusters);
     applyRoute(currentRoute());
     const search = el('[data-search]') as HTMLInputElement;
@@ -119,16 +122,44 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
       <div class="rail-rows">${rows}</div>
     </section>`;
 
+  const displayTimeline = () => {
+    const data = store.data!;
+    const facets = timelineFacets(data.nodes, data.timeline, store.filters);
+    return data.timeline.map((point, index) => ({
+      ...point,
+      count: facets[index]?.count ?? 0,
+      top_languages: facets[index]?.topLanguages ?? [],
+    }));
+  };
+
   const renderPanels = () => {
     const data = store.data!;
     const { filters } = store;
-    const lists = [...data.star_lists].sort((a, b) => b.repo_count - a.repo_count);
+    const listCounts = new Map<string, number>();
+    for (const node of facetNodes(data.nodes, data.timeline, filters, 'lists')) {
+      for (const id of node.star_list_ids) listCounts.set(id, (listCounts.get(id) ?? 0) + 1);
+    }
+    const lists = data.star_lists
+      .map((list) => ({ list, count: listCounts.get(list.id) ?? 0 }))
+      .filter((item) => item.count > 0 || filters.lists.has(item.list.id))
+      .sort((a, b) => b.count - a.count || a.list.name.localeCompare(b.list.name));
     const counts = new Map<number, number>();
-    data.nodes.forEach((n) => n.cluster_id != null && counts.set(n.cluster_id, (counts.get(n.cluster_id) ?? 0) + 1));
+    for (const node of facetNodes(data.nodes, data.timeline, filters, 'clusters')) {
+      if (node.cluster_id == null) continue;
+      counts.set(node.cluster_id, (counts.get(node.cluster_id) ?? 0) + 1);
+    }
+    for (const id of filters.clusters) if (!counts.has(id)) counts.set(id, 0);
     const clusters = data.clusters
       .map((cluster) => ({ cluster, count: counts.get(cluster.id) ?? 0 }))
-      .filter((c) => c.count > 0)
+      .filter((item) => item.count > 0 || filters.clusters.has(item.cluster.id))
       .sort((a, b) => b.count - a.count);
+    const languageCounts = new Map<string, number>();
+    for (const node of facetNodes(data.nodes, data.timeline, filters, 'languages')) {
+      if (!node.language) continue;
+      languageCounts.set(node.language, (languageCounts.get(node.language) ?? 0) + 1);
+    }
+    for (const language of filters.languages) if (!languageCounts.has(language)) languageCounts.set(language, 0);
+    const languages = [...languageCounts].filter(([language, count]) => count > 0 || filters.languages.has(language)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
     el('[data-region="panels"]').innerHTML = html`
       ${clusters.length
@@ -152,25 +183,47 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
             filters.lists.size,
             'clear-lists',
             lists.map(
-              (list) => html`<button class="facet" data-act="toggle-list" data-id="${list.id}"
+              ({ list, count }) => html`<button class="facet" data-act="toggle-list" data-id="${list.id}"
                 aria-pressed="${filters.lists.has(list.id)}" title="${list.description ?? ''}">
                 ${icon('folder')}
-                <span class="truncate">${list.id === -1 ? t('graph.uncategorized') : list.name}</span>
-                <span class="facet-count">${list.repo_count}</span>
+                <span class="truncate">${list.id === UNCATEGORIZED_LIST_ID ? t('graph.uncategorized') : list.name}</span>
+                <span class="facet-count">${count}</span>
               </button>`,
             ),
           )
         : ''}
-      <div data-region="timeline">${renderTimeline(data.timeline, previewRange ?? filters.timeRange)}</div>`.value;
+      ${languages.length
+        ? section(
+            t('search.languages'),
+            filters.languages.size,
+            'clear-languages',
+            languages.map(
+              ([language, count]) => html`<button class="facet" data-act="toggle-language" data-id="${language}"
+                aria-pressed="${filters.languages.has(language)}">
+                ${icon('code')}
+                <span class="truncate">${language}</span>
+                <span class="facet-count">${count}</span>
+              </button>`,
+            ),
+          )
+        : ''}
+      <div data-region="timeline">${renderTimeline(displayTimeline(), previewRange ?? filters.timeRange)}</div>`.value;
   };
 
   const renderTimelineOnly = () => {
-    el('[data-region="timeline"]').innerHTML = renderTimeline(store.data!.timeline, previewRange ?? store.filters.timeRange).value;
+    el('[data-region="timeline"]').innerHTML = renderTimeline(displayTimeline(), previewRange ?? store.filters.timeRange).value;
   };
+
+  /** Ids last written to the list, so a filter change that keeps the same rows skips the rebuild. */
+  let listKey = '';
 
   const renderList = () => {
     const region = el('[data-region="list"]');
     const nodes = store.visibleNodes;
+    const key = showList ? nodes.map((node) => node.id).join(',') : 'closed';
+    if (key === listKey && region.firstElementChild) return;
+    listKey = key;
+    const stars = (count: number) => (count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count.toLocaleString());
     region.innerHTML = showList
       ? html`<div class="node-list" id="graph-node-list" aria-label="${t('graph.repository_list')}">
           <div class="node-list-head">
@@ -178,14 +231,19 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
             <button class="btn btn-ghost btn-icon btn-sm" data-act="hide-list" aria-label="${t('common.close')}">${icon('x')}</button>
           </div>
           <ul>
-            ${nodes.slice(0, LIST_LIMIT).map(
-              (node) => html`<li><button class="node-list-item" data-act="select" data-id="${node.id}"
-                ${store.selectedId === node.id ? html`aria-current="true"` : ''}>
-                <span class="truncate strong small">${node.full_name}</span>
-                <span class="truncate muted xsmall">${node.description || node.ai_summary || t('common.no_description')}</span>
-              </button></li>`,
-            )}
-            ${nodes.length > LIST_LIMIT ? html`<li class="muted xsmall pad">${t('graph.repository_list_limited')}</li>` : ''}
+            ${nodes.length
+              ? nodes.map(
+                  (node) => html`<li><button class="node-list-item" data-act="select" data-id="${node.id}"
+                    ${store.selectedId === node.id ? html`aria-current="true"` : ''}>
+                    <span class="node-list-title">
+                      <span class="truncate strong small">${node.full_name}</span>
+                      ${node.language ? html`<span class="dim xsmall">${node.language}</span>` : ''}
+                      <span class="dim xsmall tabular node-list-stars">${stars(node.stargazers_count)}</span>
+                    </span>
+                    <span class="truncate muted xsmall">${node.description || node.ai_summary || t('common.no_description')}</span>
+                  </button></li>`,
+                )
+              : html`<li class="node-list-empty muted small">${t('graph.list_empty')}</li>`}
           </ul>
         </div>`.value
       : html`<button class="btn btn-outline btn-sm list-toggle" data-act="show-list" aria-controls="graph-node-list" aria-expanded="false">
@@ -193,11 +251,25 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
         </button>`.value;
   };
 
+  /** Update the current row without rebuilding the list, so scroll and focus stay put. */
+  const syncListSelection = (scroll: boolean) => {
+    const current = store.selectedId;
+    let target: HTMLElement | null = null;
+    for (const button of el('[data-region="list"]').querySelectorAll<HTMLButtonElement>('.node-list-item')) {
+      const on = Number(button.dataset.id) === current;
+      if (on) {
+        button.setAttribute('aria-current', 'true');
+        target = button;
+      } else button.removeAttribute('aria-current');
+    }
+    if (scroll && target) target.scrollIntoView({ block: 'nearest' });
+  };
+
   const renderDetailsRegion = () => {
     const region = el('[data-region="details"]');
     const node = store.selected;
     root.querySelector('.graph-page')?.classList.toggle('has-details', Boolean(node));
-    region.innerHTML = node ? renderDetails(node, details).value : '';
+    region.innerHTML = node ? renderDetails(node, { ...details, topic: null, languages: store.filters.languages, lists: store.filters.lists, clusters: store.filters.clusters }).value : '';
   };
 
   const renderHover = () => {
@@ -225,22 +297,93 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
 
   renderFrame();
 
+  type FocusKey = { kind: 'act'; act: string; id: string } | { kind: 'month'; index: string };
+
+  /** The rail or list control that was focused before a filter rebuild. */
+  const focusedGraphControl = (): FocusKey | null => {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !root.contains(active) || active.matches('[data-search]')) return null;
+    const bar = active.closest<HTMLElement>('.timeline-bar');
+    if (bar?.dataset.index) return { kind: 'month', index: bar.dataset.index };
+    const act = active.dataset.act;
+    if (!act || active.closest('[data-region="details"]')) return null;
+    return { kind: 'act', act, id: active.dataset.id ?? '' };
+  };
+
+  const restoreGraphControl = (key: FocusKey | null) => {
+    if (!key) return;
+    const match =
+      key.kind === 'month'
+        ? [...root.querySelectorAll<HTMLElement>('.timeline-bar')].find((bar) => bar.dataset.index === key.index)
+        : [...root.querySelectorAll<HTMLElement>('[data-act]')].find(
+            (button) =>
+              button.dataset.act === key.act &&
+              (button.dataset.id ?? '') === key.id &&
+              !button.closest('[data-region="details"]') &&
+              button.offsetParent !== null,
+          );
+    const target =
+      match ??
+      (key.kind === 'act' && key.act === 'select'
+        ? (root.querySelector<HTMLElement>('.node-list-item') ?? root.querySelector<HTMLElement>('[data-act="hide-list"]'))
+        : null);
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    if (target.classList.contains('node-list-item') || target.classList.contains('timeline-bar')) {
+      target.scrollIntoView({ block: 'nearest' });
+    }
+  };
+
+  let filtersBefore = store.filters;
   cleanups.push(
     store.subscribe(['data'], renderFrame),
     store.subscribe(['filters'], () => {
       if (!canvas) return;
+      const next = store.filters;
+      const queryOnly =
+        next.clusters === filtersBefore.clusters &&
+        next.lists === filtersBefore.lists &&
+        next.languages === filtersBefore.languages &&
+        next.timeRange === filtersBefore.timeRange;
+      const languagesChanged = next.languages !== filtersBefore.languages;
+      const listsChanged = next.lists !== filtersBefore.lists;
+      const clustersChanged = next.clusters !== filtersBefore.clusters;
+      filtersBefore = next;
+      const restore = focusedGraphControl();
+      const active = document.activeElement;
+      const detailsControl =
+        active instanceof HTMLElement &&
+        (active.dataset.act === 'language' || active.dataset.act === 'list' || active.dataset.act === 'cluster') &&
+        active.closest('[data-region="details"]')
+          ? { act: active.dataset.act, id: active.dataset.id ?? '' }
+          : null;
       const search = el('[data-search]') as HTMLInputElement;
-      if (document.activeElement !== search && search.value !== store.filters.query) search.value = store.filters.query;
+      if (document.activeElement !== search && search.value !== next.query) search.value = next.query;
       renderSummary();
-      renderPanels();
+      if (!queryOnly) renderPanels();
+      if (languagesChanged || listsChanged || clustersChanged) {
+        renderDetailsRegion();
+        if (detailsControl) {
+          [...root.querySelectorAll<HTMLElement>('[data-region="details"] [data-act]')]
+            .find((button) => button.dataset.act === detailsControl.act && (button.dataset.id ?? '') === detailsControl.id)
+            ?.focus({ preventScroll: true });
+        }
+      }
       renderList();
+      syncListSelection(next.query === '' && store.selectedId != null);
       updateCanvas();
       writeRoute();
+      restoreGraphControl(restore);
     }),
     store.subscribe(['selection'], () => {
       if (!canvas) return;
-      renderList();
+      const fromRelated =
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement.classList.contains('related-item') &&
+        root.contains(document.activeElement);
+      syncListSelection(true);
       renderDetailsRegion();
+      if (fromRelated && store.selectedId != null) focusRelatedItem(root);
       if (store.selectedId != null) canvas.focusNode(store.selectedId);
       updateCanvas();
       writeRoute();
@@ -250,7 +393,11 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
       updateCanvas();
       renderDetailsRegion();
     }),
-    onRoute((route) => (route.path === '/' || route.path === '/graph') && applyRoute(route)),
+    onRoute((route) => {
+      if (route.path !== '/' && route.path !== '/graph') return;
+      previewRange = null;
+      applyRoute(route);
+    }),
   );
 
   cleanups.push(
@@ -265,29 +412,95 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
         store.clearFilters();
         store.select(null);
       },
-      'toggle-list': (button) => store.toggleIn('lists', Number(button.dataset.id)),
+      'toggle-list': (button) => store.toggleIn('lists', button.dataset.id ?? ''),
+      list: (button) => {
+        const id = button.dataset.id ?? '';
+        if (!id) return;
+        store.toggleIn('lists', id);
+      },
       'toggle-cluster': (button) => store.toggleIn('clusters', Number(button.dataset.id)),
+      cluster: (button) => {
+        const id = Number(button.dataset.id);
+        if (!Number.isFinite(id)) return;
+        store.toggleIn('clusters', id);
+      },
       'clear-lists': () => store.setFilters({ lists: new Set() }),
       'clear-clusters': () => store.setFilters({ clusters: new Set() }),
-      'timeline-clear': () => store.setFilters({ timeRange: null }),
+      'clear-languages': () => store.setFilters({ languages: new Set() }),
+      'toggle-language': (button) => store.toggleIn('languages', button.dataset.id ?? ''),
+      language: (button) => {
+        const language = button.dataset.id ?? '';
+        if (!language) return;
+        store.toggleIn('languages', language);
+      },
+      'timeline-clear': () => {
+        previewRange = null;
+        store.setFilters({ timeRange: null });
+      },
       'show-list': () => {
         showList = true;
         renderList();
+        syncListSelection(true);
+        (root.querySelector<HTMLElement>('.node-list-item') ?? root.querySelector<HTMLElement>('[data-act="hide-list"]'))?.focus();
       },
       'hide-list': () => {
         showList = false;
         renderList();
+        root.querySelector<HTMLElement>('[data-act="show-list"]')?.focus();
       },
       select: (button) => store.select(Number(button.dataset.id)),
+      topic: (button) => {
+        const topic = button.dataset.id ?? '';
+        if (!topic) return;
+        const params = sharedViewParams(currentRoute().params);
+        params.set('topic', topic);
+        navigate('/data', params);
+      },
       'close-details': () => store.select(null),
       'related-tab': (button) => {
         details.relatedTab = button.dataset.tab as DetailsState['relatedTab'];
         renderDetailsRegion();
+        focusRelatedTab(root, details.relatedTab);
       },
     }),
   );
 
+  /** Arrows move through the open repository list. Enter on the focused row still selects it. */
+  const moveListFocus = (event: KeyboardEvent): boolean => {
+    const key = event.key;
+    if (key !== 'ArrowDown' && key !== 'ArrowUp' && key !== 'Home' && key !== 'End') return false;
+    if (event.altKey || event.metaKey || event.ctrlKey) return false;
+    const list = root.querySelector('#graph-node-list');
+    const active = document.activeElement;
+    if (!(list instanceof HTMLElement) || !(active instanceof HTMLElement) || !list.contains(active)) return false;
+    if (active.closest('input, select, textarea')) return false;
+    const items = [...list.querySelectorAll<HTMLButtonElement>('.node-list-item')];
+    if (!items.length) return false;
+    const index = items.indexOf(active as HTMLButtonElement);
+    const next =
+      key === 'Home' ? 0
+      : key === 'End' ? items.length - 1
+      : key === 'ArrowDown' ? (index < 0 ? 0 : Math.min(items.length - 1, index + 1))
+      : index < 0 ? items.length - 1
+      : Math.max(0, index - 1);
+    event.preventDefault();
+    if (next !== index) {
+      items[next].focus({ preventScroll: true });
+      items[next].scrollIntoView({ block: 'nearest' });
+    }
+    return true;
+  };
+
   const onKey = (event: KeyboardEvent) => {
+    const tab = moveRelatedTab(event);
+    if (tab) {
+      details.relatedTab = tab;
+      renderDetailsRegion();
+      focusRelatedTab(root, tab);
+      return;
+    }
+    if (moveRelatedItem(event, root)) return;
+    if (moveListFocus(event)) return;
     if (event.key !== 'Escape' || store.selectedId == null || document.querySelector('.palette')) return;
     if ((event.target as HTMLElement).closest('input, select, textarea')) return;
     store.select(null);

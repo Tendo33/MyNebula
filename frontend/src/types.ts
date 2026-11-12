@@ -1,4 +1,7 @@
-/** Shapes of the static JSON written by `python -m nebula`. */
+/** Shapes of the static JSON written by `pnpm sync`. List ids are GitHub list ids. */
+
+/** Repos in no star list use this id once the owner has at least one list. */
+export const UNCATEGORIZED_LIST_ID = 'uncategorized';
 
 export interface GraphNode {
   id: number;
@@ -16,7 +19,7 @@ export interface GraphNode {
   starred_at?: string | null;
   last_commit_time?: string | null;
   cluster_id: number | null;
-  star_list_id: number | null;
+  star_list_ids: string[];
 }
 
 /** [source id, target id, weight] */
@@ -32,7 +35,7 @@ export interface ClusterInfo {
 }
 
 export interface StarListInfo {
-  id: number;
+  id: string;
   name: string;
   description?: string | null;
   repo_count: number;

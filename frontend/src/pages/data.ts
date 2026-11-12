@@ -1,14 +1,30 @@
-import { renderDetails, type DetailsState } from '../graph/details';
+import { renderDetails, focusRelatedItem, focusRelatedTab, moveRelatedItem, moveRelatedTab, type DetailsState } from '../graph/details';
 import { avatarUrl, html, onAction, qs, type Raw } from '../html';
 import { t } from '../i18n';
 import { icon } from '../icons';
 import { currentRoute, navigate, onRoute } from '../router';
-import { filterRepos, nextSort, sortRepos, type DataQuery, type SortConfig, type SortField } from './dataQuery';
+import {
+  DATA_PAGE_SIZES,
+  clusterFacetCounts,
+  filterRepos,
+  nextSort,
+  readLanguages,
+  readMonth,
+  pageContaining,
+  readPage,
+  readPageSize,
+  readSort,
+  sortRepos,
+  starMonth,
+  writeLanguages,
+  writeSort,
+  type DataQuery,
+  type SortField,
+} from './dataQuery';
 import { store } from '../store';
 import type { ClusterInfo, GraphNode } from '../types';
 import { errorState, formatDate, loadingState } from './common';
 
-const PAGE_SIZES = [25, 50, 100];
 const SORT_OPTIONS: [SortField, string][] = [
   ['starred_at', 'data.starred_date'],
   ['name', 'data.repository'],
@@ -27,12 +43,24 @@ const parseClusters = (params: URLSearchParams): Set<number> =>
       .filter(Number.isFinite),
   );
 
-const clusterTag = (cluster: ClusterInfo | undefined): Raw =>
+const clusterTag = (cluster: ClusterInfo | undefined, selected = false): Raw =>
   cluster
-    ? html`<button class="cluster-tag" data-act="cluster" data-id="${cluster.id}" title="${cluster.name}">
+    ? html`<button class="cluster-tag" data-act="cluster" data-id="${cluster.id}" aria-pressed="${selected}" title="${t('search.filter_by_cluster', { cluster: cluster.name })}">
         <span class="dot" style="--dot:${cluster.color}"></span><span class="truncate">${cluster.name}</span>
       </button>`
     : html`<span class="dim">—</span>`;
+
+const languageButton = (language: string | null | undefined, selected: boolean): Raw =>
+  language
+    ? html`<button class="cluster-tag" data-act="language" data-id="${language}" aria-pressed="${selected}" title="${t('search.filter_by_language', { language })}">${language}</button>`
+    : html`<span class="dim">—</span>`;
+
+const monthButton = (starredAt: string | null | undefined, selectedMonth: string | null): Raw => {
+  const month = starMonth(starredAt);
+  return month
+    ? html`<button class="cluster-tag tabular" data-act="month" data-id="${month}" aria-pressed="${selectedMonth === month}" title="${t('search.filter_by_month', { month })}">${formatDate(starredAt)}</button>`
+    : html`<span class="dim">—</span>`;
+};
 
 const parseNode = (params: URLSearchParams): number | null => {
   const id = Number.parseInt(params.get('node') ?? '', 10);
@@ -47,14 +75,15 @@ const repoAvatar = (repo: GraphNode, size: number) => {
 };
 
 export const mountData = (root: HTMLElement): (() => void) => {
-  let sort: SortConfig = { field: 'starred_at', direction: 'desc' };
-  let page = 1;
-  let pageSize = 25;
   const route = currentRoute();
+  let sort = readSort(route.params);
+  let page = readPage(route.params);
+  let pageSize = readPageSize(route.params);
   const q: DataQuery = {
     query: route.params.get('q') ?? '',
     clusters: parseClusters(route.params),
-    month: route.params.get('month'),
+    languages: new Set(readLanguages(route.params)),
+    month: readMonth(route.params),
     topic: route.params.get('topic'),
   };
   // The open details panel; kept in the URL so a shared Data link reopens it.
@@ -71,11 +100,15 @@ export const mountData = (root: HTMLElement): (() => void) => {
     else if (clusters.length > 1) params.set('clusters', clusters.join(','));
     if (q.month) params.set('month', q.month);
     if (q.topic) params.set('topic', q.topic);
+    writeLanguages(params, q.languages);
     if (selectedId != null) params.set('node', String(selectedId));
+    writeSort(params, sort);
+    if (page > 1) params.set('page', String(page));
+    if (pageSize !== DATA_PAGE_SIZES[0]) params.set('size', String(pageSize));
     navigate('/data', params, true);
   };
 
-  const activeFilters = () => Boolean(q.clusters.size || q.query.trim() || q.month || q.topic);
+  const activeFilters = () => Boolean(q.clusters.size || q.languages.size || q.query.trim() || q.month || q.topic);
 
   const sortHeader = (label: string, field: SortField, cls = '') => {
     const active = sort.field === field;
@@ -88,7 +121,7 @@ export const mountData = (root: HTMLElement): (() => void) => {
 
   const renderFrame = () => {
     if (store.loading) return void (root.innerHTML = loadingState().value);
-    if (store.error) return void (root.innerHTML = errorState().value);
+    if (store.error) return void (root.innerHTML = errorState(store.error).value);
     root.innerHTML = html`<div class="data-page">
       <div class="data-main">
       <div class="data-toolbar">
@@ -120,26 +153,109 @@ export const mountData = (root: HTMLElement): (() => void) => {
     if (!region) return;
     const node = selectedId != null ? store.nodeById.get(selectedId) : undefined;
     root.querySelector('.data-page')?.classList.toggle('has-details', Boolean(node));
-    region.innerHTML = node ? renderDetails(node, details).value : '';
+    region.innerHTML = node ? renderDetails(node, { ...details, topic: q.topic, languages: q.languages, clusters: q.clusters }).value : '';
   };
 
-  // Selection only restyles rows, so the table keeps its scroll position.
+  const visibleRow = (id: number): HTMLElement | null =>
+    [...root.querySelectorAll<HTMLElement>('[data-row]')].find((row) => Number(row.dataset.row) === id && row.offsetParent !== null) ??
+    null;
+
+  /** Move to the page that contains this repository, then scroll that row into view. */
   const select = (id: number | null) => {
+    const fromRelated =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement.classList.contains('related-item') &&
+      root.contains(document.activeElement);
     if (id !== selectedId) details.relatedTab = 'similar';
     selectedId = id;
-    root.querySelectorAll<HTMLElement>('[data-row]').forEach((row) => row.classList.toggle('is-selected', Number(row.dataset.row) === id));
-    syncUrl();
+    const nextPage =
+      id == null ? null : pageContaining(sortRepos(filterRepos(store.nodes, q), sort).map((node) => node.id), id, pageSize);
+    if (nextPage != null && nextPage !== page) {
+      page = nextPage;
+      syncUrl();
+      renderResults(false);
+    } else {
+      root.querySelectorAll<HTMLElement>('[data-row]').forEach((row) => row.classList.toggle('is-selected', Number(row.dataset.row) === id));
+      syncUrl();
+    }
+    if (id != null) visibleRow(id)?.scrollIntoView({ block: 'nearest' });
     renderDetailsRegion();
+    if (fromRelated && id != null) focusRelatedItem(root);
   };
 
-  const renderResults = () => {
+  /** The control that was focused before a results rebuild, so paging and sorting do not drop the keyboard. */
+  const controlRegion = (el: HTMLElement): string => {
+    if (el.closest('[data-region="details"]')) return 'details';
+    if (el.closest('[data-region="chips"]')) return 'chips';
+    if (el.closest('[data-region="table"]')) return 'table';
+    return '';
+  };
+
+  const focusedControl = (): { act: string; field: string; id: string; region: string; row: string } | null => {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !root.contains(active) || active.closest('[data-region="details"]')) return null;
+    if (active.matches('[data-page-size]')) return { act: 'page-size', field: '', id: '', region: '', row: '' };
+    const act = active.dataset.act;
+    if (!act) return null;
+    return {
+      act,
+      field: active.dataset.field ?? '',
+      id: active.dataset.id ?? '',
+      region: controlRegion(active),
+      row: active.closest<HTMLElement>('[data-row]')?.dataset.row ?? '',
+    };
+  };
+
+  const restoreControl = (key: { act: string; field: string; id: string; region: string; row: string } | null) => {
+    if (!key) return;
+    if (key.act === 'page-size') {
+      root.querySelector<HTMLElement>('[data-page-size]')?.focus({ preventScroll: true });
+      return;
+    }
+    const candidates = [...root.querySelectorAll<HTMLElement>('[data-act]')].filter(
+      (el) =>
+        el.dataset.act === key.act &&
+        (el.dataset.field ?? '') === key.field &&
+        (el.dataset.id ?? '') === key.id &&
+        !el.closest('[data-region="details"]') &&
+        el.offsetParent !== null &&
+        !el.hasAttribute('disabled'),
+    );
+    const match =
+      candidates.find((el) => key.row && el.closest<HTMLElement>('[data-row]')?.dataset.row === key.row) ??
+      candidates.find((el) => key.region && controlRegion(el) === key.region) ??
+      candidates[0];
+    if (match) {
+      match.focus({ preventScroll: true });
+      if (match.classList.contains('repo-link')) match.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (key.act === 'clear-language' || key.act === 'clear-month' || key.act === 'clear-topic') {
+      const fallback =
+        root.querySelector<HTMLElement>('[data-act="clear-language"], [data-act="clear-month"], [data-act="clear-topic"]') ??
+        root.querySelector<HTMLElement>('[data-act="clear"]') ??
+        root.querySelector<HTMLElement>('input[type="search"], input');
+      if (fallback && fallback.offsetParent !== null) fallback.focus({ preventScroll: true });
+      return;
+    }
+    if (key.act !== 'next' && key.act !== 'prev') return;
+    const fallback = root.querySelector<HTMLElement>(`[data-region="pager"] [data-act="${key.act === 'next' ? 'prev' : 'next'}"]`);
+    if (fallback && !fallback.hasAttribute('disabled')) fallback.focus({ preventScroll: true });
+  };
+
+  const renderResults = (rebuildChips = true) => {
     if (!root.querySelector('[data-region="table"]')) return;
+    const restore = focusedControl();
     const all = store.nodes;
     const clusters = store.data?.clusters ?? [];
     const clusterMap = new Map(clusters.map((c) => [c.id, c]));
     const filtered = sortRepos(filterRepos(all, q), sort);
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    page = Math.min(page, totalPages);
+    const clamped = Math.min(page, totalPages);
+    if (clamped !== page) {
+      page = clamped;
+      syncUrl();
+    }
     const offset = (page - 1) * pageSize;
     const rows = filtered.slice(offset, offset + pageSize);
 
@@ -148,8 +264,12 @@ export const mountData = (root: HTMLElement): (() => void) => {
     el('[data-region="count"]').innerHTML = html`${all.length ? t('data.shown_of_total', { shown: filtered.length, total: all.length }) : ''}
       ${activeFilters() ? html`<button class="link-btn" data-act="clear">${t('common.clear_filters')}</button>` : ''}`.value;
 
-    const sortedClusters = [...clusters].sort((a, b) => b.repo_count - a.repo_count);
-    el('[data-region="chips"]').innerHTML = html`
+    const clusterCounts = clusterFacetCounts(all, q);
+    const sortedClusters = clusters
+      .map((cluster) => ({ cluster, count: clusterCounts.get(cluster.id) ?? 0 }))
+      .filter((item) => item.count > 0 || q.clusters.has(item.cluster.id))
+      .sort((a, b) => b.count - a.count || a.cluster.name.localeCompare(b.cluster.name));
+    if (rebuildChips) el('[data-region="chips"]').innerHTML = html`
       ${q.month
         ? html`<span class="chip chip-on">${icon('calendar')}${q.month}
             <button class="chip-x" data-act="clear-month" aria-label="${t('common.clear_filter')}">${icon('x')}</button></span>`
@@ -158,9 +278,13 @@ export const mountData = (root: HTMLElement): (() => void) => {
         ? html`<span class="chip chip-on" title="${q.topic}">${icon('tag')}${q.topic}
             <button class="chip-x" data-act="clear-topic" aria-label="${t('common.clear_filter')}">${icon('x')}</button></span>`
         : ''}
+      ${[...q.languages].sort().map(
+        (language) => html`<span class="chip chip-on">${icon('code')}${language}
+            <button class="chip-x" data-act="clear-language" data-id="${language}" aria-label="${t('common.clear_filter')}">${icon('x')}</button></span>`,
+      )}
       ${sortedClusters.map(
-        (cluster) => html`<button class="chip" data-act="cluster" data-id="${cluster.id}" aria-pressed="${q.clusters.has(cluster.id)}" title="${cluster.name}">
-          <span class="dot" style="--dot:${cluster.color}"></span><span class="truncate">${cluster.name}</span><span class="chip-count">${cluster.repo_count}</span>
+        ({ cluster, count }) => html`<button class="chip" data-act="cluster" data-id="${cluster.id}" aria-pressed="${q.clusters.has(cluster.id)}" title="${cluster.name}">
+          <span class="dot" style="--dot:${cluster.color}"></span><span class="truncate">${cluster.name}</span><span class="chip-count">${count}</span>
         </button>`,
       )}`.value;
 
@@ -191,10 +315,10 @@ export const mountData = (root: HTMLElement): (() => void) => {
               (repo) => html`<tr data-row="${repo.id}" class="${repo.id === selectedId ? 'is-selected' : ''}">
                 <td>${repoButton(repo)}</td>
                 <td><p class="clamp-2 muted" title="${repo.ai_summary || repo.description || ''}">${repo.ai_summary || repo.description || '—'}</p></td>
-                <td class="muted truncate col-opt">${repo.language || '—'}</td>
+                <td class="muted truncate col-opt">${languageButton(repo.language, q.languages.has(repo.language ?? ''))}</td>
                 <td class="num tabular">${repo.stargazers_count.toLocaleString()}</td>
-                <td>${clusterTag(repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined)}</td>
-                <td class="num muted tabular">${formatDate(repo.starred_at)}</td>
+                <td>${clusterTag(repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined, repo.cluster_id != null && q.clusters.has(repo.cluster_id))}</td>
+                <td class="num muted tabular">${monthButton(repo.starred_at, q.month)}</td>
                 <td class="num muted tabular col-opt">${formatDate(repo.last_commit_time)}</td>
               </tr>`,
             )}
@@ -209,9 +333,9 @@ export const mountData = (root: HTMLElement): (() => void) => {
             <p class="clamp-2 muted small">${repo.ai_summary || repo.description || t('data.no_summary')}</p>
             <div class="repo-meta small muted">
               <span class="stars tabular">${icon('star')}${repo.stargazers_count.toLocaleString()}</span>
-              ${repo.language ? html`<span>${repo.language}</span>` : ''}
-              ${clusterTag(repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined)}
-              <span class="tabular">${formatDate(repo.starred_at)}</span>
+              ${languageButton(repo.language, q.languages.has(repo.language ?? ''))}
+              ${clusterTag(repo.cluster_id != null ? clusterMap.get(repo.cluster_id) : undefined, repo.cluster_id != null && q.clusters.has(repo.cluster_id))}
+              ${monthButton(repo.starred_at, q.month)}
             </div>
           </li>`,
         )}
@@ -220,7 +344,7 @@ export const mountData = (root: HTMLElement): (() => void) => {
 
     el('[data-region="pager"]').innerHTML = filtered.length
       ? html`<label class="muted small pager-size">${t('data.rows_per_page')}
-            <select class="select select-sm" data-page-size>${PAGE_SIZES.map(
+            <select class="select select-sm" data-page-size>${DATA_PAGE_SIZES.map(
               (size) => html`<option value="${size}" ${size === pageSize ? 'selected' : ''}>${size}</option>`,
             )}</select>
           </label>
@@ -230,29 +354,44 @@ export const mountData = (root: HTMLElement): (() => void) => {
             <button class="btn btn-ghost btn-icon btn-sm" data-act="next" ${page === totalPages ? 'disabled' : ''} aria-label="${t('data.next_page')}">${icon('chevronRight')}</button>
           </span>`.value
       : '';
+    restoreControl(restore);
   };
 
-  const update = (resetPage = true) => {
+  const refreshDetails = (focus?: { act: string; id: string }) => {
+    if (!root.querySelector('.data-page.has-details')) return;
+    renderDetailsRegion();
+    if (!focus) return;
+    [...root.querySelectorAll<HTMLElement>('[data-region="details"] [data-act]')]
+      .find((el) => el.dataset.act === focus.act && (el.dataset.id ?? '') === focus.id)
+      ?.focus({ preventScroll: true });
+  };
+
+  const update = (resetPage = true, rebuildChips = true) => {
     if (resetPage) page = 1;
     syncUrl();
-    renderResults();
+    renderResults(rebuildChips);
   };
 
   renderFrame();
+  syncUrl();
   const cleanups = [
     store.subscribe(['data'], renderFrame),
     onRoute((next) => {
       if (next.path !== '/data') return;
       q.query = next.params.get('q') ?? '';
       q.clusters = parseClusters(next.params);
-      q.month = next.params.get('month');
+      q.month = readMonth(next.params);
       q.topic = next.params.get('topic');
+      q.languages = new Set(readLanguages(next.params));
       const search = root.querySelector<HTMLInputElement>('[data-search]');
       if (search) search.value = q.query;
       selectedId = parseNode(next.params);
-      page = 1;
+      sort = readSort(next.params);
+      page = readPage(next.params);
+      pageSize = readPageSize(next.params);
       renderResults();
       renderDetailsRegion();
+      syncUrl();
     }),
     onAction(root, 'click', {
       retry: () => void store.load(),
@@ -261,42 +400,82 @@ export const mountData = (root: HTMLElement): (() => void) => {
       'related-tab': (button) => {
         details.relatedTab = button.dataset.tab as DetailsState['relatedTab'];
         renderDetailsRegion();
+        focusRelatedTab(root, details.relatedTab);
       },
       sort: (button) => {
         sort = nextSort(sort, button.dataset.field as SortField);
-        update();
+        update(true, false);
       },
       'sort-dir': () => {
         sort = { ...sort, direction: sort.direction === 'asc' ? 'desc' : 'asc' };
-        update();
+        update(true, false);
       },
       cluster: (button) => {
         const id = Number(button.dataset.id);
+        if (!Number.isFinite(id)) return;
+        const fromDetails = Boolean(button.closest('[data-region="details"]'));
         q.clusters = new Set(q.clusters);
         if (q.clusters.has(id)) q.clusters.delete(id);
         else q.clusters.add(id);
         update();
+        refreshDetails(fromDetails ? { act: 'cluster', id: String(id) } : undefined);
+      },
+      month: (button) => {
+        const month = button.dataset.id ?? '';
+        if (!month) return;
+        const fromDetails = Boolean(button.closest('[data-region="details"]'));
+        q.month = q.month === month ? null : month;
+        update();
+        refreshDetails(fromDetails ? { act: 'month', id: month } : undefined);
+      },
+      topic: (button) => {
+        const topic = button.dataset.id ?? '';
+        if (!topic) return;
+        q.topic = q.topic?.trim().toLowerCase() === topic.toLowerCase() ? null : topic;
+        update();
+        refreshDetails({ act: 'topic', id: topic });
       },
       'clear-month': () => {
         q.month = null;
         update();
+        refreshDetails();
       },
       'clear-topic': () => {
         q.topic = null;
         update();
+        refreshDetails();
+      },
+      language: (button) => {
+        const language = button.dataset.id ?? '';
+        if (!language) return;
+        const fromDetails = Boolean(button.closest('[data-region="details"]'));
+        q.languages = new Set(q.languages);
+        if (q.languages.has(language)) q.languages.delete(language);
+        else q.languages.add(language);
+        update();
+        refreshDetails(fromDetails ? { act: 'language', id: language } : undefined);
+      },
+      'clear-language': (button) => {
+        q.languages = new Set(q.languages);
+        q.languages.delete(button.dataset.id ?? '');
+        update();
+        refreshDetails();
       },
       clear: () => {
-        Object.assign(q, { query: '', clusters: new Set(), month: null, topic: null });
+        Object.assign(q, { query: '', clusters: new Set(), languages: new Set(), month: null, topic: null });
         (el('[data-search]') as HTMLInputElement).value = '';
         update();
+        refreshDetails();
       },
       prev: () => {
         page = Math.max(1, page - 1);
-        renderResults();
+        syncUrl();
+        renderResults(false);
       },
       next: () => {
         page += 1;
-        renderResults();
+        syncUrl();
+        renderResults(false);
       },
     }),
   ];
@@ -315,13 +494,45 @@ export const mountData = (root: HTMLElement): (() => void) => {
     const target = event.target as HTMLSelectElement;
     if (target.matches('[data-page-size]')) {
       pageSize = Number(target.value);
-      update();
+      update(true, false);
     } else if (target.matches('[data-sort-field]')) {
       sort = { ...sort, field: target.value as SortField };
-      update();
+      update(true, false);
     }
   };
+  /** Arrows move between the repository names on the current page. Enter still opens one. */
+  const moveRowFocus = (event: KeyboardEvent): boolean => {
+    const key = event.key;
+    if (key !== 'ArrowDown' && key !== 'ArrowUp' && key !== 'Home' && key !== 'End') return false;
+    if (event.altKey || event.metaKey || event.ctrlKey) return false;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !active.classList.contains('repo-link') || !root.contains(active)) return false;
+    const items = [...root.querySelectorAll<HTMLButtonElement>('.repo-link')].filter((row) => row.offsetParent !== null);
+    const index = items.indexOf(active as HTMLButtonElement);
+    if (index < 0) return false;
+    const next =
+      key === 'Home' ? 0
+      : key === 'End' ? items.length - 1
+      : key === 'ArrowDown' ? Math.min(items.length - 1, index + 1)
+      : Math.max(0, index - 1);
+    event.preventDefault();
+    if (next !== index) {
+      items[next].focus({ preventScroll: true });
+      items[next].scrollIntoView({ block: 'nearest' });
+    }
+    return true;
+  };
+
   const onKey = (event: KeyboardEvent) => {
+    const tab = moveRelatedTab(event);
+    if (tab && selectedId != null) {
+      details.relatedTab = tab;
+      renderDetailsRegion();
+      focusRelatedTab(root, tab);
+      return;
+    }
+    if (moveRelatedItem(event, root)) return;
+    if (moveRowFocus(event)) return;
     if (event.key !== 'Escape' || selectedId == null || document.querySelector('.palette')) return;
     select(null);
   };

@@ -29,6 +29,12 @@ import {
   type LinkContext,
 } from './style';
 
+const sameIds = (left: ReadonlySet<number>, right: ReadonlySet<number>): boolean => {
+  if (left.size !== right.size) return false;
+  for (const id of left) if (!right.has(id)) return false;
+  return true;
+};
+
 const FONT = 'Geist, system-ui, sans-serif';
 const FIT_PADDING = 80;
 const FOCUS_ZOOM = 1.6;
@@ -68,6 +74,8 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
   sourceId: number;
   targetId: number;
   weight: number;
+  /** Cached stroke. Recomputed when focus changes, reused while nodes only drift. */
+  stroke?: { color: string; width: number };
 }
 
 export interface GraphView {
@@ -165,6 +173,8 @@ export class GraphCanvas {
     hqRendering: true,
   };
   private hoverId: number | null = null;
+  /** Link strokes depend on focus, not on the drift, so they can be reused between frames. */
+  private linkStylesReady = false;
   private transform: Transform = { k: 1, x: 0, y: 0 };
   private animation: { from: Transform; to: Transform; start: number; duration: number } | null = null;
   private width = 0;
@@ -261,6 +271,7 @@ export class GraphCanvas {
         weight,
       }));
     this.overview = buildOverviewLinks(this.links);
+    this.linkStylesReady = false;
     this.userInteracted = false;
     this.pendingFocus = null;
     this.bursting = !this.reduceMotion && this.nodes.length > 0;
@@ -320,7 +331,17 @@ export class GraphCanvas {
   }
 
   setView(view: GraphView): void {
+    const paint =
+      view.selectedId !== this.view.selectedId ||
+      view.showTrajectories !== this.view.showTrajectories ||
+      !sameIds(view.visible, this.view.visible) ||
+      !sameIds(view.neighbors, this.view.neighbors);
+    const hqChanged = view.hqRendering !== this.view.hqRendering;
+    if (!paint && !hqChanged) return;
+    const enableHq = hqChanged && view.hqRendering;
     this.view = view;
+    if (paint) this.linkStylesReady = false;
+    if (enableHq) this.preloadAvatars();
     this.requestDraw();
   }
 
@@ -461,6 +482,8 @@ export class GraphCanvas {
   private hitTest(x: number, y: number): SimNode | null {
     for (let i = this.nodes.length - 1; i >= 0; i -= 1) {
       const n = this.nodes[i];
+      // Filtered nodes are drawn as ghosts and must not steal the click.
+      if (!this.view.visible.has(n.id) && n.id !== this.view.selectedId) continue;
       const r = n.radius + 5;
       if ((n.x! - x) ** 2 + (n.y! - y) ** 2 <= r * r) return n;
     }
@@ -573,6 +596,7 @@ export class GraphCanvas {
   private setHover(id: number | null): void {
     if (id === this.hoverId) return;
     this.hoverId = id;
+    this.linkStylesReady = false;
     this.canvas.style.cursor = id == null ? '' : 'pointer';
     this.callbacks.onHover(id);
     this.requestDraw();
@@ -689,9 +713,16 @@ export class GraphCanvas {
 
   private drawLinks(context: LinkContext): void {
     const { ctx } = this;
+    if (!this.linkStylesReady) {
+      for (const link of this.links) {
+        const kind = classifyLink(link, context, this.overview.has(link));
+        link.stroke = LINK_STYLE[kind];
+      }
+      this.linkStylesReady = true;
+    }
     for (const link of this.links) {
-      const style = LINK_STYLE[classifyLink(link, context, this.overview.has(link))];
-      if (!style.width) continue;
+      const style = link.stroke;
+      if (!style?.width) continue;
       const { x: x1, y: y1 } = link.source as { x: number; y: number };
       const { x: x2, y: y2 } = link.target as { x: number; y: number };
       // Same gentle curve react-force-graph drew with linkCurvature 0.1.

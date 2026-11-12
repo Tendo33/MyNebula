@@ -78,7 +78,8 @@ export const attachTimelineBrush = (
     } else drag = { handle: 'end', offset: 0, range: [index, index], container };
     preview(drag.range);
     window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp, { once: true });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   };
 
   const onMove = (event: PointerEvent) => {
@@ -98,6 +99,8 @@ export const attachTimelineBrush = (
 
   const onUp = () => {
     window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
     if (!drag) return;
     const [start, end] = drag.range;
     // The full span is the same as no filter.
@@ -127,5 +130,7 @@ export const attachTimelineBrush = (
     root.removeEventListener('pointerdown', onDown);
     root.removeEventListener('keydown', onKey);
     window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
   };
 };

@@ -1,4 +1,5 @@
-import type { GraphNode, GraphPayload } from './types';
+import type { GraphNode, GraphPayload, StarListInfo } from './types';
+import { UNCATEGORIZED_LIST_ID } from './types';
 import { buildAdjacency, emptyFilters, filterNodes, type Filters } from './filters';
 import { buildRepoSearchText } from './search';
 
@@ -25,6 +26,24 @@ const loadSettings = (): Settings => {
 };
 
 const dataUrl = (file: string) => `${import.meta.env.BASE_URL}data/${file}`;
+
+/** Current exports use string list ids. Older graph.json used one numeric id, with -1 for none. */
+const normalizeNode = (node: GraphNode & { star_list_id?: number | string | null }): GraphNode => {
+  if (Array.isArray(node.star_list_ids)) return { ...node, star_list_ids: node.star_list_ids.map(String) };
+  const legacy = node.star_list_id;
+  const star_list_ids =
+    legacy == null || legacy === ''
+      ? []
+      : legacy === -1 || legacy === '-1'
+        ? [UNCATEGORIZED_LIST_ID]
+        : [String(legacy)];
+  return { ...node, star_list_ids };
+};
+
+const normalizeList = (list: Omit<StarListInfo, 'id'> & { id: number | string }): StarListInfo => {
+  const id = String(list.id);
+  return { ...list, id: id === '-1' ? UNCATEGORIZED_LIST_ID : id };
+};
 
 /**
  * App state: the loaded snapshot, filters, selection, and display settings.
@@ -79,11 +98,16 @@ class Store {
   }
 
   private setData(data: GraphPayload | null): void {
-    this.data = data;
+    this.data = data && {
+      ...data,
+      nodes: data.nodes.map((node) => normalizeNode(node)),
+      star_lists: data.star_lists.map((list) => normalizeList(list)),
+    };
     this.loading = false;
-    this.nodeById = new Map(data?.nodes.map((node) => [node.id, node]) ?? []);
-    this.adjacency = buildAdjacency(data?.edges ?? []);
-    this.searchText = new Map(data?.nodes.map((node) => [node.id, buildRepoSearchText(node)]) ?? []);
+    const nodes = this.data?.nodes ?? [];
+    this.nodeById = new Map(nodes.map((node) => [node.id, node]));
+    this.adjacency = buildAdjacency(this.data?.edges ?? []);
+    this.searchText = new Map(nodes.map((node) => [node.id, buildRepoSearchText(node)]));
     this.visibleCache = null;
     this.emit('data');
   }

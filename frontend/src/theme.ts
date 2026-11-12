@@ -35,18 +35,15 @@ export const getTheme = (): ThemePreference => preference;
 /** Switch theme with a circular wipe from the click point when supported. */
 export const setTheme = (next: ThemePreference, origin?: { x: number; y: number }): void => {
   const changesLook = resolve(next) !== resolve(preference);
-  const commit = () => {
-    preference = next;
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Preference stays for this session.
-    }
-    apply();
-  };
+  preference = next;
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // Preference stays for this session.
+  }
   const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
   if (!changesLook || !origin || !doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    commit();
+    apply();
     return;
   }
   const radius = Math.hypot(Math.max(origin.x, innerWidth - origin.x), Math.max(origin.y, innerHeight - origin.y));
@@ -59,5 +56,5 @@ export const setTheme = (next: ThemePreference, origin?: { x: number; y: number 
       to { clip-path: circle(${radius}px at ${origin.x}px ${origin.y}px); }
     }`;
   document.head.appendChild(style);
-  doc.startViewTransition(commit).finished.finally(() => style.remove());
+  doc.startViewTransition(() => apply()).finished.finally(() => style.remove());
 };
