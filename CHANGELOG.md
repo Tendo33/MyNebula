@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-12
+
+### Added
+- Filter by language on the graph rail and on the Data page.
+- Click a language, cluster, list, or starred month in the table or details panel to filter by it. A GitHub topic in the graph's details opens Data filtered by that topic.
+- Graph links keep star lists, languages, and the timeline window (stored as months). Data links keep sort, page, and page size. Switching tabs carries the shared search, cluster, language, and open repository.
+- Keyboard: arrow keys move through the graph's repository list, the Data rows, the related-repo tabs and list, and the Settings toggles. Focus stays put when filters re-render.
+- Settings notes how many repositories are missing from the map; load errors show what went wrong.
+
+### Changed
+- A repository can belong to several star lists, and lists keep their GitHub ids. `graph.json` nodes carry `star_list_ids: string[]` instead of `star_list_id`; older caches and `graph.json` files are still read.
+- Rail counts and the timeline follow the other active filters, so each row shows what selecting it would leave.
+- The graph's repository list shows every match instead of the first 50, with language and stars.
+- A README change now re-summarizes and re-embeds the repository. Upgrading keeps existing summaries; the README id is recorded on the next sync.
+- Search matches tag synonyms, and the site and the pipeline share one synonym map.
+- A palette choice made on Data stays on Data.
+
+### Security
+- On GitHub Actions, API keys are only sent over https to hosts listed in `ALLOWED_API_HOSTS` in `.github/workflows/pages.yml` (SiliconFlow and DeepSeek by default). **Forks that point `EMBEDDING_BASE_URL` or `LLM_BASE_URL` elsewhere must add that host there**, or the sync stops with an error. Local runs are not restricted.
+- The summary prompt treats repository text as data, not instructions, and model requests no longer follow redirects.
+
+### Fixed
+- Filtered-out repositories on the graph no longer catch clicks.
+- The timeline brush releases when the pointer is cancelled.
+- The palette reopens on the All filter.
+- Two local syncs can no longer overwrite each other's temporary cache file.
+- On narrow screens the Data details sheet no longer widens the page.
 ## [2.1.0] - 2026-11-05
 
 ### Added
@@ -364,7 +391,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pytest and coverage configuration
   - Pre-commit hooks configuration
 
-[Unreleased]: https://github.com/Tendo33/mynebula/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/Tendo33/mynebula/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/Tendo33/mynebula/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/Tendo33/mynebula/compare/v1.6.1...v2.1.0
 [1.5.0]: https://github.com/Tendo33/mynebula/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/Tendo33/mynebula/compare/v1.4.1...v1.4.2
