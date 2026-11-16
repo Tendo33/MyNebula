@@ -11,6 +11,8 @@ import type { Edge } from './graph.ts';
 const MIN_GROUP_SIZE = 3;
 const RESOLUTIONS = [1.0, 0.8, 0.6, 0.45, 0.3, 0.2, 0.1, 0.05];
 const MATCH_JACCARD = 0.5;
+/** Bump when resolution, minimum size, or the id-match threshold changes. */
+export const GROUP_ALGO = 1;
 
 /** Small seeded PRNG so node visiting order (and thus the result) is reproducible. */
 const mulberry32 = (seed: number) => () => {

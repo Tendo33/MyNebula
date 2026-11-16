@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
-import { deduplicateNames, detectCommunities, louvain, matchPrevious, sanitizeClusterName, tagNames } from './cluster.ts';
-import { adaptiveThreshold, analyze, buildEdges, normalizeTag, normalizeTags, scorePairs, tagOverlap, writeSite, type Edge } from './graph.ts';
+import { deduplicateNames, detectCommunities, GROUP_ALGO, louvain, matchPrevious, sanitizeClusterName, tagNames } from './cluster.ts';
+import { adaptiveThreshold, analyze, buildEdges, graphKey, normalizeTag, normalizeTags, scorePairs, tagOverlap, writeSite, type Edge } from './graph.ts';
 import { embeddingText, fallbackTags, parseSummaryJson, pickReadmeOid, readmeSignal } from './remote.ts';
-import { applyContentHash, assertAllowedApiHost, assignClusters, checkApiHosts, contentHash, legacyContentHash, loadSettings, loadState, markForEnrichment, saveState, type Repo, type State } from './sync.ts';
+import { applyContentHash, assertAllowedApiHost, assignClusters, checkApiHosts, contentHash, legacyContentHash, loadSettings, loadState, markForEnrichment, saveState, shouldReuseClusters, type Repo, type State } from './sync.ts';
 
 const repo = (id: number, patch: Partial<Repo> = {}): Repo => ({
   id,
@@ -132,6 +132,85 @@ describe('tags and scores', () => {
       star_lists: [],
     };
     expect(key(analyze(state).edges)).toEqual(key(stableEdges(repos)));
+  });
+
+  it('reuses edges when only display fields change', () => {
+    const state = syntheticState();
+    const repos = Object.values(state.repos)
+      .filter((item) => item.embedding?.length)
+      .sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
+    const first = analyze(state);
+    expect(first.reused).toBe(false);
+    expect(state.graph_key).toBe(graphKey(repos));
+    state.repos['1'].stargazers_count = 1;
+    state.repos['1'].ai_summary = 'rewritten blurb';
+    const again = analyze(state);
+    expect(again.reused).toBe(true);
+    expect(again.edges).toEqual(first.edges);
+
+    state.repos['1'].language = 'Zig';
+    expect(analyze(state).reused).toBe(false);
+    state.repos['1'].language = 'Go';
+    expect(analyze(state).reused).toBe(false);
+    expect(analyze(state).reused).toBe(true);
+    state.repos['1'].star_list_ids = ['other'];
+    expect(analyze(state).reused).toBe(false);
+  });
+
+  it('changes the scoring key when the cutoff sample changes order', () => {
+    const state = syntheticState();
+    analyze(state);
+    const before = state.graph_key;
+    const early = state.repos['1'];
+    const late = state.repos['30'];
+    [early.starred_at, late.starred_at] = [late.starred_at, early.starred_at];
+    expect(analyze(state).reused).toBe(false);
+    expect(state.graph_key).not.toBe(before);
+  });
+
+  it('keeps list ids and tags from sliding across the scoring key', () => {
+    const state = syntheticState();
+    const repo1 = state.repos['1'];
+    repo1.star_list_ids = ['agent', 'llm'];
+    repo1.topics = ['tool'];
+    repo1.ai_tags = [];
+    analyze(state);
+    const split = state.graph_key;
+    repo1.star_list_ids = ['llm', 'agent'];
+    expect(analyze(state).reused).toBe(true);
+
+    repo1.star_list_ids = ['agent'];
+    repo1.topics = ['llm', 'tool'];
+    expect(analyze(state).reused).toBe(false);
+    expect(state.graph_key).not.toBe(split);
+  });
+
+  it('keeps the scoring key when tags normalize to the same tokens', () => {
+    const state = syntheticState();
+    state.repos['1'].topics = ['agent'];
+    analyze(state);
+    const before = state.graph_key;
+    state.repos['1'].topics = ['AI_Agents'];
+    expect(analyze(state).reused).toBe(true);
+    expect(state.graph_key).toBe(before);
+  });
+
+  it('reuses groups only when the edges and the naming inputs still match', () => {
+    const state = syntheticState();
+    analyze(state);
+    state.graph_max_clusters = 12;
+    state.graph_group_algo = GROUP_ALGO;
+    state.clusters = { '0': { name: 'A', description: null, keywords: [], members: [1], named_by: 'tags' } };
+    expect(shouldReuseClusters(true, state, 12, false, false)).toBe(true);
+    expect(shouldReuseClusters(false, state, 12, false, false)).toBe(false);
+    expect(shouldReuseClusters(true, state, 8, false, false)).toBe(false);
+    expect(shouldReuseClusters(true, state, 12, true, false)).toBe(false);
+    expect(shouldReuseClusters(true, state, 12, false, true)).toBe(false);
+    state.graph_group_algo = 0;
+    expect(shouldReuseClusters(true, state, 12, false, false)).toBe(false);
+    state.graph_group_algo = GROUP_ALGO;
+    state.clusters['0'].named_by = 'llm';
+    expect(shouldReuseClusters(true, state, 12, false, true)).toBe(true);
   });
 
   it('separates neighbours that share a dominant embedding direction', () => {
@@ -307,7 +386,12 @@ describe('end to end', () => {
     expect(Object.values(state.clusters).some((c) => c.members.includes(99))).toBe(true);
 
     saveState(state, join(dir, 'cache.json.gz'));
-    expect(loadState(join(dir, 'cache.json.gz')).repos['99'].full_name).toBe('o/new');
+    const loaded = loadState(join(dir, 'cache.json.gz'));
+    expect(loaded.repos['99'].full_name).toBe('o/new');
+    expect(loaded.graph_key).toBe(state.graph_key);
+    expect(loaded.graph_edges).toEqual(state.graph_edges);
+    expect(loaded.graph_max_clusters).toBe(12);
+    expect(loaded.graph_group_algo).toBe(GROUP_ALGO);
   });
 
   it('keeps a repo on every star list and reads a legacy numeric cache', () => {

@@ -1,5 +1,6 @@
 /** Similarity scoring, graph edges, timeline, and the JSON the site reads. */
 
+import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -13,6 +14,10 @@ const STAR_LIST_WEIGHT = 0.1;
 const LANGUAGE_WEIGHT = 0.05;
 
 const EDGE_K = 8;
+/** How many leading repos, in starred_at order, feed the score cutoff. */
+const THRESHOLD_SAMPLE = 200;
+/** Bump when the cutoff rule changes. Weights and `EDGE_K` are already in the key. */
+const GRAPH_ALGO = 1;
 /** Repos in no star list. Must match `UNCATEGORIZED_LIST_ID` in frontend/src/types.ts. */
 const UNCATEGORIZED_LIST_ID = 'uncategorized';
 
@@ -185,7 +190,7 @@ const thresholdFromUpper = (upper: number[], m: number): number => {
   return quantile(upper, Math.max(0.05, Math.min(0.98, 1 - degree / (m - 1))));
 };
 
-export const adaptiveThreshold = ({ n, score }: Scores, sample = 200): number => {
+export const adaptiveThreshold = ({ n, score }: Scores, sample = THRESHOLD_SAMPLE): number => {
   const m = Math.min(n, sample);
   const upper: number[] = [];
   for (let i = 0; i < m; i += 1) for (let j = i + 1; j < m; j += 1) upper.push(score[i * n + j]);
@@ -232,7 +237,7 @@ const linkRepos = (repos: Repo[]): Edge[] => {
   const { n, weight } = prepare(repos);
   if (n < 2) return [];
   const rows: Neighbour[][] = Array.from({ length: n }, () => []);
-  const m = Math.min(n, 200);
+  const m = Math.min(n, THRESHOLD_SAMPLE);
   const upper: number[] = [];
   for (let i = 0; i < n; i += 1) {
     for (let j = i + 1; j < n; j += 1) {
@@ -280,15 +285,43 @@ export const buildTimeline = (repos: Repo[]) => {
 export interface Analysis {
   repos: Repo[];
   edges: Edge[];
+  /** True when the stored edges were still valid for this scoring input. */
+  reused: boolean;
 }
+
+/**
+ * Hash of everything `linkRepos` reads, in its starred_at order. Star counts,
+ * avatars, and summary text are display fields and stay out of the hash.
+ * Counts sit between the list ids and the tags so a list id cannot slide into
+ * the tag list and leave the key unchanged.
+ */
+export const graphKey = (repos: Repo[]): string => {
+  const hash = createHash('sha256');
+  hash.update([GRAPH_ALGO, EDGE_K, THRESHOLD_SAMPLE, SEMANTIC_WEIGHT, TAG_OVERLAP_WEIGHT, STAR_LIST_WEIGHT, LANGUAGE_WEIGHT].join('\0'));
+  for (const repo of repos) {
+    const tags = normalizeTags(repo.ai_tags, repo.topics).slice().sort();
+    const lists = [...(repo.star_list_ids ?? [])].sort();
+    hash.update(`\n${repo.id}\0${repo.language || ''}\0${lists.length}`);
+    for (const list of lists) hash.update(`\0${list}`);
+    hash.update(`\0${tags.length}`);
+    for (const tag of tags) hash.update(`\0${tag}`);
+    hash.update('\0');
+    hash.update((repo.embedding ?? []).join(','));
+  }
+  return hash.digest('hex');
+};
 
 /** Score every embedded repo pair once and link each repo to its closest neighbours. */
 export const analyze = (state: State): Analysis => {
   const repos = Object.values(state.repos)
     .filter((r) => r.embedding?.length)
     .sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
-  if (!repos.length) return { repos, edges: [] };
-  return { repos, edges: linkRepos(repos) };
+  const key = graphKey(repos);
+  if (state.graph_key === key && state.graph_edges) return { repos, edges: state.graph_edges, reused: true };
+  const edges = repos.length < 2 ? [] : linkRepos(repos);
+  state.graph_key = key;
+  state.graph_edges = edges;
+  return { repos, edges, reused: false };
 };
 
 const NODE_FIELDS = [

@@ -13,7 +13,7 @@ import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
 import { gunzipSync, gzipSync } from 'node:zlib';
 
-import { deduplicateNames, detectCommunities, matchPrevious, tagNames, type ClusterInfo } from './cluster.ts';
+import { deduplicateNames, detectCommunities, GROUP_ALGO, matchPrevious, tagNames, type ClusterInfo } from './cluster.ts';
 import { analyze, normalizeTags, writeSite, type Analysis } from './graph.ts';
 import type { Lang } from './prompts.ts';
 import { ai, embeddingText, github, pool } from './remote.ts';
@@ -49,6 +49,12 @@ export interface State {
   repos: Record<string, Repo>;
   clusters: Record<string, ClusterInfo>;
   star_lists: { id: string; name: string; description: string | null }[];
+  /** Scoring input for `graph_edges`. Absent until one analyze has been saved. */
+  graph_key?: string;
+  graph_edges?: [number, number, number][];
+  /** `maxClusters` and the grouping algorithm used when `clusters` was last built. */
+  graph_max_clusters?: number;
+  graph_group_algo?: number;
 }
 
 export interface Settings {
@@ -319,8 +325,27 @@ export const assignClusters = async (
     });
   }
   state.clusters = Object.fromEntries(deduplicateNames(entries).map(({ id, ...info }) => [String(id), info]));
+  state.graph_max_clusters = settings.maxClusters;
+  state.graph_group_algo = GROUP_ALGO;
   log(`Grouped ${analysis.repos.length} repos into ${entries.length} clusters (${matched.filter(([, p]) => p).length} reused ids)`);
 };
+
+/**
+ * Louvain and paid cluster names can stay when the edges and the group count
+ * are unchanged. A first LLM naming pass, or `--recluster`, still runs.
+ */
+export const shouldReuseClusters = (
+  edgesReused: boolean,
+  state: State,
+  maxClusters: number,
+  reset: boolean,
+  llmNames: boolean,
+): boolean =>
+  edgesReused &&
+  state.graph_max_clusters === maxClusters &&
+  state.graph_group_algo === GROUP_ALGO &&
+  !reset &&
+  !(llmNames && Object.values(state.clusters).some((cluster) => cluster.named_by !== 'llm'));
 
 const main = async () => {
   const { values, positionals } = parseArgs({
@@ -351,8 +376,13 @@ const main = async () => {
     failed = await enrich(state, settings, dirty);
   }
   const analysis = analyze(state);
-  await assignClusters(state, analysis, settings, { reset: values.recluster, llmNames: values['llm-names'] || settings.llmClusterNames });
-  saveState(state, settings.cachePath);
+  const llmNames = Boolean(values['llm-names'] || settings.llmClusterNames);
+  const reuseClusters = shouldReuseClusters(analysis.reused, state, settings.maxClusters, Boolean(values.recluster), llmNames);
+  if (!reuseClusters) {
+    await assignClusters(state, analysis, settings, { reset: Boolean(values.recluster), llmNames });
+  }
+  // fetchStars and each enrich batch already persisted. This write is the edges and groups.
+  if (!analysis.reused || !reuseClusters) saveState(state, settings.cachePath);
   log('Exported', writeSite(state, analysis, settings.outputDir), 'to', settings.outputDir);
   if (failed) log(`${failed} repos failed to embed and will be retried next run`);
 };
