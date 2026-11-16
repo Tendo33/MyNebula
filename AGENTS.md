@@ -13,7 +13,10 @@ A static site plus an offline pipeline, one TypeScript package on Node 24 (pnpm)
   `frontend/public/data/graph.json`. State lives in
   `data/cache.json.gz`; reruns must stay incremental. Edges and groups are
   reused when the scoring inputs are unchanged, and `graph.json` is still
-  rewritten.
+  rewritten. Only `GITHUB_TOKEN` is required: without an embedding key repos
+  are linked on topics, star lists, and language, and without an LLM key no
+  chat model is called. A repo missing its embedding stays in the graph rather
+  than dropping out.
 - `frontend/` (Vite, vanilla TypeScript, d3-force): Graph (home), Data,
   Settings, and the Cmd/Ctrl+K palette. Hash routing so any static host works.
   The canvas is `frontend/src/graph/canvas.ts`: a force simulation on the

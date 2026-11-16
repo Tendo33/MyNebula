@@ -111,17 +111,35 @@ const consider = (row: Neighbour[], j: number, w: number) => {
 
 const prepare = (repos: Repo[]) => {
   const n = repos.length;
-  const dim = repos[0]?.embedding?.length ?? 0;
+  const first = repos.find((repo) => repo.embedding?.length)?.embedding;
+  const dim = first?.length ?? 0;
   const unit = new Float32Array(n * dim);
   const mean = new Float32Array(dim);
+  /**
+   * Repos with a vector. Without an embedding key none of them have one, and a
+   * failed batch leaves a few out; both fall back to metadata scoring.
+   */
+  const embedded = new Uint8Array(n);
+  let count = 0;
+  for (let i = 0; i < n; i += 1) {
+    if (repos[i].embedding?.length) {
+      embedded[i] = 1;
+      count += 1;
+    }
+  }
+  // The centroid averages the vectors that exist. With every repo embedded this
+  // divisor is `n`, the same value the previous version divided by.
+  const divisor = count || 1;
   repos.forEach((repo, i) => {
-    const vec = repo.embedding!;
+    const vec = repo.embedding;
+    if (!vec?.length) return;
     let sum = 0;
     for (const value of vec) sum += value * value;
     const norm = Math.sqrt(sum) || 1;
-    for (let d = 0; d < dim; d += 1) mean[d] += (unit[i * dim + d] = vec[d] / norm) / n;
+    for (let d = 0; d < dim; d += 1) mean[d] += (unit[i * dim + d] = vec[d] / norm) / divisor;
   });
   for (let i = 0; i < n; i += 1) {
+    if (!embedded[i]) continue;
     let norm = 0;
     for (let d = 0; d < dim; d += 1) norm += (unit[i * dim + d] -= mean[d]) ** 2;
     norm = Math.sqrt(norm) || 1;
@@ -130,7 +148,12 @@ const prepare = (repos: Repo[]) => {
   const tags = repos.map((r) => normalizeTags(r.ai_tags, r.topics));
   const tagSets = tags.map((row) => new Set(row));
   const listSets = repos.map((r) => new Set(r.star_list_ids));
-  /** Blend for one pair once its cosine is known. */
+  /**
+   * Blend for one pair once its cosine is known. A pair only uses the semantic
+   * term when both sides have a vector; otherwise the remaining signals are
+   * divided by their own total, so a metadata-only pair still spans 0..1 and
+   * the rank-based cutoff keeps selecting the strongest neighbours.
+   */
   const combine = (i: number, j: number, dot: number) => {
     let sharedList = 0;
     const lists = listSets[i];
@@ -144,15 +167,13 @@ const prepare = (repos: Repo[]) => {
       }
     }
     const sameLanguage = Boolean(repos[i].language) && repos[i].language === repos[j].language;
-    return f32(
-      Math.min(
-        1,
-        SEMANTIC_WEIGHT * Math.max(0, dot) +
-          TAG_OVERLAP_WEIGHT * tagOverlap(tags[i], tags[j], tagSets[i]) +
-          STAR_LIST_WEIGHT * sharedList +
-          LANGUAGE_WEIGHT * +sameLanguage,
-      ),
-    );
+    const semantic = embedded[i] === 1 && embedded[j] === 1;
+    const blended =
+      (semantic ? SEMANTIC_WEIGHT * Math.max(0, dot) : 0) +
+      TAG_OVERLAP_WEIGHT * tagOverlap(tags[i], tags[j], tagSets[i]) +
+      STAR_LIST_WEIGHT * sharedList +
+      LANGUAGE_WEIGHT * +sameLanguage;
+    return f32(Math.min(1, semantic ? blended : blended / (TAG_OVERLAP_WEIGHT + STAR_LIST_WEIGHT + LANGUAGE_WEIGHT)));
   };
   return { n, dim, unit, combine };
 };
@@ -377,11 +398,13 @@ export const graphKey = (repos: Repo[]): string => {
   return hash.digest('hex');
 };
 
-/** Score every embedded repo pair once and link each repo to its closest neighbours. */
+/**
+ * Score every repo pair once and link each repo to its closest neighbours.
+ * Repos without an embedding still appear, linked by tags, lists, and language,
+ * so a deployment with only `GITHUB_TOKEN` produces a usable graph.
+ */
 export const analyze = (state: State): Analysis => {
-  const repos = Object.values(state.repos)
-    .filter((r) => r.embedding?.length)
-    .sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
+  const repos = Object.values(state.repos).sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
   const key = graphKey(repos);
   if (state.graph_key === key && state.graph_edges) return { repos, edges: state.graph_edges, reused: true };
   const edges = repos.length < 2 ? [] : linkRepos(repos);

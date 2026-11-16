@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { deduplicateNames, detectCommunities, GROUP_ALGO, louvain, matchPrevious, sanitizeClusterName, tagNames } from './cluster.ts';
 import { adaptiveThreshold, analyze, buildEdges, forEachPair, graphKey, normalizeTag, normalizeTags, scorePairs, tagOverlap, writeSite, type Edge } from './graph.ts';
 import { embeddingText, fallbackTags, parseSummaryJson, pickReadmeOid, readmeSignal } from './remote.ts';
-import { applyContentHash, assertAllowedApiHost, assignClusters, checkApiHosts, contentHash, legacyContentHash, loadSettings, loadState, markForEnrichment, saveState, shouldReuseClusters, type Repo, type State } from './sync.ts';
+import { applyContentHash, assertAllowedApiHost, assignClusters, checkApiHosts, contentHash, enrich, legacyContentHash, loadSettings, loadState, markForEnrichment, saveState, shouldReuseClusters, type Repo, type State } from './sync.ts';
 
 const repo = (id: number, patch: Partial<Repo> = {}): Repo => ({
   id,
@@ -246,6 +246,57 @@ describe('tags and scores', () => {
     const edges = buildEdges(crowded.map((r) => r.id), scores);
     expect(edges.every(([s, t]) => theme(s - 1) === theme(t - 1))).toBe(true);
   });
+
+  it('links repos with no embeddings from topics, lists, and language', () => {
+    const state = syntheticState();
+    for (const repo of Object.values(state.repos)) delete repo.embedding;
+    const analysis = analyze(state);
+    expect(analysis.repos).toHaveLength(30);
+    expect(analysis.edges.length).toBeGreaterThan(0);
+    // The synthetic themes differ by language and topic, so those edges must be within a theme.
+    const theme = (i: number) => Math.floor((i - 1) / 10);
+    expect(analysis.edges.every(([s, t]) => theme(s) === theme(t))).toBe(true);
+    expect(analysis.edges.every(([, , w]) => w > 0 && w <= 1)).toBe(true);
+  });
+
+  it('keeps a metadata-only repo in the graph instead of dropping it', () => {
+    const state = syntheticState();
+    delete state.repos['1'].embedding;
+    const analysis = analyze(state);
+    expect(analysis.repos.some((repo) => repo.id === 1)).toBe(true);
+    expect(analysis.edges.some(([s, t]) => s === 1 || t === 1)).toBe(true);
+  });
+
+  it('scores a pair without vectors on the non-semantic weights alone', () => {
+    const repos = [
+      repo(1, { language: 'Go', topics: ['cli'], starred_at: '2024-01-02T00:00:00Z' }),
+      repo(2, { language: 'Go', topics: ['cli'], starred_at: '2024-01-01T00:00:00Z' }),
+      repo(3, { language: 'Rust', topics: ['web'], starred_at: '2024-01-03T00:00:00Z' }),
+    ];
+    const state: State = {
+      version: 1,
+      repos: Object.fromEntries(repos.map((item) => [String(item.id), item])),
+      clusters: {},
+      star_lists: [],
+    };
+    const edges = analyze(state).edges;
+    const between = edges.find(([s, t]) => (s === 1 && t === 2) || (s === 2 && t === 1));
+    expect(between).toBeDefined();
+    // Same tags and language, no shared list: (0.2 + 0.05) / (0.2 + 0.1 + 0.05).
+    expect(between![2]).toBeCloseTo(0.25 / 0.35, 4);
+    expect(edges.some(([s, t]) => (s === 1 && t === 3) || (s === 1 && t === 3))).toBe(false);
+  });
+
+  it('changes the scoring key when embeddings appear or disappear', () => {
+    const state = syntheticState();
+    analyze(state);
+    const withVectors = state.graph_key;
+    delete state.repos['1'].embedding;
+    expect(analyze(state).reused).toBe(false);
+    expect(state.graph_key).not.toBe(withVectors);
+    state.repos['1'].embedding = Array.from({ length: 16 }, () => 0.25);
+    expect(analyze(state).reused).toBe(false);
+  });
 });
 
 describe('text helpers', () => {
@@ -443,5 +494,34 @@ describe('end to end', () => {
     expect(loaded.repos['1'].star_list_ids).toEqual(['3']);
     expect(loaded.star_lists[0].id).toBe('3');
     expect('star_list_id' in loaded.repos['1']).toBe(false);
+  });
+
+  it('skips enrichment entirely without an LLM or embedding key', async () => {
+    const state = syntheticState();
+    for (const repo of Object.values(state.repos)) delete repo.embedding;
+    const keys = Object.keys(state.repos);
+    const bare = { ...settings(), llmApiKey: '', embeddingApiKey: '' };
+    // No network is reachable from a test; returning 0 rather than throwing is the point.
+    await expect(enrich(state, bare, keys)).resolves.toBe(0);
+    for (const repo of Object.values(state.repos)) {
+      expect(repo.embedding).toBeUndefined();
+      expect(repo.ai_summary).toBeUndefined();
+    }
+  });
+
+  it('links and clusters a site built without any model key', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nebula-'));
+    const state = syntheticState();
+    for (const repo of Object.values(state.repos)) delete repo.embedding;
+    const analysis = analyze(state);
+    expect(analysis.repos).toHaveLength(30);
+    await assignClusters(state, analysis, settings(), { reset: false, llmNames: false });
+    const meta = writeSite(state, analysis, dir);
+    expect(meta.nodes).toBe(30);
+    expect(meta.edges).toBeGreaterThan(0);
+    expect(meta.clusters).toBeGreaterThan(0);
+    const graph = JSON.parse(readFileSync(join(dir, 'graph.json'), 'utf8'));
+    expect(graph.edges.length).toBeGreaterThan(0);
+    expect(graph.nodes.every((n: { ai_summary?: string | null }) => !n.ai_summary)).toBe(true);
   });
 });

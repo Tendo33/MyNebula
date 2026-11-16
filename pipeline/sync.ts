@@ -251,37 +251,56 @@ const fetchStars = async (state: State, settings: Settings, full: boolean): Prom
   return dirty;
 };
 
-/** README -> LLM summary/tags (if configured) -> embedding, saved per batch so a crash resumes. */
-const enrich = async (state: State, settings: Settings, keys: string[]): Promise<number> => {
+/**
+ * README -> LLM summary/tags (if configured) -> embedding, saved per batch so a
+ * crash resumes. Both paid steps are optional: with neither key the sync still
+ * links repos by topics, star lists, and language.
+ */
+export const enrich = async (state: State, settings: Settings, keys: string[]): Promise<number> => {
   if (!keys.length) return 0;
-  if (!settings.embeddingApiKey) throw new Error('EMBEDDING_API_KEY is not set');
+  const wantsSummary = Boolean(settings.llmApiKey);
+  const wantsEmbedding = Boolean(settings.embeddingApiKey);
+  if (!wantsSummary && !wantsEmbedding) {
+    log('No LLM or embedding key: repos stay metadata-only and link by topics, lists, and language');
+    return 0;
+  }
+  // Retry only what this tier can actually fill, so a metadata-only run does not
+  // re-fetch READMEs for repos it cannot summarize or embed.
+  const pending = keys.filter((key) => {
+    const repo = state.repos[key];
+    return (wantsSummary && !repo.ai_summary) || (wantsEmbedding && !repo.embedding?.length);
+  });
+  if (!pending.length) return 0;
   const gh = github(settings.githubToken);
   const model = ai(settings);
   let failed = 0;
-  for (let start = 0; start < keys.length; start += settings.batchSize) {
-    const batch = keys.slice(start, start + settings.batchSize).map((k) => state.repos[k]);
+  for (let start = 0; start < pending.length; start += settings.batchSize) {
+    const batch = pending.slice(start, start + settings.batchSize).map((k) => state.repos[k]);
     const readmes = await gh.readmes(
       batch.map((r) => r.full_name),
       settings.readmeMaxLength,
       settings.readmeConcurrency,
     );
-    if (settings.llmApiKey) {
+    if (wantsSummary) {
       const unsummarized = batch.filter((repo) => !repo.ai_summary);
       await pool(unsummarized, settings.llmConcurrency, async (repo) => {
         [repo.ai_summary, repo.ai_tags] = await model.summarize(repo, readmes.get(repo.full_name));
       });
     }
-    try {
-      const vectors = await model.embed(batch.map((r) => embeddingText(r, readmes.get(r.full_name))));
-      batch.forEach((repo, i) => (repo.embedding = vectors[i].map((v) => Math.round(v * 1e6) / 1e6)));
-    } catch (err) {
-      failed += batch.length;
-      log(`Embedding batch failed (${batch.length} repos):`, String(err));
+    if (wantsEmbedding) {
+      const unembedded = batch.filter((repo) => !repo.embedding?.length);
+      try {
+        const vectors = await model.embed(unembedded.map((r) => embeddingText(r, readmes.get(r.full_name))));
+        unembedded.forEach((repo, i) => (repo.embedding = vectors[i].map((v) => Math.round(v * 1e6) / 1e6)));
+      } catch (err) {
+        failed += unembedded.length;
+        log(`Embedding batch failed (${unembedded.length} repos):`, String(err));
+      }
     }
     saveState(state, settings.cachePath);
-    log(`Enriched ${Math.min(start + batch.length, keys.length)}/${keys.length}`);
+    log(`Enriched ${Math.min(start + batch.length, pending.length)}/${pending.length}`);
   }
-  if (failed === keys.length) throw new Error('Every embedding batch failed; check EMBEDDING_* settings');
+  if (wantsEmbedding && failed === pending.length) throw new Error('Every embedding batch failed; check EMBEDDING_* settings');
   return failed;
 };
 

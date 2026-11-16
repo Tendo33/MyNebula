@@ -43,13 +43,13 @@ MyNebula 读取你的 GitHub 星标，为每个仓库写一段简短摘要，并
 先准备好两个 key：
 
 - GitHub token：[创建一个勾选 `repo` 和 `user` 权限的 classic token](https://github.com/settings/tokens/new?scopes=repo,user&description=MyNebula)。
-- Embedding API key，例如在 [SiliconFlow](https://cloud.siliconflow.cn/account/ak) 创建。同一个 key 也可以当 `LLM_API_KEY` 用。
+- 可选：Embedding API key，例如在 [SiliconFlow](https://cloud.siliconflow.cn/account/ak) 创建，填了图谱才是语义近邻。同一个 key 也可以当 `LLM_API_KEY` 用。一个 key 都不填时，图谱只由 GitHub 元数据构建。
 
 然后：
 
 1. Fork 本仓库，然后打开你 fork 的 **Actions** 页启用 workflows。
 2. **Settings › Pages**：Source 选 **GitHub Actions**。
-3. **Settings › Secrets and variables › Actions** 的 **Secrets** 里添加：`STARS_TOKEN`（你的 GitHub token）、`EMBEDDING_API_KEY`，可选 `LLM_API_KEY`。
+3. **Settings › Secrets and variables › Actions** 的 **Secrets** 里添加：`STARS_TOKEN`（你的 GitHub token）。`EMBEDDING_API_KEY` 可选，填了图谱变成语义近邻；`LLM_API_KEY` 可选，填了才有摘要。
 4. 可选：在 **Variables** 里覆盖[配置](#配置)中列出的模型相关设置。
 5. **Actions › Sync and Deploy › Run workflow**。输入框可以填同步参数，例如 `--full`（见[同步参数](#同步参数)）。
 
@@ -68,10 +68,10 @@ MyNebula 读取你的 GitHub 星标，为每个仓库写一段简短摘要，并
 | 变量 | 默认值 | 作用 |
 | --- | --- | --- |
 | `GITHUB_TOKEN` | 必填 | 读取你的星标和星标列表。在 Actions 上存为 `STARS_TOKEN` secret。 |
-| `EMBEDDING_API_KEY` | 必填 | Embedding 服务的 key。 |
+| `EMBEDDING_API_KEY` | 空 | Embedding 服务的 key。不填时仓库按话题、星标列表和语言连边聚类，除 GitHub 外不调用任何 API。 |
 | `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | 任何兼容 OpenAI 接口的服务。Actions 只请求 `.github/workflows/pages.yml` 里 `ALLOWED_API_HOSTS` 列出的主机；换用其他服务时把它的主机加进去。 |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | 多语言模型，中英文混合效果好。 |
-| `LLM_API_KEY` | 空 | 开启摘要、标签和 LLM 聚类命名。留空则完全不调用对话模型。 |
+| `LLM_API_KEY` | 空 | 开启摘要、标签和 LLM 聚类命名。有没有 embedding key 都能用。留空则完全不调用对话模型。 |
 | `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | 任何兼容 OpenAI 接口的对话服务。Actions 上的主机限制与 embedding 相同。 |
 | `LLM_MODEL` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | 生成摘要和组名的模型。 |
 | `LLM_OUTPUT_LANGUAGE` | `zh` | 生成内容的语言：`zh` 或 `en`。 |
@@ -87,6 +87,7 @@ MyNebula 读取你的 GitHub 星标，为每个仓库写一段简短摘要，并
 - **SiliconFlow**（默认）：一个 key 同时用于 embedding 和 LLM。账户必须有余额，否则即使是价格接近零的模型也会返回 HTTP 402。
 - **DeepSeek** 作为 LLM：设置 `LLM_BASE_URL=https://api.deepseek.com`，模型填 DeepSeek 的模型名，例如 `deepseek-chat`。DeepSeek 没有 embedding 接口，embedding 需要另配服务商。
 - **不用 LLM**：`LLM_API_KEY` 留空。仓库按描述、话题和 README 计算向量，聚类按最有区分度的标签命名，只有 embedding 产生费用。
+- **连 embedding 也没有**：`EMBEDDING_API_KEY` 也留空。图谱只用话题、星标列表和语言构建，零成本，照样聚类；之后补上 key，下次同步会原地升级。
 - **Ollama**（仅本地）：把 `EMBEDDING_BASE_URL` 指向 `http://localhost:11434/v1`，模型用 `nomic-embed-text` 等。GitHub Actions 上不可用。
 
 ### 同步参数
@@ -139,7 +140,7 @@ flowchart LR
 git clone https://github.com/Tendo33/MyNebula.git
 cd MyNebula
 pnpm install
-cp .env.example .env   # 填 GITHUB_TOKEN 和 EMBEDDING_API_KEY，可选 LLM_API_KEY
+cp .env.example .env   # 只填 GITHUB_TOKEN 就能跑；想更准再加 EMBEDDING_API_KEY 和 LLM_API_KEY
 pnpm sync              # 生成 frontend/public/data/
 pnpm dev               # http://localhost:5173
 ```

@@ -43,13 +43,13 @@ You do not need to clone anything. Fork the repository and GitHub Actions builds
 Have two keys ready:
 
 - A GitHub token: [create a classic token with `repo` and `user` scopes](https://github.com/settings/tokens/new?scopes=repo,user&description=MyNebula).
-- An embedding API key, for example from [SiliconFlow](https://cloud.siliconflow.cn/account/ak). The same key works as `LLM_API_KEY`.
+- Optional: an embedding API key, for example from [SiliconFlow](https://cloud.siliconflow.cn/account/ak), which makes the graph semantic. The same key works as `LLM_API_KEY`. Without any key the graph is built from GitHub metadata alone.
 
 Then:
 
 1. Fork this repository, then open the **Actions** tab of your fork and enable workflows.
 2. **Settings › Pages**: set the source to **GitHub Actions**.
-3. **Settings › Secrets and variables › Actions**, under **Secrets**: add `STARS_TOKEN` (your GitHub token), `EMBEDDING_API_KEY`, and optionally `LLM_API_KEY`.
+3. **Settings › Secrets and variables › Actions**, under **Secrets**: add `STARS_TOKEN` (your GitHub token). `EMBEDDING_API_KEY` is optional and makes the graph semantic; `LLM_API_KEY` is optional and adds summaries.
 4. Optionally, under **Variables**, override the model settings listed in [Configuration](#configuration).
 5. **Actions › Sync and Deploy › Run workflow**. The input field accepts sync flags such as `--full` (see [sync flags](#sync-flags)).
 
@@ -68,10 +68,10 @@ On GitHub Actions, keys go in **Secrets** (the GitHub token is named `STARS_TOKE
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GITHUB_TOKEN` | required | Reads your stars and star lists. Stored as the `STARS_TOKEN` secret on Actions. |
-| `EMBEDDING_API_KEY` | required | Key for the embedding endpoint. |
+| `EMBEDDING_API_KEY` | empty | Key for the embedding endpoint. Without it repos are linked and grouped by topics, star lists, and language; no API is called beyond GitHub. |
 | `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | Any OpenAI-compatible endpoint. Actions only calls hosts named in `ALLOWED_API_HOSTS` in `.github/workflows/pages.yml`; add another provider's host there. |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | Multilingual, works well for mixed Chinese and English. |
-| `LLM_API_KEY` | empty | Enables summaries, tags, and LLM cluster names. Leave empty to skip. |
+| `LLM_API_KEY` | empty | Enables summaries, tags, and LLM cluster names. Works with or without an embedding key. Leave empty to skip. |
 | `LLM_BASE_URL` | `https://api.siliconflow.cn/v1` | Any OpenAI-compatible chat endpoint. Same Actions host list as the embedding URL. |
 | `LLM_MODEL` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | Chat model for summaries and names. |
 | `LLM_OUTPUT_LANGUAGE` | `zh` | `zh` or `en` for generated text. |
@@ -87,6 +87,7 @@ On GitHub Actions, keys go in **Secrets** (the GitHub token is named `STARS_TOKE
 - **SiliconFlow** (the default): one key covers both embeddings and the LLM. The account needs a positive balance; calls return HTTP 402 otherwise, even for models priced near zero.
 - **DeepSeek** for the LLM: set `LLM_BASE_URL=https://api.deepseek.com` and a DeepSeek model such as `deepseek-chat`. DeepSeek has no embedding API, so keep a separate embedding provider.
 - **No LLM**: leave `LLM_API_KEY` empty. Repositories are embedded from their description, topics, and README, and groups are named from their most distinctive tags. Only embedding calls cost anything.
+- **No embedding provider either**: leave `EMBEDDING_API_KEY` empty too. The graph is built from topics, star lists, and language alone, so it costs nothing and still clusters; adding a key later upgrades the next sync in place.
 - **Ollama** (local only): point `EMBEDDING_BASE_URL` at `http://localhost:11434/v1` with a model such as `nomic-embed-text`. This does not work on GitHub Actions.
 
 ### Sync flags
@@ -139,7 +140,7 @@ Clone only if you want to change MyNebula or run the sync on your own machine. Y
 git clone https://github.com/Tendo33/MyNebula.git
 cd MyNebula
 pnpm install
-cp .env.example .env   # fill in GITHUB_TOKEN and EMBEDDING_API_KEY, optionally LLM_API_KEY
+cp .env.example .env   # GITHUB_TOKEN is enough; add EMBEDDING_API_KEY and LLM_API_KEY for a richer graph
 pnpm sync              # writes frontend/public/data/
 pnpm dev               # http://localhost:5173
 ```

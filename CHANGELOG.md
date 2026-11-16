@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The pipeline runs with `GITHUB_TOKEN` alone. Without an embedding key, repositories are linked and grouped by topics, star lists, and language, and no API is called beyond GitHub. `LLM_API_KEY` alone still produces summaries and tags. Adding keys later upgrades the next sync in place.
+
 ### Changed
 - Linking a few thousand repositories no longer evaluates each embedding pair one at a time: four rows advance together so each neighbour vector is read once. Results are unchanged to the last bit, and the edge list is identical.
 - The scoring key hashes embedding bytes instead of building a comma-joined string per repository, cutting the reuse check from hundreds of milliseconds to tens at a few thousand repos.
+
+### Fixed
+- A repository whose embedding failed no longer disappears from the map; it is drawn and linked from its metadata until the next sync fills in a vector.
 
 ## [2.3.0] - 2026-11-16
 
