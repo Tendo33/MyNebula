@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-16
+
 ### Changed
 - The force layout stops once it settles. The slow drift is drawn on those positions, pauses while the tab is hidden, and is folded back into the layout when a node is dragged.
 - Dragging a settled node reheats the layout immediately, so its neighbours follow the pointer.
-- A sync reuses stored edges and groups when languages, lists, tags, and embeddings are unchanged. Star counts and summaries still refresh the site.
+- A sync reuses stored edges and groups when languages, lists, tags, and embeddings are unchanged. Star counts and summaries still refresh the site. The edge pass streams each repository's nearest neighbours instead of holding an all-pairs matrix.
+- Compact star counts drop a trailing `.0` (`1k`, not `1.0k`).
+- Search text is built once per load and shared by the graph list, the table, the facet counts, and the palette.
+
+### Fixed
+- Below 900px, the graph's repository list starts closed so it no longer covers the canvas.
 
 ## [2.2.0] - 2026-11-12
 
