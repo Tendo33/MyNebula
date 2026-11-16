@@ -50,9 +50,11 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
   let canvas: GraphCanvas | null = null;
   let hoverId: number | null = null;
   let previewRange: [number, number] | null = null;
-  let showList = window.innerWidth < 1024 || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Below 900px the rail overlays the canvas, so it starts closed there.
-  let filtersOpen = window.innerWidth >= 900;
+  // Below 900px a list panel covers the canvas, so it starts closed with the rail.
+  // On a short desktop window, and under reduced motion when there is room, it starts open.
+  const roomForList = window.innerWidth >= 900;
+  let showList = (window.innerWidth < 1024 && roomForList) || (window.matchMedia('(prefers-reduced-motion: reduce)').matches && roomForList);
+  let filtersOpen = roomForList;
   const details: DetailsState = { relatedTab: 'similar' };
   const cleanups: (() => void)[] = [];
 
@@ -223,7 +225,7 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
     const key = showList ? nodes.map((node) => node.id).join(',') : 'closed';
     if (key === listKey && region.firstElementChild) return;
     listKey = key;
-    const stars = (count: number) => (count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count.toLocaleString());
+    const stars = (count: number) => (count >= 1000 ? `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k` : count.toLocaleString());
     region.innerHTML = showList
       ? html`<div class="node-list" id="graph-node-list" aria-label="${t('graph.repository_list')}">
           <div class="node-list-head">

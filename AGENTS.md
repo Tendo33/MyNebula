@@ -11,13 +11,16 @@ A static site plus an offline pipeline, one TypeScript package on Node 24 (pnpm)
   embeddings for new or changed repos, links related repos, groups them as
   Louvain communities (ids matched to the previous run), and writes
   `frontend/public/data/graph.json`. State lives in
-  `data/cache.json.gz`; reruns must stay incremental.
+  `data/cache.json.gz`; reruns must stay incremental. Edges and groups are
+  reused when the scoring inputs are unchanged, and `graph.json` is still
+  rewritten.
 - `frontend/` (Vite, vanilla TypeScript, d3-force): Graph (home), Data,
   Settings, and the Cmd/Ctrl+K palette. Hash routing so any static host works.
-  The canvas is `frontend/src/graph/canvas.ts`: layout is a live force
-  simulation on the edges with a gentle drift (paused in hidden tabs, off under
-  reduced motion). Colour and visibility rules are pure functions in
-  `graph/style.ts`.
+  The canvas is `frontend/src/graph/canvas.ts`: a force simulation on the
+  edges runs until it settles, then a drawn drift continues (paused in hidden
+  tabs, off under reduced motion). Dragging writes that drift back into the
+  layout and reheats the simulation. Colour and visibility rules are pure
+  functions in `graph/style.ts`.
 - `.github/workflows/pages.yml` runs the sync daily and deploys to Pages.
 
 ## Working rules

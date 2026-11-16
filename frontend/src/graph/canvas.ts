@@ -615,7 +615,9 @@ export class GraphCanvas {
         this.bakeDrift();
         this.settled = false;
         if (this.reduceMotion) this.sim?.stop();
-        else this.sim?.alphaTarget(0.3).restart();
+        // A settled sim sits under alphaMin. Restarting alone climbs toward 0.3
+        // from nearly zero, so the neighbours barely follow the pointer.
+        else this.sim?.alphaTarget(0.3)?.alpha(0.3)?.restart();
       }
       gesture.node.fx = x;
       gesture.node.fy = y;
@@ -635,21 +637,21 @@ export class GraphCanvas {
     const gesture = this.gesture;
     this.gesture = null;
     if (gesture?.kind === 'drag') {
+      if (gesture.moved && this.reduceMotion) {
+        // One hot burst while the dropped node stays pinned, then stop.
+        // Cooling alpha during these ticks leaves the neighbours short of the drop.
+        this.sim?.stop();
+        this.sim?.alphaTarget(0.3)?.alpha(0.3);
+        for (let i = 0; i < 60; i += 1) this.sim?.tick();
+        this.sim?.alphaTarget(0);
+        this.settled = true;
+        this.coasting = false;
+        this.requestDraw();
+      }
       gesture.node.fx = undefined;
       gesture.node.fy = undefined;
-      if (gesture.moved) {
-        if (this.reduceMotion) {
-          // No live simulation: let the neighbours catch up once, then stop.
-          this.sim?.stop();
-          this.sim?.alphaTarget(0)?.alpha(0.3);
-          for (let i = 0; i < 60; i += 1) this.sim?.tick();
-          this.settled = true;
-          this.coasting = false;
-          this.requestDraw();
-        } else {
-          this.sim?.alphaTarget(0);
-        }
-      } else {
+      if (gesture.moved && !this.reduceMotion) this.sim?.alphaTarget(0);
+      else if (!gesture.moved) {
         this.callbacks.onSelect(gesture.node.id);
         this.focusNode(gesture.node.id, 1000);
       }
@@ -859,10 +861,7 @@ export class GraphCanvas {
       this.linkStylesReady = true;
     }
     // Link colours already carry alpha. One stroke() of many curves would
-    // composite them as a single layer and lighten every crossing, so each
-    // curve is stroked on its own. Shared colour, width, and opacity are set
-    // once per group.
-    const groups = new Map<string, { color: string; width: number; alpha: number; segs: number[] }>();
+    // composite them as a single layer and lighten every crossing.
     for (const link of this.links) {
       const style = link.stroke;
       if (!style?.width) continue;
@@ -871,21 +870,12 @@ export class GraphCanvas {
       if (!this.linkOnScreen(a.x, a.y, b.x, b.y, view)) continue;
       const alpha = Math.min(link.source.fade, link.target.fade, 1) ** 0.5;
       if (alpha <= 0) continue;
-      const key = `${style.color}\0${style.width}\0${alpha}`;
-      const group = groups.get(key);
-      if (group) group.segs.push(a.x, a.y, b.x, b.y);
-      else groups.set(key, { color: style.color, width: style.width, alpha, segs: [a.x, a.y, b.x, b.y] });
-    }
-    for (const group of groups.values()) {
-      ctx.globalAlpha = group.alpha;
-      ctx.strokeStyle = group.color;
-      ctx.lineWidth = group.width;
-      const { segs } = group;
-      for (let i = 0; i < segs.length; i += 4) {
-        ctx.beginPath();
-        this.curve(segs[i], segs[i + 1], segs[i + 2], segs[i + 3]);
-        ctx.stroke();
-      }
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = style.width;
+      ctx.beginPath();
+      this.curve(a.x, a.y, b.x, b.y);
+      ctx.stroke();
     }
     ctx.globalAlpha = 1;
   }

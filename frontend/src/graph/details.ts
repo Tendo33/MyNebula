@@ -135,7 +135,7 @@ const avatar = (node: GraphNode, size: 'sm' | 'md') => {
 };
 
 const relatedItem = ({ repo, reason }: RelatedEntry): Raw => {
-  const stars = repo.stargazers_count >= 1000 ? `${(repo.stargazers_count / 1000).toFixed(1)}k` : String(repo.stargazers_count);
+  const stars = repo.stargazers_count >= 1000 ? `${(repo.stargazers_count / 1000).toFixed(1).replace(/\.0$/, '')}k` : String(repo.stargazers_count);
   return html`<button class="related-item" data-act="select" data-id="${repo.id}">
     ${avatar(repo, 'sm')}
     <span class="related-body">

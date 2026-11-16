@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The force layout stops once it settles. The slow drift is drawn on those positions, pauses while the tab is hidden, and is folded back into the layout when a node is dragged.
+- Dragging a settled node reheats the layout immediately, so its neighbours follow the pointer.
+- A sync reuses stored edges and groups when languages, lists, tags, and embeddings are unchanged. Star counts and summaries still refresh the site.
+
 ## [2.2.0] - 2026-11-12
 
 ### Added
