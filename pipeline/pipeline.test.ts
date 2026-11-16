@@ -26,6 +26,31 @@ const repo = (id: number, patch: Partial<Repo> = {}): Repo => ({
   ...patch,
 });
 
+/**
+ * Neighbours a full stable sort would keep. Independent of the pipeline's
+ * top-k heap: score, rank, then the same cutoff (best edge always, then
+ * anything at or above the sampled threshold, at most 8).
+ */
+const stableEdges = (repos: Repo[]): Edge[] => {
+  const scores = scorePairs(repos);
+  const { n, score } = scores;
+  const threshold = adaptiveThreshold(scores);
+  const ids = repos.map((item) => item.id);
+  const pairs = new Map<string, Edge>();
+  for (let i = 0; i < n; i += 1) {
+    const ranked: { j: number; w: number }[] = [];
+    for (let j = 0; j < n; j += 1) if (j !== i) ranked.push({ j, w: score[i * n + j] });
+    ranked.sort((a, b) => b.w - a.w || a.j - b.j);
+    for (let rank = 0; rank < Math.min(8, ranked.length); rank += 1) {
+      const { j, w } = ranked[rank];
+      if (w <= 0 || (w < threshold && rank > 0)) break;
+      const [s, t] = ids[i] < ids[j] ? [ids[i], ids[j]] : [ids[j], ids[i]];
+      pairs.set(`${s}:${t}`, [s, t, Math.round(w * 1e4) / 1e4]);
+    }
+  }
+  return [...pairs.values()];
+};
+
 /** Three well-separated themes of ten repos each. */
 const syntheticState = (): State => {
   let seed = 1;
@@ -67,6 +92,46 @@ describe('tags and scores', () => {
     expect(edges.every(([s, t]) => s < t)).toBe(true);
     expect(new Set(edges.map(([s, t]) => `${s}:${t}`)).size).toBe(edges.length);
     expect(new Set(edges.flatMap(([s, t]) => [s, t])).size).toBe(30);
+  });
+
+  it('streams the same edges as the full score matrix', () => {
+    const state = syntheticState();
+    const repos = Object.values(state.repos)
+      .filter((repo) => repo.embedding?.length)
+      .sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
+    expect(analyze(state).edges).toEqual(buildEdges(repos.map((repo) => repo.id), scorePairs(repos)));
+  });
+
+  it('keeps the neighbours a full stable sort would keep', () => {
+    const state = syntheticState();
+    const repos = Object.values(state.repos).filter((item) => item.embedding?.length);
+    const byStar = repos.slice().sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
+    const key = (edges: Edge[]) => edges.map(([s, t, w]) => `${s}:${t}:${w}`).sort();
+    expect(key(buildEdges(repos.map((item) => item.id), scorePairs(repos)))).toEqual(key(stableEdges(repos)));
+    expect(key(analyze(state).edges)).toEqual(key(stableEdges(byStar)));
+  });
+
+  it('prefers the earlier repo when every score ties', () => {
+    const repos = Array.from({ length: 10 }, (_, i) =>
+      repo(i + 1, { embedding: [1, 0], language: 'Go', starred_at: '2024-01-01T00:00:00Z' }),
+    );
+    const scores = scorePairs(repos);
+    const off: number[] = [];
+    for (let i = 0; i < 10; i += 1) for (let j = i + 1; j < 10; j += 1) off.push(scores.score[i * 10 + j]);
+    expect(new Set(off).size).toBe(1);
+    expect(off[0]).toBeGreaterThan(0);
+    const edges = buildEdges(repos.map((item) => item.id), scores);
+    const key = (rows: Edge[]) => rows.map(([s, t, w]) => `${s}:${t}:${w}`).sort();
+    expect(key(edges)).toEqual(key(stableEdges(repos)));
+    expect(edges.some(([s, t]) => s === 9 && t === 10)).toBe(false);
+    expect(edges.some(([s, t]) => s === 1 && t === 2)).toBe(true);
+    const state: State = {
+      version: 1,
+      repos: Object.fromEntries(repos.map((item) => [String(item.id), item])),
+      clusters: {},
+      star_lists: [],
+    };
+    expect(key(analyze(state).edges)).toEqual(key(stableEdges(repos)));
   });
 
   it('separates neighbours that share a dominant embedding direction', () => {

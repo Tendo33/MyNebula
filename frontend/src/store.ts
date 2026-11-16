@@ -116,6 +116,11 @@ class Store {
     return this.data?.nodes ?? [];
   }
 
+  /** Search text built once at load. Data and the palette reuse it. */
+  get repoSearchText(): ReadonlyMap<number, string> {
+    return this.searchText;
+  }
+
   get visibleNodes(): GraphNode[] {
     if (!this.data) return [];
     const cache = this.visibleCache;

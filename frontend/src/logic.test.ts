@@ -207,6 +207,8 @@ describe('data page query', () => {
     expect(filterRepos(nodes, { ...base, topic: 'cli' }).map((n) => n.id)).toEqual([1]);
     expect(filterRepos(nodes, { ...base, month: '2024-06' }).map((n) => n.id)).toEqual([2]);
     expect(filterRepos(nodes, { ...base, languages: new Set(['Go']) }).map((n) => n.id)).toEqual([2]);
+    expect(filterRepos(nodes, { ...base, query: 'vector' })).toEqual([]);
+    expect(filterRepos(nodes, { ...base, query: 'vector' }, new Map([[1, 'vector store']])).map((n) => n.id)).toEqual([1]);
     expect([...clusterFacetCounts(nodes, { ...base, languages: new Set(['Go']), clusters: new Set([1]) })]).toEqual([[0, 1]]);
   });
 

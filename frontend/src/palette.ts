@@ -52,14 +52,20 @@ const saveRecent = (items: string[]) => {
   }
 };
 
-export const buildResults = (nodes: GraphNode[], clusters: ClusterInfo[], query: string, filter: FilterType): Result[] => {
+export const buildResults = (
+  nodes: GraphNode[],
+  clusters: ClusterInfo[],
+  query: string,
+  filter: FilterType,
+  searchText?: ReadonlyMap<number, string>,
+): Result[] => {
   const normalized = normalizeSearchQuery(query);
   if (!normalized) return [];
   const facetsOff = parseStarsThreshold(normalized) !== null;
   const results: Result[] = [];
   if (filter === 'all' || filter === 'repos') {
     nodes
-      .filter((node) => matchesRepoSearch(node, normalized))
+      .filter((node) => matchesRepoSearch(node, normalized, searchText?.get(node.id)))
       .slice(0, MAX_RESULTS)
       .forEach((node) =>
         results.push({
@@ -179,7 +185,7 @@ export const initPalette = (): void => {
     const body = host.querySelector<HTMLElement>('[data-region="body"]');
     const footer = host.querySelector<HTMLElement>('[data-region="count"]');
     if (!body || !footer) return;
-    results = buildResults(store.nodes, store.data?.clusters ?? [], query, filter);
+    results = buildResults(store.nodes, store.data?.clusters ?? [], query, filter, store.repoSearchText);
     selected = Math.min(selected, Math.max(results.length - 1, 0));
     footer.textContent = results.length ? `${results.length} ${t('search.results')}` : '';
     body.setAttribute('role', results.length ? 'listbox' : 'presentation');

@@ -73,12 +73,38 @@ export interface Scores {
   score: Float32Array;
 }
 
+/** One-slot buffer so a streamed score rounds the same way as a Float32Array store. */
+const scoreBits = new Float32Array(1);
+const f32 = (value: number) => {
+  scoreBits[0] = value;
+  return scoreBits[0];
+};
+
+interface Neighbour {
+  j: number;
+  w: number;
+}
+
 /**
- * Blend of embedding similarity, tag overlap, star list, and language for every
- * pair. Embeddings share a dominant direction (raw cosines bunch around
- * 0.5-0.65), so they are mean-centered first to separate neighbours from bystanders.
+ * Keep the K neighbours a stable descending sort would have kept. Equal scores
+ * prefer the earlier index, matching a stable sort of 0..n-1.
  */
-export const scorePairs = (repos: Repo[]): Scores => {
+const consider = (row: Neighbour[], j: number, w: number) => {
+  if (row.length < EDGE_K) {
+    row.push({ j, w });
+    return;
+  }
+  let worst = 0;
+  for (let k = 1; k < row.length; k += 1) {
+    const candidate = row[k];
+    const held = row[worst];
+    if (candidate.w < held.w || (candidate.w === held.w && candidate.j > held.j)) worst = k;
+  }
+  const held = row[worst];
+  if (w > held.w || (w === held.w && j < held.j)) row[worst] = { j, w };
+};
+
+const prepare = (repos: Repo[]) => {
   const n = repos.length;
   const dim = repos[0]?.embedding?.length ?? 0;
   const unit = new Float32Array(n * dim);
@@ -99,28 +125,45 @@ export const scorePairs = (repos: Repo[]): Scores => {
   const tags = repos.map((r) => normalizeTags(r.ai_tags, r.topics));
   const tagSets = tags.map((row) => new Set(row));
   const listSets = repos.map((r) => new Set(r.star_list_ids));
-  const sameList = (i: number, j: number) => {
-    const left = listSets[i];
+  const weight = (i: number, j: number) => {
+    let dot = 0;
+    for (let d = 0, a = i * dim, b = j * dim; d < dim; d += 1) dot += unit[a + d] * unit[b + d];
+    let sharedList = 0;
+    const lists = listSets[i];
     const right = repos[j].star_list_ids;
-    if (!left.size || !right.length) return false;
-    return right.some((id) => left.has(id));
-  };
-  const sameLanguage = (i: number, j: number) => Boolean(repos[i].language) && repos[i].language === repos[j].language;
-
-  const score = new Float32Array(n * n);
-  for (let i = 0; i < n; i += 1) {
-    score[i * n + i] = -1;
-    for (let j = i + 1; j < n; j += 1) {
-      let dot = 0;
-      for (let d = 0, a = i * dim, b = j * dim; d < dim; d += 1) dot += unit[a + d] * unit[b + d];
-      score[i * n + j] = score[j * n + i] = Math.min(
+    if (lists.size && right.length) {
+      for (const id of right) {
+        if (lists.has(id)) {
+          sharedList = 1;
+          break;
+        }
+      }
+    }
+    const sameLanguage = Boolean(repos[i].language) && repos[i].language === repos[j].language;
+    return f32(
+      Math.min(
         1,
         SEMANTIC_WEIGHT * Math.max(0, dot) +
           TAG_OVERLAP_WEIGHT * tagOverlap(tags[i], tags[j], tagSets[i]) +
-          STAR_LIST_WEIGHT * +sameList(i, j) +
-          LANGUAGE_WEIGHT * +sameLanguage(i, j),
-      );
-    }
+          STAR_LIST_WEIGHT * sharedList +
+          LANGUAGE_WEIGHT * +sameLanguage,
+      ),
+    );
+  };
+  return { n, weight };
+};
+
+/**
+ * Blend of embedding similarity, tag overlap, star list, and language for every
+ * pair. Embeddings share a dominant direction (raw cosines bunch around
+ * 0.5-0.65), so they are mean-centered first to separate neighbours from bystanders.
+ */
+export const scorePairs = (repos: Repo[]): Scores => {
+  const { n, weight } = prepare(repos);
+  const score = new Float32Array(n * n);
+  for (let i = 0; i < n; i += 1) {
+    score[i * n + i] = -1;
+    for (let j = i + 1; j < n; j += 1) score[i * n + j] = score[j * n + i] = weight(i, j);
   }
   return { n, score };
 };
@@ -136,41 +179,74 @@ const quantile = (values: number[], q: number): number => {
  * Link-score cutoff that yields roughly `EDGE_K` edges per node, sampled on 200
  * repos. Purely rank-based: centered scores have no fixed scale to anchor a floor.
  */
-export const adaptiveThreshold = ({ n, score }: Scores, sample = 200): number => {
-  const m = Math.min(n, sample);
+const thresholdFromUpper = (upper: number[], m: number): number => {
   if (m < 3) return 0.5;
-  const upper: number[] = [];
-  for (let i = 0; i < m; i += 1) for (let j = i + 1; j < m; j += 1) upper.push(score[i * n + j]);
   const degree = Math.max(1, Math.min(EDGE_K, m - 1));
   return quantile(upper, Math.max(0.05, Math.min(0.98, 1 - degree / (m - 1))));
 };
 
-const rankRow = (scores: Scores, i: number) =>
-  Array.from({ length: scores.n }, (_, j) => j)
-    .filter((j) => j !== i)
-    .sort((a, b) => scores.score[i * scores.n + b] - scores.score[i * scores.n + a]);
+export const adaptiveThreshold = ({ n, score }: Scores, sample = 200): number => {
+  const m = Math.min(n, sample);
+  const upper: number[] = [];
+  for (let i = 0; i < m; i += 1) for (let j = i + 1; j < m; j += 1) upper.push(score[i * n + j]);
+  return thresholdFromUpper(upper, m);
+};
+
+const commitRow = (ids: number[], i: number, row: Neighbour[], threshold: number, pairs: Map<string, Edge>) => {
+  const ordered = row.slice().sort((a, b) => b.w - a.w || a.j - b.j);
+  for (let rank = 0; rank < ordered.length; rank += 1) {
+    const { j, w } = ordered[rank];
+    if (w <= 0 || (w < threshold && rank > 0)) return;
+    const [s, t] = ids[i] < ids[j] ? [ids[i], ids[j]] : [ids[j], ids[i]];
+    pairs.set(`${s}:${t}`, [s, t, Math.round(w * 1e4) / 1e4]);
+  }
+};
+
+const edgesFromRows = (ids: number[], rows: Neighbour[][], threshold: number): Edge[] => {
+  const pairs = new Map<string, Edge>();
+  rows.forEach((row, i) => commitRow(ids, i, row, threshold, pairs));
+  return [...pairs.values()].sort((a, b) => b[2] - a[2]);
+};
 
 /**
  * Undirected per-node k-NN edges above the adaptive threshold. Every node also
  * keeps its best edge, so the force layout never flings a weakly related repo
- * off into space.
+ * off into space. Each row keeps only its top K, with the same tie break as a
+ * stable sort of the full row.
  */
 export const buildEdges = (ids: number[], scores: Scores): Edge[] => {
   if (ids.length < 2) return [];
-  const threshold = adaptiveThreshold(scores);
-  const pairs = new Map<string, Edge>();
+  const rows: Neighbour[][] = Array.from({ length: scores.n }, () => []);
   for (let i = 0; i < scores.n; i += 1) {
-    rankRow(scores, i)
-      .slice(0, EDGE_K)
-      .every((j, rank) => {
-        const w = scores.score[i * scores.n + j];
-        if (w <= 0 || (w < threshold && rank > 0)) return false;
-        const [s, t] = ids[i] < ids[j] ? [ids[i], ids[j]] : [ids[j], ids[i]];
-        pairs.set(`${s}:${t}`, [s, t, Math.round(w * 1e4) / 1e4]);
-        return true;
-      });
+    const base = i * scores.n;
+    for (let j = 0; j < scores.n; j += 1) if (j !== i) consider(rows[i], j, scores.score[base + j]);
   }
-  return [...pairs.values()].sort((a, b) => b[2] - a[2]);
+  return edgesFromRows(ids, rows, adaptiveThreshold(scores));
+};
+
+/**
+ * Same edges as `buildEdges(scorePairs(...))` without retaining the n×n matrix.
+ * The sync path uses this; the matrix stays available for the threshold helper.
+ */
+const linkRepos = (repos: Repo[]): Edge[] => {
+  const { n, weight } = prepare(repos);
+  if (n < 2) return [];
+  const rows: Neighbour[][] = Array.from({ length: n }, () => []);
+  const m = Math.min(n, 200);
+  const upper: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i + 1; j < n; j += 1) {
+      const w = weight(i, j);
+      if (i < m && j < m) upper.push(w);
+      consider(rows[i], j, w);
+      consider(rows[j], i, w);
+    }
+  }
+  return edgesFromRows(
+    repos.map((repo) => repo.id),
+    rows,
+    thresholdFromUpper(upper, m),
+  );
 };
 
 const topCounts = (values: string[], limit: number) => {
@@ -212,7 +288,7 @@ export const analyze = (state: State): Analysis => {
     .filter((r) => r.embedding?.length)
     .sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
   if (!repos.length) return { repos, edges: [] };
-  return { repos, edges: buildEdges(repos.map((r) => r.id), scorePairs(repos)) };
+  return { repos, edges: linkRepos(repos) };
 };
 
 const NODE_FIELDS = [

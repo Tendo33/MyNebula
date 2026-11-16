@@ -86,22 +86,30 @@ export interface DataQuery {
 }
 
 /** Same filters the old `/api/v2/data/repos` endpoint applied, now in memory. */
-export const filterRepos = (nodes: GraphNode[], q: DataQuery): GraphNode[] => {
+export const filterRepos = (
+  nodes: GraphNode[],
+  q: DataQuery,
+  searchText?: ReadonlyMap<number, string>,
+): GraphNode[] => {
   const topic = q.topic?.trim().toLowerCase();
   return nodes.filter(
     (node) =>
       (!q.clusters.size || (node.cluster_id != null && q.clusters.has(node.cluster_id))) &&
       (!q.languages.size || (node.language != null && q.languages.has(node.language))) &&
-      matchesRepoSearch(node, q.query) &&
+      matchesRepoSearch(node, q.query, searchText?.get(node.id)) &&
       (!q.month || node.starred_at?.startsWith(q.month)) &&
       (!topic || (node.topics ?? []).some((value) => value.trim().toLowerCase() === topic)),
   );
 };
 
 /** Cluster chip counts. The cluster selection itself is not applied, so each chip shows what it would add. */
-export const clusterFacetCounts = (nodes: GraphNode[], q: DataQuery): Map<number, number> => {
+export const clusterFacetCounts = (
+  nodes: GraphNode[],
+  q: DataQuery,
+  searchText?: ReadonlyMap<number, string>,
+): Map<number, number> => {
   const counts = new Map<number, number>();
-  for (const node of filterRepos(nodes, { ...q, clusters: new Set() })) {
+  for (const node of filterRepos(nodes, { ...q, clusters: new Set() }, searchText)) {
     if (node.cluster_id == null) continue;
     counts.set(node.cluster_id, (counts.get(node.cluster_id) ?? 0) + 1);
   }

@@ -120,7 +120,9 @@ export const saveState = (state: State, path: string) => {
   mkdirSync(dirname(path), { recursive: true });
   // A private temp name so two local syncs cannot overwrite one half-written file.
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, gzipSync(JSON.stringify(state)));
+  // Level 1: a full sync rewrites every embedding, and the default level spends
+  // most of its time shrinking an already-random payload by a small fraction.
+  writeFileSync(tmp, gzipSync(JSON.stringify(state), { level: 1 }));
   renameSync(tmp, path);
 };
 

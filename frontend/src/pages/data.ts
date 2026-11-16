@@ -169,7 +169,7 @@ export const mountData = (root: HTMLElement): (() => void) => {
     if (id !== selectedId) details.relatedTab = 'similar';
     selectedId = id;
     const nextPage =
-      id == null ? null : pageContaining(sortRepos(filterRepos(store.nodes, q), sort).map((node) => node.id), id, pageSize);
+      id == null ? null : pageContaining(sortRepos(filterRepos(store.nodes, q, store.repoSearchText), sort).map((node) => node.id), id, pageSize);
     if (nextPage != null && nextPage !== page) {
       page = nextPage;
       syncUrl();
@@ -249,7 +249,7 @@ export const mountData = (root: HTMLElement): (() => void) => {
     const all = store.nodes;
     const clusters = store.data?.clusters ?? [];
     const clusterMap = new Map(clusters.map((c) => [c.id, c]));
-    const filtered = sortRepos(filterRepos(all, q), sort);
+    const filtered = sortRepos(filterRepos(all, q, store.repoSearchText), sort);
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const clamped = Math.min(page, totalPages);
     if (clamped !== page) {
@@ -264,7 +264,7 @@ export const mountData = (root: HTMLElement): (() => void) => {
     el('[data-region="count"]').innerHTML = html`${all.length ? t('data.shown_of_total', { shown: filtered.length, total: all.length }) : ''}
       ${activeFilters() ? html`<button class="link-btn" data-act="clear">${t('common.clear_filters')}</button>` : ''}`.value;
 
-    const clusterCounts = clusterFacetCounts(all, q);
+    const clusterCounts = clusterFacetCounts(all, q, store.repoSearchText);
     const sortedClusters = clusters
       .map((cluster) => ({ cluster, count: clusterCounts.get(cluster.id) ?? 0 }))
       .filter((item) => item.count > 0 || q.clusters.has(item.cluster.id))

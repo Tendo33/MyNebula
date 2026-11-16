@@ -46,11 +46,14 @@ const MAX_ZOOM = 12;
 const AVATAR_PRELOAD_MS = 400;
 /** The viewport follows the unfolding layout for this long, unless the user takes over. */
 const FOLLOW_MS = 4500;
-/** Simulation heat kept after settling; enough for the drift to read as motion. */
-const DRIFT_ALPHA = 0.015;
-const DRIFT_STRENGTH = 0.02;
-/** Once settled, redraw at ~30fps: the drift is slow and this halves the cost. */
+/** Public d3 velocityDecay. The simulation keeps 60% of each tick's velocity. */
+const VELOCITY_DECAY = 0.4;
+/** Drawn sway after the layout settles. Small enough that labels and hits stay with the node. */
+const DRIFT_PX = 2;
+/** Once settled, redraw at ~30fps: the drift is slow and this halves the paint cost. */
 const IDLE_FRAME_MS = 33;
+/** GitHub avatars are requested at 80px. The sprite stays at that size. */
+const AVATAR_SPRITE = 80;
 /** Per-frame easing for dim/highlight fades. */
 const FADE_RATE = 0.18;
 
@@ -92,6 +95,13 @@ interface Transform {
   y: number;
 }
 
+interface WorldView {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 /** Deterministic 0..1 noise from an id, so the burst looks the same on every load. */
@@ -130,30 +140,15 @@ const clusterCohesion = (strength: number) => {
   return force;
 };
 
-/** Slow, independent sway per node. Ignores alpha so it survives settling. */
-const drift = (amplitude: number) => {
-  let nodes: SimNode[] = [];
-  const force = () => {
-    const t = performance.now() / 1000;
-    for (const node of nodes) {
-      if (node.fx != null) continue;
-      node.vx! += Math.sin(t * node.freq + node.phase) * amplitude;
-      node.vy! += Math.cos(t * node.freq * 0.83 + node.phase * 1.7) * amplitude;
-    }
-  };
-  force.initialize = (next: SimNode[]) => {
-    nodes = next;
-  };
-  return force;
-};
-
 /**
  * Canvas force graph laid out purely by similarity edges.
  *
- * Nodes burst out of the centre, one wedge per cluster, settle into
- * communities, then keep drifting gently. The viewport follows the burst until
- * the user pans or zooms. Drift pauses in background tabs and is off under
- * reduced motion, where the layout is computed up front and drawn once.
+ * Nodes burst out of the centre, one wedge per cluster, and settle. The force
+ * simulation then stops. Drift is a position offset applied while drawing and
+ * hit-testing, so the stored layout stays where the forces left it. The
+ * viewport follows the burst until the user pans or zooms. Drift pauses in
+ * background tabs and is off under reduced motion, where the layout is
+ * computed up front and drawn once.
  */
 export class GraphCanvas {
   readonly canvas = document.createElement('canvas');
@@ -175,6 +170,20 @@ export class GraphCanvas {
   private hoverId: number | null = null;
   /** Link strokes depend on focus, not on the drift, so they can be reused between frames. */
   private linkStylesReady = false;
+  /** True once the force simulation has cooled. Drift is then a draw offset. */
+  private settled = false;
+  private coasting = false;
+  /** Time origin of the draw offset, on the paused clock, so the sway starts at zero. */
+  private coastT0 = 0;
+  /** Seconds the tab has spent hidden. The sway clock does not advance while paused. */
+  private paused = 0;
+  /** performance.now()/1000 when the tab was hidden. Zero while visible. */
+  private hiddenAt = 0;
+  /** The next frame must paint, even inside the idle interval. */
+  private paintNow = false;
+  /** Node opacity is still easing, so the idle interval cannot skip the frame. */
+  private nodesFading = false;
+  private sprites = new Map<string, HTMLCanvasElement>();
   private transform: Transform = { k: 1, x: 0, y: 0 };
   private animation: { from: Transform; to: Transform; start: number; duration: number } | null = null;
   private width = 0;
@@ -225,9 +234,11 @@ export class GraphCanvas {
   }
 
   destroy(): void {
+    this.coasting = false;
     this.sim?.stop();
     window.clearTimeout(this.startTimer);
     cancelAnimationFrame(this.frame);
+    this.frame = 0;
     this.resizeObserver.disconnect();
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.canvas.remove();
@@ -235,6 +246,11 @@ export class GraphCanvas {
 
   setData(nodes: GraphNode[], edges: GraphEdge[], clusters: ClusterInfo[]): void {
     this.sim?.stop();
+    this.settled = false;
+    this.coasting = false;
+    this.nodesFading = false;
+    cancelAnimationFrame(this.frame);
+    this.frame = 0;
     window.clearTimeout(this.startTimer);
     this.clusters = new Map(clusters.map((c) => [c.id, c]));
     const colorOf = new Map(clusters.map((c) => [c.id, c.color]));
@@ -304,8 +320,8 @@ export class GraphCanvas {
     });
     const sim = forceSimulation<SimNode, SimLink>(this.nodes)
       .alphaDecay(0.03)
-      .alphaTarget(this.reduceMotion ? 0 : DRIFT_ALPHA)
-      .velocityDecay(0.4)
+      .alphaTarget(0)
+      .velocityDecay(VELOCITY_DECAY)
       .force(
         'link',
         forceLink<SimNode, SimLink>(this.links)
@@ -322,10 +338,18 @@ export class GraphCanvas {
       .force('cluster', clusterCohesion(0.12))
       .force('x', forceX<SimNode>(0).strength(0.035))
       .force('y', forceY<SimNode>(0).strength(0.035));
-    if (!this.reduceMotion) sim.force('drift', drift(DRIFT_STRENGTH));
     sim.on('tick', () => {
-      const now = performance.now();
-      if (sim.alpha() > 0.05 || now - this.lastDraw >= IDLE_FRAME_MS) this.requestDraw();
+      if (sim.alpha() > 0.05 || performance.now() - this.lastDraw >= IDLE_FRAME_MS) this.requestDraw();
+    });
+    sim.on('end', () => {
+      for (const node of this.nodes) {
+        node.vx = 0;
+        node.vy = 0;
+      }
+      this.settled = true;
+      this.coastT0 = this.motionTime();
+      this.coasting = !this.reduceMotion && this.nodes.length > 0 && !document.hidden;
+      if (this.coasting) this.requestDraw();
     });
     return sim;
   }
@@ -360,8 +384,9 @@ export class GraphCanvas {
     this.followUntil = 0;
     this.bursting = false;
     this.pendingFocus = null;
+    const placed = this.place(node);
     this.animateTo(
-      { k: FOCUS_ZOOM, x: this.width / 2 - node.x! * FOCUS_ZOOM, y: this.height / 2 - node.y! * FOCUS_ZOOM },
+      { k: FOCUS_ZOOM, x: this.width / 2 - placed.x * FOCUS_ZOOM, y: this.height / 2 - placed.y * FOCUS_ZOOM },
       duration,
     );
   }
@@ -370,10 +395,11 @@ export class GraphCanvas {
     if (!this.nodes.length || !this.width || !this.height) return null;
     let [minX, maxX, minY, maxY] = [Infinity, -Infinity, Infinity, -Infinity];
     for (const n of this.nodes) {
-      minX = Math.min(minX, n.x! - n.radius);
-      maxX = Math.max(maxX, n.x! + n.radius);
-      minY = Math.min(minY, n.y! - n.radius);
-      maxY = Math.max(maxY, n.y! + n.radius);
+      const p = this.place(n);
+      minX = Math.min(minX, p.x - n.radius);
+      maxX = Math.max(maxX, p.x + n.radius);
+      minY = Math.min(minY, p.y - n.radius);
+      maxY = Math.max(maxY, p.y + n.radius);
     }
     const k = Math.min(
       MAX_ZOOM,
@@ -444,8 +470,22 @@ export class GraphCanvas {
 
   private onVisibility = () => {
     if (!this.sim || this.reduceMotion) return;
-    if (document.hidden) this.sim.stop();
-    else this.sim.restart();
+    if (document.hidden) {
+      this.hiddenAt = performance.now() / 1000;
+      this.sim.stop();
+      this.coasting = false;
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
+      return;
+    }
+    if (this.hiddenAt) {
+      this.paused += performance.now() / 1000 - this.hiddenAt;
+      this.hiddenAt = 0;
+    }
+    if (this.settled) {
+      this.coasting = this.nodes.length > 0;
+      this.requestDraw();
+    } else this.sim.restart();
   };
 
   private preloadAvatars(): void {
@@ -470,6 +510,36 @@ export class GraphCanvas {
     return null;
   }
 
+  /** Clip once. Later frames scale this sprite instead of clipping the image again. */
+  private avatarSprite(url: string): HTMLCanvasElement | null {
+    const cached = this.sprites.get(url);
+    if (cached) return cached;
+    const img = this.image(url);
+    if (!img) return null;
+    const sprite = document.createElement('canvas');
+    const size = Math.max(1, Math.min(img.naturalWidth || AVATAR_SPRITE, AVATAR_SPRITE));
+    sprite.width = size;
+    sprite.height = size;
+    const g = sprite.getContext('2d');
+    if (!g) return null;
+    g.beginPath();
+    g.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    g.clip();
+    g.drawImage(img, 0, 0, size, size);
+    this.sprites.set(url, sprite);
+    return sprite;
+  }
+
+  private worldView(): WorldView {
+    const { k, x, y } = this.transform;
+    return { x0: -x / k, y0: -y / k, x1: (this.width - x) / k, y1: (this.height - y) / k };
+  }
+
+  private onScreen(x: number, y: number, pad: number, view: WorldView): boolean {
+    if (this.width <= 0 || this.height <= 0) return true;
+    return x + pad >= view.x0 && x - pad <= view.x1 && y + pad >= view.y0 && y - pad <= view.y1;
+  }
+
   // ---- input -------------------------------------------------------------
 
   private toWorld(clientX: number, clientY: number) {
@@ -485,7 +555,8 @@ export class GraphCanvas {
       // Filtered nodes are drawn as ghosts and must not steal the click.
       if (!this.view.visible.has(n.id) && n.id !== this.view.selectedId) continue;
       const r = n.radius + 5;
-      if ((n.x! - x) ** 2 + (n.y! - y) ** 2 <= r * r) return n;
+      const p = this.place(n);
+      if ((p.x - x) ** 2 + (p.y - y) ** 2 <= r * r) return n;
     }
     return null;
   }
@@ -539,7 +610,12 @@ export class GraphCanvas {
     } else if (gesture?.kind === 'drag') {
       if (!gesture.moved) {
         gesture.moved = true;
-        this.sim?.alphaTarget(0.3).restart();
+        // The pointer grabbed the drawn position. Put that back into the layout
+        // before the forces run, or the node jumps by the current sway.
+        this.bakeDrift();
+        this.settled = false;
+        if (this.reduceMotion) this.sim?.stop();
+        else this.sim?.alphaTarget(0.3).restart();
       }
       gesture.node.fx = x;
       gesture.node.fy = y;
@@ -564,11 +640,14 @@ export class GraphCanvas {
       if (gesture.moved) {
         if (this.reduceMotion) {
           // No live simulation: let the neighbours catch up once, then stop.
-          this.sim?.alpha(0.3);
+          this.sim?.stop();
+          this.sim?.alphaTarget(0)?.alpha(0.3);
           for (let i = 0; i < 60; i += 1) this.sim?.tick();
+          this.settled = true;
+          this.coasting = false;
           this.requestDraw();
         } else {
-          this.sim?.alphaTarget(DRIFT_ALPHA);
+          this.sim?.alphaTarget(0);
         }
       } else {
         this.callbacks.onSelect(gesture.node.id);
@@ -604,12 +683,66 @@ export class GraphCanvas {
 
   // ---- drawing -----------------------------------------------------------
 
-  private requestDraw(): void {
+  private requestDraw(immediate = true): void {
+    if (immediate) this.paintNow = true;
     if (!this.frame) this.frame = requestAnimationFrame(this.draw);
+  }
+
+  /** Seconds since load, not counting time the tab was hidden. */
+  private motionTime(now = performance.now()): number {
+    return now / 1000 - this.paused;
+  }
+
+  /** Sway at time t, in world pixels. Independent of the stored layout. */
+  private sway(node: SimNode, t: number): { x: number; y: number } {
+    return {
+      x: Math.sin(t * node.freq + node.phase) * DRIFT_PX,
+      y: Math.cos(t * node.freq * 0.83 + node.phase * 1.7) * DRIFT_PX,
+    };
+  }
+
+  /**
+   * Where a node is drawn. After the simulation ends this is the settled
+   * position plus a sway that is zero at that moment, so the first coasting
+   * frame does not pop.
+   */
+  private place(node: SimNode, t = this.motionTime()): { x: number; y: number } {
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    if (!this.coasting) return { x, y };
+    const now = this.sway(node, t);
+    const origin = this.sway(node, this.coastT0);
+    return { x: x + now.x - origin.x, y: y + now.y - origin.y };
+  }
+
+  /** Write the drawn position into the layout before a drag reheats the forces. */
+  private bakeDrift(): void {
+    if (!this.coasting) return;
+    const t = this.motionTime();
+    for (const node of this.nodes) {
+      const p = this.place(node, t);
+      node.x = p.x;
+      node.y = p.y;
+      node.vx = 0;
+      node.vy = 0;
+    }
+    this.coasting = false;
   }
 
   private draw = (now: number) => {
     this.frame = 0;
+    const painting =
+      this.paintNow ||
+      !this.coasting ||
+      this.animation != null ||
+      this.nodesFading ||
+      (!this.userInteracted && now < this.followUntil) ||
+      now - this.lastDraw >= IDLE_FRAME_MS;
+    this.paintNow = false;
+    if (!painting) {
+      this.requestDraw(false);
+      return;
+    }
     this.lastDraw = now;
     if (this.animation) {
       const { from, to, start, duration } = this.animation;
@@ -664,16 +797,20 @@ export class GraphCanvas {
         fading = true;
       }
     }
+    this.nodesFading = fading;
     if (fading) this.requestDraw();
 
-    this.drawHulls(focus, tf.k);
-    this.drawLinks({ ...focus, showTrajectories: this.view.showTrajectories, clusterOf: this.clusterOf });
+    const view = this.worldView();
+    const t = this.motionTime(now);
+    this.drawHulls(focus, tf.k, t);
+    this.drawLinks({ ...focus, showTrajectories: this.view.showTrajectories, clusterOf: this.clusterOf }, view, t);
     const emphasized: SimNode[] = [];
     for (const node of this.nodes) {
       if (node.id === focus.selectedId || node.id === hover?.id) emphasized.push(node);
-      else this.drawNode(node, focus, tf.k);
+      else this.drawNode(node, focus, tf.k, view, t);
     }
-    emphasized.forEach((node) => this.drawNode(node, focus, tf.k));
+    emphasized.forEach((node) => this.drawNode(node, focus, tf.k, view, t));
+    if (this.coasting) this.requestDraw(false);
   };
 
   private targetAlpha(node: SimNode, focus: FocusContext): number {
@@ -683,13 +820,14 @@ export class GraphCanvas {
     return 1;
   }
 
-  private drawHulls(focus: FocusContext, scale: number): void {
+  private drawHulls(focus: FocusContext, scale: number, t: number): void {
     const clusterId = focusClusterId(focus);
     const cluster = clusterId == null ? undefined : this.clusters.get(clusterId);
     if (!cluster) return;
     const members = this.nodes.filter((n) => n.cluster_id === clusterId && focus.visible.has(n.id));
     if (members.length < 3) return;
-    const hull = convexHull(members.map((n) => ({ x: n.x!, y: n.y! })));
+    const placed = members.map((n) => this.place(n, t));
+    const hull = convexHull(placed);
     if (hull.length < 3) return;
     const { ctx } = this;
     ctx.beginPath();
@@ -701,8 +839,8 @@ export class GraphCanvas {
     ctx.lineWidth = 1 / scale;
     ctx.stroke();
     if (scale > 0.5 && cluster.name) {
-      const cx = members.reduce((s, n) => s + n.x!, 0) / members.length;
-      const cy = members.reduce((s, n) => s + n.y!, 0) / members.length;
+      const cx = placed.reduce((s, p) => s + p.x, 0) / placed.length;
+      const cy = placed.reduce((s, p) => s + p.y, 0) / placed.length;
       ctx.font = `600 ${Math.max(14 / scale, 10)}px ${FONT}`;
       ctx.fillStyle = `${cluster.color}60`;
       ctx.textAlign = 'center';
@@ -711,7 +849,7 @@ export class GraphCanvas {
     }
   }
 
-  private drawLinks(context: LinkContext): void {
+  private drawLinks(context: LinkContext, view: WorldView, t: number): void {
     const { ctx } = this;
     if (!this.linkStylesReady) {
       for (const link of this.links) {
@@ -720,29 +858,68 @@ export class GraphCanvas {
       }
       this.linkStylesReady = true;
     }
+    // Link colours already carry alpha. One stroke() of many curves would
+    // composite them as a single layer and lighten every crossing, so each
+    // curve is stroked on its own. Shared colour, width, and opacity are set
+    // once per group.
+    const groups = new Map<string, { color: string; width: number; alpha: number; segs: number[] }>();
     for (const link of this.links) {
       const style = link.stroke;
       if (!style?.width) continue;
-      const { x: x1, y: y1 } = link.source as { x: number; y: number };
-      const { x: x2, y: y2 } = link.target as { x: number; y: number };
-      // Same gentle curve react-force-graph drew with linkCurvature 0.1.
-      const offset = Math.hypot(x2 - x1, y2 - y1) * 0.1;
-      const angle = Math.atan2(y2 - y1, x2 - x1) - Math.PI / 2;
-      ctx.globalAlpha = Math.min(link.source.fade, link.target.fade, 1) ** 0.5;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.quadraticCurveTo((x1 + x2) / 2 + offset * Math.cos(angle), (y1 + y2) / 2 + offset * Math.sin(angle), x2, y2);
-      ctx.strokeStyle = style.color;
-      ctx.lineWidth = style.width;
-      ctx.stroke();
+      const a = this.place(link.source, t);
+      const b = this.place(link.target, t);
+      if (!this.linkOnScreen(a.x, a.y, b.x, b.y, view)) continue;
+      const alpha = Math.min(link.source.fade, link.target.fade, 1) ** 0.5;
+      if (alpha <= 0) continue;
+      const key = `${style.color}\0${style.width}\0${alpha}`;
+      const group = groups.get(key);
+      if (group) group.segs.push(a.x, a.y, b.x, b.y);
+      else groups.set(key, { color: style.color, width: style.width, alpha, segs: [a.x, a.y, b.x, b.y] });
+    }
+    for (const group of groups.values()) {
+      ctx.globalAlpha = group.alpha;
+      ctx.strokeStyle = group.color;
+      ctx.lineWidth = group.width;
+      const { segs } = group;
+      for (let i = 0; i < segs.length; i += 4) {
+        ctx.beginPath();
+        this.curve(segs[i], segs[i + 1], segs[i + 2], segs[i + 3]);
+        ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
   }
 
-  private drawNode(node: SimNode, focus: FocusContext, scale: number): void {
+  /** Same gentle curve react-force-graph drew with linkCurvature 0.1. */
+  private curve(x1: number, y1: number, x2: number, y2: number): void {
     const { ctx } = this;
-    const x = node.x!;
-    const y = node.y!;
+    const offset = Math.hypot(x2 - x1, y2 - y1) * 0.1;
+    const angle = Math.atan2(y2 - y1, x2 - x1) - Math.PI / 2;
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo((x1 + x2) / 2 + offset * Math.cos(angle), (y1 + y2) / 2 + offset * Math.sin(angle), x2, y2);
+  }
+
+  private linkOnScreen(x1: number, y1: number, x2: number, y2: number, view: WorldView): boolean {
+    if (this.width <= 0 || this.height <= 0) return true;
+    const bulge = Math.hypot(x2 - x1, y2 - y1) * 0.1;
+    return (
+      Math.max(x1, x2) + bulge >= view.x0 &&
+      Math.min(x1, x2) - bulge <= view.x1 &&
+      Math.max(y1, y2) + bulge >= view.y0 &&
+      Math.min(y1, y2) - bulge <= view.y1
+    );
+  }
+
+  private drawNode(node: SimNode, focus: FocusContext, scale: number, view: WorldView, t: number): void {
+    const { ctx } = this;
+    const emphasized = node.id === focus.selectedId || node.id === focus.hover?.id;
+    // The label font floors at 8 world pixels, so a pad that shrinks with zoom
+    // hides names whose centres have just left the viewport.
+    const fontSize = Math.max(10 / scale, 8);
+    const labeled = showLabel(node.id, focus) && (emphasized || scale >= NEIGHBOR_LABEL_ZOOM);
+    const pad = labeled ? node.radius + fontSize * (node.name.length + 1) + 4 / scale : node.radius + 4 / scale;
+    const { x, y } = this.place(node, t);
+    if (!this.onScreen(x, y, pad, view)) return;
     const visible = focus.visible.has(node.id);
     const isSelected = focus.selectedId === node.id;
     const isHovered = focus.hover?.id === node.id;
@@ -750,19 +927,13 @@ export class GraphCanvas {
     // Colour without the baked-in dim alpha: opacity comes from the eased fade.
     const color = dimmed ? COLORS.NODE_DEFAULT : nodeColor(node, focus);
 
-    ctx.save();
     ctx.globalAlpha = node.fade;
 
     // Filtered-out nodes are uniform ghosts; an avatar would make them read as visible.
     const ghost = !visible && !isSelected && !isHovered;
-    const img = this.view.hqRendering && node.avatar && !ghost ? this.image(node.avatar) : null;
-    if (img) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(x, y, node.radius, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(img, x - node.radius, y - node.radius, node.radius * 2, node.radius * 2);
-      ctx.restore();
+    const sprite = this.view.hqRendering && node.avatar && !ghost ? this.avatarSprite(node.avatar) : null;
+    if (sprite) {
+      ctx.drawImage(sprite, x - node.radius, y - node.radius, node.radius * 2, node.radius * 2);
     } else {
       ctx.beginPath();
       ctx.arc(x, y, !visible && !isSelected && !isHovered ? node.radius * 0.8 : node.radius, 0, Math.PI * 2);
@@ -778,9 +949,7 @@ export class GraphCanvas {
       ctx.stroke();
     }
 
-    const emphasized = node.id === focus.selectedId || node.id === focus.hover?.id;
-    if (showLabel(node.id, focus) && (emphasized || scale >= NEIGHBOR_LABEL_ZOOM)) {
-      const fontSize = Math.max(10 / scale, 8);
+    if (labeled) {
       const padding = 3 / scale;
       const labelY = y + node.radius + fontSize + 2 / scale;
       ctx.font = `500 ${fontSize}px ${FONT}`;
@@ -792,6 +961,6 @@ export class GraphCanvas {
       ctx.textBaseline = 'middle';
       ctx.fillText(node.name, x, labelY - fontSize / 2 + padding);
     }
-    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 }
