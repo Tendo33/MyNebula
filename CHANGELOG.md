@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-16
+
 ### Added
 - The pipeline runs with `GITHUB_TOKEN` alone. Without an embedding key, repositories are linked and grouped by topics, star lists, and language, and no API is called beyond GitHub. `LLM_API_KEY` alone still produces summaries and tags. Adding keys later upgrades the next sync in place.
 
