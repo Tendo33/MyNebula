@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
 import { deduplicateNames, detectCommunities, GROUP_ALGO, louvain, matchPrevious, sanitizeClusterName, tagNames } from './cluster.ts';
-import { adaptiveThreshold, analyze, buildEdges, graphKey, normalizeTag, normalizeTags, scorePairs, tagOverlap, writeSite, type Edge } from './graph.ts';
+import { adaptiveThreshold, analyze, buildEdges, forEachPair, graphKey, normalizeTag, normalizeTags, scorePairs, tagOverlap, writeSite, type Edge } from './graph.ts';
 import { embeddingText, fallbackTags, parseSummaryJson, pickReadmeOid, readmeSignal } from './remote.ts';
 import { applyContentHash, assertAllowedApiHost, assignClusters, checkApiHosts, contentHash, legacyContentHash, loadSettings, loadState, markForEnrichment, saveState, shouldReuseClusters, type Repo, type State } from './sync.ts';
 
@@ -100,6 +100,30 @@ describe('tags and scores', () => {
       .filter((repo) => repo.embedding?.length)
       .sort((a, b) => (b.starred_at ?? '').localeCompare(a.starred_at ?? ''));
     expect(analyze(state).edges).toEqual(buildEdges(repos.map((repo) => repo.id), scorePairs(repos)));
+  });
+
+  it('visits every pair once with the same dot as the scalar loop', () => {
+    for (const n of [1, 2, 3, 4, 5, 7, 8, 9, 17]) {
+      const dim = 6;
+      const unit = new Float32Array(n * dim);
+      for (let k = 0; k < unit.length; k += 1) unit[k] = Math.sin((k + 1) * (n + 3)) * 0.5;
+      const seen = new Map<string, number>();
+      let order = 0;
+      forEachPair(unit, dim, n, (i, j, dot) => {
+        expect(i).toBeLessThan(j);
+        seen.set(`${i}:${j}`, dot);
+        order += 1;
+      });
+      expect(order).toBe((n * (n - 1)) / 2);
+      expect(seen.size).toBe(order);
+      for (let i = 0; i < n; i += 1) {
+        for (let j = i + 1; j < n; j += 1) {
+          let naive = 0;
+          for (let d = 0; d < dim; d += 1) naive += unit[i * dim + d] * unit[j * dim + d];
+          expect(seen.get(`${i}:${j}`)).toBe(naive);
+        }
+      }
+    }
   });
 
   it('keeps the neighbours a full stable sort would keep', () => {

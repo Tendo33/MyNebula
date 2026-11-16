@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Linking a few thousand repositories no longer evaluates each embedding pair one at a time: four rows advance together so each neighbour vector is read once. Results are unchanged to the last bit, and the edge list is identical.
+- The scoring key hashes embedding bytes instead of building a comma-joined string per repository, cutting the reuse check from hundreds of milliseconds to tens at a few thousand repos.
+
 ## [2.3.0] - 2026-11-16
 
 ### Changed

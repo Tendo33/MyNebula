@@ -130,9 +130,8 @@ const prepare = (repos: Repo[]) => {
   const tags = repos.map((r) => normalizeTags(r.ai_tags, r.topics));
   const tagSets = tags.map((row) => new Set(row));
   const listSets = repos.map((r) => new Set(r.star_list_ids));
-  const weight = (i: number, j: number) => {
-    let dot = 0;
-    for (let d = 0, a = i * dim, b = j * dim; d < dim; d += 1) dot += unit[a + d] * unit[b + d];
+  /** Blend for one pair once its cosine is known. */
+  const combine = (i: number, j: number, dot: number) => {
     let sharedList = 0;
     const lists = listSets[i];
     const right = repos[j].star_list_ids;
@@ -155,7 +154,63 @@ const prepare = (repos: Repo[]) => {
       ),
     );
   };
-  return { n, weight };
+  return { n, dim, unit, combine };
+};
+
+/** Cosine of one pair. The single-row path the block loop must match bit for bit. */
+const cosine = (unit: Float32Array, dim: number, i: number, j: number): number => {
+  let dot = 0;
+  for (let d = 0, a = i * dim, b = j * dim; d < dim; d += 1) dot += unit[a + d] * unit[b + d];
+  return dot;
+};
+
+/** Rows per block. Four accumulators fit in registers; eight measured slower. */
+const PAIR_BLOCK = 4;
+
+/**
+ * Visit every `i < j` pair once with its cosine. Four rows advance together so
+ * each `j` row is read once instead of four times, which is where the n²·dim
+ * cost lives at a few thousand repos. Every accumulator still sums `d` in
+ * ascending order, so each dot is identical to `cosine`.
+ *
+ * Exported for the test that pins the block arithmetic against `cosine`.
+ */
+export const forEachPair = (
+  unit: Float32Array,
+  dim: number,
+  n: number,
+  visit: (i: number, j: number, dot: number) => void,
+): void => {
+  let i = 0;
+  for (; i + PAIR_BLOCK <= n; i += PAIR_BLOCK) {
+    const a0 = i * dim;
+    const a1 = a0 + dim;
+    const a2 = a1 + dim;
+    const a3 = a2 + dim;
+    for (let j = i + PAIR_BLOCK; j < n; j += 1) {
+      const b = j * dim;
+      let s0 = 0;
+      let s1 = 0;
+      let s2 = 0;
+      let s3 = 0;
+      for (let d = 0; d < dim; d += 1) {
+        const v = unit[b + d];
+        s0 += unit[a0 + d] * v;
+        s1 += unit[a1 + d] * v;
+        s2 += unit[a2 + d] * v;
+        s3 += unit[a3 + d] * v;
+      }
+      visit(i, j, s0);
+      visit(i + 1, j, s1);
+      visit(i + 2, j, s2);
+      visit(i + 3, j, s3);
+    }
+    // Pairs inside the block have no shared j row to reuse.
+    for (let r = i; r < i + PAIR_BLOCK; r += 1) {
+      for (let j = r + 1; j < i + PAIR_BLOCK; j += 1) visit(r, j, cosine(unit, dim, r, j));
+    }
+  }
+  for (; i < n; i += 1) for (let j = i + 1; j < n; j += 1) visit(i, j, cosine(unit, dim, i, j));
 };
 
 /**
@@ -164,12 +219,14 @@ const prepare = (repos: Repo[]) => {
  * 0.5-0.65), so they are mean-centered first to separate neighbours from bystanders.
  */
 export const scorePairs = (repos: Repo[]): Scores => {
-  const { n, weight } = prepare(repos);
+  const { n, dim, unit, combine } = prepare(repos);
   const score = new Float32Array(n * n);
-  for (let i = 0; i < n; i += 1) {
-    score[i * n + i] = -1;
-    for (let j = i + 1; j < n; j += 1) score[i * n + j] = score[j * n + i] = weight(i, j);
-  }
+  for (let i = 0; i < n; i += 1) score[i * n + i] = -1;
+  forEachPair(unit, dim, n, (i, j, dot) => {
+    const w = combine(i, j, dot);
+    score[i * n + j] = w;
+    score[j * n + i] = w;
+  });
   return { n, score };
 };
 
@@ -234,19 +291,17 @@ export const buildEdges = (ids: number[], scores: Scores): Edge[] => {
  * The sync path uses this; the matrix stays available for the threshold helper.
  */
 const linkRepos = (repos: Repo[]): Edge[] => {
-  const { n, weight } = prepare(repos);
+  const { n, dim, unit, combine } = prepare(repos);
   if (n < 2) return [];
   const rows: Neighbour[][] = Array.from({ length: n }, () => []);
   const m = Math.min(n, THRESHOLD_SAMPLE);
   const upper: number[] = [];
-  for (let i = 0; i < n; i += 1) {
-    for (let j = i + 1; j < n; j += 1) {
-      const w = weight(i, j);
-      if (i < m && j < m) upper.push(w);
-      consider(rows[i], j, w);
-      consider(rows[j], i, w);
-    }
-  }
+  forEachPair(unit, dim, n, (i, j, dot) => {
+    const w = combine(i, j, dot);
+    if (j < m) upper.push(w);
+    consider(rows[i], j, w);
+    consider(rows[j], i, w);
+  });
   return edgesFromRows(
     repos.map((repo) => repo.id),
     rows,
@@ -298,6 +353,10 @@ export interface Analysis {
 export const graphKey = (repos: Repo[]): string => {
   const hash = createHash('sha256');
   hash.update([GRAPH_ALGO, EDGE_K, THRESHOLD_SAMPLE, SEMANTIC_WEIGHT, TAG_OVERLAP_WEIGHT, STAR_LIST_WEIGHT, LANGUAGE_WEIGHT].join('\0'));
+  // Embeddings are hashed as float64 bytes: exact, and no per-value string to
+  // allocate. The length goes in first so two vectors cannot concatenate into
+  // the same bytes as one longer vector.
+  let scratch = new Float64Array(0);
   for (const repo of repos) {
     const tags = normalizeTags(repo.ai_tags, repo.topics).slice().sort();
     const lists = [...(repo.star_list_ids ?? [])].sort();
@@ -305,8 +364,15 @@ export const graphKey = (repos: Repo[]): string => {
     for (const list of lists) hash.update(`\0${list}`);
     hash.update(`\0${tags.length}`);
     for (const tag of tags) hash.update(`\0${tag}`);
-    hash.update('\0');
-    hash.update((repo.embedding ?? []).join(','));
+    const embedding = repo.embedding ?? [];
+    hash.update(`\0${embedding.length}:`);
+    if (scratch.length !== embedding.length) scratch = new Float64Array(embedding.length);
+    for (let d = 0; d < embedding.length; d += 1) {
+      const value = embedding[d];
+      // JSON turns -0 into 0, so hash the same value either way.
+      scratch[d] = value === 0 ? 0 : value;
+    }
+    hash.update(new Uint8Array(scratch.buffer, 0, embedding.length * 8));
   }
   return hash.digest('hex');
 };
