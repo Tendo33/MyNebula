@@ -38,7 +38,7 @@ Connections, not folders: semantic similarity links decide both the layout and t
 
 ## Brand Commitments
 
-- Name: MyNebula. Logo and banner in `doc/images/`.
+- Name: MyNebula. Logo and screenshots in `docs/screenshots/`.
 - Personality: precise, exploratory, calm. Credible and engineered, not a sci-fi toy.
 - Visual language is Vercel Geist as recorded in `DESIGN.md`.
 
@@ -48,7 +48,7 @@ Ivory/indigo “research desk” leftovers, gimmicky space visuals, Inter/Roboto
 
 ## Evidence on Hand
 
-- `doc/images/logo.png`, `doc/images/screenshot-graph.webp`, and `doc/images/screenshot-details.webp`.
+- `docs/screenshots/logo.png`, `docs/screenshots/legacy-graph.webp`, and `docs/screenshots/legacy-details.webp`.
 - No testimonials, user counts, benchmarks, or case studies exist. Do not invent them.
 
 ## Product Principles

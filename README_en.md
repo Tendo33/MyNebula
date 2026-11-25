@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/Tendo33/MyNebula">
-    <img src="doc/images/logo.png" width="96" alt="MyNebula logo" />
+    <img src="docs/screenshots/logo.png" width="96" alt="MyNebula logo" />
   </a>
 
   <h1>MyNebula</h1>
@@ -27,7 +27,7 @@
   </p>
 </div>
 
-![图谱视图：225 个星标仓库以图标呈现，按主题聚成团，左侧是聚类与星标列表筛选](doc/images/live/graph.webp)
+![图谱视图：225 个星标仓库以图标呈现，按主题聚成团，左侧是聚类与星标列表筛选](docs/screenshots/graph.webp)
 
 ## 这是什么
 
@@ -35,7 +35,7 @@ MyNebula 读取你的 GitHub 星标，为每个仓库写一段简短摘要，并
 
 它是一个静态站点加一条离线同步，没有服务端，也没有数据库：GitHub Actions 每天跑一次同步并重新部署到 GitHub Pages。每次只处理新增或有变化的星标，所以保持更新几乎不花钱。
 
-![选中一个仓库：画布上只点亮与它相连的节点，右侧面板显示星数、标签、摘要和相关仓库](doc/images/live/details.webp)
+![选中一个仓库：画布上只点亮与它相连的节点，右侧面板显示星数、标签、摘要和相关仓库](docs/screenshots/details.webp)
 
 ## 功能
 

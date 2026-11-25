@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/Tendo33/MyNebula">
-    <img src="doc/images/logo.png" width="96" alt="MyNebula logo" />
+    <img src="docs/screenshots/logo.png" width="96" alt="MyNebula logo" />
   </a>
 
   <h1>MyNebula</h1>
@@ -27,7 +27,7 @@
   </p>
 </div>
 
-![The graph view: 225 starred repositories as logos, clustered by topic, with the cluster and star-list filters down the left](doc/images/live/graph.webp)
+![The graph view: 225 starred repositories as logos, clustered by topic, with the cluster and star-list filters down the left](docs/screenshots/graph.webp)
 
 ## What it is
 
@@ -35,7 +35,7 @@ MyNebula reads your GitHub stars, writes a short summary of each repository, and
 
 It ships as a static site plus an offline sync. There is no server and no database: a daily GitHub Actions run refreshes the data and redeploys to GitHub Pages. Reruns only process new or changed stars, so keeping it current costs close to nothing.
 
-![A repository selected: its neighbours light up on the canvas, and the panel on the right shows stars, tags, summary and related repositories](doc/images/live/details.webp)
+![A repository selected: its neighbours light up on the canvas, and the panel on the right shows stars, tags, summary and related repositories](docs/screenshots/details.webp)
 
 ## Features
 
