@@ -11,9 +11,19 @@
 
   <p>
     <img src="https://img.shields.io/badge/Node-24%2B-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 24+" />
-    <img src="https://img.shields.io/badge/TypeScript-vanilla-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite" />
+    <img src="https://img.shields.io/badge/d3--force-000000?style=flat-square&logo=d3dotjs&logoColor=white" alt="d3-force" />
     <img src="https://img.shields.io/badge/deploy-GitHub%20Pages-222?style=flat-square&logo=github" alt="GitHub Pages" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2EA043?style=flat-square" alt="MIT License" /></a>
+  </p>
+
+  <p>
+    <a href="#这是什么">这是什么</a> ·
+    <a href="#部署你自己的星图">部署你自己的</a> ·
+    <a href="#工作方式">工作方式</a> ·
+    <a href="#配置">配置</a> ·
+    <a href="#本地开发">本地开发</a>
   </p>
 </div>
 
