@@ -27,7 +27,7 @@
   </p>
 </div>
 
-![MyNebula graph view](doc/images/screenshot-graph.webp)
+![The graph view: 225 starred repositories as logos, clustered by topic, with the cluster and star-list filters down the left](doc/images/live/graph.webp)
 
 ## What it is
 
@@ -35,7 +35,7 @@ MyNebula reads your GitHub stars, writes a short summary of each repository, and
 
 It ships as a static site plus an offline sync. There is no server and no database: a daily GitHub Actions run refreshes the data and redeploys to GitHub Pages. Reruns only process new or changed stars, so keeping it current costs close to nothing.
 
-![Repository details with related repositories](doc/images/screenshot-details.webp)
+![A repository selected: its neighbours light up on the canvas, and the panel on the right shows stars, tags, summary and related repositories](doc/images/live/details.webp)
 
 ## Features
 
