@@ -1,48 +1,31 @@
-# Project Agent Entrypoint
+# MyNebula
 
-This file is the shared root entrypoint for AI assistants in MyNebula.
+把 GitHub Stars 变成语义知识星云，发布为静态站点。单包，pnpm，Node 24。
 
-## Shape
+## 形态
 
-A static site plus an offline pipeline, one TypeScript package on Node 24 (pnpm).
+- `pipeline/`：离线管线，用 `node` 直接跑类型剥离，不编译、无运行时依赖。`pnpm sync` 拉取 stars，为新仓库或有变化的仓库生成摘要/标签与向量，连接相关仓库，按 Louvain 划分社区（id 与上一轮对齐），写出 `frontend/public/data/graph.json`。
+- `data/cache.json.gz` 保存状态，**重跑必须增量**：只有新仓库和内容变化的仓库才能打付费 API。评分输入没变时复用边与分组，但 `graph.json` 仍会重写。
+- 只有 `GITHUB_TOKEN` 是必需的。没有 embedding key 时按 topics、star 列表和语言连边；没有 LLM key 时不调用对话模型。拿不到向量的仓库留在图里，不剔除。
+- `frontend/`：Vite + 原生 TypeScript + d3-force。Graph（首页）、Data、Settings 与 Cmd/Ctrl+K 面板，hash 路由以便任意静态托管。画布在 `frontend/src/graph/canvas.ts`：边上的力模拟跑至稳定后转为绘制的漂移（隐藏标签页暂停，减弱动效时关闭），拖拽会把漂移写回布局并重新加热。配色与可见性是 `graph/style.ts` 里的纯函数。
+- `.github/workflows/pages.yml` 每天跑一次 sync 并部署到 Pages。
 
-- `pipeline/` runs directly with `node` (type stripping, no build, no runtime
-  deps). `pnpm sync` fetches stars, writes optional LLM summaries/tags and
-  embeddings for new or changed repos, links related repos, groups them as
-  Louvain communities (ids matched to the previous run), and writes
-  `frontend/public/data/graph.json`. State lives in
-  `data/cache.json.gz`; reruns must stay incremental. Edges and groups are
-  reused when the scoring inputs are unchanged, and `graph.json` is still
-  rewritten. Only `GITHUB_TOKEN` is required: without an embedding key repos
-  are linked on topics, star lists, and language, and without an LLM key no
-  chat model is called. A repo missing its embedding stays in the graph rather
-  than dropping out.
-- `frontend/` (Vite, vanilla TypeScript, d3-force): Graph (home), Data,
-  Settings, and the Cmd/Ctrl+K palette. Hash routing so any static host works.
-  The canvas is `frontend/src/graph/canvas.ts`: a force simulation on the
-  edges runs until it settles, then a drawn drift continues (paused in hidden
-  tabs, off under reduced motion). Dragging writes that drift back into the
-  layout and reheats the simulation. Colour and visibility rules are pure
-  functions in `graph/style.ts`.
-- `.github/workflows/pages.yml` runs the sync daily and deploys to Pages.
+## 规则
 
-## Working rules
+- 管线代码必须是可擦除的 TypeScript（不用 enum、namespace、参数属性），Node 只剥离类型不编译。
+- 保持前端轻量：不引入 UI 框架或组件库。
+- 模板一律经过 `frontend/src/html.ts` 的 `html`，它会对每个插值做转义。条件标记写成 `cond ? html\`…\` : ''`，不要用 `cond && …`，否则布尔值会渲染成 "true"/"false"。
+- Graph、Data 页与面板搜索共用 `frontend/src/search.ts`。
+- `graph.json` 的字段契约要在 `pipeline/graph.ts` 与 `frontend/src/types.ts` 之间保持同步。
+- 前端保留 Graph、Data、Settings 三条流程、Graph 与 Data 的 URL 状态、命令面板、en/zh 双语。
+- 视觉沿用 `DESIGN.md` 里的 Vercel Geist：细线优先于卡片，控件 6px，一个墨色加若干社区色。
 
-- Keep changes minimal, explicit, and verifiable.
-- Pipeline code must stay erasable TypeScript (no enums, namespaces, or
-  parameter properties) because Node strips types instead of compiling.
-- Keep the frontend dependency-light: no UI framework or component library.
-- Templates go through `html` in `frontend/src/html.ts`, which escapes every
-  interpolation. Write conditional markup as `cond ? html`…` : ''`, never
-  `cond && …`, because booleans render as "true"/"false".
-- Graph, Data page, and palette search share `frontend/src/search.ts`.
-- Visual language is Vercel Geist in `DESIGN.md`:
-  hairlines over cards, 6px controls, one ink plus cluster hues.
-
-## Commands
+## 命令
 
 ```bash
-pnpm lint    # tsc over pipeline + frontend
+pnpm sync    # 拉取 stars 并重建 graph.json（增量）
+pnpm lint    # tsc 检查 pipeline 与 frontend
 pnpm test    # vitest
 pnpm build
+pnpm dev
 ```
