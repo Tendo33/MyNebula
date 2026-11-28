@@ -1,14 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="%SITE_LANG%">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="./logo.png" />
+    <link rel="icon" type="image/svg+xml" href="%SITE_ICON%" />
+    <link rel="apple-touch-icon" href="%SITE_APPLE_ICON%" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MyNebula</title>
-    <meta name="description" content="MyNebula: visualize your GitHub stars as a clustered knowledge nebula." />
-    <meta property="og:title" content="MyNebula" />
-    <meta property="og:description" content="Visualize your GitHub stars as a clustered knowledge nebula." />
-    <meta property="og:image" content="./logo.png" />
+    <title>%SITE_NAME%</title>
+    <meta name="description" content="%SITE_DESCRIPTION%" />
+    %SITE_CANONICAL%
+    <meta name="theme-color" content="%SITE_THEME_COLOR%" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="%SITE_NAME%" />
+    <meta property="og:description" content="%SITE_DESCRIPTION%" />
+    <meta property="og:image" content="%SITE_OG_IMAGE%" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="%SITE_NAME%" />
+    <meta name="twitter:description" content="%SITE_DESCRIPTION%" />
+    <meta name="twitter:image" content="%SITE_OG_IMAGE%" />
     <!-- Sets the theme class before first paint. External (not inline) so a strict
          CSP script-src 'self' allows it; vite-ignore keeps it out of the bundle. -->
     <script src="./theme-init.js" vite-ignore></script>

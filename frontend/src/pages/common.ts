@@ -9,8 +9,10 @@ export const loadingState = (): Raw =>
 export const errorState = (message?: string | null): Raw => {
   const detail = loadErrorDetail(message);
   return html`<div class="center-state" role="alert">
-    <p>${t('common.load_failed')}</p>
-    ${detail ? html`<p class="muted">${detail}</p>` : ''}
+    <span class="empty-icon">${icon('alert')}</span>
+    <h2 class="empty-title">${t('common.load_failed_title')}</h2>
+    <p class="muted">${t('common.load_failed')}</p>
+    ${detail ? html`<p class="dim small tabular">${detail}</p>` : ''}
     <button class="btn btn-primary" data-act="retry">${t('common.retry')}</button>
   </div>`;
 };

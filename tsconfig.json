@@ -17,5 +17,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client", "node"]
   },
-  "include": ["frontend/src", "pipeline", "vite.config.ts"]
+  "include": ["frontend/src", "pipeline", "vite.config.ts", "site-config.ts"]
 }

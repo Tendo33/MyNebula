@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `site.config.json` — and the matching `SITE_*` Actions variables — lets a fork publish under its own name, tagline, description, icon (favicon and home-screen), theme colour, default language, and URL without touching component code. The build writes them into the wordmark, tab title, favicon, social metadata, and first-visit language.
+- A constellation mark (`mark.svg`) and its 180px Apple touch icon replace the 672KB square logo as the small-size identity; the README logo is unchanged.
+- `pnpm test` now covers the site config resolution: file values, `SITE_*` overrides, blank values, and language normalisation.
+
+### Changed
+- Restored the 16px rem baseline the design assumes (`body` stays 14px). Controls, gutters, the rail, the details panel, and the content column had been rendering about 14% small; they now match `DESIGN.md` (32px controls, 20px gutter, 264px rail).
+- Chips and badges use the 6px control radius instead of marketing pills, so every in-app control shares one shape.
+- The graph camera now settles on the finished layout instead of freezing after 4.5s, and its fit padding scales with the viewport. The map fills the frame at 1440 and 320 instead of sitting small and off-centre. Avatar nodes gained a one-pixel ring that unifies the cloud.
+- Table headers drop to 12px so rows lead; settings section labels are muted so row titles lead; the mobile sort direction uses an arrow rather than a second chevron.
+- Phones narrower than 360px drop the pager label and the row date instead of wrapping them into two ragged lines.
+- Load errors keep a composed icon/title/body layout and no longer print raw parser text; only an HTTP status survives.
+
+### Fixed
+- `defaultLanguage` defaults to `auto`; a configured `en` had been overriding the visitor's browser language.
+
 ## [2.4.0] - 2026-11-16
 
 ### Added

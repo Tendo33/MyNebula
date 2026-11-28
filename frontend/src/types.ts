@@ -60,3 +60,21 @@ export interface GraphPayload {
   timeline: TimelinePoint[];
 }
 
+/** Product identity a fork can change without touching component code. */
+export interface SiteConfig {
+  name: string;
+  tagline: string;
+  description: string;
+  /** Favicon and wordmark, relative to `frontend/public` or an absolute URL. */
+  icon: string;
+  /** Square 180px icon for iOS home screens. */
+  appleIcon: string;
+  /** Social preview image. */
+  ogImage: string;
+  themeColor: string;
+  /** `auto` follows the visitor's browser; `en` / `zh` force the first-visit language. */
+  defaultLanguage: 'auto' | 'en' | 'zh';
+  /** Public URL of the deployed site. When set, social metadata uses absolute URLs. */
+  url: string;
+}
+

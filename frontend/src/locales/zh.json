@@ -8,6 +8,7 @@
     "command_palette": "命令面板",
     "filter": "筛选",
     "load_failed": "图谱数据加载失败。请检查连接后重试。",
+    "load_failed_title": "数据不可用",
     "loading": "加载中…",
     "no_description": "暂无描述",
     "overview": "概览",

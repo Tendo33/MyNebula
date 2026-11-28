@@ -8,6 +8,7 @@
     "command_palette": "Command Palette",
     "filter": "Filters",
     "load_failed": "The graph data could not be loaded. Check your connection, then retry.",
+    "load_failed_title": "Data unavailable",
     "loading": "Loading…",
     "no_description": "No description",
     "overview": "Overview",

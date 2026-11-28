@@ -1,5 +1,6 @@
 import en from './locales/en.json';
 import zh from './locales/zh.json';
+import { site } from './site';
 
 type Dict = { [key: string]: string | Dict };
 export type Lang = 'en' | 'zh';
@@ -14,8 +15,9 @@ const detect = (): Lang => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return stored.startsWith('zh') ? 'zh' : 'en';
   } catch {
-    // Storage blocked: fall back to the browser language.
+    // Storage blocked: fall back to the site default, then the browser language.
   }
+  if (site.defaultLanguage !== 'auto') return site.defaultLanguage;
   return navigator.language?.startsWith('zh') ? 'zh' : 'en';
 };
 

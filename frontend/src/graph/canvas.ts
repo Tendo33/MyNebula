@@ -209,8 +209,13 @@ export class GraphCanvas {
     | null = null;
   private resizeObserver: ResizeObserver;
   private reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  /** Theme-dependent ink for labels and the hover ring, refreshed every frame (cheap class check). */
-  private ink: { labelBg: string; labelText: string; hover: string } = { labelBg: COLORS.LABEL_BG, labelText: COLORS.LABEL_TEXT, hover: COLORS.NODE_HOVER };
+  /** Theme-dependent ink for labels, the hover ring, and the avatar hairline (refreshed per frame). */
+  private ink: { labelBg: string; labelText: string; hover: string; ring: string } = {
+    labelBg: COLORS.LABEL_BG,
+    labelText: COLORS.LABEL_TEXT,
+    hover: COLORS.NODE_HOVER,
+    ring: 'rgba(0, 0, 0, 0.08)',
+  };
 
   private host: HTMLElement;
   private callbacks: { onSelect: (id: number | null) => void; onHover: (id: number | null) => void };
@@ -349,6 +354,19 @@ export class GraphCanvas {
       this.settled = true;
       this.coastT0 = this.motionTime();
       this.coasting = !this.reduceMotion && this.nodes.length > 0 && !document.hidden;
+      // The camera stops following at FOLLOW_MS; settle it on the finished layout
+      // so a wide screen is not left with a small, off-centre cloud.
+      if (!this.userInteracted) {
+        this.bursting = false;
+        this.followUntil = 0;
+        if (this.pendingFocus) {
+          const { id, duration } = this.pendingFocus;
+          this.pendingFocus = null;
+          this.focusNode(id, duration || 800);
+        } else {
+          this.fitTo(this.reduceMotion ? 0 : 500);
+        }
+      }
       if (this.coasting) this.requestDraw();
     });
     return sim;
@@ -393,6 +411,9 @@ export class GraphCanvas {
 
   private fitTransform(): Transform | null {
     if (!this.nodes.length || !this.width || !this.height) return null;
+    // A fixed 80px pad would leave half a phone's canvas empty; scale it with the
+    // short side so the graph fills the frame at every width.
+    const pad = Math.max(24, Math.min(FIT_PADDING, Math.min(this.width, this.height) * 0.09));
     let [minX, maxX, minY, maxY] = [Infinity, -Infinity, Infinity, -Infinity];
     for (const n of this.nodes) {
       const p = this.place(n);
@@ -405,7 +426,7 @@ export class GraphCanvas {
       MAX_ZOOM,
       Math.max(
         MIN_ZOOM,
-        Math.min((this.width - FIT_PADDING * 2) / Math.max(maxX - minX, 1), (this.height - FIT_PADDING * 2) / Math.max(maxY - minY, 1)),
+        Math.min((this.width - pad * 2) / Math.max(maxX - minX, 1), (this.height - pad * 2) / Math.max(maxY - minY, 1)),
       ),
     );
     return { k, x: this.width / 2 - ((minX + maxX) / 2) * k, y: this.height / 2 - ((minY + maxY) / 2) * k };
@@ -766,15 +787,28 @@ export class GraphCanvas {
       }
       this.requestDraw();
     } else if (this.bursting && this.followUntil && now >= this.followUntil) {
-      this.bursting = false;
-      if (this.pendingFocus) this.focusNode(this.pendingFocus.id, this.pendingFocus.duration || 800);
-      this.pendingFocus = null;
+      // Keep following until the layout actually rests; the follow window is a cap,
+      // not the moment to freeze a half-grown graph.
+      if (!this.settled) {
+        this.followUntil = now + 1500;
+        this.requestDraw();
+      } else {
+        this.bursting = false;
+        this.followUntil = 0;
+        if (this.pendingFocus) {
+          const { id, duration } = this.pendingFocus;
+          this.pendingFocus = null;
+          this.focusNode(id, duration || 800);
+        } else {
+          this.fitTo(this.reduceMotion ? 0 : 500);
+        }
+      }
     }
 
     const dark = document.documentElement.classList.contains('dark');
     this.ink = dark
-      ? { labelBg: 'rgba(17, 17, 17, 0.92)', labelText: '#ededed', hover: '#ededed' }
-      : { labelBg: COLORS.LABEL_BG, labelText: COLORS.LABEL_TEXT, hover: COLORS.NODE_HOVER };
+      ? { labelBg: 'rgba(17, 17, 17, 0.92)', labelText: '#ededed', hover: '#ededed', ring: 'rgba(255, 255, 255, 0.1)' }
+      : { labelBg: COLORS.LABEL_BG, labelText: COLORS.LABEL_TEXT, hover: COLORS.NODE_HOVER, ring: 'rgba(0, 0, 0, 0.08)' };
 
     const { ctx, transform: tf } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -924,6 +958,14 @@ export class GraphCanvas {
     const sprite = this.view.hqRendering && node.avatar && !ghost ? this.avatarSprite(node.avatar) : null;
     if (sprite) {
       ctx.drawImage(sprite, x - node.radius, y - node.radius, node.radius * 2, node.radius * 2);
+      // One hairline keeps hundreds of unrelated logos reading as one object.
+      if (!isSelected && !isHovered) {
+        ctx.beginPath();
+        ctx.arc(x, y, node.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = this.ink.ring;
+        ctx.lineWidth = 1 / scale;
+        ctx.stroke();
+      }
     } else {
       ctx.beginPath();
       ctx.arc(x, y, !visible && !isSelected && !isHovered ? node.radius * 0.8 : node.radius, 0, Math.PI * 2);

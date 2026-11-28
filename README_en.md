@@ -71,6 +71,8 @@ MyNebula 读取你的 GitHub 星标，为每个仓库写一段简短摘要，并
 
 **隐私**：发布出去的站点是公开的，包括你星标仓库的摘要。如果要私有，可以把 `frontend/dist` 部署在 Cloudflare Access 之类的访问控制后面。任何静态托管都能用，构建产物使用相对路径和 hash 路由。
 
+**改成你自己的**：[site.config.json](site.config.json) 里是站点名称、标语、描述、图标、主题色、默认语言和公开地址。在 fork 里改完，下次构建就会更新顶栏名称、标签页标题、favicon 和分享卡片。自己的图标放进 `frontend/public/`，把 `icon` 写成文件名（`appleIcon` 是 180px 主屏图标）；`ogImage` 是分享图，`url` 填部署后的地址，社交元数据就会用绝对链接。每项也可以用 Actions Variables 覆盖（`SITE_NAME`、`SITE_TAGLINE`、`SITE_DESCRIPTION`、`SITE_ICON`、`SITE_APPLE_ICON`、`SITE_OG_IMAGE`、`SITE_THEME_COLOR`、`SITE_DEFAULT_LANGUAGE`、`SITE_URL`），优先级高于文件。语言留 `auto` 时跟随访客浏览器，也可以强制首次访问用 `en` 或 `zh`。
+
 ## 配置
 
 在 GitHub Actions 上，key 放在 **Secrets** 里（GitHub token 在那里叫 `STARS_TOKEN`），workflow 会读取这些 **Variables**：`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`、`LLM_BASE_URL`、`LLM_MODEL`、`LLM_OUTPUT_LANGUAGE`、`GRAPH_MAX_CLUSTERS`、`GRAPH_LLM_NAMES`、`SYNC_LLM_CONCURRENCY`。本地运行时全部写在 `.env` 里，`.env.example` 逐项有注释。

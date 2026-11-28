@@ -64,14 +64,15 @@ People explore their own or a shared GitHub Stars graph. The shell must stay out
 ## Type
 
 - Geist Sans, self-hosted Latin subset only (`frontend/src/assets/geist-latin.woff2`); Chinese and other scripts use the system face. Monospace is the system mono and only for code.
-- Three sizes: 12px (meta, captions, rail headings), 14px (body, controls, table), 16px (page and repository names). Weight 400 / 500 for labels / 600 for names.
+- Three sizes: 12px (meta, captions, rail headings, table headers), 14px (body, controls, table), 16px (page and repository names). Weight 400 / 500 for labels / 600 for names.
 - Numbers in counts, tables, and dates use tabular figures.
+- `html` is 16px so rem matches the control grid; body text is 14px. Chinese drops the negative tracking used on Latin headings and gets 1.6–1.7 line-height where text runs long.
 
 ## Visual Language
 
 - Canvas `#fafafa`, ink `#171717`, hairline `#ebebeb`; elevated white only for floating layers.
 - Primary actions fill with ink; ghost actions are white + 1px hairline.
-- In-app controls are 6px squares. Do not use marketing pills in Graph / Data / Settings.
+- In-app controls are 6px squares — buttons, inputs, selects, chips, and badges share `--radius`. Do not use marketing pills in Graph / Data / Settings; `999px` is only for the switch track and avatars.
 - Color is reserved for links (`#0070f3`), graph selection, cluster hues, and semantic error. No ivory, no indigo chrome, no nebula gradients.
 
 ## Dark
@@ -90,7 +91,7 @@ In-app chrome is hand-written CSS in `frontend/src/styles.css`, mapped to these 
 - `.btn` primary / outline / ghost / icon: 6px squares, 32px tall (primary ink fill, outline hairline)
 - Structure comes from 1px hairlines, not cards. Only floating layers (hover card, node list, palette) are 12px elevated surfaces.
 - `.search-input`, `.select`, `.switch`, `.range`, `.toggle-group`, `.table`, `.chip`. Native selects keep the same 6px corners and hairlines.
-- The shell is one 48px top bar: wordmark, Graph / Data / Settings tabs with an ink underline, and the search trigger. No sidebar, no breadcrumb.
+- The shell is one 48px top bar: a 20px site mark beside the wordmark, Graph / Data / Settings tabs with an ink underline, and the search trigger. No sidebar, no breadcrumb. Name and mark come from `site.config.json`, so a fork's own identity appears without code changes.
 - Graph is the home page: a flat filter rail (Clusters, My Lists, Timeline as hairline sections, rows without checkboxes) and a full-width canvas. Selecting a repository adds a ~23rem details panel: name, a two-column facts grid, summary, tags, text links, then related repos in one scroll with no tabs.
 - Below 900px the rail and details overlay the canvas instead of taking columns; the rail starts closed and gives way while details are open, so the canvas is never fully covered.
 - Graph layout is a force simulation on the similarity edges: after avatars start loading, nodes burst out one wedge per cluster and settle into communities. The simulation then stops. A slow drift is drawn on those positions and pauses while the tab is hidden. Dragging writes the drift back into the layout and reheats the simulation; dim and highlight changes fade. Reduced motion computes the resting layout up front with no drift. The overview shows a sparse strongest-edge backbone, while hover and selection reveal related edges.

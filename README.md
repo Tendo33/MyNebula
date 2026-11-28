@@ -71,6 +71,8 @@ When the run finishes, the site is at `https://<your-username>.github.io/MyNebul
 
 **Privacy**: the published site is public, including summaries of your starred repositories. Keep it private by serving `frontend/dist` behind an access layer such as Cloudflare Access instead. Any static host works, because the build uses relative paths and hash routing.
 
+**Make it yours**: [site.config.json](site.config.json) holds the site name, tagline, description, icon, theme colour, default language, and public URL. Edit it in your fork and the next build updates the wordmark, tab title, favicon, and social preview. Put your own icon in `frontend/public/` and set `icon` to its file name (plus `appleIcon` for the 180px home-screen icon); set `ogImage` for the share card and `url` to the deployed address so social metadata uses absolute links. Each field can also be set as an Actions variable (`SITE_NAME`, `SITE_TAGLINE`, `SITE_DESCRIPTION`, `SITE_ICON`, `SITE_APPLE_ICON`, `SITE_OG_IMAGE`, `SITE_THEME_COLOR`, `SITE_DEFAULT_LANGUAGE`, `SITE_URL`), which overrides the file. Leave the language as `auto` to follow each visitor's browser, or set `en` / `zh` to force the first visit.
+
 ## Configuration
 
 On GitHub Actions, keys go in **Secrets** (the GitHub token is named `STARS_TOKEN` there) and the workflow reads these **Variables**: `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_OUTPUT_LANGUAGE`, `GRAPH_MAX_CLUSTERS`, `GRAPH_LLM_NAMES`, `SYNC_LLM_CONCURRENCY`. For a local run, everything goes in `.env`; `.env.example` lists each setting with comments.

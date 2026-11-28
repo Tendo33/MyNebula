@@ -260,7 +260,7 @@ export const mountData = (root: HTMLElement): (() => void) => {
     const rows = filtered.slice(offset, offset + pageSize);
 
     (el('[data-sort-field]') as HTMLSelectElement).value = sort.field;
-    el('[data-region="sort-dir"]').innerHTML = icon(sort.direction === 'asc' ? 'chevronUp' : 'chevronDown').value;
+    el('[data-region="sort-dir"]').innerHTML = icon(sort.direction === 'asc' ? 'arrowUp' : 'arrowDown').value;
     el('[data-region="count"]').innerHTML = html`${all.length ? t('data.shown_of_total', { shown: filtered.length, total: all.length }) : ''}
       ${activeFilters() ? html`<button class="link-btn" data-act="clear">${t('common.clear_filters')}</button>` : ''}`.value;
 
@@ -343,7 +343,7 @@ export const mountData = (root: HTMLElement): (() => void) => {
       </ul>`.value;
 
     el('[data-region="pager"]').innerHTML = filtered.length
-      ? html`<label class="muted small pager-size">${t('data.rows_per_page')}
+      ? html`<label class="muted small pager-size"><span class="hide-xs">${t('data.rows_per_page')}</span>
             <select class="select select-sm" data-page-size>${DATA_PAGE_SIZES.map(
               (size) => html`<option value="${size}" ${size === pageSize ? 'selected' : ''}>${size}</option>`,
             )}</select>

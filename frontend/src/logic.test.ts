@@ -190,8 +190,10 @@ describe('graph style', () => {
 describe('load error detail', () => {
   it('keeps a short reason and caps a long one', () => {
     expect(loadErrorDetail(' HTTP  500 ')).toBe('HTTP 500');
+    expect(loadErrorDetail('HTTP 404')).toBe('HTTP 404');
     expect(loadErrorDetail(null)).toBe('');
-    expect(loadErrorDetail('x'.repeat(200))).toBe(`${'x'.repeat(179)}…`);
+    expect(loadErrorDetail('Unexpected token < in JSON at position 0')).toBe('');
+    expect(loadErrorDetail('x'.repeat(200))).toBe('');
   });
 });
 

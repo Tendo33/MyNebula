@@ -11,6 +11,7 @@ import { initPalette, openPalette, shortcutLabel } from './palette';
 import { mountGraph } from './pages/graph';
 import { mountData } from './pages/data';
 import { mountSettings } from './pages/settings';
+import { site, siteAsset } from './site';
 
 type Mount = (root: HTMLElement, route: Route) => () => void;
 
@@ -54,7 +55,10 @@ const renderShell = (active: string | undefined) => {
   app.innerHTML = html`
     <a class="skip-link" href="#main-content" data-act="skip">${t('common.skip_to_content')}</a>
     <header class="topbar">
-      <a class="wordmark" href="#/" aria-label="MyNebula">MyNebula</a>
+      <a class="wordmark" href="#/" aria-label="${site.name}">
+        <img class="wordmark-mark" src="${siteAsset(site.icon)}" alt="" width="20" height="20" />
+        <span>${site.name}</span>
+      </a>
       <nav class="tabs-nav" aria-label="${t('nav.label')}">
         ${PAGES.map(
           (p) => html`<a href="${tabHref(p.paths[0], route)}" data-path="${p.paths[0]}" ${p.key === active ? html`aria-current="page"` : ''}>${t(p.label)}</a>`,

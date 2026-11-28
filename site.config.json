@@ -1,0 +1,11 @@
+{
+  "name": "MyNebula",
+  "tagline": "Your GitHub stars as a living semantic graph",
+  "description": "A live map of your GitHub stars: related repositories pull together, so you explore by connection instead of scrolling a list.",
+  "icon": "mark.svg",
+  "appleIcon": "apple-touch-icon.png",
+  "ogImage": "logo.png",
+  "themeColor": "#fafafa",
+  "defaultLanguage": "auto",
+  "url": ""
+}

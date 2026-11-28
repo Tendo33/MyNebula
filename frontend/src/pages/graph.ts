@@ -81,7 +81,7 @@ export const mountGraph = (root: HTMLElement): (() => void) => {
         <div class="rail-body" data-region="panels"></div>
       </aside>
       <div class="graph-stage">
-        <button class="btn btn-ghost btn-icon stage-filters-toggle" data-act="toggle-filters"
+        <button class="btn btn-outline btn-icon stage-filters-toggle" data-act="toggle-filters"
           aria-controls="graph-filters" aria-expanded="${filtersOpen}" aria-label="${t('graph.toggle_filters')}">${icon('panel')}</button>
         <div class="graph-host" data-region="canvas"></div>
         <div data-region="hover"></div>
