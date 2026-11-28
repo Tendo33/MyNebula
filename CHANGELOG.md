@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-28
+
 ### Added
 - `site.config.json` — and the matching `SITE_*` Actions variables — lets a fork publish under its own name, tagline, description, icon (favicon and home-screen), theme colour, default language, and URL without touching component code. The build writes them into the wordmark, tab title, favicon, social metadata, and first-visit language.
 - A constellation mark (`mark.svg`) and its 180px Apple touch icon replace the 672KB square logo as the small-size identity; the README logo is unchanged.
